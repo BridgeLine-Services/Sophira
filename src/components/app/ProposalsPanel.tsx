@@ -63,10 +63,22 @@ export function ProposalsPanel({ targetType, targetId }: { targetType?: "teacher
             .eq("id", proposal.target_id);
           if (error) throw new Error(error.message);
         } else if (proposal.target_type === "writing" && proposal.target_id) {
+          let summary: Record<string, unknown> | undefined;
+          try {
+            summary = proposal.proposed_changes.summary
+              ? JSON.parse(proposal.proposed_changes.summary)
+              : undefined;
+          } catch {
+            summary = undefined;
+          }
           const { error } = await supabase
             .from("writing_profiles")
             .update({
               guidance: proposal.proposed_changes.guidance ?? undefined,
+              ...(summary ? { summary } : {}),
+              ...(proposal.proposed_changes.version
+                ? { version: parseInt(proposal.proposed_changes.version, 10) || undefined }
+                : {}),
               status: "approved",
             })
             .eq("id", proposal.target_id);
