@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-paper text-ink antialiased;
+  /* mobile-safe tap targets + no horizontal scroll */
+  overflow-x: hidden;
+}
+
+::selection {
+  @apply bg-accent/20;
+}
+
+/* focus visibility for keyboard users */
+:focus-visible {
+  @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-paper rounded-sm;
+}
+
+/* thin, calm scrollbars */
+::-webkit-scrollbar { height: 6px; width: 6px; }
+::-webkit-scrollbar-thumb { @apply bg-ink-soft/30 rounded-full; }
+
+/* markdown-ish rendering inside results */
+.result-body h1, .result-body h2, .result-body h3 { @apply font-semibold mt-5 mb-2 text-ink; }
+.result-body h1 { @apply text-xl; }
+.result-body h2 { @apply text-lg; }
+.result-body h3 { @apply text-base; }
+.result-body p { @apply my-2 leading-relaxed; }
+.result-body ul { @apply list-disc pl-5 my-2 space-y-1; }
+.result-body ol { @apply list-decimal pl-5 my-2 space-y-1; }
+.result-body pre { @apply bg-ink/5 rounded-card p-3 my-3 overflow-x-auto text-sm; }
+.result-body code { @apply font-mono text-sm; }
+.result-body table { @apply w-full my-3 text-sm border-collapse; }
+.result-body th, .result-body td { @apply border border-ink/10 px-2 py-1 text-left; }
