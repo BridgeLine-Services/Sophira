@@ -7,7 +7,8 @@ import {
   type TaskClassification,
 } from "@/lib/ai/client";
 import { composeAcademicContext, wrapUntrusted, detectInjectionAttempt } from "@/lib/ai/context";
-import { routeSubject } from "@/lib/ai/subjects";
+import { routeSubject, routeMathTopic } from "@/lib/ai/subjects";
+import { normalizeMethodCompliance } from "@/lib/ai/compliance";
 import { runMachineChecks } from "@/lib/ai/mathverify";
 import { MODE_MAP } from "@/lib/modes";
 import type { Mode } from "@/lib/types";
@@ -126,10 +127,14 @@ export async function POST(request: NextRequest) {
 
   // --- Stage 3: solve + self-verification in one call -------------------------
   const workflow = routeSubject(classification?.subject ?? course?.subject, classification?.task_type);
+  const mathTopicSystem = workflow.id === "mathematics"
+    ? routeMathTopic(question, classification?.subject ?? course?.subject).extraSystem
+    : null;
   const { systemPrompt, conflicts } = buildSystemPrompt({
     profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask,
     subject: classification?.subject ?? null,
     taskType: classification?.task_type ?? null,
+    mathTopicSystem,
   });
 
   // The exact context that was applied — persisted with the response so the UI
@@ -183,7 +188,9 @@ export async function POST(request: NextRequest) {
   let verification: {
     status: "verified" | "needs_verification" | "unverified";
     verification_method?: "computational" | "self_check" | "none";
+    verification_kinds?: string[];
     checks: { name: string; passed: boolean; detail: string; method?: "computational" | "self_check" }[];
+    method_compliance?: { status: "compliant" | "partial" | "non_compliant" | "not_applicable"; checks: { name: string; passed: boolean; detail: string }[]; notes: string };
     warnings: string[];
   } = { status: "unverified", verification_method: "none", checks: [], warnings: [] };
   try {
@@ -198,6 +205,7 @@ export async function POST(request: NextRequest) {
     const parsed = parseJsonLoose<{
       answer?: string;
       machine_checks?: unknown;
+      method_compliance?: unknown;
       verification?: { status?: string; checks?: unknown; warnings?: unknown };
     }>(raw);
     if (parsed && typeof parsed.answer === "string" && parsed.answer.trim()) {
@@ -212,10 +220,12 @@ export async function POST(request: NextRequest) {
       // --- Independent verification (spec §10) --------------------------------
       // Re-compute the model's claimed arithmetic identities with mathjs — a
       // deterministic engine, not the same language model checking itself.
-      let machineResults: { results: { name: string; passed: boolean; method: "computational"; detail: string }[]; allPassed: boolean } = { results: [], allPassed: false };
-      if (workflow.machineVerifiable) {
-        machineResults = runMachineChecks(parsed.machine_checks);
-      }
+      const machineResults = workflow.machineVerifiable
+        ? runMachineChecks(parsed.machine_checks)
+        : { results: [] as never[], allPassed: false, kinds: [] as string[] };
+
+      // Method compliance — separate from mathematical correctness (spec §2).
+      const methodCompliance = normalizeMethodCompliance(parsed.method_compliance);
 
       verification = {
         status:
@@ -227,7 +237,9 @@ export async function POST(request: NextRequest) {
                 : "needs_verification"
               : selfStatus,
         verification_method: machineResults.results.length > 0 ? "computational" : "self_check",
+        verification_kinds: machineResults.kinds,
         checks: [...machineResults.results, ...selfChecks],
+        method_compliance: methodCompliance,
         warnings: [...injectionWarnings, ...selfWarnings],
       };
     } else {
@@ -236,6 +248,7 @@ export async function POST(request: NextRequest) {
       content = raw;
       verification = {
         status: "unverified", verification_method: "none", checks: [],
+        method_compliance: normalizeMethodCompliance(null),
         warnings: [...injectionWarnings, "The response could not be structured for verification — treat as needs review."],
       };
     }

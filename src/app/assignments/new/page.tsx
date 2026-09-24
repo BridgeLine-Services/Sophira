@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Fragment, Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/app/AppShell";
@@ -26,6 +26,10 @@ interface Attachment {
   confidence: "high" | "medium" | "low";
   notes: string;
   storage_path: string | null;
+  /** kept in memory only (never uploaded twice) so a low-confidence read can be retried */
+  original?: File;
+  /** true when the student should review/correct the interpretation before solving */
+  needsReview: boolean;
 }
 
 function Wizard() {
@@ -84,6 +88,9 @@ function Wizard() {
         const res = await fetch("/api/extract", { method: "POST", body: fd });
         const json = await res.json();
         if (res.ok && json.data) {
+          const needsReview =
+            json.data.confidence !== "high" ||
+            /handwriting/i.test(json.data.notes || "");
           setAttachments((a) => [
             ...a,
             {
@@ -92,9 +99,16 @@ function Wizard() {
               confidence: json.data.confidence,
               notes: json.data.notes || "",
               storage_path: json.data.storage_path,
+              original: file,
+              needsReview,
             },
           ]);
-          toast("info", `${json.data.file_name}: ${json.data.notes || "read"}`);
+          toast(
+            needsReview ? "info" : "success",
+            needsReview
+              ? `${json.data.file_name} — please check the interpretation below before solving.`
+              : `${json.data.file_name}: ${json.data.notes || "read"}`
+          );
         } else {
           toast("error", `${file.name} — ${json.error || "could not be read"}`);
         }
@@ -104,6 +118,45 @@ function Wizard() {
     }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
+  }
+
+  /** Retry the extraction of one attachment (fresh read of the original file). */
+  async function retryRead(index: number) {
+    const att = attachments[index];
+    if (!att?.original) {
+      toast("error", "The original file is no longer available — please re-attach it.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", att.original);
+      const res = await fetch("/api/extract", { method: "POST", body: fd });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        const needsReview = json.data.confidence !== "high" || /handwriting/i.test(json.data.notes || "");
+        setAttachments((list) =>
+          list.map((a, i) =>
+            i === index
+              ? {
+                  ...a,
+                  extracted_text: json.data.extracted_text,
+                  confidence: json.data.confidence,
+                  notes: json.data.notes || "",
+                  needsReview,
+                }
+              : a
+          )
+        );
+        toast(needsReview ? "info" : "success", needsReview ? "Still unsure — please correct the text yourself below." : "Read again — looks good now.");
+      } else {
+        toast("error", json.error || "Retry failed — you can still edit the text below.");
+      }
+    } catch {
+      toast("error", "Retry failed — you can still edit the text below.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function start() {
@@ -266,7 +319,8 @@ function Wizard() {
               {attachments.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {attachments.map((a, i) => (
-                    <div key={i} className="flex items-start gap-2 rounded-lg border border-ink/10 bg-white p-3">
+                    <Fragment key={i}>
+                    <div className="flex items-start gap-2 rounded-lg border border-ink/10 bg-white p-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-ink">{a.file_name}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -286,6 +340,46 @@ function Wizard() {
                         <X className="h-4 w-4" />
                       </button>
                     </div>
+
+                    {a.needsReview && (
+                      <div className="mt-3 space-y-2 rounded-lg bg-warn/10 p-3">
+                        <p className="text-sm font-medium text-ink">
+                          Check this interpretation{a.original?.type.startsWith("image/") ? " (handwritten/photo content is never assumed correct)" : ""}
+                        </p>
+                        {a.notes && <p className="text-xs text-ink-soft">{a.notes}</p>}
+                        <Textarea
+                          aria-label={`Correct the extracted text for ${a.file_name}`}
+                          className="min-h-28 bg-white"
+                          value={a.extracted_text}
+                          onChange={(e) =>
+                            setAttachments((list) =>
+                              list.map((x, j) => (j === i ? { ...x, extracted_text: e.target.value } : x))
+                            )
+                          }
+                        />
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              setAttachments((list) => list.map((x, j) => (j === i ? { ...x, needsReview: false } : x)))
+                            }
+                          >
+                            Accept interpretation
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => retryRead(i)} disabled={uploading}>
+                            {uploading ? "Reading again…" : "Retry reading"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAttachments((list) => list.filter((_, j) => j !== i))}
+                          >
+                            Cancel (remove file)
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    </Fragment>
                   ))}
                 </div>
               )}

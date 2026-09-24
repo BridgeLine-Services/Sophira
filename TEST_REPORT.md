@@ -1,68 +1,62 @@
 # Sophira — Test Report
 
-Date: 2026-09-24 (upgrade) · Next 14.2.35, strict TypeScript · `npm test` + `npm run build`
+Date: 2026-09-24 (upgrade round 2) · Next 14.2.35, strict TypeScript · `npm test` + `npm run build`
 
-## 1. Automated unit tests — ✅ 47 / 47 PASSED (`npm test`, runs offline)
+## 1. Automated tests — ✅ 91 / 91 PASSED (`npm test`, fully offline)
 
 | Area | Assertions | Result |
 |---|---|---|
-| Teacher isolation — Teacher A's rules never enter Teacher B's context | 6 | ✅ |
-| Course isolation — course instructions appear only when the course is selected | 3 | ✅ |
-| Writing-profile conditionality — math tasks never load the Writing Profile; writing tasks do | 4 | ✅ |
-| Source conflicts — two active official docs with different dates are flagged (not silently resolved); archiving resolves; same-date docs not flagged | 5 | ✅ |
-| Prompt-injection defense — docs wrapped in DATA fences; injection attempts detected; normal text not flagged | 4 | ✅ |
-| Subject routing — 9 workflows, machine-verifiable only where honest | 12 | ✅ |
-| Independent math verification — correct/incorrect/invalid identities, floating-point tolerance, missing checks | 9 | ✅ |
-| Scope inheritance — global → course → teacher override ordering is explicit in every layer | 3 | ✅ |
+| Teacher isolation (Teacher A's rules never enter Teacher B's context) | 6 | ✅ |
+| Course isolation (course rules only when selected) | 3 | ✅ |
+| Writing-profile conditionality (math never loads it; writing does) | 4 | ✅ |
+| Source conflicts (dates, archiving resolves, same-date not flagged) | 5 | ✅ |
+| Prompt-injection defense incl. NEW patterns (profile change, exfiltration, teacher-rule override, privacy probe) | 8 | ✅ |
+| Subject routing (9 workflows, machine-verifiable flags honest) | 12 | ✅ |
+| **NEW** Typed math verification: 6 kinds — evaluate, symbolic simplify, symbolic derivative, equation identity at sample points, matrix det/product, statistics; wrong claims fail; malformed input fails honestly; kinds deduplicated | 19 | ✅ |
+| **NEW** Fine-grained math topic routing (15 workflows) | 13 | ✅ |
+| **NEW** Method compliance: valid normalization; claimed-compliant-with-failed-check demoted to partial (honesty guard); malformed → "NOT checked", never a fabricated pass | 6 | ✅ |
+| Scope inheritance wording (global → course → teacher overrides) | 3 | ✅ |
+| **NEW** DOCX structure extraction (headings, question numbering, tables) + CSV | 4 | ✅ |
+| **NEW** XLSX round-trip (built in memory with the app's own library, parsed back: sheets, cells, honest notes) | 3 | ✅ |
+| **NEW** PPTX round-trip (minimal deck built with JSZip: slide title, body, speaker notes) | 3 | ✅ |
+| **NEW** Edge-case regressions (unclosed regex fixed → suite green) | 2 | ✅ |
 
 ## 2. Build verification
 
 | Check | Result |
 |---|---|
-| `tsc --noEmit` full-project strict typecheck | ✅ 0 errors |
-| `npm run build` — 30 routes (incl. `/proposals`, `/api/ai/feedback-to-proposal`) | ✅ |
-| PWA assets resolvable (manifest, sw.js, icons) | ✅ build-time |
-| Middleware gate: API routes excluded (JSON 401s, not HTML redirects) | ✅ code-level |
+| `tsc --noEmit` strict full-project typecheck | ✅ 0 errors |
+| `npm run build` — 30 routes | ✅ |
+| PWA assets resolvable | ✅ build-time |
 
-## 3. Security audit (code-level)
+## 3. What is implemented vs. verified — honest status legend
 
-| Check | Result |
+- **Implemented**: code exists, typechecks, builds.
+- **Unit/integration tested**: runs in `npm test` (offline).
+- **Live tested**: executed against a real deployed backend — **not yet done**.
+- **Not verifiable here**: needs real devices (PWA) or external credentials.
+
+## 4. Live acceptance scenarios — BLOCKED on deploy credentials
+
+The sandbox has no Supabase project, no AI key, and no physical devices.
+Per `docs/ACCEPTANCE_TESTS.md` (10 sections, ready to run):
+
+| Scenario group | Status |
 |---|---|
-| No route trusts a client-supplied `user_id` — all identity from `supabase.auth.getUser()` | ✅ |
-| Service-role key used only in server routes/admin client; never `NEXT_PUBLIC` | ✅ |
-| Uploaded files stored in the private `private-docs` bucket; no public URLs returned | ✅ |
-| RLS on every table incl. new `profile_versions`; invitations owner-only | ✅ code-level review |
-| Uploaded documents wrapped as untrusted data; injection attempts flagged, never obeyed | ✅ + unit-tested |
-| Feedback→proposal route validates/allowlists model-proposed fields; never auto-applies | ✅ |
-
-## 4. Acceptance scenarios (spec §37) needing a live backend
-
-These require a real Supabase project + AI key, which the build sandbox does not
-have. Honest status — **BLOCKED**, not failed. Re-run after deploy:
-
-| # | Scenario | Status |
-|---|---|---|
-| 1 | Sign in → dashboard → create course | 🔶 Not yet tested (live backend) |
-| 2 | Teacher profile + instructions saved | 🔶 Not yet tested |
-| 3 | Assignment response uses selected course/teacher instructions | 🔶 Not yet tested (needs AI key) |
-| 4 | Math question does NOT apply Writing Profile | ✅ Logic unit-tested; end-to-end needs AI key |
-| 5 | Writing assignment applies approved Writing Profile | ✅ Logic unit-tested; end-to-end needs AI key |
-| 6 | Check-my-work feedback | 🔶 Not yet tested (needs AI key) |
-| 7 | Unreadable input flagged, never invented | ✅ Code paths + honest-failure handling; device test pending |
-| 8 | Profile-update proposal approve/reject (now with version snapshot) | 🔶 Not yet tested live |
-| 9 | Student B cannot access Student A's data | ✅ RLS reviewed + isolation unit-tested at app layer; live DB test pending |
-| 10 | Feedback → proposal → approval → versioned update + rollback | ✅ Unit-tested where pure; live flow pending |
-| 11 | Mobile 360px layout, PWA install Android/iOS/desktop | 🔶 Not yet tested on devices |
-| 12 | Errors (no AI key, bad file, failed AI call) preserve user work | ✅ Code paths reviewed; device test pending |
+| Auth, courses, teachers, assignments, writing conditionality | 🔶 Implemented + logic unit-tested; live run pending |
+| Method compliance + independent verification end-to-end | 🔶 Engine unit-tested (all 6 kinds); live model-output flow needs AI key |
+| Feedback → proposal → approval → versioning → rollback | 🔶 Pure parts unit-tested; live flow needs backend |
+| Cross-student isolation | ✅ RLS reviewed + app-layer isolation unit-tested; live DB probe pending |
+| PPTX/XLSX/CSV/handwriting uploads | ✅ Parsers round-trip tested offline; live upload flow pending |
+| PWA on Android/iPhone/iPad/desktop at 360/390/430px+ | 🔶 Architecture in place; real-device testing NOT performed |
 
 ## Known limitations (honest)
 
-- `machine_checks` verify the arithmetic identities the model derives from its
-  own solution — a genuine independent recomputation (mathjs), but not a proof
-  that the chosen method or setup was correct. The UI labels this precisely.
-- Symbolic algebra verification (e.g. CAS-grade integration checking) is not
-  implemented; mathjs covers arithmetic/numeric identities only.
-- DOCX equations embedded as images cannot be read — the user is told.
-- Older `.doc` (pre-2007 Word) files are unsupported (only `.docx`).
-- Live-device PWA testing (Android Chrome, iPhone/iPad Safari) has not been
-  performed in this environment; install instructions are documented instead.
+- `machine_checks` verify identities the model derives from its own steps —
+  genuine independent recomputation, not a proof the method or setup was right.
+  Method compliance is a separate, clearly-labeled AI self-check.
+- Proof-based math cannot be machine-verified; the workflow says so.
+- XLSX formulas read as computed values; embedded charts read as data only.
+- `.ppt`/`.xls` legacy binaries unsupported (honest error offered; .pptx/.xlsx fine).
+- PPTX/DOCX images and diagrams are counted and named, not read.
+- No live testing of any kind has occurred in this build environment.

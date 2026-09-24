@@ -74,8 +74,8 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
   const [extractBusy, setExtractBusy] = useState(false);
 
   // New-doc form state per section
-  const [newDoc, setNewDoc] = useState<Record<string, { title: string; content: string; source: string; source_date: string; archived: boolean }>>(
-    Object.fromEntries(DOC_SECTIONS.map((s) => [s.key, { title: "", content: "", source: "", source_date: "", archived: false }]))
+  const [newDoc, setNewDoc] = useState<Record<string, { title: string; content: string; source: string; source_date: string; effective_date: string; description: string; archived: boolean }>>(
+    Object.fromEntries(DOC_SECTIONS.map((s) => [s.key, { title: "", content: "", source: "", source_date: "", effective_date: "", description: "", archived: false }]))
   );
   const [openDocForm, setOpenDocForm] = useState<string | null>(null);
   const [confirmDocDelete, setConfirmDocDelete] = useState<{ section: string; index: number } | null>(null);
@@ -161,6 +161,8 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
       content: d.content.trim(),
       ...(d.source.trim() ? { source: d.source.trim() } : {}),
       ...(d.source_date ? { source_date: d.source_date } : {}),
+      ...(d.effective_date ? { effective_date: d.effective_date } : {}),
+      ...(d.description.trim() ? { description: d.description.trim() } : {}),
       ...(d.archived ? { archived: true } : {}),
     };
     const next = [...(docs[section] ?? []), doc];
@@ -174,7 +176,7 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
       return;
     }
     setDocs((s) => ({ ...s, [section]: next }));
-    setNewDoc((s) => ({ ...s, [section]: { title: "", content: "", source: "", source_date: "", archived: false } }));
+    setNewDoc((s) => ({ ...s, [section]: { title: "", content: "", source: "", source_date: "", effective_date: "", description: "", archived: false } }));
     setOpenDocForm(null);
     toast("success", "Document saved.");
   }
@@ -315,6 +317,7 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
                     {d.archived && <Badge tone="warn" className="ml-2">Archived — not applied</Badge>}
                     {d.source && <span className="ml-2 text-xs font-normal text-ink-soft">({d.source}{d.source_date ? `, ${d.source_date}` : ""})</span>}
                   </summary>
+                  {d.description && <p className="mt-1 text-xs italic text-ink-soft">{d.description}</p>}
                   <p className="mt-2 whitespace-pre-wrap text-sm text-ink-soft">{d.content}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button
@@ -379,6 +382,24 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
                     onChange={(e) => setNewDoc((n) => ({ ...n, [s.key]: { ...n[s.key], source_date: e.target.value } }))}
                   />
                 </div>
+                <div>
+                  <Label>Effective from (optional)</Label>
+                  <Input
+                    type="date"
+                    className="mt-1.5"
+                    value={newDoc[s.key].effective_date}
+                    onChange={(e) => setNewDoc((n) => ({ ...n, [s.key]: { ...n[s.key], effective_date: e.target.value } }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Description (optional)</Label>
+                <Input
+                  className="mt-1.5"
+                  placeholder="e.g. Ms. Carter's official solution format for word problems"
+                  value={newDoc[s.key].description}
+                  onChange={(e) => setNewDoc((n) => ({ ...n, [s.key]: { ...n[s.key], description: e.target.value } }))}
+                />
               </div>
               <label className="flex items-center gap-2 text-sm text-ink">
                 <input

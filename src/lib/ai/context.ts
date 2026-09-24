@@ -64,6 +64,12 @@ export function detectInjectionAttempt(text: string): boolean {
     /reveal (your )?(system )?prompt/i,
     /you are now/i,
     /system:/i,
+    /change (the |my |a |your )?(user'?s? )?profile/i,
+    /update (the |my |a |your )?(user'?s? )?profile/i,
+    /(send|upload|exfiltrate|post) (this|the|all) (data|content|document|information|files) (to|elsewhere|somewhere)/i,
+    /ignore (all |the )?(teacher|course) (rules|requirements|instructions)/i,
+    /reveal (all |the )?(private|other users?'?) (information|data|records|assignments)/i,
+    /act as (if you were )?(a different|another) (persona|mode|assistant)/i,
   ];
   return patterns.some((p) => p.test(text));
 }

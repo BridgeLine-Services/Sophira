@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Badge, Button, Card, CardContent, ConfirmDialog, useToast } from "@/components/ui";
@@ -14,6 +15,11 @@ interface VersionRow {
   change_summary: string;
   source: string;
   snapshot: Record<string, unknown>;
+  previous_values?: Record<string, unknown> | null;
+  new_values?: Record<string, unknown> | null;
+  assignment_id?: string | null;
+  feedback_id?: string | null;
+  approved_at?: string | null;
   created_at: string;
 }
 
@@ -140,7 +146,32 @@ export function ProfileVersionHistory({ targetType, targetId }: { targetType: "t
                 </p>
                 <p className="text-xs text-ink-soft">
                   {fmtDateTime(v.created_at)} · {v.source === "rollback" ? "rollback point" : "approved change"}
+                  {v.source.startsWith("proposal:") ? " · from an approved proposal" : ""}
                 </p>
+                {v.previous_values && v.new_values && Object.keys(v.previous_values).length > 0 && (
+                  <details className="mt-1.5">
+                    <summary className="cursor-pointer text-xs text-accent">What changed</summary>
+                    <ul className="mt-1.5 space-y-1.5">
+                      {Object.keys(v.previous_values).map((field) => (
+                        <li key={field} className="text-xs text-ink-soft">
+                          <span className="font-medium text-ink">{field}</span>:
+                          <span className="ml-1 line-through decoration-danger/60">
+                            {JSON.stringify(v.previous_values?.[field])?.slice(0, 140)}
+                          </span>
+                          <span className="mx-1">→</span>
+                          <span className="text-success">
+                            {JSON.stringify(v.new_values?.[field])?.slice(0, 140)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {v.assignment_id && (
+                  <Link href={`/assignments/${v.assignment_id}`} className="text-xs text-accent hover:underline">
+                    From assignment →
+                  </Link>
+                )}
               </div>
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => setConfirmRollback(v)}>
                 <RotateCcw className="h-4 w-4" /> Roll back to this

@@ -212,8 +212,9 @@ export function buildSystemPrompt(args: {
   isWritingTask: boolean;
   subject?: string | null;
   taskType?: string | null;
+  mathTopicSystem?: string | null;
 }): { systemPrompt: string; conflicts: ContextConflict[] } {
-  const { profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask, subject, taskType } = args;
+  const { profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask, subject, taskType, mathTopicSystem } = args;
 
   const workflow = routeSubject(subject ?? course?.subject, taskType);
   const composed = composeAcademicContext({
@@ -237,16 +238,31 @@ export function buildSystemPrompt(args: {
     );
   }
 
+  if (mathTopicSystem) parts.push(mathTopicSystem);
+
   parts.push(`Format your final answer in clean Markdown (headings, lists, LaTeX-free plain math notation like x^2, tables where helpful). Respond ONLY with a JSON object of the form:
 {
   "answer": "<your full answer in Markdown>",
-  "machine_checks": ${workflow.machineVerifiable ? `[{"label": "<what this checks>", "expr": "<simple arithmetic expression using numbers only, no variables>", "expected": <number>}] — derive 1-5 key arithmetic identities from your actual solution steps (final values, substitutions, totals) that a computer can recompute. Use plain arithmetic (+ - * / ^ parentheses), no variable names. Omit if the task is purely conceptual.` : `[] (this subject cannot be machine-checked — omit entirely)`},
+  "machine_checks": ${workflow.machineVerifiable ? `[{"kind": "evaluate"|"simplify_equal"|"derivative"|"equation_check"|"matrix"|"stats", ...}] — derive 1-6 identities from your ACTUAL solution steps that a computer can independently recompute. Use only mathjs-safe syntax (numbers, x as a plain variable, pi, sqrt(), ^, [a,b] arrays, [[1,2],[3,4]] matrices):
+  • evaluate: {"kind":"evaluate","label":"...","expr":"3*7+2","expected":23}
+  • simplify_equal: {"kind":"simplify_equal","label":"...","expr":"(x+1)^2","expected":"x^2+2*x+1"}
+  • derivative: {"kind":"derivative","label":"...","expr":"x^2*sin(x)","var":"x","expected":"2*x*sin(x)+x^2*cos(x)"}
+  • equation_check: {"kind":"equation_check","label":"...","left":"x^2-1","right":"(x-1)(x+1)","var":"x"}
+  • matrix: {"kind":"matrix","label":"...","op":"det"|"multiply"|"transpose"|"inverse","expr":"[[1,2],[3,4]]","expected":<number for det, JSON array otherwise>}
+  • stats: {"kind":"stats","label":"...","op":"mean"|"median"|"std"|"variance","data":[1,2,3],"expected":2}
+  Omit checks you cannot honestly derive from your steps.` : `[] (this subject cannot be machine-checked — omit entirely)`},
+  "method_compliance": {
+    "status": "compliant" | "partial" | "non_compliant" | "not_applicable",
+    "checks": [{"name": "<requirement>", "passed": true|false, "detail": "<how the response satisfies or fails it>"}],
+    "notes": "<anything about method requirements that could not be met or verified>"
+  },
   "verification": {
     "status": "verified" | "needs_verification" | "unverified",
     "checks": [{"name": "<check>", "passed": true|false, "detail": "<what you actually checked and how>", "method": "self_check"}],
     "warnings": ["<anything uncertain, unverified, or the student should double-check>"]
   }
 }
+method_compliance verifies the TEACHER'S REQUIRED METHOD separately from mathematical correctness: required method, required formulas, required notation, number of steps, calculator restrictions, formatting requirements, unit requirements, and assignment-specific instructions. Report "not_applicable" when no method requirements exist for this task.
 Verification is a SELF-CHECK, not a guarantee: honestly record which of these you were able to check — every question/subquestion addressed, teacher's required method followed, calculations consistent, units and notation correct, rubric satisfied, word count/format met, sources real and available, no unsupported assumptions, no contradictions. Use "needs_verification" whenever any check fails or cannot be performed. Do NOT claim a check passed unless you genuinely performed it. In math, verify the result by an independent method when practical and record that in checks.`);
   return { systemPrompt: parts.join("\n\n"), conflicts: composed.applied.conflicts };
 }

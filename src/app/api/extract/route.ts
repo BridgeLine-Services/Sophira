@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
+import { docxHtmlToStructuredText, parsePptx, parseSpreadsheet, parseCsv } from "@/lib/extract/documents";
 
 export const runtime = "nodejs";
 
@@ -46,18 +47,22 @@ async function extractText(bytes: Buffer, mime: string, name: string): Promise<E
     const dataUrl = `data:${mime};base64,${bytes.toString("base64")}`;
     const raw = await aiChat(
       [
-        { role: "system", content: "You transcribe academic documents from photos. Extract ALL visible text, questions, equations, and instructions EXACTLY as shown. Use plain text math notation (x^2, sqrt(x), a/b). HONESTY: if any part is blurry, cut off, or unreadable, list it in 'unreadable' — NEVER guess or fabricate missing text. Respond only with JSON: {\"text\": \"...\", \"confidence\": \"high|medium|low\", \"notes\": \"...\", \"unreadable\": [\"...\"]}" },
+        { role: "system", content: "You transcribe academic documents and handwritten work from photos. Extract ALL visible text, questions, equations, and instructions EXACTLY as shown, including handwritten mathematics (use plain text math notation: x^2, sqrt(x), a/b, integral notation as INT[f(x)]dx). If the image is handwritten, say so in notes. HONESTY: if any part is blurry, cut off, or unreadable, list it in 'unreadable' — NEVER guess or fabricate missing text, exponents, or digits. Respond only with JSON: {\"text\": \"...\", \"confidence\": \"high|medium|low\", \"notes\": \"...\", \"is_handwriting\": true|false, \"unreadable\": [\"...\"]}" },
         { role: "user", content: "Extract the text from this image.", },
       ],
       { temperature: 0, maxTokens: 3000, jsonMode: true, images: [dataUrl] }
     );
-    const parsed = parseJsonLoose<{ text?: string; confidence?: string; notes?: string; unreadable?: string[] }>(raw);
+    const parsed = parseJsonLoose<{ text?: string; confidence?: string; notes?: string; is_handwriting?: boolean; unreadable?: string[] }>(raw);
     if (!parsed || typeof parsed.text !== "string" || !parsed.text.trim()) {
       return { text: "", confidence: "failed", notes: "I could not read this image reliably. Please take a clearer photo (more light, no blur, text filling the frame) or type the question." };
     }
     const unread = (parsed.unreadable || []).filter(Boolean);
     const conf = (["high", "medium", "low"] as const).includes(parsed.confidence as "high") ? (parsed.confidence as "high" | "medium" | "low") : "low";
-    const notes = [parsed.notes, unread.length ? `Unreadable parts: ${unread.join("; ")}` : null].filter(Boolean).join(" ") || "Transcribed from image.";
+    const notes = [
+      parsed.notes,
+      parsed.is_handwriting ? "Handwriting detected — please review the interpretation carefully before solving." : null,
+      unread.length ? `Unreadable parts: ${unread.join("; ")}` : null,
+    ].filter(Boolean).join(" ") || "Transcribed from image.";
     return { text: parsed.text, confidence: unread.length ? (conf === "high" ? "medium" : conf) : conf, notes };
   }
 
@@ -83,64 +88,37 @@ async function extractText(bytes: Buffer, mime: string, name: string): Promise<E
     }
   }
 
-  return { text: "", confidence: "failed", notes: `Unsupported file type${mime ? ` (${mime})` : ""}. I can read PDFs, plain text, and images. You can always paste the text instead.` };
-}
-
-
-/**
- * Converts mammoth's HTML output to structured plain text, keeping document
- * structure visible: headings, ordered/unordered lists, and tables
- * (spec §11: "do not reduce every document to an unstructured wall of text").
- */
-function docxHtmlToStructuredText(html: string): string {
-  const inline = (h: string) =>
-    h
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/(p|h1|h2|h3|h4|h5|h6|li|tr)>/gi, "\n")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'");
-
-  let out = "";
-  // Headings -> Markdown-style #
-  out = html.replace(/<h1[^>]*>(.*?)<\/h1>/gis, (_m: string, t: string) => `# ${inline(t)}\n`);
-  out = out.replace(/<h2[^>]*>(.*?)<\/h2>/gis, (_m: string, t: string) => `## ${inline(t)}\n`);
-  out = out.replace(/<h3[^>]*>(.*?)<\/h3>/gis, (_m: string, t: string) => `### ${inline(t)}\n`);
-  out = out.replace(/<h[456][^>]*>(.*?)<\/h[456]>/gis, (_m: string, t: string) => `#### ${inline(t)}\n`);
-  // Ordered lists -> numbered lines (preserves question numbering)
-  let ol = 1;
-  out = out.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gis, (_m: string, body: string) => {
-    ol = 1;
-    return body.replace(/<li[^>]*>([\s\S]*?)<\/li>/gis, (_l: string, li: string) => `${ol++}. ${inline(li).trim()}\n`);
-  });
-  out = out.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gis, (_m: string, body: string) =>
-    body.replace(/<li[^>]*>([\s\S]*?)<\/li>/gis, (_l: string, li: string) => `- ${inline(li).trim()}\n`)
-  );
-  // Tables -> pipe rows
-  out = out.replace(/<table[^>]*>([\s\S]*?)<\/table>/gis, (_m: string, body: string) => {
-    const rows: string[] = [];
-    const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gis;
-    let m: RegExpExecArray | null;
-    while ((m = rowRe.exec(body)) !== null) {
-      const cellRe = /<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gis;
-      const cells: string[] = [];
-      let c: RegExpExecArray | null;
-      while ((c = cellRe.exec(m[1])) !== null) cells.push(inline(c[1]).trim());
-      rows.push(`| ${cells.join(" | ")} |`);
+  if (mime.includes("presentationml") || lower.endsWith(".pptx")) {
+    try {
+      const { text, notes } = await parsePptx(bytes);
+      const clean = text.trim();
+      if (clean.length < 40) {
+        return { text: clean, confidence: "low", notes: "This presentation contains almost no readable text (it may be all images). Try exporting as PDF or photograph the important slides." };
+      }
+      return { text: clean, confidence: "high", notes };
+    } catch {
+      return { text: "", confidence: "failed", notes: "This PowerPoint could not be read (only .pptx is supported — not .ppt or .pptm). Export it as PDF or paste the text." };
     }
-    return rows.join("\n") + "\n";
-  });
+  }
 
-  // Paragraphs and anything left
-  out = out.replace(/<p[^>]*>([\s\S]*?)<\/p>/gis, (_m: string, t: string) => `${inline(t).trim()}\n`);
-  out = inline(out);
-  // collapse 3+ newlines, tidy list numbering artifacts
-  return out.replace(/\n{3,}/g, "\n\n").trim();
+  if (mime.includes("spreadsheetml") || /\.xlsx$/.test(lower)) {
+    try {
+      const { text, notes } = await parseSpreadsheet(bytes);
+      return { text: text.trim(), confidence: "high", notes };
+    } catch {
+      return { text: "", confidence: "failed", notes: "This Excel workbook could not be read (only .xlsx is supported — not legacy .xls). Export it as CSV or paste the data." };
+    }
+  }
+
+  if (mime === "text/csv" || lower.endsWith(".csv")) {
+    const text = bytes.toString("utf8");
+    if (!text.trim()) return { text: "", confidence: "failed", notes: "This CSV file is empty." };
+    return { text: parseCsv(text).text, confidence: "high", notes: parseCsv(text).notes };
+  }
+
+  return { text: "", confidence: "failed", notes: `Unsupported file type${mime ? ` (${mime})` : ""}. I can read PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), CSV, plain text/Markdown, and images. You can always paste the text instead.` };
 }
+
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();

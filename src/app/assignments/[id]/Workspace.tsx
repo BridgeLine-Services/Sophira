@@ -336,6 +336,52 @@ export function Workspace({
         </Card>
       )}
 
+      {/* Method compliance — separate from mathematical correctness (spec §2) */}
+      {latestResponse && v?.method_compliance && v.method_compliance.status !== "not_applicable" && (
+        <Card className={v.method_compliance.status === "non_compliant" ? "border-danger/40" : undefined}>
+          <CardHeader>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle>Method compliance</CardTitle>
+              <Badge tone={
+                v.method_compliance.status === "compliant" ? "success"
+                : v.method_compliance.status === "partial" ? "warn"
+                : "danger"
+              }>
+                {v.method_compliance.status === "compliant"
+                  ? "Teacher's method followed (AI self-check)"
+                  : v.method_compliance.status === "partial"
+                    ? "Method partially followed (AI self-check)"
+                    : "Method requirement not met"}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {v.method_compliance.checks.length > 0 ? (
+              <ul className="space-y-1.5">
+                {v.method_compliance.checks.map((c, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    {c.passed ? (
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                    ) : (
+                      <X className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+                    )}
+                    <span className="text-ink"><strong>{c.name}</strong>{c.detail ? ` — ${c.detail}` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-ink-soft">{v.method_compliance.notes || "No specific method requirements were checked."}</p>
+            )}
+            {v.method_compliance.notes && v.method_compliance.checks.length > 0 && (
+              <p className="text-xs text-ink-soft">{v.method_compliance.notes}</p>
+            )}
+            <p className="text-xs text-ink-soft">
+              This is about HOW the work was done (required method, notation, steps) — separate from whether the math is right.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Verification panel */}
       {latestResponse && v && (
         <Card className={v.status === "needs_verification" ? "border-warn/40" : undefined}>
@@ -345,8 +391,8 @@ export function Workspace({
               <Badge tone={v.status === "verified" ? "success" : v.status === "needs_verification" ? "warn" : "neutral"}>
                 {v.status === "verified"
                   ? (v as { verification_method?: string }).verification_method === "computational"
-                    ? "Verified (independent computation)"
-                    : "Verified (AI self-check)"
+                    ? `Independently verified (${((v as { verification_kinds?: string[] }).verification_kinds ?? ["computational"]).join(", ")})`
+                    : "Verified (AI self-check only)"
                   : v.status === "needs_verification"
                     ? "Needs verification"
                     : "Unverified"}

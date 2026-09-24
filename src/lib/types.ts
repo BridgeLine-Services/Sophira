@@ -68,6 +68,10 @@ export interface TeacherDoc {
   content: string;
   source?: string;
   source_date?: string;
+  /** when this source takes effect (helps resolve current vs outdated) */
+  effective_date?: string;
+  /** what this document is, in one line */
+  description?: string;
   archived?: boolean;
 }
 
@@ -153,7 +157,15 @@ export interface Verification {
   status: "verified" | "needs_verification" | "unverified";
   /** How the response was verified: "computational" (independent tool), "self_check" (AI self-review), or "none". */
   verification_method?: "computational" | "self_check" | "none";
+  /** What kinds of independent checks ran: "numeric" | "symbolic" | "computational". */
+  verification_kinds?: string[];
   checks: { name: string; passed: boolean; detail: string; method?: "computational" | "self_check" }[];
+  /** Separate from mathematical correctness: was the teacher's required METHOD followed? */
+  method_compliance?: {
+    status: "compliant" | "partial" | "non_compliant" | "not_applicable";
+    checks: { name: string; passed: boolean; detail: string }[];
+    notes: string;
+  };
   warnings: string[];
 }
 

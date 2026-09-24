@@ -48,6 +48,45 @@ src/
 supabase/migrations/  (0001 schema + RLS, 0002 owner-only invitations)
 ```
 
+### Upgrade round 2: academic engines (2026-09-24, later)
+
+- **Fine-grained math workflows** (`routeMathTopic`) — 15 sub-workflows
+  (arithmetic → proof-based) each with method-specific guidance: calculus II
+  must name its technique and show the substitution variable, linear algebra
+  shows row operations one at a time, proofs never hide steps behind "clearly".
+  A correct answer never excuses a different method than the teacher required.
+- **Expanded independent verification** — mathjs now verifies six typed kinds:
+  numeric evaluation, symbolic simplification equivalence, symbolic
+  derivatives, equation identities at sample points, matrix
+  det/product/transpose/inverse, and statistics. Statuses honestly say
+  "Independently verified (numeric, symbolic)" vs "AI self-check only".
+- **Method Compliance Check** — a separate card from mathematical correctness:
+  required method, notation, steps, calculator restrictions, formatting, units.
+  The normalizer demotes an overclaimed "compliant" if any check failed.
+- **Document ingestion** — PPTX (slide text + speaker notes + table text, via
+  JSZip), XLSX (all sheets, headers, formulas-as-values, via SheetJS), and CSV
+  added to PDF/DOCX/TXT/Markdown/images. Everything keeps structure, and
+  unreadable parts are named, never invented.
+- **Handwriting workflow** — photos flagged as handwriting open a review panel
+  with the AI's interpretation in an editable box: Accept / Edit / Retry /
+  Cancel. Uncertain OCR is never treated as fact.
+- **Source metadata** — teacher docs now carry description, effective date,
+  and archived status; conflicts show dates and suggest the newer source
+  without silently choosing. Migration 0004 adds the structured
+  `academic_sources` table (authority 1–9, official/AI origin, supersedes
+  links) and a richer version audit trail (field-level diffs, assignment and
+  feedback origin, approval timestamps).
+- **Version history compare** — each approved change shows previous → new
+  values and links to the assignment that caused it; rollback remains
+  append-only.
+- **Citation honesty** — research/writing workflows now forbid citing anything
+  except student-provided sources and label general model knowledge as such.
+- **Injection defense expanded** — profile-change, exfiltration,
+  teacher-rule-override, and privacy-probe patterns are detected and flagged.
+- **Tests: 91 assertions** (was 47) including offline round-trip tests that
+  build a real XLSX and PPTX and parse them back.
+- See `docs/ACCEPTANCE_TESTS.md` for the live post-deploy acceptance runbook.
+
 ### Upgrade: personalization architecture (2026-09-24)
 
 - **Academic context composer** (`src/lib/ai/context.ts`) — pure, unit-tested
@@ -104,7 +143,7 @@ Key design decisions:
 1. Create a project at [supabase.com](https://supabase.com).
 2. In the SQL editor, run the migrations in order:
    `0001_init.sql` → `0002_owner_only_invitations.sql` →
-   `0003_profile_versions_and_context.sql`.
+   `0003_profile_versions_and_context.sql` → `0004_sources_and_audit.sql`.
    (This creates all tables with RLS, the signup trigger, the private
    `private-docs` storage bucket, and owner-only invitation policies.)
 3. In **Authentication → Providers**, keep Email enabled. For a truly closed
@@ -157,8 +196,10 @@ optional and not required to use Sophira.
 
 ## Testing
 
-- `npm test` — unit tests for the personalization logic (isolation, conditionality,
-  conflicts, injection defense, routing, math verification). Runs offline.
+- `npm test` — 91 unit/integration assertions: isolation, conditionality,
+  conflicts, injection defense, subject + math-topic routing, all six verifier
+  kinds, method-compliance honesty guards, and offline round-trip parsing of a
+  real XLSX and PPTX. Runs fully offline.
 - `npm run build` — must pass with zero type errors (verified before every push).
 
 See `TEST_REPORT.md` for the full scenario-based acceptance results, including

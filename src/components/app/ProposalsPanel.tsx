@@ -18,7 +18,9 @@ async function snapshotVersion(
   targetType: "teacher" | "writing",
   targetId: string,
   changeSummary: string,
-  source: string
+  source: string,
+  context?: Record<string, unknown>,
+  proposedChanges?: Record<string, string>
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated.");
@@ -36,6 +38,16 @@ async function snapshotVersion(
     .eq("target_type", targetType)
     .eq("target_id", targetId);
 
+  // Field-level diff for the compare view (spec §9).
+  const previousValues: Record<string, unknown> = {};
+  const newValues: Record<string, unknown> = {};
+  if (proposedChanges) {
+    for (const [field, value] of Object.entries(proposedChanges)) {
+      previousValues[field] = (current as Record<string, unknown>)?.[field] ?? null;
+      newValues[field] = value;
+    }
+  }
+
   const { error } = await supabase.from("profile_versions").insert({
     user_id: user.id,
     target_type: targetType,
@@ -44,7 +56,12 @@ async function snapshotVersion(
     change_summary: changeSummary,
     source,
     approved_by: user.id,
+    approved_at: new Date().toISOString(),
     snapshot: current,
+    previous_values: previousValues,
+    new_values: newValues,
+    assignment_id: (context?.assignment_id as string) || null,
+    feedback_id: (context?.feedback_id as string) || null,
   });
   if (error) console.warn("profile snapshot failed:", error.message);
 }
@@ -99,7 +116,7 @@ export function ProposalsPanel({ targetType, targetId }: { targetType?: "teacher
 
       if (approve) {
         if (proposal.target_type === "teacher" && proposal.target_id) {
-          await snapshotVersion(supabase, proposal.target_type, proposal.target_id, proposal.change_summary, "proposal:" + proposal.id);
+          await snapshotVersion(supabase, proposal.target_type, proposal.target_id, proposal.change_summary, "proposal:" + proposal.id, proposal.context as Record<string, unknown>, proposal.proposed_changes);
           const { error } = await supabase
             .from("teacher_profiles")
             .update({
@@ -117,7 +134,7 @@ export function ProposalsPanel({ targetType, targetId }: { targetType?: "teacher
           } catch {
             summary = undefined;
           }
-          await snapshotVersion(supabase, proposal.target_type, proposal.target_id, proposal.change_summary, "proposal:" + proposal.id);
+          await snapshotVersion(supabase, proposal.target_type, proposal.target_id, proposal.change_summary, "proposal:" + proposal.id, proposal.context as Record<string, unknown>, proposal.proposed_changes);
           const { data: current } = await supabase
             .from("writing_profiles")
             .select("guidance, version")
