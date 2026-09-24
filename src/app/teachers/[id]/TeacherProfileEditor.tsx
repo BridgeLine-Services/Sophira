@@ -6,6 +6,7 @@ import {
   Badge, Button, ConfirmDialog, Input, Label, Select, Textarea, useToast,
 } from "@/components/ui";
 import type { Teacher, TeacherDoc, TeacherProfile } from "@/lib/types";
+import { ProfileVersionHistory } from "@/components/app/ProfileVersionHistory";
 
 type ReqField =
   | "required_methods" | "required_steps" | "preferred_notation" | "units_sig_figs"
@@ -73,8 +74,8 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
   const [extractBusy, setExtractBusy] = useState(false);
 
   // New-doc form state per section
-  const [newDoc, setNewDoc] = useState<Record<string, { title: string; content: string; source: string; source_date: string }>>(
-    Object.fromEntries(DOC_SECTIONS.map((s) => [s.key, { title: "", content: "", source: "", source_date: "" }]))
+  const [newDoc, setNewDoc] = useState<Record<string, { title: string; content: string; source: string; source_date: string; archived: boolean }>>(
+    Object.fromEntries(DOC_SECTIONS.map((s) => [s.key, { title: "", content: "", source: "", source_date: "", archived: false }]))
   );
   const [openDocForm, setOpenDocForm] = useState<string | null>(null);
   const [confirmDocDelete, setConfirmDocDelete] = useState<{ section: string; index: number } | null>(null);
@@ -160,6 +161,7 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
       content: d.content.trim(),
       ...(d.source.trim() ? { source: d.source.trim() } : {}),
       ...(d.source_date ? { source_date: d.source_date } : {}),
+      ...(d.archived ? { archived: true } : {}),
     };
     const next = [...(docs[section] ?? []), doc];
     const { error } = await supabase
@@ -172,7 +174,7 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
       return;
     }
     setDocs((s) => ({ ...s, [section]: next }));
-    setNewDoc((s) => ({ ...s, [section]: { title: "", content: "", source: "", source_date: "" } }));
+    setNewDoc((s) => ({ ...s, [section]: { title: "", content: "", source: "", source_date: "", archived: false } }));
     setOpenDocForm(null);
     toast("success", "Document saved.");
   }
@@ -191,6 +193,25 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
     }
     setDocs((s) => ({ ...s, [section]: next }));
     toast("success", "Document removed.");
+  }
+
+
+  /** Archives or restores a teacher source (spec §12: current vs outdated). */
+  async function toggleArchived(section: string, index: number) {
+    const profileId = await ensureProfile();
+    if (!profileId) return;
+    setBusy(true);
+    const list = docs[section] ?? [];
+    const next = list.map((d, i) => (i === index ? { ...d, archived: !d.archived } : d));
+    const { error } = await supabase.from("teacher_profiles").update({ [section]: next }).eq("id", profileId);
+    setBusy(false);
+    if (error) {
+      toast("error", "Could not update: " + error.message);
+      return;
+    }
+    setDocs((s) => ({ ...s, [section]: next }));
+    const doc = list[index];
+    toast("info", doc.archived ? `Restored "${doc.title}" — its rules apply again.` : `Archived "${doc.title}" — its rules will no longer be applied.`);
   }
 
   async function onExtract() {
@@ -288,21 +309,32 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
           {(docs[s.key] ?? []).length > 0 && (
             <div className="mb-3 space-y-2">
               {(docs[s.key] ?? []).map((d, i) => (
-                <details key={i} className="rounded-lg border border-ink/10 bg-white p-3">
+                <details key={i} className={`rounded-lg border border-ink/10 bg-white p-3 ${d.archived ? "opacity-60" : ""}`}>
                   <summary className="cursor-pointer text-sm font-medium text-ink">
                     {d.title}
+                    {d.archived && <Badge tone="warn" className="ml-2">Archived — not applied</Badge>}
                     {d.source && <span className="ml-2 text-xs font-normal text-ink-soft">({d.source}{d.source_date ? `, ${d.source_date}` : ""})</span>}
                   </summary>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-ink-soft">{d.content}</p>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 text-danger"
-                    onClick={() => setConfirmDocDelete({ section: s.key, index: i })}
-                  >
-                    Remove this document
-                  </Button>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => toggleArchived(s.key, i)}
+                    >
+                      {d.archived ? "Restore (current again)" : "Archive (outdated — stop applying)"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-danger"
+                      onClick={() => setConfirmDocDelete({ section: s.key, index: i })}
+                    >
+                      Remove this document
+                    </Button>
+                  </div>
                 </details>
               ))}
             </div>
@@ -348,6 +380,15 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
                   />
                 </div>
               </div>
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-ink/30 accent-[var(--accent)]"
+                  checked={newDoc[s.key].archived}
+                  onChange={(e) => setNewDoc((n) => ({ ...n, [s.key]: { ...n[s.key], archived: e.target.checked } }))}
+                />
+                Archived / outdated (e.g. an old syllabus — its rules won&apos;t be applied)
+              </label>
               <Button type="button" disabled={busy} onClick={() => onAddDoc(s.key)}>
                 {busy ? "Saving…" : "Save document"}
               </Button>
@@ -381,6 +422,8 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
           </div>
         </section>
       )}
+
+      {profile?.id && <ProfileVersionHistory targetType="teacher" targetId={profile.id} />}
 
       {/* Extract rules */}
       <section className="rounded-card border border-accent/30 bg-accent-soft/30 p-4">

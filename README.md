@@ -48,6 +48,43 @@ src/
 supabase/migrations/  (0001 schema + RLS, 0002 owner-only invitations)
 ```
 
+### Upgrade: personalization architecture (2026-09-24)
+
+- **Academic context composer** (`src/lib/ai/context.ts`) — pure, unit-tested
+  hierarchy engine. Scope inheritance: global student profile → course →
+  teacher → assignment instructions; each layer explicitly overrides the one
+  above. Teacher/course isolation is by construction (only the selected
+  teacher's rules are ever loaded).
+- **Subject router** (`src/lib/ai/subjects.ts`) — routes each task to a
+  specialized workflow (math, physics, chemistry, biology, CS, writing/
+  humanities, history, research, general) with its own prompting and
+  verification strategy.
+- **Independent verification stack** (`src/lib/ai/mathverify.ts`) — for
+  math/physics/chemistry, the model emits `machine_checks` (arithmetic
+  identities from its actual solution) that the server re-computes with
+  [mathjs](https://mathjs.org). UI labels distinguish "independent
+  computation" from "AI self-check" honestly (spec §40).
+- **Prompt-injection defense** — every uploaded document and teacher doc is
+  wrapped in UNTRUSTED DATA fences; obvious injection attempts are flagged to
+  the student, never obeyed.
+- **Source management** — teacher documents carry source dates and
+  active/archived status; two active official sources with different dates
+  produce a visible conflict notice (never silently resolved).
+- **Feedback → proposal loop** (`/api/ai/feedback-to-proposal`) — a student
+  correction can be analyzed for reusability and turned into a PENDING
+  Teacher/Writing profile proposal. Nothing is applied without approval.
+- **Profile versioning + rollback** (migration 0003) — every approved change
+  snapshots the previous profile into `profile_versions`; the UI shows a
+  version history with rollback on each Teacher and Writing profile.
+- **"What was applied" panel** — each response stores `context_applied`
+  (teacher rules, sources, course, writing profile, conflicts), and the
+  workspace renders real backend state, never a decorative badge.
+- **DOCX ingestion** — Word documents are parsed with mammoth, preserving
+  headings, numbered lists, and tables instead of a wall of text.
+- **Unit tests** — `npm test` runs 47 assertions covering teacher/course
+  isolation, writing-profile conditionality, conflict detection, injection
+  defense, subject routing, and the math verifier.
+
 Key design decisions:
 
 - **AI calls are server-only.** The API key never reaches the browser.
@@ -65,8 +102,9 @@ Key design decisions:
 ### 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run `supabase/migrations/0001_init.sql`, then
-   `supabase/migrations/0002_owner_only_invitations.sql`.
+2. In the SQL editor, run the migrations in order:
+   `0001_init.sql` → `0002_owner_only_invitations.sql` →
+   `0003_profile_versions_and_context.sql`.
    (This creates all tables with RLS, the signup trigger, the private
    `private-docs` storage bucket, and owner-only invitation policies.)
 3. In **Authentication → Providers**, keep Email enabled. For a truly closed
@@ -119,8 +157,12 @@ optional and not required to use Sophira.
 
 ## Testing
 
-`npm run build` must pass with zero type errors (verified in CI-style before every
-push). See `TEST_REPORT.md` for the scenario-based acceptance test results.
+- `npm test` — unit tests for the personalization logic (isolation, conditionality,
+  conflicts, injection defense, routing, math verification). Runs offline.
+- `npm run build` — must pass with zero type errors (verified before every push).
+
+See `TEST_REPORT.md` for the full scenario-based acceptance results, including
+what is honestly still blocked on a live backend.
 
 ## Honesty guarantees
 

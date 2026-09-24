@@ -9,6 +9,7 @@ import {
 } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { PenLine, RefreshCw } from "lucide-react";
+import { ProfileVersionHistory } from "@/components/app/ProfileVersionHistory";
 import type { WritingProfile, WritingSample } from "@/lib/types";
 
 const REPR_BADGE = {
@@ -203,6 +204,8 @@ export default function WritingPage() {
             </div>
           )}
         </section>
+
+        {profile?.id && <ProfileVersionHistory targetType="writing" targetId={profile.id} />}
 
         <ConfirmDialog
           open={confirmDelete !== null}

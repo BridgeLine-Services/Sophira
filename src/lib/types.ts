@@ -57,6 +57,8 @@ export interface TeacherProfile {
   examples: TeacherDoc[];
   corrections: TeacherDoc[];
   ai_notes: { note: string; proposed: string; status: string }[];
+  version?: number;
+  change_summary?: string;
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +68,7 @@ export interface TeacherDoc {
   content: string;
   source?: string;
   source_date?: string;
+  archived?: boolean;
 }
 
 export interface Course {
@@ -101,6 +104,7 @@ export interface WritingProfile {
   guidance: string;
   status: "draft" | "approved";
   version: number;
+  change_summary?: string;
   created_at: string;
   updated_at: string;
 }
@@ -147,7 +151,9 @@ export interface WorkSession {
 
 export interface Verification {
   status: "verified" | "needs_verification" | "unverified";
-  checks: { name: string; passed: boolean; detail: string }[];
+  /** How the response was verified: "computational" (independent tool), "self_check" (AI self-review), or "none". */
+  verification_method?: "computational" | "self_check" | "none";
+  checks: { name: string; passed: boolean; detail: string; method?: "computational" | "self_check" }[];
   warnings: string[];
 }
 

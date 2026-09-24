@@ -6,6 +6,9 @@ import {
   buildSystemPrompt,
   type TaskClassification,
 } from "@/lib/ai/client";
+import { composeAcademicContext, wrapUntrusted, detectInjectionAttempt } from "@/lib/ai/context";
+import { routeSubject } from "@/lib/ai/subjects";
+import { runMachineChecks } from "@/lib/ai/mathverify";
 import { MODE_MAP } from "@/lib/modes";
 import type { Mode } from "@/lib/types";
 
@@ -122,9 +125,38 @@ export async function POST(request: NextRequest) {
   }
 
   // --- Stage 3: solve + self-verification in one call -------------------------
-  const systemPrompt = buildSystemPrompt({
+  const workflow = routeSubject(classification?.subject ?? course?.subject, classification?.task_type);
+  const { systemPrompt, conflicts } = buildSystemPrompt({
     profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask,
+    subject: classification?.subject ?? null,
+    taskType: classification?.task_type ?? null,
   });
+
+  // The exact context that was applied — persisted with the response so the UI
+  // can show real backend state (spec §40), never a fabricated badge.
+  const composed = composeAcademicContext({
+    profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask,
+    subject: classification?.subject ?? null,
+  });
+  const contextApplied = {
+    ...composed.applied,
+    classification: classification
+      ? { subject: classification.subject, task_type: classification.task_type, level: classification.academic_level }
+      : null,
+    conflicts,
+    workflow: workflow.id,
+  };
+
+  // Prompt-injection defense: uploaded files are wrapped as untrusted data and
+  // obvious injection attempts are flagged to the student (never obeyed).
+  const injectionWarnings: string[] = [];
+  for (const f of files) {
+    if (detectInjectionAttempt(f.extracted_text)) {
+      injectionWarnings.push(
+        `The document "${f.file_name}" contains text that looks like instructions directed at the AI. It was treated as document content only.`
+      );
+    }
+  }
 
   const userParts: string[] = [];
   if (body.title) userParts.push(`Assignment title: ${body.title}`);
@@ -133,7 +165,7 @@ export async function POST(request: NextRequest) {
   if (files.length) {
     userParts.push(
       "Attached documents (extracted text):\n" +
-        files.map((f) => `--- ${f.file_name} ---\n${f.extracted_text}`).join("\n")
+        files.map((f) => wrapUntrusted(`uploaded file: ${f.file_name}`, f.extracted_text)).join("\n\n")
     );
   }
   userParts.push(`The request:\n${question}`);
@@ -148,9 +180,12 @@ export async function POST(request: NextRequest) {
   }
 
   let content = "";
-  let verification: { status: string; checks: unknown[]; warnings: string[] } = {
-    status: "unverified", checks: [], warnings: [],
-  };
+  let verification: {
+    status: "verified" | "needs_verification" | "unverified";
+    verification_method?: "computational" | "self_check" | "none";
+    checks: { name: string; passed: boolean; detail: string; method?: "computational" | "self_check" }[];
+    warnings: string[];
+  } = { status: "unverified", verification_method: "none", checks: [], warnings: [] };
   try {
     const raw = await aiChat(
       [
@@ -160,20 +195,49 @@ export async function POST(request: NextRequest) {
       ],
       { temperature: 0.4, maxTokens: 4096, jsonMode: true, images }
     );
-    const parsed = parseJsonLoose<{ answer?: string; verification?: { status?: string; checks?: unknown; warnings?: unknown } }>(raw);
+    const parsed = parseJsonLoose<{
+      answer?: string;
+      machine_checks?: unknown;
+      verification?: { status?: string; checks?: unknown; warnings?: unknown };
+    }>(raw);
     if (parsed && typeof parsed.answer === "string" && parsed.answer.trim()) {
       content = parsed.answer;
       const v = parsed.verification || {};
+      const selfChecks: { name: string; passed: boolean; detail: string; method?: "computational" | "self_check" }[] = Array.isArray(v.checks)
+        ? (v.checks as { name: string; passed: boolean; detail: string }[]).map((c) => ({ ...c, method: "self_check" as const }))
+        : [];
+      const selfWarnings = Array.isArray(v.warnings) ? v.warnings.filter((w) => typeof w === "string") : [];
+      const selfStatus = v.status === "verified" || v.status === "needs_verification" ? v.status : "unverified";
+
+      // --- Independent verification (spec §10) --------------------------------
+      // Re-compute the model's claimed arithmetic identities with mathjs — a
+      // deterministic engine, not the same language model checking itself.
+      let machineResults: { results: { name: string; passed: boolean; method: "computational"; detail: string }[]; allPassed: boolean } = { results: [], allPassed: false };
+      if (workflow.machineVerifiable) {
+        machineResults = runMachineChecks(parsed.machine_checks);
+      }
+
       verification = {
-        status: v.status === "verified" || v.status === "needs_verification" ? v.status : "unverified",
-        checks: Array.isArray(v.checks) ? v.checks : [],
-        warnings: Array.isArray(v.warnings) ? v.warnings.filter((w) => typeof w === "string") : [],
+        status:
+          selfStatus === "unverified"
+            ? "unverified"
+            : machineResults.results.length > 0
+              ? machineResults.allPassed && selfStatus !== "needs_verification"
+                ? "verified"
+                : "needs_verification"
+              : selfStatus,
+        verification_method: machineResults.results.length > 0 ? "computational" : "self_check",
+        checks: [...machineResults.results, ...selfChecks],
+        warnings: [...injectionWarnings, ...selfWarnings],
       };
     } else {
       // The model answered but not in the JSON shape — use the raw response,
       // honestly marked unverified rather than pretending a check ran.
       content = raw;
-      verification = { status: "unverified", checks: [], warnings: ["The response could not be structured for verification — treat as needs review."] };
+      verification = {
+        status: "unverified", verification_method: "none", checks: [],
+        warnings: [...injectionWarnings, "The response could not be structured for verification — treat as needs review."],
+      };
     }
   } catch (err) {
     if (err instanceof AiNotConfiguredError) {
@@ -245,6 +309,7 @@ export async function POST(request: NextRequest) {
     content,
     mode,
     verification,
+    context_applied: contextApplied,
     model_used: process.env.SOPHIRA_MODEL || "gpt-4o-mini",
   }).select("id").single();
 
@@ -256,6 +321,7 @@ export async function POST(request: NextRequest) {
       content,
       verification,
       classification,
+      context_applied: contextApplied,
       model_used: process.env.SOPHIRA_MODEL || "gpt-4o-mini",
     },
   });

@@ -40,6 +40,7 @@ export default async function AssignmentWorkspacePage({ params }: { params: { id
         teacher={(teacherRes.data as Teacher) ?? null}
         session={(sessionRes.data as WorkSession) ?? null}
         latestResponse={(responsesRes.data?.[0] as AiResponse) ?? null}
+        contextApplied={((responsesRes.data?.[0] as AiResponse & { context_applied?: unknown })?.context_applied as Record<string, unknown>) ?? null}
       />
     </AppShell>
   );

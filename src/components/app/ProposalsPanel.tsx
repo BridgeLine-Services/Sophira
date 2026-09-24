@@ -2,10 +2,52 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ProfileUpdateProposal } from "@/lib/types";
+import Link from "next/link";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { fmtDate } from "@/lib/format";
 import { Check, X } from "lucide-react";
+
+/**
+ * Snapshots the CURRENT state of a profile into profile_versions BEFORE a
+ * change is applied (spec §14). Append-only history enables rollback.
+ * Failure is non-fatal for the approve action but is surfaced honestly.
+ */
+async function snapshotVersion(
+  supabase: ReturnType<typeof createClient>,
+  targetType: "teacher" | "writing",
+  targetId: string,
+  changeSummary: string,
+  source: string
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated.");
+
+  const { data: current } = await supabase
+    .from(targetType === "teacher" ? "teacher_profiles" : "writing_profiles")
+    .select("*")
+    .eq("id", targetId)
+    .single();
+  if (!current) return; // nothing to snapshot (e.g. row not created yet)
+
+  const { count } = await supabase
+    .from("profile_versions")
+    .select("id", { count: "exact", head: true })
+    .eq("target_type", targetType)
+    .eq("target_id", targetId);
+
+  const { error } = await supabase.from("profile_versions").insert({
+    user_id: user.id,
+    target_type: targetType,
+    target_id: targetId,
+    version: (count ?? 0) + 1,
+    change_summary: changeSummary,
+    source,
+    approved_by: user.id,
+    snapshot: current,
+  });
+  if (error) console.warn("profile snapshot failed:", error.message);
+}
 
 const TEACHER_FIELD_LABELS: Record<string, string> = {
   required_methods: "Required methods",
@@ -57,9 +99,13 @@ export function ProposalsPanel({ targetType, targetId }: { targetType?: "teacher
 
       if (approve) {
         if (proposal.target_type === "teacher" && proposal.target_id) {
+          await snapshotVersion(supabase, proposal.target_type, proposal.target_id, proposal.change_summary, "proposal:" + proposal.id);
           const { error } = await supabase
             .from("teacher_profiles")
-            .update(proposal.proposed_changes)
+            .update({
+              ...proposal.proposed_changes,
+              change_summary: proposal.change_summary,
+            })
             .eq("id", proposal.target_id);
           if (error) throw new Error(error.message);
         } else if (proposal.target_type === "writing" && proposal.target_id) {
@@ -71,14 +117,27 @@ export function ProposalsPanel({ targetType, targetId }: { targetType?: "teacher
           } catch {
             summary = undefined;
           }
+          await snapshotVersion(supabase, proposal.target_type, proposal.target_id, proposal.change_summary, "proposal:" + proposal.id);
+          const { data: current } = await supabase
+            .from("writing_profiles")
+            .select("guidance, version")
+            .eq("id", proposal.target_id)
+            .single();
+          // Writing guidance proposals are ADDENDUMS on top of approved guidance
+          // (feedback-style proposals add habits, extraction proposals replace).
+          const mergedGuidance =
+            proposal.proposed_changes.guidance &&
+            (proposal.context as Record<string, unknown>)?.source === "student_feedback" &&
+            current?.guidance
+              ? `${current.guidance}\n- ${proposal.proposed_changes.guidance}`
+              : proposal.proposed_changes.guidance ?? undefined;
           const { error } = await supabase
             .from("writing_profiles")
             .update({
-              guidance: proposal.proposed_changes.guidance ?? undefined,
+              guidance: mergedGuidance,
               ...(summary ? { summary } : {}),
-              ...(proposal.proposed_changes.version
-                ? { version: parseInt(proposal.proposed_changes.version, 10) || undefined }
-                : {}),
+              version: (current?.version ?? 0) + 1,
+              change_summary: proposal.change_summary,
               status: "approved",
             })
             .eq("id", proposal.target_id);
@@ -125,7 +184,15 @@ export function ProposalsPanel({ targetType, targetId }: { targetType?: "teacher
                 </li>
               ))}
             </ul>
-            <p className="text-xs text-ink-soft">Nothing changes until you approve.</p>
+            {typeof (p.context as Record<string, unknown>)?.assignment_id === "string" && (
+              <Link
+                href={`/assignments/${(p.context as Record<string, string>).assignment_id}`}
+                className="text-xs text-accent hover:underline"
+              >
+                View source assignment →
+              </Link>
+            )}
+            <p className="text-xs text-ink-soft">Nothing changes until you approve. Approved updates snapshot the previous profile so you can roll back.</p>
             <div className="flex gap-2">
               <Button size="sm" onClick={() => decide(p.id, true)} disabled={busyId === p.id}>
                 <Check className="h-4 w-4" /> Approve update

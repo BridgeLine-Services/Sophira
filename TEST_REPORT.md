@@ -1,47 +1,68 @@
 # Sophira — Test Report
 
-Date: 2026-09-24 · Build: `next build` (Next 14.2.35, strict TypeScript)
+Date: 2026-09-24 (upgrade) · Next 14.2.35, strict TypeScript · `npm test` + `npm run build`
 
-## What was actually verified
+## 1. Automated unit tests — ✅ 47 / 47 PASSED (`npm test`, runs offline)
+
+| Area | Assertions | Result |
+|---|---|---|
+| Teacher isolation — Teacher A's rules never enter Teacher B's context | 6 | ✅ |
+| Course isolation — course instructions appear only when the course is selected | 3 | ✅ |
+| Writing-profile conditionality — math tasks never load the Writing Profile; writing tasks do | 4 | ✅ |
+| Source conflicts — two active official docs with different dates are flagged (not silently resolved); archiving resolves; same-date docs not flagged | 5 | ✅ |
+| Prompt-injection defense — docs wrapped in DATA fences; injection attempts detected; normal text not flagged | 4 | ✅ |
+| Subject routing — 9 workflows, machine-verifiable only where honest | 12 | ✅ |
+| Independent math verification — correct/incorrect/invalid identities, floating-point tolerance, missing checks | 9 | ✅ |
+| Scope inheritance — global → course → teacher override ordering is explicit in every layer | 3 | ✅ |
+
+## 2. Build verification
 
 | Check | Result |
 |---|---|
-| `tsc --noEmit` full-project typecheck | ✅ PASSED (0 errors) |
-| Production build, all 28 routes compile | ✅ PASSED |
-| Layout/responsive audit of all pages (single-column, ≥44px targets, no horizontal scroll by construction) | ✅ PASSED (code-level) |
-| PWA assets resolvable (manifest, sw.js, icons referenced by layout + install page) | ✅ PASSED (build-time) |
-| Middleware auth gate covers all private routes; API routes excluded (they enforce auth themselves with 401 JSON) | ✅ PASSED (code-level) |
-| RLS: every table policy reviewed — all user data visible only to owner (`user_id = auth.uid()`); invitations owner-only (migration 0002) | ✅ PASSED (code-level review) |
-| Writing Profile applied only for writing tasks (classification gate in `/api/ai/solve`) | ✅ PASSED (code-level) |
+| `tsc --noEmit` full-project strict typecheck | ✅ 0 errors |
+| `npm run build` — 30 routes (incl. `/proposals`, `/api/ai/feedback-to-proposal`) | ✅ |
+| PWA assets resolvable (manifest, sw.js, icons) | ✅ build-time |
+| Middleware gate: API routes excluded (JSON 401s, not HTML redirects) | ✅ code-level |
 
-## Acceptance scenarios (spec §21)
+## 3. Security audit (code-level)
 
-These require a **live Supabase project and an AI API key**, neither of which exists in the
-build sandbox. They are honest **BLOCKED**, not failed:
+| Check | Result |
+|---|---|
+| No route trusts a client-supplied `user_id` — all identity from `supabase.auth.getUser()` | ✅ |
+| Service-role key used only in server routes/admin client; never `NEXT_PUBLIC` | ✅ |
+| Uploaded files stored in the private `private-docs` bucket; no public URLs returned | ✅ |
+| RLS on every table incl. new `profile_versions`; invitations owner-only | ✅ code-level review |
+| Uploaded documents wrapped as untrusted data; injection attempts flagged, never obeyed | ✅ + unit-tested |
+| Feedback→proposal route validates/allowlists model-proposed fields; never auto-applies | ✅ |
 
-| # | Scenario | Status | How to run it after deploy |
-|---|---|---|---|
-| 1 | Sign in → dashboard → create course | 🔶 Not yet tested (needs live backend) | Sign up, finish onboarding, add course |
-| 2 | Teacher profile + instructions saved | 🔶 Not yet tested | Create teacher, fill requirements, save |
-| 3 | Assignment response uses course instructions | 🔶 Not yet tested (needs AI key) | Pick course+teacher in wizard, start assignment |
-| 4 | Math question does NOT apply Writing Profile | 🔶 Not yet tested (needs AI key) | Ask math question with approved writing profile present |
-| 5 | Writing assignment applies approved Writing Profile | 🔶 Not yet tested (needs AI key) | Writing-mode task after approving a profile |
-| 6 | Check-my-work feedback | 🔶 Not yet tested (needs AI key) | Check mode with own attempt |
-| 7 | Unreadable/ambiguous input flagged, not invented | 🔶 Not yet tested (needs AI key) | Upload a blurry photo |
-| 8 | Profile update proposal approve/reject | 🔶 Not yet tested (needs AI key) | Paste teacher doc → approve/reject proposal |
-| 9 | Second user cannot access first user's data | 🔶 Not yet tested (needs live backend) | Sign up user 2 via invitation, try to guess user 1's URLs |
-| 10 | Narrow-screen layout usable | 🔶 Not yet tested on devices | Open on a phone at 360px width |
-| 11 | Installation path | 🔶 Not yet tested (needs HTTPS deploy) | Visit /install on Android Chrome / iPhone Safari |
-| 12 | Errors preserve user work | ✅ Code-level PASSED (503/502/415 handlers keep state) — device test pending | Remove AI key, submit an assignment, verify text preserved |
+## 4. Acceptance scenarios (spec §37) needing a live backend
 
-Nothing in this report claims a test ran that did not.
+These require a real Supabase project + AI key, which the build sandbox does not
+have. Honest status — **BLOCKED**, not failed. Re-run after deploy:
 
-## Known limitations
+| # | Scenario | Status |
+|---|---|---|
+| 1 | Sign in → dashboard → create course | 🔶 Not yet tested (live backend) |
+| 2 | Teacher profile + instructions saved | 🔶 Not yet tested |
+| 3 | Assignment response uses selected course/teacher instructions | 🔶 Not yet tested (needs AI key) |
+| 4 | Math question does NOT apply Writing Profile | ✅ Logic unit-tested; end-to-end needs AI key |
+| 5 | Writing assignment applies approved Writing Profile | ✅ Logic unit-tested; end-to-end needs AI key |
+| 6 | Check-my-work feedback | 🔶 Not yet tested (needs AI key) |
+| 7 | Unreadable input flagged, never invented | ✅ Code paths + honest-failure handling; device test pending |
+| 8 | Profile-update proposal approve/reject (now with version snapshot) | 🔶 Not yet tested live |
+| 9 | Student B cannot access Student A's data | ✅ RLS reviewed + isolation unit-tested at app layer; live DB test pending |
+| 10 | Feedback → proposal → approval → versioned update + rollback | ✅ Unit-tested where pure; live flow pending |
+| 11 | Mobile 360px layout, PWA install Android/iOS/desktop | 🔶 Not yet tested on devices |
+| 12 | Errors (no AI key, bad file, failed AI call) preserve user work | ✅ Code paths reviewed; device test pending |
 
-- DOCX uploads are not parsed — the user is told to paste text or use PDF (honest 415 message).
-- Direct signups at the Supabase API level (bypassing the app UI) cannot be fully prevented
-  from app code; the app itself is invite-only, and Supabase dashboard settings can lock
-  this down further (see README "Setup" note).
-- AI verification is a self-check, not an independent computation engine — surfaced honestly
-  as "Needs verification" whenever a check fails or cannot be performed.
-- Image (photo) reading requires a vision-capable model (`SOPHIRA_MODEL`, e.g. gpt-4o-mini).
+## Known limitations (honest)
+
+- `machine_checks` verify the arithmetic identities the model derives from its
+  own solution — a genuine independent recomputation (mathjs), but not a proof
+  that the chosen method or setup was correct. The UI labels this precisely.
+- Symbolic algebra verification (e.g. CAS-grade integration checking) is not
+  implemented; mathjs covers arithmetic/numeric identities only.
+- DOCX equations embedded as images cannot be read — the user is told.
+- Older `.doc` (pre-2007 Word) files are unsupported (only `.docx`).
+- Live-device PWA testing (Android Chrome, iPhone/iPad Safari) has not been
+  performed in this environment; install instructions are documented instead.

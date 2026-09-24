@@ -31,14 +31,28 @@ const FEEDBACK_KINDS = [
   { kind: "note", label: "Note" },
 ] as const;
 
+interface AppliedTeacher { name: string | null; applied: boolean; sources_used: string[]; fields_applied: string[] }
+interface AppliedCourse { name: string | null; applied: boolean }
+interface AppliedWriting { applied: boolean; reason: string }
+interface AppliedContextData {
+  teacher?: AppliedTeacher;
+  course?: AppliedCourse;
+  writing_profile?: AppliedWriting;
+  classification?: { subject: string | null; task_type: string | null; level: string | null } | null;
+  conflicts?: { a: string; b: string; detail: string }[];
+  workflow?: string;
+  verification_method?: string;
+}
+
 export function Workspace({
-  assignment, course, teacher, session, latestResponse,
+  assignment, course, teacher, session, latestResponse, contextApplied,
 }: {
   assignment: Assignment;
   course: Course | null;
   teacher: Teacher | null;
   session: WorkSession | null;
   latestResponse: AiResponse | null;
+  contextApplied: AppliedContextData | null;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -57,6 +71,8 @@ export function Workspace({
   const [sendingFeedback, setSendingFeedback] = useState(false);
 
   const [savingToLibrary, setSavingToLibrary] = useState(false);
+  const [ruleBusy, setRuleBusy] = useState(false);
+  const [lastFeedbackId, setLastFeedbackId] = useState<string | null>(null);
 
   async function saveTitle() {
     if (!title.trim()) {
@@ -124,24 +140,52 @@ export function Workspace({
     }
     setSendingFeedback(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("feedback").insert({
-      user_id: user!.id,
-      response_id: latestResponse?.id ?? null,
-      assignment_id: assignment.id,
-      course_id: assignment.course_id,
-      teacher_id: assignment.teacher_id,
-      kind: feedbackKind,
-      comment: feedbackText.trim(),
-      content: "",
-    });
+    const { data, error } = await supabase
+      .from("feedback")
+      .insert({
+        user_id: user!.id,
+        response_id: latestResponse?.id ?? null,
+        assignment_id: assignment.id,
+        course_id: assignment.course_id,
+        teacher_id: assignment.teacher_id,
+        kind: feedbackKind,
+        comment: feedbackText.trim(),
+        content: "",
+      })
+      .select("id")
+      .single();
     setSendingFeedback(false);
     if (error) {
       toast("error", "Could not save feedback: " + error.message);
       return;
     }
     setFeedbackText("");
-    setFeedbackKind(null);
+    setLastFeedbackId(data?.id ?? null);
     toast("success", "Thanks — saved with this assignment.");
+  }
+
+  /** Ask the AI to judge whether the last correction is a reusable rule (spec §13). */
+  async function proposeRule() {
+    if (!lastFeedbackId) return;
+    setRuleBusy(true);
+    try {
+      const res = await fetch("/api/ai/feedback-to-proposal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedback_id: lastFeedbackId }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        toast(json.data?.proposal_id ? "success" : "info", json.data?.message || "Done.");
+        setLastFeedbackId(null);
+      } else {
+        toast("error", json.error || "The analysis failed — your feedback is still saved.");
+      }
+    } catch {
+      toast("error", "Could not reach the server — your feedback is still saved.");
+    } finally {
+      setRuleBusy(false);
+    }
   }
 
   async function sendFollowUp(e: FormEvent) {
@@ -233,6 +277,65 @@ export function Workspace({
         )}
       </div>
 
+      {/* What was ACTUALLY applied (spec §40) — real backend state, not badges */}
+      {contextApplied && (
+        <Card>
+          <CardHeader><CardTitle>What was applied</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <ul className="space-y-1.5 text-sm">
+              <li className="flex items-start gap-2">
+                {contextApplied.teacher?.applied ? (
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                ) : (
+                  <X className="mt-0.5 h-4 w-4 shrink-0 text-ink-soft" />
+                )}
+                <span className="text-ink">
+                  {contextApplied.teacher?.applied
+                    ? <>Teacher rules applied{contextApplied.teacher.name ? ` — ${contextApplied.teacher.name}` : ""} ({contextApplied.teacher.fields_applied.length} requirement field{contextApplied.teacher.fields_applied.length === 1 ? "" : "s"}, {contextApplied.teacher.sources_used.length} source{contextApplied.teacher.sources_used.length === 1 ? "" : "s"})</>
+                    : "No teacher rules applied (none selected or none saved)"}
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                {contextApplied.course?.applied ? (
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                ) : (
+                  <X className="mt-0.5 h-4 w-4 shrink-0 text-ink-soft" />
+                )}
+                <span className="text-ink">
+                  {contextApplied.course?.applied ? `Course context applied — ${contextApplied.course.name}` : "No course context applied"}
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                {contextApplied.writing_profile?.applied ? (
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                ) : (
+                  <X className="mt-0.5 h-4 w-4 shrink-0 text-ink-soft" />
+                )}
+                <span className="text-ink">Writing Profile: {contextApplied.writing_profile?.reason ?? "not applied"}</span>
+              </li>
+              {contextApplied.classification?.subject && (
+                <li className="text-sm text-ink-soft">
+                  Detected: {contextApplied.classification.subject}
+                  {contextApplied.classification.task_type ? ` · ${contextApplied.classification.task_type}` : ""}
+                  {contextApplied.classification.level ? ` · ${contextApplied.classification.level}` : ""}
+                  {contextApplied.workflow ? ` · ${contextApplied.workflow.replace(/_/g, " ")} workflow` : ""}
+                </li>
+              )}
+            </ul>
+            {(contextApplied.conflicts?.length ?? 0) > 0 && (
+              <ul className="space-y-1.5 rounded-lg bg-warn/10 p-3">
+                {contextApplied.conflicts!.map((c, i) => (
+                  <li key={i} className="text-sm text-ink">
+                    <AlertTriangle className="mr-1.5 inline h-4 w-4 text-warn" />
+                    {c.a} vs {c.b}: {c.detail}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Verification panel */}
       {latestResponse && v && (
         <Card className={v.status === "needs_verification" ? "border-warn/40" : undefined}>
@@ -240,7 +343,13 @@ export function Workspace({
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle>Verification</CardTitle>
               <Badge tone={v.status === "verified" ? "success" : v.status === "needs_verification" ? "warn" : "neutral"}>
-                {v.status === "verified" ? "Verified (self-check)" : v.status === "needs_verification" ? "Needs verification" : "Unverified"}
+                {v.status === "verified"
+                  ? (v as { verification_method?: string }).verification_method === "computational"
+                    ? "Verified (independent computation)"
+                    : "Verified (AI self-check)"
+                  : v.status === "needs_verification"
+                    ? "Needs verification"
+                    : "Unverified"}
               </Badge>
             </div>
           </CardHeader>
@@ -254,7 +363,11 @@ export function Workspace({
                     ) : (
                       <X className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
                     )}
-                    <span className="text-ink"><strong>{c.name}</strong>{c.detail ? ` — ${c.detail}` : ""}</span>
+                    <span className="text-ink">
+                      <strong>{c.name}</strong>
+                      {"method" in c && c.method === "computational" && <Badge tone="success" className="mx-1.5">independent</Badge>}
+                      {c.detail ? ` — ${c.detail}` : ""}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -328,8 +441,14 @@ export function Workspace({
               </Button>
             </form>
           )}
+          {lastFeedbackId && (
+            <Button variant="secondary" size="sm" onClick={proposeRule} disabled={ruleBusy}>
+              {ruleBusy ? "Analyzing…" : "Should this become a rule? (creates a proposal for you to approve)"}
+            </Button>
+          )}
           <p className="text-xs text-ink-soft">
-            Approve a Writing/Teacher profile update from the Writing or Teachers page if Sophira proposes one.
+            Corrections can become Teacher/Writing profile proposals — always subject to your approval on the
+            {" "}<Link href="/proposals" className="text-accent hover:underline">pending changes</Link> page.
           </p>
         </CardContent>
       </Card>

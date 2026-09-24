@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import { BookOpen, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone } from "lucide-react";
+import { BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone } from "lucide-react";
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -15,11 +15,17 @@ export default async function DashboardPage() {
   if (!profile) redirect("/login");
   if (!profile.onboarded) redirect("/onboarding");
 
-  const [{ data: courses }, { data: teachers }, { data: writingProfile }, { data: assignments }] = await Promise.all([
+  const [{ data: courses }, { data: teachers }, { data: writingProfile }, { data: assignments }, { count: pendingProposals }, { data: recentFeedback }] = await Promise.all([
     supabase.from("courses").select("*").order("created_at", { ascending: false }),
     supabase.from("teachers").select("id, name, notes").order("created_at", { ascending: false }),
     supabase.from("writing_profiles").select("*").order("created_at", { ascending: false }).limit(1),
     supabase.from("assignments").select("id, title, mode, status, updated_at").order("updated_at", { ascending: false }).limit(5),
+    supabase.from("profile_update_proposals").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase
+      .from("feedback")
+      .select("id, kind, comment, created_at, assignments ( title )")
+      .order("created_at", { ascending: false })
+      .limit(3),
   ]);
 
   const teacherName = (id: string | null) =>
@@ -51,6 +57,26 @@ export default async function DashboardPage() {
             <span className="text-sm text-ink-soft">Any subject, any level — explained the way you like.</span>
           </Link>
         </div>
+
+        {/* Pending profile changes */}
+        {(pendingProposals ?? 0) > 0 && (
+          <Link href="/proposals" className="block">
+            <Card className="border-accent/40 bg-accent-soft/40 transition hover:border-accent">
+              <CardContent className="flex items-center gap-3 p-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white">
+                  <ClipboardCheck className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-ink">
+                    {pendingProposals} proposed profile update{pendingProposals === 1 ? "" : "s"} waiting for you
+                  </p>
+                  <p className="text-xs text-ink-soft">Nothing changes until you approve or reject.</p>
+                </div>
+                <span className="text-sm text-accent">Review →</span>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
         {/* My courses */}
         <section>
@@ -178,6 +204,25 @@ export default async function DashboardPage() {
             />
           )}
         </section>
+
+        {/* Recent feedback */}
+        {recentFeedback && recentFeedback.length > 0 && (
+          <section>
+            <h2 className="mb-3 text-base font-semibold text-ink">Recent feedback</h2>
+            <div className="divide-y divide-ink/5 rounded-card border border-ink/10 bg-white">
+              {recentFeedback.map((f) => (
+                <div key={f.id} className="p-4">
+                  <p className="truncate text-sm text-ink">{f.comment}</p>
+                  <p className="mt-1 text-xs text-ink-soft">
+                    {fmtDate(f.created_at)}
+                    {Array.isArray(f.assignments) && f.assignments[0]?.title ? ` · ${f.assignments[0].title}` : ""}
+                    {typeof f.assignments === "object" && !Array.isArray(f.assignments) && (f.assignments as { title?: string })?.title ? ` · ${(f.assignments as { title?: string }).title}` : ""}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Footer links */}
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-ink/10 pt-5 text-sm text-ink-soft">

@@ -62,10 +62,84 @@ async function extractText(bytes: Buffer, mime: string, name: string): Promise<E
   }
 
   if (mime.includes("wordprocessingml") || lower.endsWith(".docx")) {
-    return { text: "", confidence: "failed", notes: "Word (.docx) files aren't supported yet. Please export the document as a PDF, or paste the text directly." };
+    // DOCX support (spec §11): mammoth converts to HTML, then we preserve
+    // document structure (headings, lists, tables) as lightweight Markdown-ish
+    // text instead of a wall of prose.
+    try {
+      const mammoth = await import("mammoth");
+      const { value: html } = await mammoth.convertToHtml({ buffer: bytes });
+      const text = docxHtmlToStructuredText(html);
+      const clean = text.trim();
+      if (clean.length < 80) {
+        return { text: clean, confidence: "low", notes: "This Word document contained very little text (it may be mostly images). Try a PDF export, a photo of the page, or paste the text." };
+      }
+      return {
+        text: clean,
+        confidence: "high",
+        notes: "Text extracted from the Word document with headings, lists, and tables preserved where possible. Equations embedded as images could not be read — check any math carefully.",
+      };
+    } catch {
+      return { text: "", confidence: "failed", notes: "This Word document could not be read (it may be corrupted, or an older .doc format — only .docx is supported). Export it as PDF or paste the text." };
+    }
   }
 
   return { text: "", confidence: "failed", notes: `Unsupported file type${mime ? ` (${mime})` : ""}. I can read PDFs, plain text, and images. You can always paste the text instead.` };
+}
+
+
+/**
+ * Converts mammoth's HTML output to structured plain text, keeping document
+ * structure visible: headings, ordered/unordered lists, and tables
+ * (spec §11: "do not reduce every document to an unstructured wall of text").
+ */
+function docxHtmlToStructuredText(html: string): string {
+  const inline = (h: string) =>
+    h
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|h1|h2|h3|h4|h5|h6|li|tr)>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+
+  let out = "";
+  // Headings -> Markdown-style #
+  out = html.replace(/<h1[^>]*>(.*?)<\/h1>/gis, (_m: string, t: string) => `# ${inline(t)}\n`);
+  out = out.replace(/<h2[^>]*>(.*?)<\/h2>/gis, (_m: string, t: string) => `## ${inline(t)}\n`);
+  out = out.replace(/<h3[^>]*>(.*?)<\/h3>/gis, (_m: string, t: string) => `### ${inline(t)}\n`);
+  out = out.replace(/<h[456][^>]*>(.*?)<\/h[456]>/gis, (_m: string, t: string) => `#### ${inline(t)}\n`);
+  // Ordered lists -> numbered lines (preserves question numbering)
+  let ol = 1;
+  out = out.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gis, (_m: string, body: string) => {
+    ol = 1;
+    return body.replace(/<li[^>]*>([\s\S]*?)<\/li>/gis, (_l: string, li: string) => `${ol++}. ${inline(li).trim()}\n`);
+  });
+  out = out.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gis, (_m: string, body: string) =>
+    body.replace(/<li[^>]*>([\s\S]*?)<\/li>/gis, (_l: string, li: string) => `- ${inline(li).trim()}\n`)
+  );
+  // Tables -> pipe rows
+  out = out.replace(/<table[^>]*>([\s\S]*?)<\/table>/gis, (_m: string, body: string) => {
+    const rows: string[] = [];
+    const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gis;
+    let m: RegExpExecArray | null;
+    while ((m = rowRe.exec(body)) !== null) {
+      const cellRe = /<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gis;
+      const cells: string[] = [];
+      let c: RegExpExecArray | null;
+      while ((c = cellRe.exec(m[1])) !== null) cells.push(inline(c[1]).trim());
+      rows.push(`| ${cells.join(" | ")} |`);
+    }
+    return rows.join("\n") + "\n";
+  });
+
+  // Paragraphs and anything left
+  out = out.replace(/<p[^>]*>([\s\S]*?)<\/p>/gis, (_m: string, t: string) => `${inline(t).trim()}\n`);
+  out = inline(out);
+  // collapse 3+ newlines, tidy list numbering artifacts
+  return out.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export async function POST(request: NextRequest) {
