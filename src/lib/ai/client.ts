@@ -1,5 +1,5 @@
-import type { Mode } from "./types";
-import type { Course, Profile, TeacherProfile, WritingProfile } from "./types";
+import type { Mode } from "../types";
+import type { Course, Profile, TeacherProfile, WritingProfile } from "../types";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";

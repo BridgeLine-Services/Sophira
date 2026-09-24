@@ -93,7 +93,8 @@ export async function POST(request: NextRequest) {
   const proposedChanges: Record<string, string> = {};
   if (rules) {
     for (const f of FIELDS) {
-      if (rules[f]) proposedChanges[f] = rules[f];
+      const v = rules[f];
+      if (v) proposedChanges[f] = v;
     }
   }
   if (Object.keys(proposedChanges).length === 0) {
