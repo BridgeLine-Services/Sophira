@@ -18,7 +18,7 @@
 
 import type { Course, Mode, Profile, TeacherProfile, WritingProfile } from "../types";
 import type { LearningPattern } from "../learning/patterns";
-import { patternsForPrompt, selectApplicablePatterns } from "../learning/patterns";
+import { patternsForPrompt, selectApplicablePatterns, intentionalWritingHabits } from "../learning/patterns";
 
 export interface TeacherSourceDoc {
   title: string;
@@ -39,7 +39,12 @@ export interface AppliedContext {
   course: { name: string | null; applied: boolean };
   writing_profile: { applied: boolean; reason: string };
   classification: { subject: string | null; task_type: string | null; level: string | null } | null;
-  learning: { mistakes_applied: string[]; methods_applied: string[]; patterns_considered: number };
+  learning: {
+    mistakes_applied: string[];
+    methods_applied: string[];
+    writing_habits_applied?: string[];
+    patterns_considered: number;
+  };
   conflicts: ContextConflict[];
   verification_method: "computational" | "self_check" | "none";
 }
@@ -299,10 +304,15 @@ export function composeAcademicContext(args: ComposeArgs): ComposedContext {
   // active status) enter the prompt. Corrected/inactive mistakes are excluded —
   // they must never be reintroduced (workflow §12).
   let appliedPatterns: LearningPattern[] = [];
+  let appliedHabits: string[] = [];
   if (args.learningPatterns?.length) {
     appliedPatterns = selectApplicablePatterns(args.learningPatterns, args.patternContext || {});
     const forPrompt = patternsForPrompt(appliedPatterns);
-    if (forPrompt.mistakeAwareness.length || forPrompt.methodPreferences.length) {
+    // Intentionally preserved habits (workflow §12): ONLY in writing tasks,
+    // ONLY as style reproduction, and assignment/teacher requirements win.
+    const habits = isWritingTask ? intentionalWritingHabits(appliedPatterns) : [];
+    appliedHabits = habits;
+    if (forPrompt.mistakeAwareness.length || forPrompt.methodPreferences.length || habits.length) {
       const mbits: string[] = [];
       if (forPrompt.mistakeAwareness.length) {
         mbits.push(
@@ -314,6 +324,12 @@ export function composeAcademicContext(args: ComposeArgs): ComposedContext {
         mbits.push(
           "LEARNED METHODS/PREFERENCES (how this student actually works — use where they do not conflict with the teacher's required method):\n" +
             forPrompt.methodPreferences.join("\n")
+        );
+      }
+      if (habits.length) {
+        mbits.push(
+          "ESTABLISHED WRITING HABITS THE STUDENT EXPLICITLY ASKED TO PRESERVE (reproduce these ONLY as part of matching the student's demonstrated writing voice; NEVER in fresh academic reasoning; current assignment and teacher requirements ALWAYS override them):\n" +
+            habits.join("\n")
         );
       }
       promptSections.push(mbits.join("\n\n"));
@@ -353,6 +369,7 @@ export function composeAcademicContext(args: ComposeArgs): ComposedContext {
       return {
         mistakes_applied: fp.mistakeAwareness.map((m) => m.replace(/^- /, "")),
         methods_applied: fp.methodPreferences.map((m) => m.replace(/^- /, "")),
+        writing_habits_applied: appliedHabits.map((h) => h.replace(/^- /, "")),
         patterns_considered: args.learningPatterns?.length ?? 0,
       };
     })(),

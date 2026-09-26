@@ -19,11 +19,14 @@ export const dynamic = "force-dynamic";
  *           mark_corrected "I don't make this mistake anymore"
  *           reactivate     "it came back"
  *           mark_temporary "that was a one-off"
+ *         plus the explicit habit toggle (workflow §12):
+ *           set_intentional "this is my established writing style — preserve it"
  *         No AI path silently rewrites a pattern's state — the model may only
  *         record new observations (via /api/ai/solve), never confirm/correct.
  * DELETE — forget a pattern entirely.
  */
 const ACTIONS: PatternAction[] = ["confirm", "mark_corrected", "reactivate", "mark_temporary"];
+const SET_INTENTIONAL = "set_intentional";
 
 export async function GET() {
   const supabase = createClient();
@@ -44,14 +47,15 @@ export async function PATCH(request: NextRequest) {
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 
-  let body: { id?: string; action?: string; correction_source?: string };
+  let body: { id?: string; action?: string; correction_source?: string; intentional?: boolean };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
   const { id, action } = body;
-  if (!id || !action || !ACTIONS.includes(action as PatternAction)) {
+  const isIntentionalToggle = action === SET_INTENTIONAL;
+  if (!id || !action || (!isIntentionalToggle && !ACTIONS.includes(action as PatternAction))) {
     return NextResponse.json({ error: "Missing pattern id or valid action." }, { status: 400 });
   }
 
@@ -63,6 +67,23 @@ export async function PATCH(request: NextRequest) {
     .single();
   if (!pattern) return NextResponse.json({ error: "That pattern could not be found." }, { status: 404 });
 
+  if (isIntentionalToggle) {
+    // Workflow §12: preserving an established habit is an EXPLICIT user
+    // decision only — and only meaningful for mistakes (style reproduction).
+    if (pattern.kind !== "mistake") {
+      return NextResponse.json({ error: "Only a mistake pattern can be preserved as a writing habit." }, { status: 400 });
+    }
+    const intentional = body.intentional !== false; // default true when toggled on
+    const { data: updated, error } = await supabase
+      .from("learning_patterns")
+      .update({ intentional, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ data: updated });
+  }
+
   const t = transitionPattern(pattern, action as PatternAction, {
     source: "user" as PatternSource,
     correctionSource: body.correction_source,
@@ -72,6 +93,7 @@ export async function PATCH(request: NextRequest) {
     .update({
       status: t.status,
       confidence: t.confidence,
+      intentional: false, // any state change re-evaluates habit preservation
       ...(t.source ? { source: t.source } : {}),
       ...(t.correction_source !== undefined ? { correction_source: t.correction_source } : {}),
       updated_at: new Date().toISOString(),

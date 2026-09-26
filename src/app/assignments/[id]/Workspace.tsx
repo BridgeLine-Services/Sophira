@@ -53,6 +53,7 @@ interface AppliedWriting { applied: boolean; reason: string }
 interface AppliedLearning {
   mistakes_applied: string[];
   methods_applied: string[];
+  writing_habits_applied?: string[];
   patterns_considered: number;
 }
 interface AppliedContextData {
@@ -340,7 +341,8 @@ export function Workspace({
               </li>
               {contextApplied.learning &&
                 (contextApplied.learning.mistakes_applied.length > 0 ||
-                  contextApplied.learning.methods_applied.length > 0) && (
+                  contextApplied.learning.methods_applied.length > 0 ||
+                  (contextApplied.learning.writing_habits_applied?.length ?? 0) > 0) && (
                 <span className="flex items-start gap-1.5">
                   {contextApplied.learning.mistakes_applied.length > 0 ? (
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
@@ -356,6 +358,8 @@ export function Workspace({
                       " · "}
                     {contextApplied.learning.methods_applied.length > 0 &&
                       `${contextApplied.learning.methods_applied.length} learned method${contextApplied.learning.methods_applied.length === 1 ? "" : "s"}`}
+                    {(contextApplied.learning.writing_habits_applied?.length ?? 0) > 0 &&
+                      ` · ${(contextApplied.learning.writing_habits_applied!.length)} preserved writing habit${contextApplied.learning.writing_habits_applied!.length === 1 ? "" : "s"}`}
                     {" "}(<Link href="/corrections" className="text-accent hover:underline">review what I know</Link>)
                   </span>
                 </span>

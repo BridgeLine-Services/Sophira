@@ -21,7 +21,7 @@ import { docxHtmlToStructuredText, parsePptx, parseSpreadsheet, parseCsv } from 
 import {
   scopeMatches, selectApplicablePatterns, bumpedConfidence, normalizeObservedMistakes,
   matchesExistingPattern, transitionPattern, patternsForPrompt, describePatternStatus,
-  type LearningPattern,
+  intentionalWritingHabits, type LearningPattern,
 } from "../src/lib/learning/patterns";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 
@@ -474,6 +474,64 @@ section("11. Composer applies learning honestly — what was applied comes from 
   assert(composed.applied.learning.mistakes_applied.length === 1, "applied metadata reports mistakes honestly");
   assert(composed.applied.learning.methods_applied.length === 1, "applied metadata reports learned methods honestly");
   assert(composed.applied.learning.patterns_considered === 4, "patterns considered counts ALL patterns, applied lists only relevant ones");
+}
+
+
+section("12. Intentionally preserved habits — explicit opt-in, writing only (workflow §12)");
+{
+  const habit = mkPattern({
+    kind: "mistake", intentional: true, status: "active",
+    description: "Long, winding sentences with several commas before the point",
+  });
+  const notHabit = mkPattern({
+    kind: "mistake", intentional: false, status: "active",
+    description: "Forgets to double-check the discriminant before solving",
+  });
+  const correctedHabit = mkPattern({
+    kind: "mistake", intentional: true, status: "corrected",
+    description: "Old habit that was fixed and stays fixed",
+  });
+  const methodIntentional = mkPattern({
+    kind: "method", intentional: true, status: "active",
+    description: "Some method flagged by mistake",
+  });
+  const lines = intentionalWritingHabits([habit, notHabit, correctedHabit, methodIntentional]);
+  assert(lines.length === 1, "only explicit, applyable, intentional MISTAKES qualify as habits");
+  assert(lines[0].includes("Long, winding sentences"), "the habit line describes the preserved mistake");
+  assert(lines[0].includes("explicitly preserved"), "habit lines are labeled as explicitly preserved, never guessed");
+
+  // In the composer: habits enter ONLY writing tasks; a math task with the same
+  // pattern set must not contain the habit line.
+  const course: Course = {
+    id: "c1", user_id: "u1", name: "English 101", subject: "English",
+    academic_level: "High school", institution: null, term: null, teacher_id: null,
+    instructions: "", created_at: "",
+  };
+  const writing = composeAcademicContext({
+    profile, course, teacherName: null, teacherProfile: null,
+    writingProfile: null, mode: "writing", isWritingTask: true,
+    subject: "English",
+    learningPatterns: [habit, notHabit],
+    patternContext: { subject: "English" },
+  });
+  const wj = writing.promptSections.join("\n");
+  assert(wj.includes("ESTABLISHED WRITING HABITS THE STUDENT EXPLICITLY ASKED TO PRESERVE"), "habit section enters the prompt for writing tasks");
+  assert(wj.includes("current assignment and teacher requirements ALWAYS override"), "habit section states that requirements override the habit");
+  assert(writing.applied.learning.writing_habits_applied?.length === 1, "applied metadata reports preserved habits honestly");
+
+  const mathTask = composeAcademicContext({
+    profile, course, teacherName: null, teacherProfile: null,
+    writingProfile: null, mode: "assignment", isWritingTask: false,
+    subject: "Calculus",
+    learningPatterns: [habit],
+    patternContext: { subject: "Calculus", course_id: "c1" },
+  });
+  // In a math task the same pattern may still appear as a watch-for mistake
+  // (correct — the AI should still check for it), but NEVER as a preserved habit.
+  const mj = mathTask.promptSections.join("\n");
+  assert(!mj.includes("ESTABLISHED WRITING HABITS"), "the habit section NEVER enters non-writing tasks");
+  assert(mj.includes("KNOWN RECURRING MISTAKES"), "in math the pattern remains an honest watch-for mistake");
+  assert((mathTask.applied.learning.writing_habits_applied?.length ?? 0) === 0, "applied metadata reports zero habits for non-writing tasks");
 }
 
 

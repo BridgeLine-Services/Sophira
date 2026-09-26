@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardContent, EmptyState, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { describePatternStatus, type LearningPattern } from "@/lib/learning/patterns";
-import { AlertTriangle, CheckCircle2, RotateCcw, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Pencil, RotateCcw, Trash2 } from "lucide-react";
 
 /**
  * Learning & Corrections (workflow §9–§12): the student's structured personal
@@ -49,6 +49,20 @@ export function CorrectionsPanel({ initialPatterns }: { initialPatterns: Learnin
     }
   }
 
+  async function toggleHabit(p: LearningPattern) {
+    setBusyId(p.id);
+    try {
+      await fetch("/api/learning/patterns", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p.id, action: "set_intentional", intentional: !p.intentional }),
+      });
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function forget(id: string) {
     setBusyId(id);
     try {
@@ -72,6 +86,7 @@ export function CorrectionsPanel({ initialPatterns }: { initialPatterns: Learnin
             <Badge>{KIND_LABEL[p.kind]}</Badge>
             <Badge>{p.scope}{p.subject ? `: ${p.subject}` : ""}</Badge>
             <Badge>{describePatternStatus(p.status)}</Badge>
+            {p.intentional && <Badge>preserved writing habit</Badge>}
           </p>
           <p className="mt-0.5 text-xs text-ink-soft">
             first observed {fmtDate(p.first_observed)} · last observed {fmtDate(p.last_observed)} ·
@@ -87,6 +102,18 @@ export function CorrectionsPanel({ initialPatterns }: { initialPatterns: Learnin
           {["candidate", "active", "recurring", "temporary"].includes(p.status) && (
             <Button size="sm" variant="secondary" disabled={busyId === p.id} onClick={() => act(p.id, "mark_corrected")}>
               I&apos;ve fixed this
+            </Button>
+          )}
+          {p.kind === "mistake" && ["active", "recurring", "temporary"].includes(p.status) && (
+            <Button
+              size="sm"
+              variant={p.intentional ? "secondary" : "ghost"}
+              disabled={busyId === p.id}
+              onClick={() => toggleHabit(p)}
+              title="Only for matching your established writing voice — never in fresh academic work, and teacher requirements always win."
+            >
+              <Pencil className="h-4 w-4" />
+              {p.intentional ? "Stop matching" : "Match in my writing"}
             </Button>
           )}
           {["corrected", "inactive"].includes(p.status) && (

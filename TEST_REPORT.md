@@ -2,7 +2,7 @@
 
 Date: 2026-09-26 (membership & learning upgrade) · Next 14.2.35, strict TypeScript · `npm test` + `npm run build`
 
-## 1. Automated tests — ✅ 125 / 125 PASSED (`npm test`, fully offline)
+## 1. Automated tests — ✅ 134 / 134 PASSED (`npm test`, fully offline)
 
 | Area | Assertions | Result |
 |---|---|---|
@@ -19,6 +19,7 @@ Date: 2026-09-26 (membership & learning upgrade) · Next 14.2.35, strict TypeScr
 | **NEW** Learning-pattern lifecycle: candidate→active on confirm (confidence ≥0.85); mark_corrected records source; corrected→recurring on return; temporary caps confidence; confidence ceiling; observed-mistake normalization (junk dropped, subjects kept); similarity matching incl. paraphrase and non-match | 14 | ✅ |
 | **NEW** Learning-scope leakage: calculus/biology subject scoping, teacher A's method never reaches teacher B, global always applies, corrected never applied, course-scope matching | 7 | ✅ |
 | **NEW** Honest applied-context: applicable mistakes/methods enter the prompt; corrected and out-of-scope patterns excluded; mistakes framed watch-for; applied metadata reflects real state | 9 | ✅ |
+| **NEW** §12 preserved writing habits: only explicit opt-in mistakes qualify; enter the prompt ONLY for writing tasks with an "requirements always override" caveat; stay honest watch-for mistakes in math tasks; applied metadata reports them separately | 5 | ✅ |
 | **NEW** DOCX structure extraction (headings, question numbering, tables) + CSV | 4 | ✅ |
 | **NEW** XLSX round-trip (built in memory with the app's own library, parsed back: sheets, cells, honest notes) | 3 | ✅ |
 | **NEW** PPTX round-trip (minimal deck built with JSZip: slide title, body, speaker notes) | 3 | ✅ |

@@ -43,6 +43,9 @@ export interface LearningPattern {
   confidence: number;
   source: PatternSource;
   correction_source: string;
+  /** Set ONLY by explicit user action: this mistake is part of my established
+   *  writing voice and may be reproduced in writing tasks (workflow §12). */
+  intentional: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -241,6 +244,20 @@ export function patternsForPrompt(patterns: LearningPattern[]): PatternsForPromp
     mistakeAwareness: mistakeAwareness.slice(0, 8),
     methodPreferences: methodPreferences.slice(0, 8),
   };
+}
+
+/**
+ * Intentionally preserved habits (workflow §12). ONLY explicit opt-in
+ * mistakes with an applyable status qualify, and they are used EXCLUSIVELY
+ * as writing-voice reproduction in writing tasks — never in fresh academic
+ * work, never when a teacher requirement conflicts (the composer states
+ * that assignment/teacher requirements win over any habit).
+ */
+export function intentionalWritingHabits(patterns: LearningPattern[]): string[] {
+  return patterns
+    .filter((p) => p.kind === "mistake" && p.intentional && APPLYABLE_STATUSES.includes(p.status))
+    .map((p) => `- Established stylistic habit of this student (explicitly preserved): ${p.description}`)
+    .slice(0, 8);
 }
 
 /** Human-readable explanation of what pattern state was applied to a response. */

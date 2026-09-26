@@ -223,12 +223,14 @@ optional and not required to use Sophira.
 
 ## Testing
 
-- `npm test` — 125 unit/integration assertions: isolation, conditionality,
+- `npm test` — 134 unit/integration assertions: isolation, conditionality,
   conflicts, injection defense, subject + math-topic routing, all six verifier
   kinds, method-compliance honesty guards, offline round-trip parsing of a
   real XLSX and PPTX, the learning-pattern lifecycle (confirm → corrected →
   recurring, temporary caps), scope leakage (subject/course/teacher/global),
-  and honest applied-context metadata. Runs fully offline.
+  honest applied-context metadata, and the §12 preserved-writing-habit
+  guard (explicit opt-in, writing tasks only, requirements always win).
+  Runs fully offline.
 - Live workflow verification (real auth, real Supabase, two accounts) is
   documented in `docs/ACCEPTANCE_TESTS.md` — see `TEST_REPORT.md` for which
   scenarios are unit-verified vs. what needs a live backend.
