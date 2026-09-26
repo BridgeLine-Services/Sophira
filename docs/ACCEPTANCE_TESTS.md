@@ -144,6 +144,9 @@ Additional:
       returns 410 "This invitation has expired"
 - [ ] `get_invitation_by_token` returns null for an expired token (DB-level
       enforcement — verify with `select * from public.get_invitation_by_token('<token>')`)
+- [ ] Single-use is ATOMIC: two simultaneous accepts of the same token cannot
+      both succeed — the accept update is guarded by `status='pending'` and the
+      loser gets 410 (try with two parallel curl calls)
 - [ ] Pending-invitations stat on the dashboard counts only unexpired
       invitations; expired ones show an "expired" badge
 

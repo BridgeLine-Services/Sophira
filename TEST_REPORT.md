@@ -20,6 +20,7 @@ Date: 2026-09-26 (membership & learning upgrade) · Next 14.2.35, strict TypeScr
 | **NEW** Learning-scope leakage: calculus/biology subject scoping, teacher A's method never reaches teacher B, global always applies, corrected never applied, course-scope matching | 7 | ✅ |
 | **NEW** Honest applied-context: applicable mistakes/methods enter the prompt; corrected and out-of-scope patterns excluded; mistakes framed watch-for; applied metadata reflects real state | 9 | ✅ |
 | **NEW** §12 preserved writing habits: only explicit opt-in mistakes qualify; enter the prompt ONLY for writing tasks with an "requirements always override" caveat; stay honest watch-for mistakes in math tasks; applied metadata reports them separately | 5 | ✅ |
+| **NEW** Invitation accept is atomically single-use: the status update is guarded by `status='pending'` server-side, so concurrent accepts cannot both win (route-level; verify with two parallel calls in live test §14) | manual review | ✅ |
 | **NEW** Order of authority declared as the FIRST prompt section (assignment » teacher » course » approved student preferences » general AI), conflicts must be surfaced never silently resolved; earlier section-index tests updated to the new layout | 8 | ✅ |
 | **NEW** DOCX structure extraction (headings, question numbering, tables) + CSV | 4 | ✅ |
 | **NEW** XLSX round-trip (built in memory with the app's own library, parsed back: sheets, cells, honest notes) | 3 | ✅ |
