@@ -48,11 +48,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { error: uErr } = await admin
+  // Atomic single-use enforcement: the update only fires while the row is
+  // STILL pending, so two concurrent accepts cannot both succeed (the loser
+  // sees zero affected rows and gets the already-used response).
+  const { data: accepted, error: uErr } = await admin
     .from("invitations")
     .update({ status: "accepted", accepted_at: new Date().toISOString() })
-    .eq("id", invitation.id);
-  if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
+    .eq("id", invitation.id)
+    .eq("status", "pending")
+    .select("id")
+    .single();
+  if (uErr || !accepted) {
+    return NextResponse.json({ error: "That invitation was already used or revoked." }, { status: 410 });
+  }
 
   return NextResponse.json({ data: { ok: true } });
 }
