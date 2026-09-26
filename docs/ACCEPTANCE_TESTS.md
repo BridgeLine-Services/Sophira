@@ -118,3 +118,30 @@ invitation.
       corrected this / Use a different method / Teacher wanted something else /
       This is how I normally do it / That rule isn't correct anymore / Only
       for this assignment / Note
+
+## 14. Invitation expiry (added 2026-09-26)
+- [ ] Owner creates an invitation with a 1-day expiry → the invitation row in
+      the dashboard shows the expiry date
+- [ ] Before expiry: the signup link opens signup with the invited email
+      pre-filled; after expiry (or with the clock moved): the same link shows
+      the invalid/expired invitation state, and `/api/invitations/accept`
+      returns 410 "This invitation has expired"
+- [ ] `get_invitation_by_token` returns null for an expired token (DB-level
+      enforcement — verify with `select * from public.get_invitation_by_token('<token>')`)
+- [ ] Pending-invitations stat on the dashboard counts only unexpired
+      invitations; expired ones show an "expired" badge
+
+## 15. Preserved writing habits (added 2026-09-26)
+- [ ] Student A has an active mistake pattern on the Corrections page →
+      button "Match in my writing" appears (mistake patterns only)
+- [ ] Toggle it → badge "preserved writing habit" appears
+- [ ] Writing assignment: "What was applied" reports "N preserved writing
+      habit(s)"; the AI matches the habit as part of the demonstrated voice
+- [ ] Math assignment with the same pattern: NO habit is applied (the pattern
+      remains an honest watch-for mistake; applied metadata reports zero
+      habits) — unit-tested in tests/run.ts §12
+- [ ] Teacher requirement that conflicts with the habit still wins in the
+      generated answer
+- [ ] Any lifecycle change (confirm / fixed / came back) clears the
+      intentional flag — habits are re-confirmed explicitly, never carried
+      over silently
