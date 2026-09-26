@@ -11,22 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+        with: { node-version: 20, cache: npm }
       - run: npm ci
-      - name: Unit & integration tests (offline, 141 assertions)
+      - name: Unit and integration tests (offline, 141 assertions)
         run: npm test
-      - name: TypeScript check
+      - name: TypeScript strict check
         run: npx tsc --noEmit -p tsconfig.json
       - name: Production build
         run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-          # Public vars only — the Next build requires placeholders; real
-          # values are set at deploy time. Never put service keys here.
-      - name: Native projects still present
+      - name: Native projects present and intact
         run: |
-          test -d android && test -d ios && test -d src-tauri
-          test -f capacitor.config.ts
+          test -f android/app/build.gradle && test -x android/gradlew
+          test -f ios/App/App.xcodeproj/project.pbxproj && test -f ios/App/App.xcworkspace && test -f ios/App/Podfile
+          test -f src-tauri/tauri.conf.json && test -f src-tauri/Cargo.toml && test -f src-tauri/icons/icon.icns && test -f src-tauri/icons/icon.ico
+          test -f capacitor.config.ts && test -f public/manifest.webmanifest
+          echo "All native projects validated."
