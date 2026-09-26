@@ -31,6 +31,24 @@ export async function middleware(request: NextRequest) {
     url.searchParams.set("next", path);
     return NextResponse.redirect(url);
   }
+
+  // Revoked membership: explicit Access Denied on every protected route —
+  // not just hidden nav links (workflow §3, §23). Defense in depth: pages
+  // and API routes also check status independently.
+  if (user && !isPublic && path !== "/access-denied") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("status")
+      .eq("id", user.id)
+      .single();
+    if (profile && profile.status === "revoked") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/access-denied";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (user && (path === "/login" || path === "/signup")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";

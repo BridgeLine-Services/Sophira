@@ -13,6 +13,9 @@ export interface Profile {
   accessibility_prefs: Record<string, unknown>;
   preferred_language: string | null;
   onboarded: boolean;
+  status: "active" | "revoked";
+  last_active_at: string | null;
+  can_request_invites: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +28,34 @@ export interface Invitation {
   invited_by: string;
   created_at: string;
   accepted_at: string | null;
+}
+
+export interface InvitationRequest {
+  id: string;
+  requester_id: string;
+  email: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  decided_by: string | null;
+  decision_note: string;
+  decided_at: string | null;
+  invitation_id: string | null;
+  created_at: string;
+}
+
+/** Aggregate-only per-member statistics for the Owner Dashboard (privacy-safe:
+ *  no academic content, just counts and timestamps — workflow §22). */
+export interface NetworkMemberStats {
+  user_id: string;
+  display_name: string;
+  role: "owner" | "user";
+  status: "active" | "revoked";
+  onboarded: boolean;
+  created_at: string;
+  last_active_at: string | null;
+  assignment_count: number;
+  response_count: number;
+  subject_usage: { subject: string; count: number }[];
 }
 
 export interface Teacher {
@@ -188,9 +219,25 @@ export interface Feedback {
   assignment_id: string | null;
   course_id: string | null;
   teacher_id: string | null;
-  kind: "approve" | "error" | "correction" | "teacher_wanted" | "writing_pref" | "note";
+  kind:
+    | "approve"
+    | "error"
+    | "correction"
+    | "teacher_corrected"
+    | "different_method"
+    | "teacher_wanted"
+    | "writing_pref"
+    | "this_is_normal"
+    | "no_longer_correct"
+    | "remember"
+    | "forget"
+    | "assignment_only"
+    | "note";
   comment: string;
   content: string;
+  subject: string | null;
+  scope: "global" | "subject" | "course" | "teacher" | "assignment" | "task_type";
+  pattern_id: string | null;
   created_at: string;
 }
 

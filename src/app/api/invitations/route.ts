@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
+import { requireOwner } from "@/lib/supabase/guard";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-async function requireOwner() {
+async function ownerClient() {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) };
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (!profile || profile.role !== "owner") {
-    return { error: NextResponse.json({ error: "Only the owner can manage invitations." }, { status: 403 }) };
-  }
-  return { supabase };
+  const guard = await requireOwner(supabase);
+  if (!guard.ok) return { supabase: null, error: guard.response };
+  return { supabase, error: null as null };
 }
 
 export async function GET() {
-  const { supabase, error } = await requireOwner();
-  if (error) return error;
+  const { supabase, error } = await ownerClient();
+  if (error || !supabase) return error!;
   const { data, error: qErr } = await supabase
     .from("invitations")
     .select("*")
@@ -27,8 +25,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { supabase, error } = await requireOwner();
-  if (error) return error;
+  const { supabase, error } = await ownerClient();
+  if (error || !supabase) return error!;
 
   let body: { email?: string };
   try {
@@ -53,9 +51,31 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ data: { ...data, link: `${origin}/signup?invite=${token}` } });
 }
 
+export async function PATCH(request: NextRequest) {
+  // Revoke a pending invitation: the link stops working, but the record is
+  // kept (unlike DELETE) so the owner can still see its status.
+  const { supabase, error } = await ownerClient();
+  if (error || !supabase) return error!;
+
+  let body: { id?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+  if (!body.id) return NextResponse.json({ error: "Missing invitation id." }, { status: 400 });
+  const { error: uErr } = await supabase
+    .from("invitations")
+    .update({ status: "revoked" })
+    .eq("id", body.id)
+    .eq("status", "pending");
+  if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
+  return NextResponse.json({ data: { ok: true } });
+}
+
 export async function DELETE(request: NextRequest) {
-  const { supabase, error } = await requireOwner();
-  if (error) return error;
+  const { supabase, error } = await ownerClient();
+  if (error || !supabase) return error!;
 
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing invitation id." }, { status: 400 });

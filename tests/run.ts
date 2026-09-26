@@ -46,7 +46,8 @@ const profile: Profile = {
   academic_level: "High school", explanation_level: "thorough",
   answer_style: "detailed paragraphs", formatting_pref: null,
   learning_prefs: {}, accessibility_prefs: {}, preferred_language: null,
-  onboarded: true, created_at: "", updated_at: "",
+  onboarded: true, status: "active", last_active_at: null, can_request_invites: false,
+  created_at: "", updated_at: "",
 };
 
 const teacherProfileA = {
