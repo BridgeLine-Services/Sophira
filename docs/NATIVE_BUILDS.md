@@ -127,7 +127,12 @@ No secrets are bundled; the window loads your HTTPS deployment. Icons were
 generated with `npx tauri icon public/icons/icon-512.png` (regenerate the same
 way if you replace the brand icon).
 
-## Release pipeline (.github/workflows/release.yml)
+## Release pipeline (release.yml)
+
+> **Note:** the workflow definitions currently live in `.workflows-pending/`
+> because the repository's push token lacks the GitHub `workflow` scope.
+> Move them to `.github/workflows/` (see that folder's README) to activate CI
+> and the release pipeline.
 
 On a `v*` tag: tests → tsc → build → Android APK → iOS archive/ipa → desktop
 matrix (linux/windows/macos) → SHA-256 checksums → GitHub release with all

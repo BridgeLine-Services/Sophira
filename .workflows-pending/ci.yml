@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Unit & integration tests (offline, 141 assertions)
+        run: npm test
+      - name: TypeScript check
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: Production build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          # Public vars only — the Next build requires placeholders; real
+          # values are set at deploy time. Never put service keys here.
+      - name: Native projects still present
+        run: |
+          test -d android && test -d ios && test -d src-tauri
+          test -f capacitor.config.ts
