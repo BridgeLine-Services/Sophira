@@ -72,6 +72,36 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </Link>
         </div>
 
+        {/* More ways to work — quick launch (all modes are real, from MODES) */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {[
+            { id: "check", label: "Check my work" },
+            { id: "writing", label: "Writing" },
+            { id: "study", label: "Study" },
+            { id: "explain", label: "Explain simply" },
+            { id: "custom", label: "Custom help" },
+          ].map((m) => (
+            <Link
+              key={m.id}
+              href={`/assignments/new?mode=${m.id}`}
+              className="flex min-h-16 items-center justify-center rounded-card border border-ink/10 bg-white p-2 text-center text-sm font-medium text-ink shadow-sm transition active:scale-[0.99] hover:border-accent/40"
+            >
+              {m.label}
+            </Link>
+          ))}
+        </div>
+
+        {/* What I remember — real counts from your data (workflow §6) */}
+        <p className="text-sm text-ink-soft">
+          Working from <strong className="text-ink">{courses?.length ?? 0} course{(courses?.length ?? 0) === 1 ? "" : "s"}</strong>,{" "}
+          <strong className="text-ink">{teachers?.length ?? 0} teacher{(teachers?.length ?? 0) === 1 ? "" : "s"}</strong> with their profiles,{" "}
+          {wp
+            ? <>your <Link href="/writing" className="text-accent hover:underline">approved Writing Profile</Link>, and</>
+            : <>no <Link href="/writing" className="text-accent hover:underline">Writing Profile</Link> yet, and</>}{" "}
+          <strong className="text-ink">{activePatterns ?? 0} learned pattern{(activePatterns ?? 0) === 1 ? "" : "s"}</strong>{" "}
+          (<Link href="/corrections" className="text-accent hover:underline">corrections &amp; methods</Link>).
+        </p>
+
         {/* Pending profile changes */}
         {(pendingProposals ?? 0) > 0 && (
           <Link href="/proposals" className="block">
