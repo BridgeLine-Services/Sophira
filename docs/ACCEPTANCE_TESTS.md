@@ -135,6 +135,21 @@ Additional:
       This is how I normally do it / That rule isn't correct anymore / Only
       for this assignment / Note
 
+## 14a. Native builds (added 2026-09-26 — artifacts only when a release exists)
+- [ ] `Sophira-release.apk` from the release pipeline installs directly on a
+      real Android device (enable installs from your source), standalone
+      launch, login persists, camera upload, landscape + portrait
+- [ ] iOS: signed `.ipa` (requires Apple Developer cert + provisioning — see
+      docs/NATIVE_BUILDS.md) installs on a registered device, standalone
+      launch, login persists, photo upload; verify safe-area insets on notch devices
+- [ ] Desktop: `.msi`/`.dmg`/`.AppImage` launch a native window at the
+      deployment, window resizing, keyboard navigation, file upload; verify
+      NO private data is cached by the shell (it is a live web view)
+- [ ] `/downloads` shows exactly the artifacts the current release contains —
+      never claims an artifact that does not exist
+- [ ] PWA still installs from the browser after native packaging exists
+      (Sophira must never become store-only)
+
 ## 14. Invitation expiry (added 2026-09-26)
 - [ ] Owner creates an invitation with a 1-day expiry → the invitation row in
       the dashboard shows the expiry date

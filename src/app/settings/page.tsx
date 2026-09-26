@@ -10,7 +10,7 @@ import {
 } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { InvitationRequest, Profile } from "@/lib/types";
-import { ShieldCheck, Smartphone } from "lucide-react";
+import { ShieldCheck, Smartphone, Download } from "lucide-react";
 
 const LEVELS = ["Kindergarten/Elementary", "Middle school", "High school", "College/Undergraduate", "Graduate/Master's", "PhD", "Other"];
 const EXPLANATION = ["Simple", "Standard", "Advanced"];
@@ -208,6 +208,9 @@ export default function SettingsPage() {
             <p className="text-sm text-ink-soft">Add Sophira to your home screen so it opens like any app.</p>
             <Link href="/install" className="mt-3 inline-flex items-center gap-2">
               <Button variant="secondary"><Smartphone className="h-4 w-4" /> How to install</Button>
+            </Link>
+            <Link href="/downloads" className="mt-3 inline-flex items-center gap-2">
+              <Button variant="secondary"><Download className="h-4 w-4" /> Downloads</Button>
             </Link>
           </CardContent>
         </Card>

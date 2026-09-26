@@ -8,9 +8,20 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsc -p tests/tsconfig.json && node tests-dist/tests/run.js"
+    "test": "tsc -p tests/tsconfig.json && node tests-dist/tests/run.js",
+    "cap:sync": "cap sync android && cap sync ios",
+    "android:build": "cap sync android && cd android && ./gradlew assembleRelease",
+    "android:debug": "cap sync android && cd android && ./gradlew assembleDebug",
+    "ios:sync": "cap sync ios",
+    "desktop:build": "tauri build",
+    "desktop:dev": "tauri dev"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/camera": "^8.2.4",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.114.0",
     "clsx": "2.1.0",
@@ -26,6 +37,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.9",
+    "@tauri-apps/cli": "^2.12.0",
     "@types/node": "20.12.12",
     "@types/react": "18.3.1",
     "@types/react-dom": "18.3.0",

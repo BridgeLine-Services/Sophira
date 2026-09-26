@@ -231,6 +231,11 @@ optional and not required to use Sophira.
   honest applied-context metadata, and the §12 preserved-writing-habit
   guard (explicit opt-in, writing tasks only, requirements always win).
   Runs fully offline.
+- **Native targets** (web app stays canonical): `android/` + `ios/` (Capacitor,
+  real Gradle/Xcode projects) and `src-tauri/` (Tauri desktop app for
+  Windows/macOS/Linux). See `docs/NATIVE_BUILDS.md` for builds, signing and
+  the release pipeline (`.github/workflows/`). `/downloads` lists only
+  artifacts the current release actually contains.
 - `docs/MASTER_ACCEPTANCE_WORKFLOW.md` — the definitive end-to-end
   acceptance test (open → auth → access → course → teacher → assignment →
   upload → classify → solve → verify → correct → learn → persist → reuse →

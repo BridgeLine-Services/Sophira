@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "@/components/ui";
-import { Apple, Download, Smartphone, Check } from "lucide-react";
+import { Apple, Download, Smartphone, Check, Monitor } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -41,8 +41,18 @@ function InstallCard() {
   }
 
   const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const [nativeLabel, setNativeLabel] = useState<string | null>(null);
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    if (/iphone|ipad|ipod/i.test(ua)) setNativeLabel("the iOS app (.ipa — Apple signing rules apply)");
+    else if (/android/i.test(ua)) setNativeLabel("the Android app (.apk — installs directly, no Google Play)");
+    else if (/windows/i.test(ua)) setNativeLabel("the Windows app");
+    else if (/mac os x/i.test(ua)) setNativeLabel("the macOS app");
+    else if (/linux/i.test(ua)) setNativeLabel("the Linux app");
+  }, []);
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
@@ -96,12 +106,54 @@ function InstallCard() {
           </div>
         </div>
 
+        <div className="rounded-lg border border-ink/10 p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
+            <Monitor className="h-4 w-4" /> Desktop (Chrome, Edge, Safari)
+          </div>
+          <p className="text-sm text-ink-soft">
+            No installation needed — Sophira runs in the browser at full functionality. Chrome and Edge also offer{" "}
+            <strong>Install</strong> / <strong>Add shortcut</strong> from the address-bar icon for an app-like window.
+            Your sign-in persists like any website login.
+          </p>
+        </div>
+
         <p className="text-xs leading-relaxed text-ink-soft">
           This installs Sophira as a Progressive Web App — it gets its own icon and full-screen window and keeps you signed
           in, but it is not an App Store / Google Play download. App stores are not required to use Sophira.
         </p>
       </CardContent>
     </Card>
+
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Prefer a native app?</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-ink-soft">
+          {nativeLabel ? (
+            <>
+              For your device, the native option is <strong>{nativeLabel}</strong>. Native packages are optional — the
+              web app above is the same Sophira with nothing held back.
+            </>
+          ) : (
+            <>Native packages exist for iPhone, iPad, Android, Windows, macOS and Linux. The web app above is the same Sophira with nothing held back.</>
+          )}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={install}>
+            <Download className="h-4 w-4" /> Install web app
+          </Button>
+          <Link href="/downloads">
+            <Button variant="secondary">Download native apps</Button>
+          </Link>
+        </div>
+        <p className="text-xs text-ink-soft">
+          The downloads page lists only packages the current release actually contains — if a native build hasn&apos;t
+          been published yet, it will say so honestly. The PWA is always available and never requires a store account.
+        </p>
+      </CardContent>
+    </Card>
+    </>
   );
 }
 

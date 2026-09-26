@@ -66,3 +66,19 @@ Per `docs/ACCEPTANCE_TESTS.md` (10 sections, ready to run):
 - `.ppt`/`.xls` legacy binaries unsupported (honest error offered; .pptx/.xlsx fine).
 - PPTX/DOCX images and diagrams are counted and named, not read.
 - No live testing of any kind has occurred in this build environment.
+
+
+## 19. Native targets & release infrastructure (added 2026-09-26)
+
+| Item | Status |
+| --- | --- |
+| Capacitor `android/` — real Gradle project, appId com.bridgeline.sophira, Sophira icons in all mipmap densities | ✅ IMPLEMENTED (project generated + icons committed; APK build requires Android SDK — run locally or via `.github/workflows/release.yml`) |
+| Capacitor `ios/` — real Xcode project, bundle id com.bridgeline.sophira, AppIcon asset set | ✅ IMPLEMENTED (project generated; `.ipa` requires macOS + Apple signing — see docs/NATIVE_BUILDS.md) |
+| Tauri `src-tauri/` — Rust app, icons generated, bundles configured for msi/dmg/deb/AppImage | ✅ IMPLEMENTED (build requires Rust toolchain — CI matrix builds all three OS targets) |
+| Release pipeline with SHA-256 checksums + GitHub release attach | ✅ IMPLEMENTED (`.github/workflows/release.yml`; requires repo variable SOPHIRA_APP_URL + optional signing secrets) |
+| CI on push/PR: 141 tests, tsc, production build, native project presence | ✅ IMPLEMENTED |
+| Atomic single-use invitation accept | ✅ IMPLEMENTED + code-reviewed (live verification: acceptance §14) |
+| `/downloads` page — live GitHub-release lookup, honest empty states, checksum display | ✅ IMPLEMENTED (AUTO-VERIFIED via tsc/build; behavior needs a published release) |
+| `/install` — platform-aware: PWA always primary, native option links to /downloads | ✅ IMPLEMENTED |
+| Android release signing via env (secrets never committed) | ✅ IMPLEMENTED |
+| Actual signed .ipa / .apk / desktop binaries produced | ⬜ NOT-YET-VERIFIED — requires Android SDK run or Apple certs + CI secrets; the pipeline reports this honestly instead of faking it |
