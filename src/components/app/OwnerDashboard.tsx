@@ -25,6 +25,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   const [invitations, setInvitations] = useState(initialInvitations);
   const [requests, setRequests] = useState(initialRequests);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteExpires, setInviteExpires] = useState(14);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<NetworkMemberStats | null>(null);
@@ -65,7 +66,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
       const res = await fetch("/api/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail.trim() }),
+        body: JSON.stringify({ email: inviteEmail.trim(), expires_days: inviteExpires }),
       });
       const json = await res.json();
       if (res.ok) {
@@ -144,7 +145,9 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   }
 
   const activeMembers = members.filter((m) => m.status === "active");
-  const pendingInvites = invitations.filter((i) => i.status === "pending");
+  const isExpired = (i: Invitation) =>
+    i.status === "pending" && new Date(i.expires_at).getTime() <= Date.now();
+  const pendingInvites = invitations.filter((i) => i.status === "pending" && !isExpired(i));
   const pendingRequests = requests.filter((r) => r.status === "pending");
 
   const timeAgo = (iso: string | null) => {
@@ -250,6 +253,21 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                   placeholder="friend@example.com"
                 />
               </div>
+              <div>
+                <Label htmlFor="invite-expires">Expires in</Label>
+                <select
+                  id="invite-expires"
+                  className="h-10 w-full rounded-lg border border-ink/15 bg-white px-3 text-sm text-ink sm:w-36"
+                  value={inviteExpires}
+                  onChange={(e) => setInviteExpires(Number(e.target.value))}
+                >
+                  <option value={1}>1 day</option>
+                  <option value={7}>7 days</option>
+                  <option value={14}>14 days</option>
+                  <option value={30}>30 days</option>
+                  <option value={90}>90 days</option>
+                </select>
+              </div>
               <Button type="submit" disabled={inviteBusy}>
                 {inviteBusy ? "Creating…" : "Generate invitation link"}
               </Button>
@@ -263,7 +281,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
               </div>
             )}
             <p className="mt-2 text-xs text-ink-soft">
-              Each link is single-use, tied to that email, and you can revoke it any time.
+              Each link is single-use, tied to that email, expires automatically, and you can revoke it any time.
             </p>
           </CardContent>
         </Card>
@@ -276,11 +294,12 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
                       {i.email}
-                      <Badge>{i.status}</Badge>
+                      <Badge>{isExpired(i) ? "expired" : i.status}</Badge>
                     </p>
                     <p className="mt-0.5 text-xs text-ink-soft">
                       created {fmtDate(i.created_at)}
                       {i.accepted_at ? ` · accepted ${fmtDate(i.accepted_at)}` : ""}
+                      {i.status === "pending" && ` · expires ${fmtDate(i.expires_at)}`}
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">

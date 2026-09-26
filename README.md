@@ -166,8 +166,9 @@ Key design decisions:
    `0005_owner_membership_and_learning.sql`.
    (This creates all tables with RLS, the signup trigger, the private
    `private-docs` storage bucket, owner-only invitation policies, invitation
-   requests, the learning-pattern lifecycle, and the privacy-safe aggregate
-   owner-analytics function.)
+   requests, the learning-pattern lifecycle, the privacy-safe aggregate
+   owner-analytics function, and invitation expiry (default 14 days, enforced
+   in the token-lookup function and accept route).
 3. In **Authentication → Providers**, keep Email enabled. For a truly closed
    group, also set **Authentication → Sign In / Up → "Confirm email" on**, and
    consider disabling anonymous access. The app UI is invite-only; note that

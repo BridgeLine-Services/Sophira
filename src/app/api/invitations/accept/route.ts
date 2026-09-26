@@ -35,6 +35,12 @@ export async function POST(request: NextRequest) {
   if (invitation.status !== "pending") {
     return NextResponse.json({ error: "That invitation was already used or revoked." }, { status: 410 });
   }
+  if (invitation.expires_at && new Date(invitation.expires_at).getTime() <= Date.now()) {
+    return NextResponse.json(
+      { error: "This invitation has expired. Ask the owner to send a new one." },
+      { status: 410 }
+    );
+  }
   if ((user.email || "").toLowerCase() !== invitation.email.toLowerCase()) {
     return NextResponse.json(
       { error: `This invitation was issued to ${invitation.email}. Please sign up with that email address, or ask the owner to send a new invitation.` },

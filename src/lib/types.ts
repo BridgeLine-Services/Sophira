@@ -28,6 +28,7 @@ export interface Invitation {
   invited_by: string;
   created_at: string;
   accepted_at: string | null;
+  expires_at: string;
 }
 
 export interface InvitationRequest {

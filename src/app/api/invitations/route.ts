@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   const { supabase, error } = await ownerClient();
   if (error || !supabase) return error!;
 
-  let body: { email?: string };
+  let body: { email?: string; expires_days?: number };
   try {
     body = await request.json();
   } catch {
@@ -40,9 +40,16 @@ export async function POST(request: NextRequest) {
   }
 
   const token = randomBytes(24).toString("hex");
+  // Optional expiry window, clamped to a sane range (default 14 days).
+  const days = Math.min(90, Math.max(1, Math.round(body.expires_days ?? 14)));
   const { data, error: iErr } = await supabase
     .from("invitations")
-    .insert({ email, token, invited_by: (await supabase.auth.getUser()).data.user!.id })
+    .insert({
+      email,
+      token,
+      invited_by: (await supabase.auth.getUser()).data.user!.id,
+      expires_at: new Date(Date.now() + days * 86400_000).toISOString(),
+    })
     .select("*")
     .single();
   if (iErr) return NextResponse.json({ error: iErr.message }, { status: 500 });
