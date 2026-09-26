@@ -24,6 +24,19 @@ with row-level security on every table), and an OpenAI-compatible AI provider.
   your work.
 - **Installable.** A Progressive Web App — one tap on Android, "Add to Home
   Screen" on iPhone. No app store needed.
+- **Invite-only network.** The owner manages membership from a dedicated Owner
+  Dashboard: invite by email, approve or reject member-requested invitations,
+  revoke and restore access instantly. Invitation links are single-use, tied to
+  the invited email, and revocable — enforced in the database, not just hidden UI.
+- **Privacy-safe ownership.** The owner sees who is a member and aggregate
+  activity (active users, last-active times, subject usage counts) — never
+  another member's essays, answers, teacher notes, or files. Owner analytics
+  are aggregate-only at the database level.
+- **Learns how you work.** Corrections you approve become structured learning
+  patterns, each scoped (assignment / course / teacher / subject / global) so a
+  calculus habit never leaks into biology. Mistakes have a real lifecycle:
+  observed → confirmed → *corrected* → recurring if they return. The AI watches
+  for active mistakes but never reintroduces a corrected one.
 - **Seven modes:** Learn, Assignment, Check my work, Writing, Study, Explain
   simply, Custom.
 
@@ -38,7 +51,13 @@ src/
       ai/analyze-writing     # samples → style analysis → PENDING proposal
       ai/extract-teacher-doc # pasted doc → structured rules → PENDING proposal
       extract                # PDF/txt/image upload → text extraction + private storage
-      invitations, invitations/accept, account/delete
+      invitations, invitations/accept, invitation-requests,
+      learning/patterns, network/members, network/stats, account/delete
+    owner/                  # owner-only dashboard: membership, invitation
+                           #   requests, aggregate activity (RLS-enforced)
+    corrections/            # learning & corrections: pattern lifecycle
+                           #   (confirm, corrected, returned, temporary)
+    access-denied/          # explicit state for revoked members
     (login, signup, reset-password, auth/callback)   # invite-only auth
     (dashboard, onboarding, courses, teachers, writing,
      assignments/new (intake wizard), assignments/[id] (workspace),
@@ -143,9 +162,12 @@ Key design decisions:
 1. Create a project at [supabase.com](https://supabase.com).
 2. In the SQL editor, run the migrations in order:
    `0001_init.sql` → `0002_owner_only_invitations.sql` →
-   `0003_profile_versions_and_context.sql` → `0004_sources_and_audit.sql`.
+   `0003_profile_versions_and_context.sql` → `0004_sources_and_audit.sql` →
+   `0005_owner_membership_and_learning.sql`.
    (This creates all tables with RLS, the signup trigger, the private
-   `private-docs` storage bucket, and owner-only invitation policies.)
+   `private-docs` storage bucket, owner-only invitation policies, invitation
+   requests, the learning-pattern lifecycle, and the privacy-safe aggregate
+   owner-analytics function.)
 3. In **Authentication → Providers**, keep Email enabled. For a truly closed
    group, also set **Authentication → Sign In / Up → "Confirm email" on**, and
    consider disabling anonymous access. The app UI is invite-only; note that
@@ -176,8 +198,12 @@ npm run dev        # http://localhost:3000
 ```
 
 The first account you sign up with (via an invitation or directly at /signup with a
-token) becomes the **owner**. The owner invites everyone else from
-**Settings → Invitations**; each invitation link is a one-time `/signup?invite=TOKEN` URL.
+token) becomes the **owner**. The owner manages membership from the **Owner Dashboard**
+(`/owner`): invite by email, copy the one-time `/signup?invite=TOKEN` link, approve or
+reject invitation requests from members (the owner can grant a member permission to
+*request* invitations for others — requests never create access on their own), and
+revoke or restore access at any time. Revoked members get an explicit Access Denied
+state on every route, not just hidden links.
 
 ## Deploy + install on your phone
 
@@ -196,10 +222,15 @@ optional and not required to use Sophira.
 
 ## Testing
 
-- `npm test` — 91 unit/integration assertions: isolation, conditionality,
+- `npm test` — 125 unit/integration assertions: isolation, conditionality,
   conflicts, injection defense, subject + math-topic routing, all six verifier
-  kinds, method-compliance honesty guards, and offline round-trip parsing of a
-  real XLSX and PPTX. Runs fully offline.
+  kinds, method-compliance honesty guards, offline round-trip parsing of a
+  real XLSX and PPTX, the learning-pattern lifecycle (confirm → corrected →
+  recurring, temporary caps), scope leakage (subject/course/teacher/global),
+  and honest applied-context metadata. Runs fully offline.
+- Live workflow verification (real auth, real Supabase, two accounts) is
+  documented in `docs/ACCEPTANCE_TESTS.md` — see `TEST_REPORT.md` for which
+  scenarios are unit-verified vs. what needs a live backend.
 - `npm run build` — must pass with zero type errors (verified before every push).
 
 See `TEST_REPORT.md` for the full scenario-based acceptance results, including
