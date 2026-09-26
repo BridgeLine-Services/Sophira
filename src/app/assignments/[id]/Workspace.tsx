@@ -10,7 +10,7 @@ import {
 import { ResultBody } from "@/components/app/ResultBody";
 import { MODE_MAP } from "@/lib/modes";
 import type { AiResponse, Assignment, Course, Teacher, WorkSession } from "@/lib/types";
-import { AlertTriangle, Check, Copy, Pencil, Save, Send, X } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, Copy, Pencil, Save, Send, X } from "lucide-react";
 
 const QUICK_ACTIONS = [
   "Explain this step",
@@ -27,17 +27,39 @@ const QUICK_ACTIONS = [
 const FEEDBACK_KINDS = [
   { kind: "approve", label: "Looks good" },
   { kind: "error", label: "Something's wrong" },
+  { kind: "teacher_corrected", label: "My teacher corrected this" },
+  { kind: "different_method", label: "Use a different method" },
   { kind: "teacher_wanted", label: "Teacher wanted something else" },
+  { kind: "this_is_normal", label: "This is how I normally do it" },
+  { kind: "no_longer_correct", label: "That rule isn't correct anymore" },
+  { kind: "assignment_only", label: "Only for this assignment" },
   { kind: "note", label: "Note" },
+] as const;
+
+/** How broadly a correction should apply (workflow §28 — not every learned
+ *  fact is global; "my calc professor requires substitution" must not become
+ *  "every math problem uses substitution"). */
+const FEEDBACK_SCOPES = [
+  { scope: "assignment", label: "This assignment only" },
+  { scope: "teacher", label: "This teacher's classes" },
+  { scope: "course", label: "This course" },
+  { scope: "subject", label: "This subject" },
+  { scope: "global", label: "Everything I do" },
 ] as const;
 
 interface AppliedTeacher { name: string | null; applied: boolean; sources_used: string[]; fields_applied: string[] }
 interface AppliedCourse { name: string | null; applied: boolean }
 interface AppliedWriting { applied: boolean; reason: string }
+interface AppliedLearning {
+  mistakes_applied: string[];
+  methods_applied: string[];
+  patterns_considered: number;
+}
 interface AppliedContextData {
   teacher?: AppliedTeacher;
   course?: AppliedCourse;
   writing_profile?: AppliedWriting;
+  learning?: AppliedLearning;
   classification?: { subject: string | null; task_type: string | null; level: string | null } | null;
   conflicts?: { a: string; b: string; detail: string }[];
   workflow?: string;
@@ -67,6 +89,7 @@ export function Workspace({
   const [sending, setSending] = useState(false);
 
   const [feedbackKind, setFeedbackKind] = useState<string | null>(null);
+  const [feedbackScope, setFeedbackScope] = useState<string>("teacher");
   const [feedbackText, setFeedbackText] = useState("");
   const [sendingFeedback, setSendingFeedback] = useState(false);
 
@@ -151,6 +174,8 @@ export function Workspace({
         kind: feedbackKind,
         comment: feedbackText.trim(),
         content: "",
+        subject: assignment.subject ?? null,
+        scope: feedbackScope,
       })
       .select("id")
       .single();
@@ -313,6 +338,28 @@ export function Workspace({
                 )}
                 <span className="text-ink">Writing Profile: {contextApplied.writing_profile?.reason ?? "not applied"}</span>
               </li>
+              {contextApplied.learning &&
+                (contextApplied.learning.mistakes_applied.length > 0 ||
+                  contextApplied.learning.methods_applied.length > 0) && (
+                <span className="flex items-start gap-1.5">
+                  {contextApplied.learning.mistakes_applied.length > 0 ? (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                  ) : (
+                    <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                  )}
+                  <span className="text-ink">
+                    Learning applied:{" "}
+                    {contextApplied.learning.mistakes_applied.length > 0 &&
+                      `${contextApplied.learning.mistakes_applied.length} known mistake pattern${contextApplied.learning.mistakes_applied.length === 1 ? "" : "s"} watched for`}
+                    {contextApplied.learning.mistakes_applied.length > 0 &&
+                      contextApplied.learning.methods_applied.length > 0 &&
+                      " · "}
+                    {contextApplied.learning.methods_applied.length > 0 &&
+                      `${contextApplied.learning.methods_applied.length} learned method${contextApplied.learning.methods_applied.length === 1 ? "" : "s"}`}
+                    {" "}(<Link href="/corrections" className="text-accent hover:underline">review what I know</Link>)
+                  </span>
+                </span>
+              )}
               {contextApplied.classification?.subject && (
                 <li className="text-sm text-ink-soft">
                   Detected: {contextApplied.classification.subject}
@@ -482,6 +529,23 @@ export function Workspace({
                 placeholder="What worked? What didn't? What did the teacher actually want?"
                 aria-label="Feedback"
               />
+              {feedbackKind !== "approve" && feedbackKind !== "note" && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-soft" htmlFor="feedback-scope">
+                    Where should this apply?
+                  </label>
+                  <select
+                    id="feedback-scope"
+                    className="w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm text-ink"
+                    value={feedbackScope}
+                    onChange={(e) => setFeedbackScope(e.target.value)}
+                  >
+                    {FEEDBACK_SCOPES.map((sc) => (
+                      <option key={sc.scope} value={sc.scope}>{sc.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <Button type="submit" disabled={sendingFeedback}>
                 {sendingFeedback ? "Sending…" : "Send feedback"}
               </Button>

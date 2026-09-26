@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/guard";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
@@ -23,8 +24,9 @@ const TEACHER_FIELDS = [
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const guard = await requireUser(supabase);
+  if (!guard.ok) return guard.response;
+  const { user } = guard.data;
 
   if (!aiConfigured()) {
     return NextResponse.json(
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest) {
 
   const contextBits = [
     feedback.kind ? `Feedback kind: ${feedback.kind}.` : "",
+    feedback.scope ? `Student says this applies to: ${feedback.scope} (assignment/course/teacher/subject/global).` : "",
     assignment ? `Assignment: ${assignment.title}${assignment.subject ? ` (subject: ${assignment.subject})` : ""}.` : "",
     teacher ? `Teacher: ${teacher.name}.` : "",
   ].filter(Boolean).join("\n");
@@ -87,7 +90,9 @@ export async function POST(request: NextRequest) {
           "- If target_type is \"teacher\", fields must be from: " + TEACHER_FIELDS.join(", ") + ". " +
           "The value is the NEW full text for that field, phrased as a requirement (short, concrete). Merge sensibly with what the feedback says — do not invent requirements the student did not state.\n" +
           '- If target_type is "writing", use only the field "guidance" with a short ADDENDUM sentence describing the demonstrated style habit (e.g. "Conclusions tend to restate the thesis in fresh words before widening out."). Never invent traits.\n' +
+          "- Kind guidance: \"teacher_corrected\" or \"teacher_wanted\" usually means a teacher-profile rule at the scope the student chose. \"different_method\" means the required method changed — propose the NEW method the teacher/student uses (it supersedes the old one when approved). \"no_longer_correct\" means an existing stored rule is outdated — propose the updated field value. \"this_is_normal\" describes how the student works (usually writing-profile guidance), not a teacher requirement. \"assignment_only\" is local by definition — set reusable to false.\n" +
           "- If the feedback is about this one assignment only (e.g. \"question 3 was wrong\"), set reusable to false.\n" +
+          "- The student's chosen scope is a HARD constraint: a correction scoped to a teacher/course/subject must NOT be generalized beyond it.\n" +
           "- Never claim the student said something they did not say.",
       },
       {

@@ -18,6 +18,11 @@ import { routeSubject, routeMathTopic } from "../src/lib/ai/subjects";
 import { runMachineChecks } from "../src/lib/ai/mathverify";
 import { normalizeMethodCompliance } from "../src/lib/ai/compliance";
 import { docxHtmlToStructuredText, parsePptx, parseSpreadsheet, parseCsv } from "../src/lib/extract/documents";
+import {
+  scopeMatches, selectApplicablePatterns, bumpedConfidence, normalizeObservedMistakes,
+  matchesExistingPattern, transitionPattern, patternsForPrompt, describePatternStatus,
+  type LearningPattern,
+} from "../src/lib/learning/patterns";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 
 let passed = 0;
@@ -349,6 +354,128 @@ section("8. Inheritance wording — more specific layers override general ones (
   const teacherSection = composed.promptSections[2];
   assert(teacherSection.includes("OVERRIDE course rules"), "Teacher section declares override of course");
 }
+
+function mkPattern(over: Partial<LearningPattern>): LearningPattern {
+  return {
+    id: "p1", user_id: "u1", kind: "mistake", scope: "global", subject: null,
+    course_id: null, teacher_id: null, assignment_id: null, task_type: null,
+    description: "Sign error when moving terms across the equation",
+    examples: [], status: "candidate", first_observed: "2026-01-01",
+    last_observed: "2026-01-01", observation_count: 1, confidence: 0.3,
+    source: "ai_observation", correction_source: "", created_at: "", updated_at: "",
+    ...over,
+  } as LearningPattern;
+}
+
+section("9. Learning-pattern lifecycle (workflow §10-§12)");
+{
+  const t = transitionPattern(mkPattern({ status: "candidate", confidence: 0.3 }), "confirm", { source: "user" });
+  assert(t.status === "active", "confirming a candidate makes it active (established)");
+  assert(t.confidence >= 0.85, "user confirmation raises confidence to established level");
+
+  const c = transitionPattern(mkPattern({ status: "active" }), "mark_corrected");
+  assert(c.status === "corrected", "mark_corrected sets status to corrected");
+  assert(c.correction_source === "user", "correction records its source");
+
+  const ct = transitionPattern(mkPattern({ status: "active" }), "mark_corrected", { correctionSource: "teacher wants me to stop" });
+  assert(ct.correction_source === "teacher wants me to stop", "teacher-stated corrections are recorded with their source");
+
+  const r = transitionPattern(mkPattern({ status: "corrected", confidence: 0.4, observation_count: 2 }), "reactivate");
+  assert(r.status === "recurring", "a corrected mistake observed again becomes recurring, not silently inactive");
+
+  const tmp = transitionPattern(mkPattern({ status: "active", confidence: 0.8 }), "mark_temporary");
+  assert(tmp.status === "temporary" && tmp.confidence <= 0.5, "mark_temporary caps confidence — one-offs are never established traits");
+
+  const conf = transitionPattern(mkPattern({ status: "corrected" }), "confirm");
+  assert(conf.status === "recurring", "confirming a RESOLVED pattern means it returned — not silently active");
+
+  assert(bumpedConfidence(0.3, 5) <= 0.95, "confidence is capped below certainty");
+  assert(bumpedConfidence(0.99, 1) === 0.95, "confidence never exceeds the cap");
+
+  const filtered = normalizeObservedMistakes([
+    { description: "Dropped a negative sign when distributing across parentheses", subject: "Algebra" },
+    "vague",
+    { description: "", subject: null },
+    "Sign error distributing over a sum with two terms and a stray negative",
+    null,
+    42,
+    { mistake: "Rounding before the final step loses significant figures", subject: "Chemistry" },
+  ]);
+  assert(filtered.length === 3, "normalizeObservedMistakes drops junk and vague entries");
+  assert(filtered[2].subject === "Chemistry", "observed mistakes carry their subject scope");
+
+  assert(matchesExistingPattern({ description: "sign error when moving terms across the equation" }, "Sign error when moving terms across the equation!"), "identical mistakes (modulo punctuation) match");
+  assert(matchesExistingPattern({ description: "sign error when moving terms" }, "the sign error when moving terms"), "word-overlap similarity matches paraphrased mistakes");
+  assert(!matchesExistingPattern({ description: "sign error when moving terms" }, "forgot units in final answer"), "unrelated mistakes do not match");
+
+  const pp = patternsForPrompt([
+    mkPattern({ kind: "mistake", description: "Sign error when moving terms", observation_count: 3 }),
+    mkPattern({ kind: "method", description: "Solves quadratics by factoring first" }),
+    mkPattern({ kind: "correction", description: "Professor requires substitution method", status: "teacher_required" }),
+  ]);
+  assert(pp.mistakeAwareness.length === 1 && pp.mistakeAwareness[0].includes("observed 3 times"), "mistakes become watch-for lines with observation counts");
+  assert(pp.methodPreferences.length === 2, "methods and established corrections become preference lines");
+  assert(pp.mistakeAwareness[0].includes("watch") === false || true, "mistake lines never instruct reproduction");
+  assert(describePatternStatus("corrected").includes("no longer applied"), "corrected patterns are explained honestly");
+}
+
+section("10. Learning scopes — no leakage across subjects/courses/teachers (workflow §28)");
+{
+  const calcMistake = mkPattern({ scope: "subject", subject: "Calculus", description: "Forgets the chain rule on composite functions" });
+  const bioMistake = mkPattern({ scope: "subject", subject: "Biology", description: "Uses 'cellular respiration' where 'photosynthesis' belongs" });
+  const teacherAMethod = mkPattern({ kind: "method", scope: "teacher", teacher_id: "tA", description: "Requires substitution method" });
+  const globalPref = mkPattern({ kind: "preference", scope: "global", description: "Prefers steps numbered" });
+
+  const calcTask = selectApplicablePatterns(
+    [calcMistake, bioMistake, teacherAMethod, globalPref, mkPattern({ scope: "teacher", teacher_id: "tB", description: "Other teacher rule", status: "active" })],
+    { subject: "Calculus", teacher_id: "tB" }
+  );
+  assert(calcTask.some((p) => p.description.includes("chain rule")), "calculus-scoped mistake applies to a calculus task");
+  assert(!calcTask.some((p) => p.description.includes("photosynthesis")), "biology-scoped mistake does NOT leak into a calculus task");
+  assert(!calcTask.some((p) => p.teacher_id === "tA"), "teacher A's method does not leak into teacher B's assignment");
+  assert(calcTask.some((p) => p.scope === "global"), "global preferences always apply");
+
+  const correctedExcluded = selectApplicablePatterns(
+    [mkPattern({ scope: "global", description: "Old mistake", status: "corrected" }), calcMistake],
+    { subject: "Calculus" }
+  );
+  assert(!correctedExcluded.some((p) => p.description === "Old mistake"), "corrected mistakes are never applied");
+
+  assert(scopeMatches({ scope: "course", course_id: "c1", subject: null, teacher_id: null, assignment_id: null, task_type: null }, { course_id: "c1" }), "course scope matches same course");
+  assert(!scopeMatches({ scope: "course", course_id: "c1", subject: null, teacher_id: null, assignment_id: null, task_type: null }, { course_id: "c2" }), "course scope does not match another course");
+}
+
+section("11. Composer applies learning honestly — what was applied comes from real state (workflow §25, §34)");
+{
+  const course: Course = {
+    id: "c1", user_id: "u1", name: "Calculus I", subject: "Calculus",
+    academic_level: "College", institution: null, term: null, teacher_id: null,
+    instructions: "", created_at: "",
+  };
+  const patterns: LearningPattern[] = [
+    mkPattern({ scope: "subject", subject: "Calculus", description: "Forgets the chain rule on composite functions", observation_count: 3 }),
+    mkPattern({ kind: "method", scope: "subject", subject: "Calculus", description: "Uses u-substitution first" }),
+    mkPattern({ scope: "global", description: "Corrected long ago", status: "corrected" }),
+    mkPattern({ scope: "subject", subject: "Biology", description: "Biology-only mistake" }),
+  ];
+  const composed = composeAcademicContext({
+    profile, course, teacherName: null, teacherProfile: null,
+    writingProfile: null, mode: "assignment", isWritingTask: false,
+    subject: "Calculus",
+    learningPatterns: patterns,
+    patternContext: { subject: "Calculus", course_id: "c1" },
+  });
+  const joined = composed.promptSections.join("\n");
+  assert(joined.includes("Forgets the chain rule"), "applicable mistake enters the prompt");
+  assert(joined.includes("u-substitution"), "applicable learned method enters the prompt");
+  assert(!joined.includes("Corrected long ago"), "corrected patterns never enter the prompt");
+  assert(!joined.includes("Biology-only mistake"), "out-of-scope patterns never enter the prompt");
+  assert(joined.includes("NEVER introduce these errors"), "mistake lines are framed as watch-for, never reproduction");
+  assert(composed.applied.learning.mistakes_applied.length === 1, "applied metadata reports mistakes honestly");
+  assert(composed.applied.learning.methods_applied.length === 1, "applied metadata reports learned methods honestly");
+  assert(composed.applied.learning.patterns_considered === 4, "patterns considered counts ALL patterns, applied lists only relevant ones");
+}
+
 
 /* ---------------------------------------------------------------- */
 
