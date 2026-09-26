@@ -213,8 +213,16 @@ export function buildSystemPrompt(args: {
   subject?: string | null;
   taskType?: string | null;
   mathTopicSystem?: string | null;
+  learningPatterns?: import("../learning/patterns").LearningPattern[] | null;
+  patternContext?: {
+    subject?: string | null;
+    course_id?: string | null;
+    teacher_id?: string | null;
+    assignment_id?: string | null;
+    task_type?: string | null;
+  };
 }): { systemPrompt: string; conflicts: ContextConflict[] } {
-  const { profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask, subject, taskType, mathTopicSystem } = args;
+  const { profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask, subject, taskType, mathTopicSystem, learningPatterns, patternContext } = args;
 
   const workflow = routeSubject(subject ?? course?.subject, taskType);
   const composed = composeAcademicContext({
@@ -226,6 +234,8 @@ export function buildSystemPrompt(args: {
     mode,
     isWritingTask,
     subject: subject ?? null,
+    learningPatterns,
+    patternContext,
   });
 
   const parts = [HONESTY_RULES, MODE_INSTRUCTIONS[mode], workflow.extraSystem];
@@ -256,6 +266,7 @@ export function buildSystemPrompt(args: {
     "checks": [{"name": "<requirement>", "passed": true|false, "detail": "<how the response satisfies or fails it>"}],
     "notes": "<anything about method requirements that could not be met or verified>"
   },
+  "observed_mistakes": [{"description": "<a distinct mistake pattern you found in the STUDENT'S OWN submitted work, short and concrete>", "subject": "<subject if known>"}] (only when reviewing the student's own work — omit otherwise; never invent mistakes),
   "verification": {
     "status": "verified" | "needs_verification" | "unverified",
     "checks": [{"name": "<check>", "passed": true|false, "detail": "<what you actually checked and how>", "method": "self_check"}],

@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { BookOpen, GraduationCap, Home, Library, LogOut, PenLine, Settings , ClipboardCheck } from "lucide-react";
+import { BookOpen, GraduationCap, Home, Library, LogOut, PenLine, Settings, ClipboardCheck, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const NAV = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -13,6 +13,7 @@ const NAV = [
   { href: "/writing", label: "Writing", icon: PenLine },
   { href: "/library", label: "Library", icon: Library },
   { href: "/proposals", label: "Changes", icon: ClipboardCheck },
+  { href: "/corrections", label: "Learning", icon: AlertTriangle },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -31,6 +32,15 @@ export function AppShell({ title, backHref, actions, children }: {
   const router = useRouter();
   const supabase = createClient();
   const [signingOut, setSigningOut] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    supabase.from("profiles").select("role").limit(1).then(({ data }) => {
+      if (alive && data?.[0]?.role === "owner") setIsOwner(true);
+    });
+    return () => { alive = false; };
+  }, [supabase]);
 
   async function signOut() {
     setSigningOut(true);
@@ -70,6 +80,18 @@ export function AppShell({ title, backHref, actions, children }: {
           </button>
         </div>
         <nav className="mx-auto hidden max-w-4xl gap-1 overflow-x-auto px-4 pb-2 md:flex" aria-label="Main">
+          {isOwner && (
+            <Link
+              href="/owner"
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
+                pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5"
+              )}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Owner
+            </Link>
+          )}
           {NAV.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}

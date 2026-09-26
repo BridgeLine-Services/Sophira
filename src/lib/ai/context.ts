@@ -17,6 +17,8 @@
  */
 
 import type { Course, Mode, Profile, TeacherProfile, WritingProfile } from "../types";
+import type { LearningPattern } from "../learning/patterns";
+import { patternsForPrompt, selectApplicablePatterns } from "../learning/patterns";
 
 export interface TeacherSourceDoc {
   title: string;
@@ -37,6 +39,7 @@ export interface AppliedContext {
   course: { name: string | null; applied: boolean };
   writing_profile: { applied: boolean; reason: string };
   classification: { subject: string | null; task_type: string | null; level: string | null } | null;
+  learning: { mistakes_applied: string[]; methods_applied: string[]; patterns_considered: number };
   conflicts: ContextConflict[];
   verification_method: "computational" | "self_check" | "none";
 }
@@ -169,6 +172,14 @@ export interface ComposeArgs {
   mode: Mode;
   isWritingTask: boolean;
   subject?: string | null;
+  learningPatterns?: LearningPattern[] | null;
+  patternContext?: {
+    subject?: string | null;
+    course_id?: string | null;
+    teacher_id?: string | null;
+    assignment_id?: string | null;
+    task_type?: string | null;
+  };
 }
 
 export interface ComposedContext {
@@ -283,6 +294,32 @@ export function composeAcademicContext(args: ComposeArgs): ComposedContext {
     );
   }
 
+  // Layer 5 — structured learning patterns, scope-filtered (spec §9-§12, §28, §34).
+  // Only APPLICABLE patterns (matching subject/course/teacher/assignment and an
+  // active status) enter the prompt. Corrected/inactive mistakes are excluded —
+  // they must never be reintroduced (workflow §12).
+  let appliedPatterns: LearningPattern[] = [];
+  if (args.learningPatterns?.length) {
+    appliedPatterns = selectApplicablePatterns(args.learningPatterns, args.patternContext || {});
+    const forPrompt = patternsForPrompt(appliedPatterns);
+    if (forPrompt.mistakeAwareness.length || forPrompt.methodPreferences.length) {
+      const mbits: string[] = [];
+      if (forPrompt.mistakeAwareness.length) {
+        mbits.push(
+          "KNOWN RECURRING MISTAKES (observed in this student's past work — current assignment and teacher requirements ALWAYS win over them; NEVER introduce these errors into fresh work; when checking the student's own work, watch specifically for them):\n" +
+            forPrompt.mistakeAwareness.join("\n")
+        );
+      }
+      if (forPrompt.methodPreferences.length) {
+        mbits.push(
+          "LEARNED METHODS/PREFERENCES (how this student actually works — use where they do not conflict with the teacher's required method):\n" +
+            forPrompt.methodPreferences.join("\n")
+        );
+      }
+      promptSections.push(mbits.join("\n\n"));
+    }
+  }
+
   const sourcesUsed: string[] = [];
   if (teacherProfile) {
     for (const key of ["official_instructions", "rubrics", "examples", "corrections"] as const) {
@@ -311,6 +348,14 @@ export function composeAcademicContext(args: ComposeArgs): ComposedContext {
     classification: args.subject
       ? { subject: args.subject, task_type: null, level: null }
       : null,
+    learning: (() => {
+      const fp = patternsForPrompt(appliedPatterns);
+      return {
+        mistakes_applied: fp.mistakeAwareness.map((m) => m.replace(/^- /, "")),
+        methods_applied: fp.methodPreferences.map((m) => m.replace(/^- /, "")),
+        patterns_considered: args.learningPatterns?.length ?? 0,
+      };
+    })(),
     conflicts,
     verification_method: "self_check",
   };

@@ -9,8 +9,8 @@ import {
   Select, Spinner, useToast,
 } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import type { Invitation, Profile } from "@/lib/types";
-import { Copy, Smartphone } from "lucide-react";
+import type { InvitationRequest, Profile } from "@/lib/types";
+import { ShieldCheck, Smartphone } from "lucide-react";
 
 const LEVELS = ["Kindergarten/Elementary", "Middle school", "High school", "College/Undergraduate", "Graduate/Master's", "PhD", "Other"];
 const EXPLANATION = ["Simple", "Standard", "Advanced"];
@@ -25,12 +25,11 @@ export default function SettingsPage() {
   const [form, setForm] = useState({ display_name: "", academic_level: "", explanation_level: "", answer_style: "", formatting_pref: "", preferred_language: "" });
   const [saving, setSaving] = useState(false);
 
-  // Invitations (owner)
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteBusy, setInviteBusy] = useState(false);
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+  // Invitation requests (non-owner members with permission)
+  const [requests, setRequests] = useState<InvitationRequest[]>([]);
+  const [reqEmail, setReqEmail] = useState("");
+  const [reqReason, setReqReason] = useState("");
+  const [reqBusy, setReqBusy] = useState(false);
 
   // Account deletion
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -57,10 +56,10 @@ export default function SettingsPage() {
           preferred_language: p.preferred_language || "",
         });
       }
-      if ((p as Profile)?.role === "owner") {
-        fetch("/api/invitations")
+      if ((p as Profile)?.can_request_invites) {
+        fetch("/api/invitation-requests")
           .then((r) => (r.ok ? r.json() : { data: [] }))
-          .then((j) => setInvitations(j.data ?? []))
+          .then((j) => setRequests(j.data ?? []))
           .catch(() => undefined);
       }
     });
@@ -92,44 +91,32 @@ export default function SettingsPage() {
     toast("success", "Saved. New answers will use these preferences.");
   }
 
-  async function createInvite(e: FormEvent) {
+  async function submitRequest(e: FormEvent) {
     e.preventDefault();
-    setInviteBusy(true);
+    if (!reqEmail.trim()) return;
+    setReqBusy(true);
     try {
-      const res = await fetch("/api/invitations", {
+      const res = await fetch("/api/invitation-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail }),
+        body: JSON.stringify({ email: reqEmail.trim(), reason: reqReason.trim() }),
       });
       const json = await res.json();
       if (res.ok) {
-        setInvitations((list) => [json.data, ...list]);
-        setInviteLink(json.data.link);
-        setInviteEmail("");
-        toast("success", "Invitation created — copy the link and send it.");
+        setRequests((list) => [json.data, ...list]);
+        setReqEmail("");
+        setReqReason("");
+        toast("success", "Request sent — the owner will review it.");
       } else {
-        toast("error", json.error || "Could not create the invitation.");
+        toast("error", json.error || "Could not send the request.");
       }
     } catch {
       toast("error", "Could not reach the server.");
     } finally {
-      setInviteBusy(false);
+      setReqBusy(false);
     }
   }
 
-  async function revokeInvite(id: string) {
-    setInviteBusy(true);
-    const res = await fetch(`/api/invitations?id=${id}`, { method: "DELETE" });
-    const json = await res.json().catch(() => ({}));
-    setInviteBusy(false);
-    setConfirmRevoke(null);
-    if (res.ok) {
-      setInvitations((list) => list.filter((i) => i.id !== id));
-      toast("success", "Invitation removed.");
-    } else {
-      toast("error", json.error || "Could not remove the invitation.");
-    }
-  }
 
   async function deleteAccount() {
     setDeleting(true);
@@ -148,11 +135,6 @@ export default function SettingsPage() {
       toast("error", "Could not reach the server.");
       setDeleting(false);
     }
-  }
-
-  async function copy(text: string) {
-    await navigator.clipboard.writeText(text);
-    toast("success", "Copied.");
   }
 
   return (
@@ -230,55 +212,70 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Invitations (owner) */}
+        {/* Owner: membership lives in the Owner Dashboard */}
         {profile?.role === "owner" && (
           <Card>
-            <CardHeader><CardTitle>Invitations</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Members &amp; invitations</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-sm text-ink-soft">
+                Inviting people, approving or rejecting invitation requests, revoking access, and
+                membership activity now live in one place.
+              </p>
+              <Link href="/owner" className="mt-3 inline-flex">
+                <Button><ShieldCheck className="h-4 w-4" /> Open Owner Dashboard</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Member with permission: request an invitation (owner decides) */}
+        {profile?.role === "user" && profile.can_request_invites && (
+          <Card>
+            <CardHeader><CardTitle>Request an invitation for someone</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <form onSubmit={createInvite} className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  type="email"
-                  required
-                  className="flex-1"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="friend@example.com"
-                  aria-label="Invite email"
-                />
-                <Button type="submit" disabled={inviteBusy}>{inviteBusy ? "Creating…" : "Create invitation"}</Button>
-              </form>
-              {inviteLink && (
-                <div className="flex items-center gap-2 rounded-lg bg-accent-soft p-3">
-                  <code className="min-w-0 flex-1 truncate text-xs text-accent">{inviteLink}</code>
-                  <Button size="sm" variant="secondary" onClick={() => copy(inviteLink)}>
-                    <Copy className="h-4 w-4" /> Copy
-                  </Button>
+              <p className="text-sm leading-relaxed text-ink-soft">
+                You can propose someone for this network. This only sends a request — the owner
+                approves it before any invitation link exists.
+              </p>
+              <form onSubmit={submitRequest} className="space-y-3">
+                <div>
+                  <Label htmlFor="req-email">Their email</Label>
+                  <Input
+                    id="req-email"
+                    type="email"
+                    required
+                    className="mt-1.5"
+                    value={reqEmail}
+                    onChange={(e) => setReqEmail(e.target.value)}
+                    placeholder="friend@example.com"
+                  />
                 </div>
-              )}
-              {invitations.length > 0 ? (
+                <div>
+                  <Label htmlFor="req-reason">Why should they join? (optional)</Label>
+                  <Input
+                    id="req-reason"
+                    className="mt-1.5"
+                    value={reqReason}
+                    onChange={(e) => setReqReason(e.target.value)}
+                    placeholder="Study partner, classmate, sibling…"
+                  />
+                </div>
+                <Button type="submit" disabled={reqBusy}>{reqBusy ? "Sending…" : "Send request"}</Button>
+              </form>
+              {requests.length > 0 && (
                 <div className="divide-y divide-ink/5 rounded-lg border border-ink/10">
-                  {invitations.map((i) => (
-                    <div key={i.id} className="flex flex-wrap items-center gap-2 p-3">
+                  {requests.map((r) => (
+                    <div key={r.id} className="flex flex-wrap items-center gap-2 p-3">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-ink">{i.email}</p>
-                        <p className="text-xs text-ink-soft">{fmtDate(i.created_at)}</p>
+                        <p className="truncate text-sm font-medium text-ink">{r.email}</p>
+                        <p className="text-xs text-ink-soft">{fmtDate(r.created_at)}</p>
                       </div>
-                      <Badge tone={i.status === "pending" ? "warn" : i.status === "accepted" ? "success" : "neutral"}>{i.status}</Badge>
-                      <Button size="sm" variant="ghost" onClick={() => copy(`${window.location.origin}/signup?invite=${i.token}`)}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      {i.status === "pending" && (
-                        <Button size="sm" variant="ghost" className="text-danger" onClick={() => setConfirmRevoke(i.id)}>
-                          Revoke
-                        </Button>
-                      )}
+                      <Badge tone={r.status === "approved" ? "success" : r.status === "rejected" ? "neutral" : "warn"}>{r.status}</Badge>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm text-ink-soft">No invitations yet. Sophira is invite-only — share a personal link with people you trust.</p>
               )}
-              {inviteBusy && <Spinner />}
+              {reqBusy && <Spinner />}
             </CardContent>
           </Card>
         )}
@@ -293,16 +290,6 @@ export default function SettingsPage() {
             <Button variant="danger" onClick={() => setConfirmDelete(true)}>Delete my account</Button>
           </CardContent>
         </Card>
-
-        <ConfirmDialog
-          open={confirmRevoke !== null}
-          title="Remove this invitation?"
-          message="The link will stop working. The person can be invited again later."
-          confirmLabel="Remove"
-          destructive
-          onConfirm={() => confirmRevoke && revokeInvite(confirmRevoke)}
-          onCancel={() => setConfirmRevoke(null)}
-        />
 
         {/* Typed-delete panel (replaces a simple confirm: this action is permanent) */}
         {confirmDelete && (

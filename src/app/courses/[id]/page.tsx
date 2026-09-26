@@ -6,6 +6,8 @@ import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, Button } f
 import { fmtDate } from "@/lib/format";
 import { CourseEditor } from "./CourseEditor";
 
+export const dynamic = "force-dynamic";
+
 export default async function CourseDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();

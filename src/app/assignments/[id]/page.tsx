@@ -4,6 +4,8 @@ import { AppShell } from "@/components/app/AppShell";
 import { Workspace } from "./Workspace";
 import type { AiResponse, Assignment, Course, Teacher, WorkSession } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export default async function AssignmentWorkspacePage({ params }: { params: { id: string } }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();

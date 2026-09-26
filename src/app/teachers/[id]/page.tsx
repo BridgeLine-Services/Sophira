@@ -5,6 +5,8 @@ import { ProposalsPanel } from "@/components/app/ProposalsPanel";
 import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
 import { TeacherProfileEditor } from "./TeacherProfileEditor";
 
+export const dynamic = "force-dynamic";
+
 export default async function TeacherDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();

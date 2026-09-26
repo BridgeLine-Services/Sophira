@@ -5,6 +5,8 @@ import { ProposalsPanel } from "@/components/app/ProposalsPanel";
 import { EmptyState } from "@/components/ui";
 import { ClipboardCheck } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Dedicated pending-profile-changes area (spec §30): every AI-proposed
  * Teacher/Writing profile update waits here for the student's decision.

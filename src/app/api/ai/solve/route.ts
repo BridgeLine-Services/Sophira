@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/guard";
+import {
+  selectApplicablePatterns,
+  normalizeObservedMistakes,
+  matchesExistingPattern,
+  bumpedConfidence,
+  type LearningPattern,
+} from "@/lib/learning/patterns";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import {
   buildClassificationPrompt,
@@ -35,8 +43,9 @@ const PER_FILE_LIMIT = 12000;
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const guard = await requireUser(supabase);
+  if (!guard.ok) return guard.response;
+  const { user, profile } = guard.data;
 
   let body: SolveBody;
   try {
@@ -56,11 +65,12 @@ export async function POST(request: NextRequest) {
   let mode: Mode = "assignment";
   if (body.mode && MODE_MAP[body.mode]) mode = body.mode;
 
-  // --- Load student profile -------------------------------------------------
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  if (!profile) {
-    return NextResponse.json({ error: "Your profile is missing. Please sign out and sign back in, then try again." }, { status: 500 });
-  }
+  // --- Record activity (owner analytics use aggregates only) -----------------
+  await supabase
+    .from("profiles")
+    .update({ last_active_at: new Date().toISOString() })
+    .eq("id", user.id)
+    .then(() => undefined);
 
   // --- Load course / teacher context ---------------------------------------
   let course = null;
@@ -125,6 +135,24 @@ export async function POST(request: NextRequest) {
     writingProfile = wp?.[0] ?? null;
   }
 
+  // --- Stage 2b: structured learning patterns, scope-filtered (workflow §34) --
+  // Only patterns matching this task's subject/course/teacher/assignment AND an
+  // active lifecycle status are retrieved — not a dump of all history.
+  const { data: patternRows } = await supabase
+    .from("learning_patterns")
+    .select("*")
+    .eq("user_id", user.id)
+    .in("status", ["candidate", "active", "recurring", "temporary", "teacher_required"]);
+  const learningPatterns = (patternRows || []) as LearningPattern[];
+  const patternContext = {
+    subject: classification?.subject ?? course?.subject ?? null,
+    course_id: body.course_id ?? null,
+    teacher_id: body.teacher_id ?? null,
+    assignment_id: body.assignment_id ?? null,
+    task_type: classification?.task_type ?? null,
+  };
+  const applicablePatterns = selectApplicablePatterns(learningPatterns, patternContext);
+
   // --- Stage 3: solve + self-verification in one call -------------------------
   const workflow = routeSubject(classification?.subject ?? course?.subject, classification?.task_type);
   const mathTopicSystem = workflow.id === "mathematics"
@@ -135,6 +163,8 @@ export async function POST(request: NextRequest) {
     subject: classification?.subject ?? null,
     taskType: classification?.task_type ?? null,
     mathTopicSystem,
+    learningPatterns: applicablePatterns,
+    patternContext,
   });
 
   // The exact context that was applied — persisted with the response so the UI
@@ -142,6 +172,8 @@ export async function POST(request: NextRequest) {
   const composed = composeAcademicContext({
     profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask,
     subject: classification?.subject ?? null,
+    learningPatterns: applicablePatterns,
+    patternContext,
   });
   const contextApplied = {
     ...composed.applied,
@@ -185,6 +217,7 @@ export async function POST(request: NextRequest) {
   }
 
   let content = "";
+  let observedMistakesRaw: unknown = null;
   let verification: {
     status: "verified" | "needs_verification" | "unverified";
     verification_method?: "computational" | "self_check" | "none";
@@ -206,10 +239,12 @@ export async function POST(request: NextRequest) {
       answer?: string;
       machine_checks?: unknown;
       method_compliance?: unknown;
+      observed_mistakes?: unknown;
       verification?: { status?: string; checks?: unknown; warnings?: unknown };
     }>(raw);
     if (parsed && typeof parsed.answer === "string" && parsed.answer.trim()) {
       content = parsed.answer;
+      observedMistakesRaw = parsed.observed_mistakes;
       const v = parsed.verification || {};
       const selfChecks: { name: string; passed: boolean; detail: string; method?: "computational" | "self_check" }[] = Array.isArray(v.checks)
         ? (v.checks as { name: string; passed: boolean; detail: string }[]).map((c) => ({ ...c, method: "self_check" as const }))
@@ -260,6 +295,57 @@ export async function POST(request: NextRequest) {
       { error: err instanceof Error ? err.message : "The AI request failed. Your input is preserved on this screen — please try again." },
       { status: 502 }
     );
+  }
+
+  // --- Stage 3b: mistake learning (workflow §10) ------------------------------
+  // When the AI reviewed the student's own work it may report distinct mistake
+  // patterns. Each becomes (or bumps) a scoped learning_pattern candidate:
+  // repeated observations grow confidence; a previously corrected/inactive
+  // pattern observed again transitions to 'recurring' instead of silently
+  // staying "fixed". The AI can only OBSERVE — confirming or correcting a
+  // pattern stays in the student's hands (/api/learning/patterns).
+  if (mode === "check" || mode === "assignment") {
+    const observed = normalizeObservedMistakes(observedMistakesRaw);
+    for (const m of observed) {
+      const existing = learningPatterns.find(
+        (p) => p.kind === "mistake" && matchesExistingPattern(p, m.description)
+      );
+      if (existing) {
+        const now = new Date().toISOString();
+        await supabase
+          .from("learning_patterns")
+          .update({
+            observation_count: existing.observation_count + 1,
+            last_observed: now,
+            confidence: bumpedConfidence(existing.confidence, existing.observation_count + 1),
+            // A corrected mistake seen again is a RETURN, not a silent skip.
+            ...(existing.status === "corrected" || existing.status === "inactive"
+              ? { status: "recurring" }
+              : {}),
+            updated_at: now,
+          })
+          .eq("id", existing.id)
+          .eq("user_id", user.id)
+          .then(() => undefined);
+      } else {
+        await supabase
+          .from("learning_patterns")
+          .insert({
+            user_id: user.id,
+            kind: "mistake",
+            scope: patternContext.subject ? "subject" : "global",
+            subject: m.subject || patternContext.subject,
+            course_id: patternContext.course_id,
+            teacher_id: patternContext.teacher_id,
+            assignment_id: mode === "check" ? null : patternContext.assignment_id,
+            description: m.description,
+            status: "candidate",
+            confidence: 0.3,
+            source: "ai_observation",
+          })
+          .then(() => undefined);
+      }
+    }
   }
 
   // --- Stage 4: persist assignment / session / response -----------------------

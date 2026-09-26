@@ -51,6 +51,7 @@ export interface NetworkMemberStats {
   role: "owner" | "user";
   status: "active" | "revoked";
   onboarded: boolean;
+  can_request_invites: boolean;
   created_at: string;
   last_active_at: string | null;
   assignment_count: number;

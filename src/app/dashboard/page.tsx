@@ -4,18 +4,28 @@ import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import { BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone } from "lucide-react";
+import { BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone, AlertTriangle } from "lucide-react";
 
-export default async function DashboardPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (!profile) redirect("/login");
+  if (profile.status === "revoked") redirect("/access-denied");
+  // Role routing (workflow §23): owners land on the Owner Dashboard.
+  // ?view=workspace lets the owner open their own personal workspace.
+  const view = (await searchParams).view;
+  if (profile.role === "owner" && view !== "workspace") redirect("/owner");
   if (!profile.onboarded) redirect("/onboarding");
 
-  const [{ data: courses }, { data: teachers }, { data: writingProfile }, { data: assignments }, { count: pendingProposals }, { data: recentFeedback }] = await Promise.all([
+  // Activity tracking for privacy-safe aggregate owner analytics.
+  await supabase.from("profiles").update({ last_active_at: new Date().toISOString() }).eq("id", user.id).then(() => undefined);
+
+  const [{ data: courses }, { data: teachers }, { data: writingProfile }, { data: assignments }, { count: pendingProposals }, { data: recentFeedback }, { count: activePatterns }] = await Promise.all([
     supabase.from("courses").select("*").order("created_at", { ascending: false }),
     supabase.from("teachers").select("id, name, notes").order("created_at", { ascending: false }),
     supabase.from("writing_profiles").select("*").order("created_at", { ascending: false }).limit(1),
@@ -26,6 +36,10 @@ export default async function DashboardPage() {
       .select("id, kind, comment, created_at, assignments ( title )")
       .order("created_at", { ascending: false })
       .limit(3),
+    supabase
+      .from("learning_patterns")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["candidate", "active", "recurring", "temporary"]),
   ]);
 
   const teacherName = (id: string | null) =>
@@ -71,6 +85,26 @@ export default async function DashboardPage() {
                     {pendingProposals} proposed profile update{pendingProposals === 1 ? "" : "s"} waiting for you
                   </p>
                   <p className="text-xs text-ink-soft">Nothing changes until you approve or reject.</p>
+                </div>
+                <span className="text-sm text-accent">Review →</span>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
+        {/* Learning & corrections shortcut */}
+        {(activePatterns ?? 0) > 0 && (
+          <Link href="/corrections" className="block">
+            <Card className="transition hover:border-accent/40">
+              <CardContent className="flex items-center gap-3 p-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink/5 text-accent">
+                  <AlertTriangle className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-ink">
+                    {activePatterns} learned pattern{(activePatterns ?? 0) === 1 ? "" : "s"} being applied to your work
+                  </p>
+                  <p className="text-xs text-ink-soft">Recurring mistakes, methods, and corrections — review or correct them any time.</p>
                 </div>
                 <span className="text-sm text-accent">Review →</span>
               </CardContent>
