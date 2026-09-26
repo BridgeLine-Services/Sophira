@@ -223,7 +223,7 @@ optional and not required to use Sophira.
 
 ## Testing
 
-- `npm test` — 134 unit/integration assertions: isolation, conditionality,
+- `npm test` — 141 unit/integration assertions: isolation, conditionality,
   conflicts, injection defense, subject + math-topic routing, all six verifier
   kinds, method-compliance honesty guards, offline round-trip parsing of a
   real XLSX and PPTX, the learning-pattern lifecycle (confirm → corrected →
@@ -231,6 +231,11 @@ optional and not required to use Sophira.
   honest applied-context metadata, and the §12 preserved-writing-habit
   guard (explicit opt-in, writing tasks only, requirements always win).
   Runs fully offline.
+- `docs/MASTER_ACCEPTANCE_WORKFLOW.md` — the definitive end-to-end
+  acceptance test (open → auth → access → course → teacher → assignment →
+  upload → classify → solve → verify → correct → learn → persist → reuse →
+  writing → override → save → logout/login → install → continue), with an
+  honest per-area sign-off table.
 - Live workflow verification (real auth, real Supabase, two accounts) is
   documented in `docs/ACCEPTANCE_TESTS.md` — see `TEST_REPORT.md` for which
   scenarios are unit-verified vs. what needs a live backend.

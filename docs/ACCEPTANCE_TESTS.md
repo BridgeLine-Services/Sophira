@@ -63,16 +63,32 @@ invitation.
 - [ ] Upload a file with "ignore all previous instructions" text → warning
       appears; behavior unchanged
 
-## 10. PWA (real devices)
-- [ ] Android Chrome: install banner/Add to Home Screen → standalone launch,
-      file + camera upload, assignment workflow end-to-end
-- [ ] iPhone Safari: Share → Add to Home Screen → standalone launch, safe-area
-      looks right, photo upload works
-- [ ] iPad Safari: layout at tablet width, workspace usable
-- [ ] Desktop Chrome/Edge: installable, responsive
-- [ ] Layout check at 360, 390, 430 px: no horizontal scroll, dialogs fit,
-      touch targets ≥44px
+## 10. PWA + real-device matrix (NEVER tick without actually running it)
+Devices × checks. Each row is a REAL device, not an emulator. "Workflows"
+below means: login persistence, logout/login, upload, assignment workflow,
+writing workflow, math workflow, learning workflow.
+
+| Device / browser | Install & standalone | Login persists | Logout/login | Upload | Workflows | Landscape |
+| --- | --- | --- | --- | --- | --- | --- |
+| iPhone Safari | [ ] Add to Home Screen, standalone launch, app icon, safe-area | [ ] | [ ] | [ ] photo | [ ] all | [ ] if used |
+| iPad Safari | [ ] Add to Home Screen, standalone | [ ] | [ ] | [ ] | [ ] all | [ ] |
+| Android Chrome | [ ] Install app, standalone launch, app icon | [ ] | [ ] | [ ] camera | [ ] all | [ ] |
+| Desktop Chrome | [ ] installable | [ ] | [ ] | [ ] | [ ] all | n/a |
+| Desktop Edge | [ ] installable | [ ] | [ ] | [ ] | [ ] all | n/a |
+| Desktop Safari | [ ] (no install UI — in-browser use OK) | [ ] | [ ] | [ ] | [ ] all | n/a |
+
+Viewport widths (devtools, real-device primary):
+- [ ] 360 px: no horizontal scroll, dialogs fit, touch targets ≥44px
+- [ ] 390 px: same checks
+- [ ] 430 px: same checks
+- [ ] Landscape on a phone-sized device where appropriate: no clipped controls
+
+Additional:
+- [ ] `/install` auto-detects platform and shows the right instructions first
 - [ ] New deploy → PWA picks up the update on next launch
+- [ ] Login persists in the standalone PWA across app restarts (where the
+      browser supports it); if the session is lost, the login page appears
+      cleanly with no broken states
 
 ## 11. Owner membership & invitation requests (added 2026-09-26)
 - [ ] Owner opens `/owner`: sees total members, active members, pending

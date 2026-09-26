@@ -203,6 +203,18 @@ export function composeAcademicContext(args: ComposeArgs): ComposedContext {
   const conflicts = teacherProfile ? findSourceConflicts(teacherProfile) : [];
   const promptSections: string[] = [];
 
+  // Layer 0 — the single order of authority. Every more-specific layer below
+  // re-states its precedence, but the whole hierarchy is declared up front so
+  // the model can never claim ambiguity about who wins (workflow §priority 3).
+  promptSections.push(
+    "ORDER OF AUTHORITY (never silently resolve a conflict — if two requirements conflict, follow the higher one AND state the conflict to the student):\n" +
+      "1. CURRENT ASSIGNMENT REQUIREMENTS (the task's own instructions)\n" +
+      "2. TEACHER REQUIREMENTS/RUBRIC (this course's teacher only)\n" +
+      "3. COURSE REQUIREMENTS\n" +
+      "4. APPROVED STUDENT PREFERENCES/WRITING HABITS (only what the student explicitly approved)\n" +
+      "5. GENERAL AI BEHAVIOR"
+  );
+
   // Layer 1 — global student profile (weakest; everything below may override)
   const bits: string[] = [];
   if (profile.display_name) bits.push(`Student name: ${profile.display_name}.`);

@@ -347,11 +347,11 @@ section("8. Inheritance wording — more specific layers override general ones (
     teacherName: "Prof. X", teacherProfile: teacherProfileA,
     writingProfile: null, mode: "assignment", isWritingTask: false,
   });
-  const globalSection = composed.promptSections[0];
+  const globalSection = composed.promptSections[1];
   assert(globalSection.includes("OVERRIDES"), "Global profile section declares it can be overridden");
-  const courseSection = composed.promptSections[1];
+  const courseSection = composed.promptSections[2];
   assert(courseSection.includes("override global preferences"), "Course section declares override of global");
-  const teacherSection = composed.promptSections[2];
+  const teacherSection = composed.promptSections[3];
   assert(teacherSection.includes("OVERRIDE course rules"), "Teacher section declares override of course");
 }
 
@@ -476,6 +476,32 @@ section("11. Composer applies learning honestly — what was applied comes from 
   assert(composed.applied.learning.patterns_considered === 4, "patterns considered counts ALL patterns, applied lists only relevant ones");
 }
 
+
+section("12a. Order of authority is declared up front (hierarchy)");
+{
+  const course: Course = {
+    id: "c1", user_id: "u1", name: "English 101", subject: "English",
+    academic_level: "High school", institution: null, term: null, teacher_id: null,
+    instructions: "", created_at: "",
+  };
+  const out = composeAcademicContext({
+    profile, course, teacherName: null, teacherProfile: null,
+    writingProfile: null, mode: "assignment", isWritingTask: false,
+    subject: "English",
+  });
+  const pj = out.promptSections.join("\n");
+  assert(pj.indexOf("ORDER OF AUTHORITY") < pj.indexOf("STUDENT GLOBAL PROFILE"), "the order of authority is the FIRST section of the prompt");
+  for (const line of [
+    "1. CURRENT ASSIGNMENT REQUIREMENTS",
+    "2. TEACHER REQUIREMENTS/RUBRIC",
+    "3. COURSE REQUIREMENTS",
+    "4. APPROVED STUDENT PREFERENCES/WRITING HABITS",
+    "5. GENERAL AI BEHAVIOR",
+  ]) {
+    assert(pj.includes(line), `hierarchy lists ${line}`);
+  }
+  assert(pj.includes("never silently resolve a conflict"), "hierarchy demands conflicts be surfaced, never silently resolved");
+}
 
 section("12. Intentionally preserved habits — explicit opt-in, writing only (workflow §12)");
 {
