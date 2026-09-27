@@ -93,7 +93,8 @@ Per `docs/ACCEPTANCE_TESTS.md` (10 sections, ready to run):
 | Android project genuinely builds | ✅ VERIFIED LOCALLY: real `gradlew assembleDebug` + `assembleRelease` executed with Temurin JDK 21 + Android SDK (platform 36, build-tools 34) — see §21 |
 | Sophira-release.apk (signed, production URL) | ⬜ NOT-YET-VERIFIED — requires keystore secrets AND a deployed SOPHIRA_APP_URL (does not exist yet); pipeline refuses placeholder builds |
 | Sophira.ipa | ⬜ NOT BUILDABLE HERE — requires macOS + Apple Developer cert + provisioning; workflow path implemented and honest |
-| Windows .msi / macOS .dmg / Linux .AppImage+.deb | ⬜ CI-BUILDABLE ONLY — no Windows/macOS/Rust+webkit toolchain in this sandbox; matrix implemented in release.yml |
+| Linux .AppImage + .deb | ✅ BUILT AND VERIFIED LOCALLY (see §22) |
+| Windows .msi / macOS .dmg | ⬜ CI-BUILDABLE ONLY — no Windows/macOS runners in this sandbox; matrix implemented in release.yml |
 | First GitHub Release | ⬜ requires workflow activation + SOPHIRA_APP_URL |
 | Downloads page: per-platform sections, inline SHA-256 (checksum-file fetch with graceful fallback), unsigned badges, honest empty states | ✅ IMPLEMENTED + tsc/build verified |
 | docs/DEVICE_ACCEPTANCE.md — all rows honestly NOT TESTED (no physical devices in agent sandbox) | ✅ CREATED |
@@ -134,3 +135,20 @@ These were invisible to tsc/tests and would have broken the first CI run.
 - The release workflow still cannot run until the token gains `workflow`
   scope, `SOPHIRA_APP_URL` exists (deploy the web app), and real signing
   secrets are set. The APKs above are sandbox verification artifacts only.
+
+## 22. Local Linux desktop build verification (2026-09-27, agent sandbox)
+
+Real Tauri v2 build executed (Rust 1.98.1, webkit2gtk-4.1 2.50.6, Debian 12).
+The build caught a real bug: `dangerousRemoteDomainIpcAccess` is a v1-only
+key rejected by the v2 schema — removed in commit history.
+
+| Artifact | Result |
+| --- | --- |
+| `Sophira_1.0.0_amd64.deb` — 2,863,138 bytes | ✅ BUILT; `file`: valid Debian binary package (format 2.0); SHA-256 `da4d10150da6edb8b8a87efb65312c3521b629b3260b926a542fc671bc5a840c` |
+| `Sophira_1.0.0_amd64.AppImage` — 98,728,440 bytes | ✅ BUILT; `file`: ELF 64-bit LSB static-pie executable, stripped; SHA-256 `60a460f4668d5ff9a764383bf4de2292cc3bd6263ebf260dd595fdd05b76781c` |
+| Secrets scan | ✅ no ANDROID_*/store/key password material in artifacts |
+| Placeholder URL | ⚠️ present by design — this is a verification build; the release workflow rewrites `windows[0].url` from `SOPHIRA_APP_URL` and refuses the placeholder |
+
+NOT claimed: launch/GUI testing (no display server in the sandbox) — the
+Linux device row stays NOT TESTED. Windows .msi and macOS .dmg require
+their OS runners; implemented in the release matrix, not buildable here.
