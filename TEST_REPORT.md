@@ -208,3 +208,26 @@ token; hosting credentials to deploy the web app and set SOPHIRA_APP_URL
 (the sandbox has no Vercel/Netlify/hosting credential and cannot deploy a
 server-rendered Next.js app on GitHub Pages); Android signing secrets;
 Apple signing credentials; physical devices; live Supabase/AI credentials.
+
+## 25. CI ACTIVE and GREEN; matcher fix live in production (2026-09-27)
+
+**GitHub Actions is now live.** With a workflow-scoped credential, both staged
+workflows were activated and pushed (commit e925dec): `.github/workflows/ci.yml`
+and `.github/workflows/release.yml` are registered as ACTIVE. **The first real
+CI run completed with SUCCESS** on master (495099e): npm ci, 148 tests,
+TypeScript, production build, native project presence.
+
+**Middleware matcher fix verified LIVE in production.** After the Vercel
+auto-redeploy: `/favicon.png` now returns 404 (was 500 middleware crash);
+`/install` and `/downloads` return 200. Root `/` still returns 500 because
+the Vercel Production environment still lacks NEXT_PUBLIC_SUPABASE_URL /
+NEXT_PUBLIC_SUPABASE_ANON_KEY — code-side, root correctly fails fast as a
+protected route until those are configured and a redeploy runs.
+
+**SOPHIRA_APP_URL repository variable could NOT be set by the automation
+credential (HTTP 403 — lacks variables:write scope).** Required external
+action: repo Settings → Secrets and variables → Actions → Variables → add
+`SOPHIRA_APP_URL` = `https://sophira.vercel.app`. The Release workflow
+refuses placeholder URLs by design, so it stays dormant until this variable
+exists. Android signing secrets and Apple signing material likewise remain
+external (honest unsigned fallbacks built into the release pipeline).

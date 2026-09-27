@@ -90,8 +90,8 @@ successful build.
 
 ## Current status (2026-09-26)
 
-- Workflow definitions are complete in `.workflows-pending/` — the repo push
-  credential lacks GitHub's `workflow` scope, so they must be moved to
-  `.github/workflows/` (README in that folder has the exact commands).
+- **DONE (2026-09-27): workflows are ACTIVE** at `.github/workflows/ci.yml`
+  and `.github/workflows/release.yml`; first CI run passed green.
+  `.workflows-pending/` is retained only as reference.
 - The first release additionally requires `SOPHIRA_APP_URL` (deploy the web
   app first) and, for signed artifacts, the secrets above.
