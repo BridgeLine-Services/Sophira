@@ -48,8 +48,20 @@ function SignUpForm() {
     });
     if (signUpError) {
       setBusy(false);
-      if (signUpError.message.toLowerCase().includes("already registered")) {
+      const msg = signUpError.message.toLowerCase();
+      if (msg.includes("already registered")) {
         setError("That email already has an account. Try signing in instead, or use the reset-password link if you forgot it.");
+      } else if (
+        // The database trigger (migration 0008) rejects any signup without a
+        // valid, unused invitation for this exact email. Supabase surfaces
+        // that as an opaque "database error", so explain it honestly here.
+        msg.includes("database error") ||
+        msg.includes("could not create") ||
+        msg.includes("failed to create")
+      ) {
+        setError(
+          "Sign-up was refused by the invitation system. This invitation may be expired, already used, revoked, or issued for a different email address. Ask the owner to send a new invitation link, then open the new link to sign up."
+        );
       } else {
         setError(signUpError.message);
       }

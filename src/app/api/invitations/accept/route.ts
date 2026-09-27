@@ -5,9 +5,19 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const runtime = "nodejs";
 
 /**
- * Called right after an invited user signs up: marks the invitation accepted.
- * Uses the service role because invitation rows are owner-visible only.
- * The authenticated user must match the invited email.
+ * Called right after an invited user signs up: verifies that the signup
+ * used a valid invitation and marks it accepted.
+ *
+ * PRIMARY ENFORCEMENT LIVES IN THE DATABASE (migration 0008): the
+ * handle_new_user trigger on auth.users refuses to create an account
+ * without a pending, unexpired invitation tied to the registering
+ * email, and atomically claims it. A direct auth.signUp call with no
+ * invitation never creates an account at all.
+ *
+ * This route is defense in depth and an honest double-check for the
+ * normal UI flow. It is IDEMPOTENT: if the trigger already claimed the
+ * invitation during signup (the new primary path), this route confirms
+ * success instead of reporting "already used".
  */
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -33,6 +43,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "That invitation is no longer valid. Ask the owner for a new link." }, { status: 404 });
   }
   if (invitation.status !== "pending") {
+    // Idempotency: the DB signup trigger claims the invitation during
+    // signUp, so a same-email user calling this route right afterwards
+    // must succeed. Any other email re-using a consumed token is refused.
+    if (
+      invitation.status === "accepted" &&
+      (user.email || "").toLowerCase() === invitation.email.toLowerCase()
+    ) {
+      return NextResponse.json({ data: { ok: true, already_accepted: true } });
+    }
     return NextResponse.json({ error: "That invitation was already used or revoked." }, { status: 410 });
   }
   if (invitation.expires_at && new Date(invitation.expires_at).getTime() <= Date.now()) {
