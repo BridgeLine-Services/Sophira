@@ -28,6 +28,7 @@ import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
 import { PacingController } from "../src/lib/pacing-controller";
 import { estimateWorkMinutes, parseEstimatedWorkMinutes } from "../src/lib/workload";
 import { passageById, pickPassage, TYPING_PASSAGES } from "../src/lib/typing-passage";
+import { buildChecklist, auditDraft, mergeSemanticResults, failedCriteriaForRevision, countWords } from "../src/lib/rubric";
 import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
 import { readFileSync } from "fs";
@@ -703,6 +704,66 @@ section("15d. Typing passages: server-controlled calibration references (spec §
   assert(passageById("does-not-exist") === null, "passages: unknown ids are rejected (client cannot pick a fake passage)");
   assert(pickPassage("user-abc").id === pickPassage("user-abc").id, "passages: deterministic pick per seed");
   assert(new Set(TYPING_PASSAGES.map((p) => p.id)).size === TYPING_PASSAGES.length, "passages: ids unique");
+}
+
+section("15e. Rubric engine: structured checklist + deterministic audit (spec §6)");
+{
+  const rubric = "Essay must be at least 1000 words and no more than 1500 words.\nMust include: introduction, thesis, body paragraphs, counterargument, conclusion.\nUse MLA citation style. At least 3 sources required.\nInclude a works cited page. No first person.";
+  const checklist = buildChecklist({ rubricText: rubric, instructionsText: "" });
+  const kinds = checklist.criteria.map((c) => c.kind);
+  assert(kinds.includes("word_count_min") && kinds.includes("word_count_max"), "rubric: word limits parsed");
+  assert(kinds.includes("section_presence"), "rubric: required sections parsed");
+  assert(kinds.includes("bibliography"), "rubric: works-cited requirement parsed");
+  assert(kinds.includes("citation_count"), "rubric: source-count requirement parsed");
+  assert(kinds.includes("citation_style"), "rubric: MLA citation style parsed");
+  assert(kinds.includes("prohibited_element"), "rubric: no-first-person prohibition parsed");
+  assert(kinds.includes("semantic"), "rubric: semantic catch-all present and labeled");
+
+  // A failing draft: deterministic checks catch every violation.
+  const badDraft = "I think this essay is short.\n\nI have no structure. I just wrote whatever. (Smith 2020) says something.\n\nI use contractions and personal pronouns everywhere, I do.";
+  const audit = auditDraft(badDraft, checklist);
+  assert(audit.wordCount === countWords(badDraft), "rubric: word count measured deterministically");
+  const byKind = (k: string) => audit.results.find((r) => r.kind === k);
+  assert(byKind("word_count_min")?.status === "not_satisfied", "rubric: short draft fails the minimum word count");
+  assert(byKind("section_presence")?.status === "not_satisfied", "rubric: missing sections fail");
+  assert(byKind("bibliography")?.status === "not_satisfied", "rubric: missing works-cited fails");
+  assert(byKind("citation_count")?.status === "partial", "rubric: too few citations are partial, not satisfied");
+  assert(byKind("prohibited_element")?.status === "not_satisfied", "rubric: first-person ban violated and caught");
+  assert(audit.summary.failed > 0 && !audit.summary.allPassed, "rubric: audit refuses to declare a bad draft compliant");
+
+  // A passing draft.
+  const goodDraft = [
+    "## Introduction", "The thesis is clear.", "## Thesis", "This paper argues X.", "## Body Paragraphs",
+    "Evidence supports the claim (Jones 2021) and more (Lee 2022). Yet (Patel 2023) adds context.",
+    "## Counterargument", "Critics disagree (Garcia 2020).", "## Conclusion", "In sum, X holds.",
+    "## Works Cited", "Jones, A. (2021). Title. Publisher.", "Lee, B. (2022). Title. Publisher.", "Patel, C. (2023). Title. Publisher.", "Garcia, D. (2020). Title. Publisher.",
+    ...Array(140).fill("The argument continues with substantial academic development."),
+  ].join("\n");
+  const goodAudit = auditDraft(goodDraft, checklist);
+  assert(goodAudit.results.find((r) => r.kind === "section_presence")?.status === "satisfied", "rubric: all headings found");
+  assert(goodAudit.results.find((r) => r.kind === "bibliography")?.status === "satisfied", "rubric: works cited found");
+  assert(goodAudit.results.find((r) => r.kind === "citation_count")?.status === "satisfied", "rubric: enough citations counted");
+  assert(goodAudit.results.find((r) => r.kind === "word_count_min")?.status === "satisfied", "rubric: long enough");
+  assert(goodAudit.results.find((r) => r.kind === "word_count_max")?.status === "satisfied", "rubric: under the cap");
+
+  // Semantic criteria are needs_semantic until the AI pass, then merged + labeled.
+  const before = goodAudit.results.find((r) => r.kind === "semantic");
+  assert(before?.status === "needs_semantic", "rubric: semantic criteria deferred (never declared by code)");
+  const merged = mergeSemanticResults(goodAudit, [
+    { id: "semantic_rubric", status: "satisfied", evidence: "Every rubric row maps to draft sections." },
+  ]);
+  const after = merged.results.find((r) => r.kind === "semantic");
+  assert(after?.status === "satisfied" && after.evidence.includes("(AI-assessed)"), "rubric: semantic merge is labeled AI-assessed");
+  assert(merged.summary.needsSemantic === 0, "rubric: no unresolved semantic criteria after merge");
+
+  // Revision instruction lists only failed/partial criteria.
+  const revise = failedCriteriaForRevision(audit);
+  assert(revise.length > 0 && revise.includes("- "), "rubric: failed criteria become a revision instruction");
+  assert(!failedCriteriaForRevision(merged).length, "rubric: passing audit produces no revision list");
+
+  // No rubric → no criteria → the UI tells the user instead of faking it.
+  const empty = buildChecklist({ rubricText: "", instructionsText: "" });
+  assert(empty.criteria.length === 0, "rubric: no requirements means no fabricated checklist");
 }
 
 section("16. Proprietary license and legal documents (spec §11–§14)");

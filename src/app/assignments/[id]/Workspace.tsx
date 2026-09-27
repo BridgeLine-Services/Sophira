@@ -10,6 +10,7 @@ import {
 import { ResultBody } from "@/components/app/ResultBody";
 import { PacedOutput } from "@/components/app/PacedOutput";
 import { SchedulePanel } from "@/components/app/SchedulePanel";
+import { RubricAuditPanel } from "@/components/app/RubricAuditPanel";
 import { MODE_MAP } from "@/lib/modes";
 import type { AiResponse, Assignment, Course, Teacher, WorkSession } from "@/lib/types";
 import { AlertTriangle, BookOpen, Check, Copy, Pencil, Save, Send, X } from "lucide-react";
@@ -313,6 +314,10 @@ export function Workspace({
           <SchedulePanel assignmentId={assignment.id} />
         </CardContent>
       </Card>
+
+      {/* Rubric compliance audit (spec §6) — deterministic checks first,
+          AI-assessed semantics labeled, revision loop, persisted audit. */}
+      <RubricAuditPanel assignmentId={assignment.id} responseId={latestResponse?.id ?? null} />
 
       {/* What was ACTUALLY applied (spec §40) — real backend state, not badges */}
       {contextApplied && (
