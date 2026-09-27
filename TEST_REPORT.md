@@ -149,6 +149,27 @@ key rejected by the v2 schema — removed in commit history.
 | Secrets scan | ✅ no ANDROID_*/store/key password material in artifacts |
 | Placeholder URL | ⚠️ present by design — this is a verification build; the release workflow rewrites `windows[0].url` from `SOPHIRA_APP_URL` and refuses the placeholder |
 
-NOT claimed: launch/GUI testing (no display server in the sandbox) — the
-Linux device row stays NOT TESTED. Windows .msi and macOS .dmg require
+Launch verification (same sandbox, Xvfb virtual display):
+`--appimage-extract` + `AppRun` under Xvfb → process runs (survives a 30s
+timeout with zero error output), `xwininfo -root -tree` shows a mapped window
+`"Sophira" 1280x832` AND a live `WebKitWebProcess` — the GTK shell boots and
+the web engine initializes. Screenshot: docs/sophira-linux-launch-proof.png.
+Still NOT claimed: real interaction/rendering of live content (no real
+deployment URL exists), so the Linux device row stays NOT TESTED. Windows .msi and macOS .dmg require
 their OS runners; implemented in the release matrix, not buildable here.
+
+## 23. Linux desktop launch verification (2026-09-27, agent sandbox)
+
+Beyond §22 (build), the AppImage was actually LAUNCHED headlessly:
+
+| Check | Result |
+| --- | --- |
+| AppImage integrity | ✅ `--appimage-extract` extracts cleanly (FUSE unavailable in sandbox; AppImageKit's own documented fallback) |
+| Process stability | ✅ AppRun runs; survives a 30s timeout window with ZERO stderr/stdout (EXIT 124 = our kill, not a crash) |
+| Window creation | ✅ `xwininfo -root -tree`: mapped window `0x200003 "Sophira" ("sophira" "Sophira") 1280x832+0+0` |
+| Web engine | ✅ live `WebKitWebProcess` window present — webkit2gtk initialized and rendering |
+| Screenshot | ✅ docs/sophira-linux-launch-proof.png (1280x832, Xvfb :98 capture) |
+| Honest limits | ⚠️ content shown is the unreachable-URL state (placeholder has no deployment); no mouse/keyboard interaction test; NOT a substitute for a real user's desktop test |
+
+Environment: Debian 12, Xvfb, GTK 3, webkit2gtk-4.1 2.50.6, AppImage from §22
+(SHA-256 60a460f4…76781c, i.e. the exact artifact a user would download).
