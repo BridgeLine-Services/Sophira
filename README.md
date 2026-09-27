@@ -256,3 +256,28 @@ what is honestly still blocked on a live backend.
 - Extraction failures say exactly what couldn't be read and why.
 - The verification panel never claims a check that wasn't performed.
 - Profile changes require explicit approval; every proposal can be rejected.
+
+
+---
+
+## Proprietary Software — All Rights Reserved
+
+Sophira is **proprietary software**. All rights are reserved by the copyright
+holder under the [LICENSE](LICENSE) file. This is not open-source software:
+copying, redistribution, modification, and commercial exploitation are
+prohibited without express written authorization. See
+[docs/legal/TERMS_OF_SERVICE.md](docs/legal/TERMS_OF_SERVICE.md) and
+[docs/legal/PRIVACY_POLICY.md](docs/legal/PRIVACY_POLICY.md) (templates with
+placeholders — see docs/legal/LEGAL_REVIEW_NOTICE.md).
+
+## Feature status (honest, 2026-09-27)
+
+| Feature | Status |
+| --- | --- |
+| Core assignment/AI/learning/verification workflow | Implemented + automated tests |
+| RLS isolation, invite-only auth, injection defenses | Implemented + automated tests |
+| PWA, /install, /downloads, native projects | Implemented; live at https://sophira.vercel.app |
+| Typing calibration (WPM/accuracy/baseline) | **Core logic implemented + tested** (src/lib/typing.ts); onboarding/Settings UI + DB persistence pending |
+| Paced output engine | **Core logic implemented + tested** (src/lib/pacing.ts); writing-workspace UI wiring pending |
+| Deadline-aware scheduler | **Core logic implemented + tested** (src/lib/scheduler.ts); assignment-workspace UI wiring pending |
+| Verified web-research engine | **Not implemented** — requires an external search/retrieval API key and significant additional work; existing student-source citation-honesty rules remain in force |

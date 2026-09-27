@@ -24,6 +24,10 @@ import {
   intentionalWritingHabits, type LearningPattern,
 } from "../src/lib/learning/patterns";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
+import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
+import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
+import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
+import { readFileSync } from "fs";
 
 let passed = 0;
 let failed = 0;
@@ -562,6 +566,77 @@ section("12. Intentionally preserved habits — explicit opt-in, writing only (w
 
 
 /* ---------------------------------------------------------------- */
+
+section("13. Typing calibration: WPM, accuracy, baselines (spec §3)");
+{
+  const t1 = computeTypingResult({ startedAtMs: 0, endedAtMs: 60000, typed: "a".repeat(250), reference: "a".repeat(249) + "b" });
+  assert(Math.round(t1.wpm) === 50, "typing: 250 chars in 60s = 50 gross WPM");
+  assert(t1.accuracy > 0.99 && t1.accuracy <= 1, "typing: accuracy penalizes the single mismatch");
+  assert(t1.netWpm < t1.wpm, "typing: net WPM below gross WPM when accuracy < 100%");
+  const t2 = computeTypingResult({ startedAtMs: 0, endedAtMs: 60000, typed: "x".repeat(2000), reference: "x".repeat(2000) });
+  assert(t2.flags.includes("implausibly_fast") && !t2.validAttempt, "typing: 400 WPM is flagged implausible and invalid");
+  const t3 = computeTypingResult({ startedAtMs: 0, endedAtMs: 3000, typed: "xy".repeat(20), reference: "x".repeat(200) });
+  assert(t3.flags.includes("too_short") && t3.flags.includes("incomplete") && !t3.validAttempt, "typing: short half-finished attempts are invalid");
+  const b1 = adoptBaseline([t1, t2], t1);
+  assert(b1.selectedBaselineWpm === 50, "typing: user-selected baseline is stored");
+  const b2 = adoptBaseline([t1, t2], t2, "retake with keyboard change");
+  assert(b2.selectedBaselineWpm !== b1.selectedBaselineWpm && b2.notes === "retake with keyboard change", "typing: recalibration replaces the baseline — no forced permanent result");
+  let threw = false;
+  try { adoptBaseline([t1], t2); } catch { threw = true; }
+  assert(threw, "typing: baseline must come from the user's recorded attempts");
+}
+
+section("14. Paced output: progressive reveal, never a full dump (spec §4)");
+{
+  const text = "a".repeat(600);
+  const plan = planReveal(text, { wpm: 60 });
+  assert(Math.round(plan.charIntervalMs) === 200, "pacing: 60 WPM yields 200ms/char default reveal plan");
+  const half = visibleAt(plan, plan.totalMs / 2);
+  assert(half.length === 300 && half !== text, "pacing: at half time only half the text is visible");
+  const nearEnd = visibleAt(plan, plan.totalMs - 1);
+  assert(nearEnd.length < text.length, "pacing: no accidental full-text dump before the plan completes");
+  assert(visibleAt(plan, plan.totalMs) === text && pacingComplete(plan, plan.totalMs), "pacing: full text only at/after total duration");
+  assert(visibleAt(plan, 1000, "instant") === text, "pacing: instant reveal bypasses pacing (skip)");
+  const fast = planReveal(text, { wpm: 60, multiplier: 2 });
+  assert(Math.abs(fast.totalMs - plan.totalMs / 2) < 1, "pacing: speed multiplier halves the reveal duration");
+  assert(visibleAt(plan, 30000).length === 150, "pacing: paused time never advances the reveal (active time only)");
+  assert(visibleAt(plan, plan.totalMs - 1) !== text, "pacing: paced mode differs from an instant dump");
+}
+
+section("15. Deadline-aware scheduler: deterministic, bounded, honest (spec §5)");
+{
+  const MIN = 60000, HOUR = 60 * MIN, DAY = 24 * HOUR, WEEK = 7 * DAY;
+  assert(MIN_BREAK_SECONDS === 10 && MAX_BREAK_SECONDS === 21600, "scheduler: supported break range is [10s, 6h]");
+  assert(clampBreak(1) === 10 && clampBreak(30000) === 21600, "scheduler: breaks hard-clamped to the [10s, 6h] bounds");
+  const wk = planSchedule({ nowMs: 0, deadlineMs: WEEK, estimatedWorkMinutes: 300 });
+  assert(wk.sessions[0].breakSeconds > 300, "scheduler: week-scale deadline earns long (>5 min) breaks");
+  assert(wk.feasible && wk.estimatedCompletionMs <= WEEK, "scheduler: week plan completes before the deadline");
+  const hr = planSchedule({ nowMs: 0, deadlineMs: HOUR, estimatedWorkMinutes: 30 });
+  assert(hr.feasible && hr.estimatedCompletionMs <= HOUR, "scheduler: hour-scale plan never misses the deadline");
+  assert(hr.sessions.every((s) => s.breakSeconds <= 60), "scheduler: hour-scale deadlines get very short or no breaks");
+  const day = planSchedule({ nowMs: 0, deadlineMs: DAY, estimatedWorkMinutes: 240 });
+  assert(day.sessions[0].breakSeconds >= 10 && day.sessions[0].breakSeconds < 300, "scheduler: day-scale deadline gets moderate short breaks");
+  const extreme = planSchedule({ nowMs: 0, deadlineMs: DAY, estimatedWorkMinutes: 180, urgency: "extreme" });
+  assert(extreme.sessions.every((s) => s.breakSeconds <= MIN_BREAK_SECONDS), "scheduler: extreme urgency minimizes breaks to the 10s floor");
+  const impossible = planSchedule({ nowMs: 0, deadlineMs: HOUR, estimatedWorkMinutes: 240 });
+  assert(!impossible.feasible && impossible.warning !== null && impossible.warning.includes("cannot"), "scheduler: impossible workload warns explicitly");
+  assert(wk.explanation.includes("urgency") && wk.explanation.length > 40 && impossible.explanation.includes("WARNING"), "scheduler: plans explain deadline, time remaining, and interval choice");
+}
+
+section("16. Proprietary license and legal documents (spec §11–§14)");
+{
+  const license = readFileSync("LICENSE", "utf8");
+  assert(license.includes("All rights reserved") && license.includes("proprietary"), "legal: LICENSE is proprietary with all rights reserved");
+  assert(!/MIT License|Apache License|GNU|GPL|BSD/.test(license), "legal: no open-source license text in LICENSE");
+  const readme = readFileSync("README.md", "utf8");
+  assert(readme.includes("Proprietary Software") && readme.includes("All Rights Reserved"), "legal: README carries the proprietary notice");
+  const tos = readFileSync("docs/legal/TERMS_OF_SERVICE.md", "utf8");
+  assert(tos.includes("academic-integrity") && tos.includes("PLACEHOLDER NOTICE"), "legal: ToS has placeholders and the academic-integrity notice");
+  assert(!tos.toLowerCase().includes("guaranteed undetectable"), "legal: ToS never promises AI output is undetectable");
+  const privacy = readFileSync("docs/legal/PRIVACY_POLICY.md", "utf8");
+  assert(privacy.includes("typing") && privacy.includes("third-party"), "legal: privacy covers typing data and third-party AI processing");
+  assert(readFileSync("docs/legal/LEGAL_REVIEW_NOTICE.md", "utf8").includes("attorney"), "legal: attorney-review notice present");
+}
 
 function finish() {
   console.log(`\n${"=".repeat(50)}`);
