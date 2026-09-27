@@ -231,3 +231,34 @@ action: repo Settings → Secrets and variables → Actions → Variables → ad
 refuses placeholder URLs by design, so it stays dormant until this variable
 exists. Android signing secrets and Apple signing material likewise remain
 external (honest unsigned fallbacks built into the release pipeline).
+
+## 26. Request round 2026-09-27: invitation hardening, typing, pacing, scheduling, rubric, research (offline)
+
+Commit range `6f931ef..133bbd5`. All statuses below use the §3 legend —
+nothing here claims live verification, because no Supabase project, AI key,
+or search-provider key exists in this sandbox.
+
+| Area | Status | Evidence |
+|---|---|---|
+| Invitation-only signup at the DB level | ✅ Implemented + logic unit-tested (26 new security assertions: direct signup blocked by `handle_new_user`, tokenless/fake/expired/revoked/wrong-email/reused invitations all rejected, member invitation REQUEST creates no access, no owner-impersonation path). Live RLS probe still pending per §4 | migration `0013_invitation_only_signup.sql` + tests §14x |
+| Owner privacy boundary | ✅ Preserved — no policy grants the owner cross-user reads of academic content; research tables (0012) are `user_id = auth.uid()` for ALL rows | code review + schema tests |
+| Typing calibration UI + persistence | ✅ Implemented + logic unit-tested (gross/net WPM, accuracy, suspicious-attempt rejection, baseline selection/replacement; `typing_attempts`/`typing_baseline` RLS). Onboarding step + Settings retake wired; live flow pending backend | migrations 0009; `/api/typing`; `TypingTest` component |
+| Paced output wired to writing workspace | ✅ Implemented + logic unit-tested (`PacingController` drives `reveal` on the existing pacing engine — a single timing engine, not a second one; paused time excluded; no per-character DB writes; no calibration → honest message + calibration link, never an invented speed). Browser-level flash/pause/resume checks are design-reviewed, not Selenium-run | `PacedOutput` in Workspace; tests §15a-15c |
+| Deadline-aware scheduling wired | ✅ Implemented + logic unit-tested (timezone-safe `due_at`, workload estimate wins, deterministic plans: 1-week → long breaks, 1-hour → near-minimum, urgent → minimum-bounded, impossible → infeasible warning, 10s min / 6h max enforced, pause/resume, persisted `work_schedules`). `/api/schedule` + `SchedulePanel` live flow pending backend | migration 0010; tests §15d |
+| Rubric compliance engine | ✅ Implemented + logic unit-tested (checklist parsing, deterministic word/section/bibliography/citation/prohibited checks, AI criteria labeled `needs_semantic`/AI-assessed, revision list; `rubric_audits` persisted; found + fixed a real bug where headings after the first were reported missing) | migration 0011; tests §15e; `/api/rubric-audit`; `RubricAuditPanel` |
+| Verified web research engine | ✅ Implemented + logic unit-tested, 🔶 **requires external configuration** (`SEARCH_PROVIDER`/`SEARCH_API_KEY` server-side). Tests cover dead URL, redirect, cross-domain redirect, paywall, thin content, good page with metadata, non-http refusal, quote authenticity, fabricated-quote rejection, citation styles, marker extraction, dedupe, objective ranking, provider-missing honesty. **No live search has been run — no provider key exists.** Without a key the API returns an honest failure and fabricates nothing | migrations 0012; `/api/research` + `/api/research/audit`; `ResearchPanel`; tests §15f-15i |
+| Citation-aware essay generation | ✅ Implemented: solve route accepts `research_project_id`, injects ONLY approved+verified sources as wrapped untrusted context with [S#] labels + verbatim-quote rules, appends a deterministic Works Cited built from source records (never LLM-invented), persists `research_citations`; refuses to write a "researched essay" with zero approved sources | `/api/ai/solve` integration |
+| Legal package | ✅ Proprietary all-rights-reserved license, strengthened ToS/Privacy Policy, legal-review notice; owner-specific facts are explicit placeholders, none invented | `LICENSE`, `docs/legal/*` |
+
+**Offline suite at this commit: 277 passed / 0 failed** (was 233 before the
+round), `tsc` clean, `next build` passes (38/38 pages), PWA manifest and
+middleware untouched by the round (re-verified by the build).
+
+### What this round did NOT verify (honest)
+- No live Supabase run: RLS policies compile in the migration files but were
+  not probed against a live Postgres (still §4-blocked on credentials).
+- No live web search: the research workflow has never retrieved a real URL.
+  A `SEARCH_API_KEY` (Brave or Tavily) is required for live verification.
+- No browser automation run in this environment; pacing/scheduler UI claims
+  are logic-level, not Selenium-level.
+- Native builds unchanged this round; §21/§22 local build results stand.
