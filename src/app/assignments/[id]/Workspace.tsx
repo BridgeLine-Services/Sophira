@@ -8,6 +8,8 @@ import {
   Select, Spinner, Textarea, useToast,
 } from "@/components/ui";
 import { ResultBody } from "@/components/app/ResultBody";
+import { PacedOutput } from "@/components/app/PacedOutput";
+import { SchedulePanel } from "@/components/app/SchedulePanel";
 import { MODE_MAP } from "@/lib/modes";
 import type { AiResponse, Assignment, Course, Teacher, WorkSession } from "@/lib/types";
 import { AlertTriangle, BookOpen, Check, Copy, Pencil, Save, Send, X } from "lucide-react";
@@ -303,6 +305,15 @@ export function Workspace({
         )}
       </div>
 
+      {/* Deadline-aware work/break schedule (spec §11) — persisted plan,
+          start/pause/resume, honest feasibility warnings. */}
+      <Card>
+        <CardHeader><CardTitle>Deadline &amp; schedule</CardTitle></CardHeader>
+        <CardContent>
+          <SchedulePanel assignmentId={assignment.id} />
+        </CardContent>
+      </Card>
+
       {/* What was ACTUALLY applied (spec §40) — real backend state, not badges */}
       {contextApplied && (
         <Card>
@@ -486,11 +497,13 @@ export function Workspace({
         </Card>
       )}
 
-      {/* Latest result */}
+      {/* Latest result — revealed at the user's calibrated pace (spec §4):
+          the response is already generated, verified and persisted; only the
+          PRESENTATION is paced, with pause/resume and instant mode. */}
       {latestResponse && (
         <Card>
           <CardContent className="p-5">
-            <ResultBody content={latestResponse.content} />
+            <PacedOutput key={latestResponse.id} text={latestResponse.content} responseId={latestResponse.id} />
             <div className="mt-5 flex flex-wrap gap-2 border-t border-ink/10 pt-4">
               <Button variant="secondary" size="sm" onClick={copyResult}>
                 <Copy className="h-4 w-4" /> Copy

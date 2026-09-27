@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/app/AppShell";
 import { Button, Card, CardContent, Input, Label, Select, useToast } from "@/components/ui";
-import { BookOpen, GraduationCap, PenLine, Smartphone } from "lucide-react";
+import { BookOpen, Gauge, GraduationCap, PenLine, Smartphone } from "lucide-react";
+import { TypingTest } from "@/components/app/TypingTest";
 import Link from "next/link";
 
 const LEVELS = ["Kindergarten/Elementary", "Middle school", "High school", "College/Undergraduate", "Graduate/Master's", "PhD", "Other"];
@@ -118,9 +119,9 @@ export default function OnboardingPage() {
   return (
     <AppShell title="Welcome to Sophira">
       <div className="mx-auto max-w-xl space-y-6">
-        <p className="text-sm font-medium text-ink-soft">Step {Math.min(step, 4)} of 4</p>
+        <p className="text-sm font-medium text-ink-soft">Step {Math.min(step, 5)} of 5</p>
         <div className="flex gap-1.5" aria-hidden>
-          {[1, 2, 3, 4].map((n) => (
+          {[1, 2, 3, 4, 5].map((n) => (
             <span key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? "bg-accent" : "bg-ink/10"}`} />
           ))}
         </div>
@@ -208,6 +209,25 @@ export default function OnboardingPage() {
         )}
 
         {step === 4 && (
+          <Card>
+            <CardContent className="space-y-3 p-5">
+              <h2 className="text-lg font-semibold text-ink">Calibrate your typing speed (optional)</h2>
+              <p className="text-sm text-ink-soft">
+                Sophira can reveal finished writing at your own pace instead of dumping it all at
+                once. Take this short typing test and pick an attempt as your baseline — you can
+                skip this and retake it any time in Settings.
+              </p>
+              <TypingTest />
+              <div className="flex flex-col gap-2">
+                <Button size="lg" onClick={() => { setStep(5); window.scrollTo({ top: 0 }); }}>Continue</Button>
+                <Button variant="ghost" onClick={() => { setStep(5); window.scrollTo({ top: 0 }); }}>Skip</Button>
+                <Button variant="ghost" onClick={() => setStep(3)}>← Back</Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {step === 5 && (
           <>
             <Card>
               <CardContent className="space-y-3 p-5">
@@ -216,6 +236,9 @@ export default function OnboardingPage() {
                 <div className="grid gap-2">
                   <Link href="/writing" className="flex items-center gap-2 rounded-lg border border-ink/10 p-3 text-sm font-medium text-ink hover:border-accent/40">
                     <PenLine className="h-4 w-4 text-accent" /> Add writing samples so my writing sounds like you
+                  </Link>
+                  <Link href="/settings" className="flex items-center gap-2 rounded-lg border border-ink/10 p-3 text-sm font-medium text-ink hover:border-accent/40">
+                    <Gauge className="h-4 w-4 text-accent" /> Retake the typing test or change your paced-writing baseline
                   </Link>
                   <Link href="/install" className="flex items-center gap-2 rounded-lg border border-ink/10 p-3 text-sm font-medium text-ink hover:border-accent/40">
                     <Smartphone className="h-4 w-4 text-accent" /> Install Sophira on your phone

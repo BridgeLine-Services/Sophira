@@ -25,6 +25,9 @@ import {
 } from "../src/lib/learning/patterns";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
+import { PacingController } from "../src/lib/pacing-controller";
+import { estimateWorkMinutes, parseEstimatedWorkMinutes } from "../src/lib/workload";
+import { passageById, pickPassage, TYPING_PASSAGES } from "../src/lib/typing-passage";
 import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
 import { readFileSync } from "fs";
@@ -621,6 +624,85 @@ section("15. Deadline-aware scheduler: deterministic, bounded, honest (spec §5)
   const impossible = planSchedule({ nowMs: 0, deadlineMs: HOUR, estimatedWorkMinutes: 240 });
   assert(!impossible.feasible && impossible.warning !== null && impossible.warning.includes("cannot"), "scheduler: impossible workload warns explicitly");
   assert(wk.explanation.includes("urgency") && wk.explanation.length > 40 && impossible.explanation.includes("WARNING"), "scheduler: plans explain deadline, time remaining, and interval choice");
+}
+
+section("15b. Pacing controller: UI state machine on the existing engine (spec §4)");
+{
+  const text = "a".repeat(600);
+  // Paced mode starts partial and completes only after the plan's active time.
+  const c = new PacingController(text, { wpm: 60 }, "paced");
+  assert(!c.isComplete(), "controller: nothing complete before starting");
+  c.start();
+  c.tick(0);
+  c.tick(60000); // one minute of active typing time at 60 WPM
+  assert(c.visible().length < text.length, "controller: still partial before the plan finishes");
+  assert(!c.isComplete(), "controller: not complete mid-plan");
+  c.tick(120000);
+  assert(c.visible() === text && c.isComplete(), "controller: full text exactly at plan completion");
+  assert(Math.abs(c.progress() - 1) < 1e-9, "controller: progress reaches 1");
+
+  // Pause freezes the reveal: paused time never counts.
+  const c2 = new PacingController(text, { wpm: 60 }, "paced");
+  c2.start();
+  c2.tick(0); c2.tick(30000); // 30s active
+  c2.pause();
+  const frozen = c2.visible().length;
+  assert(frozen === 150, "controller: half revealed after half the plan time");
+  c2.tick(30000 + 8 * 60 * 60 * 1000); // hours pass while paused
+  assert(c2.visible().length === frozen, "controller: PAUSED time never advances the reveal");
+  assert(!c2.isComplete(), "controller: pause keeps it incomplete");
+  c2.resume();
+  c2.tick(30000 + 8 * 60 * 60 * 1000 + 1); // first tick after resume only re-arms the clock
+  assert(c2.visible().length === frozen, "controller: resume continues from accumulated ACTIVE time only");
+  // The plan is 600 chars at 60 WPM = 120s of active time; 30s was done
+  // before the pause, so exactly 90s more active time completes it.
+  c2.tick(30000 + 8 * 60 * 60 * 1000 + 1 + 90000);
+  assert(c2.isComplete() && c2.visible() === text, "controller: after the remaining active time it completes");
+
+  // Instant mode: full text immediately, totalMs 0.
+  const c3 = new PacingController(text, { wpm: 60 }, "instant");
+  assert(c3.visible() === text && c3.isComplete() && c3.totalMs === 0, "controller: instant mode reveals everything at once");
+
+  // No invented speeds: missing calibration is always flagged.
+  assert(PacingController.requiresCalibration(null) && PacingController.requiresCalibration(0) && PacingController.requiresCalibration(undefined), "controller: null/0/undefined baselines require calibration");
+  assert(!PacingController.requiresCalibration(50), "controller: a real baseline is fine");
+
+  // Clock skew (tab sleep) cannot produce a negative jump or pre-completion overflow.
+  const c4 = new PacingController(text, { wpm: 60 }, "paced");
+  c4.start();
+  c4.tick(1000);
+  c4.tick(0); // clock goes backwards
+  c4.tick(1000 + 200000);
+  assert(c4.isComplete() && c4.progress() <= 1, "controller: negative/overflow ticks are clamped safely");
+}
+
+section("15c. Workload estimation: transparent heuristic, user number wins (spec §11)");
+{
+  const essay = estimateWorkMinutes({ mode: "writing", word_count_target: 800, has_rubric: true });
+  assert(essay.minutes > 60 && essay.minutes < 400, "workload: 800-word rubric essay estimates 1-6 hours");
+  assert(essay.basis.some((b) => b.includes("12 words/minute")), "workload: the drafting basis is disclosed");
+  const research = estimateWorkMinutes({ mode: "writing", word_count_target: 800, requires_research: true, source_count: 6 });
+  assert(research.minutes > essay.minutes, "workload: research requirements add time");
+  const deflt = estimateWorkMinutes({ mode: "writing" });
+  assert(deflt.basis.some((b) => b.includes("no word count given")), "workload: assumption disclosed when no word count");
+  const mathish = estimateWorkMinutes({ mode: "assignment", task_type: "problem set" });
+  assert(mathish.minutes >= 30, "workload: problem work gets solving time");
+  assert(parseEstimatedWorkMinutes("45") === 45 && parseEstimatedWorkMinutes(45) === 45, "workload: user estimate parsed");
+  assert(parseEstimatedWorkMinutes("abc") === null && parseEstimatedWorkMinutes(0) === null && parseEstimatedWorkMinutes(-5) === null, "workload: invalid user estimates rejected");
+  assert(parseEstimatedWorkMinutes(99999) === 600, "workload: absurd estimates clamped");
+}
+
+section("15d. Typing passages: server-controlled calibration references (spec §9)");
+{
+  assert(TYPING_PASSAGES.length >= 3, "passages: multiple canonical passages exist");
+  for (const p of TYPING_PASSAGES) {
+    assert(p.text.length >= 150 && p.text.length <= 400, "passages: each passage is a sensible calibration length");
+    assert(!/[0-9]/.test(p.text), "passages: no digits to unfairly punish keyboard layouts");
+  }
+  assert(passageById(TYPING_PASSAGES[0].id)?.id === TYPING_PASSAGES[0].id, "passages: lookup by id works");
+  assert(passageById("does-not-exist") === null, "passages: unknown ids are rejected (client cannot pick a fake passage)");
+  assert(pickPassage("user-abc").id === pickPassage("user-abc").id, "passages: deterministic pick per seed");
+  assert(new Set(TYPING_PASSAGES.map((p) => p.id)).size === TYPING_PASSAGES.length, "passages: ids unique");
 }
 
 section("16. Proprietary license and legal documents (spec §11–§14)");
