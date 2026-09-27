@@ -2,7 +2,7 @@
 
 Date: 2026-09-26 (membership & learning upgrade) · Next 14.2.35, strict TypeScript · `npm test` + `npm run build`
 
-## 1. Automated tests — ✅ 141 / 141 PASSED (`npm test`, fully offline)
+## 1. Automated tests — ✅ 144 / 144 PASSED (`npm test`, fully offline)
 
 | Area | Assertions | Result |
 |---|---|---|
@@ -76,7 +76,7 @@ Per `docs/ACCEPTANCE_TESTS.md` (10 sections, ready to run):
 | Capacitor `ios/` — real Xcode project, bundle id com.bridgeline.sophira, AppIcon asset set | ✅ IMPLEMENTED (project generated; `.ipa` requires macOS + Apple signing — see docs/NATIVE_BUILDS.md) |
 | Tauri `src-tauri/` — Rust app, icons generated, bundles configured for msi/dmg/deb/AppImage | ✅ IMPLEMENTED (build requires Rust toolchain — CI matrix builds all three OS targets) |
 | Release pipeline with SHA-256 checksums + GitHub release attach | ✅ IMPLEMENTED (`.github/workflows/release.yml`; requires repo variable SOPHIRA_APP_URL + optional signing secrets) |
-| CI on push/PR: 141 tests, tsc, production build, native project presence | ✅ IMPLEMENTED |
+| CI on push/PR: 144 tests, tsc, production build, native project presence | ✅ IMPLEMENTED |
 | Atomic single-use invitation accept | ✅ IMPLEMENTED + code-reviewed (live verification: acceptance §14) |
 | `/downloads` page — live GitHub-release lookup, honest empty states, checksum display | ✅ IMPLEMENTED (AUTO-VERIFIED via tsc/build; behavior needs a published release) |
 | `/install` — platform-aware: PWA always primary, native option links to /downloads | ✅ IMPLEMENTED |

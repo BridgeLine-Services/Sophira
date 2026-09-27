@@ -30,7 +30,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The release workflow then: runs the 141 tests, TypeScript check, production
+The release workflow then: runs the 144 tests, TypeScript check, production
 build → Android APK (signed or honestly unsigned) → iOS archive (signed .ipa
 export or honest unsigned archive) → desktop matrix (Windows .msi, macOS
 .dmg, Linux .AppImage + .deb) → per-platform SHA256SUMS files → GitHub
@@ -64,7 +64,7 @@ The in-app Downloads page also displays the per-artifact SHA-256 directly.
 
 ## CI (non-release)
 
-`.github/workflows/ci.yml` runs on every push/PR: npm ci, the 141 tests,
+`.github/workflows/ci.yml` runs on every push/PR: npm ci, the 144 tests,
 TypeScript strict check, production build, and validation that the Android,
 iOS and Tauri projects are intact. It fails loudly and never fabricates a
 successful build.

@@ -10,7 +10,7 @@ current status so nothing is claimed that was not executed.
 ## Status legend (P11)
 
 - **IMPLEMENTED** — the code path exists (verified by code inspection)
-- **AUTO-VERIFIED** — covered by `npm test` (141 assertions, fully offline)
+- **AUTO-VERIFIED** — covered by `npm test` (144 assertions, fully offline)
 - **LIVE-VERIFIED** — executed against a real backend (date noted)
 - **DEVICE-VERIFIED** — executed on a real device (device/date noted)
 - **NOT-YET-VERIFIED** — requires a live backend / real device; not executed yet

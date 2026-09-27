@@ -22,7 +22,7 @@ Last updated: 2026-09-26
 - The Android Gradle project genuinely builds and produces a valid APK in the
   agent sandbox (see TEST_REPORT §20 for the exact result, signature status
   and checksum). This is a **build verification**, not a device test.
-- All web/PWA behavior is covered by the automated test suite (141 assertions)
+- All web/PWA behavior is covered by the automated test suite (144 assertions)
   and the responsive 360/390/430px + landscape requirements are enforced in
   the layout.
 - Live-backend and real-AI acceptance rows remain open in
