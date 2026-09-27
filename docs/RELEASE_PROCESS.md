@@ -1,5 +1,24 @@
 # Sophira Release Process
 
+## Production web deployment (LIVE: https://sophira.vercel.app/)
+
+The web app is deployed on Vercel from this repository (auto-deploy on
+master push). For the deployment to function, the Vercel project needs
+these **Production** environment variables (values from the Sophira
+Supabase project's API settings — the anon key is the public browser key,
+NEVER the service-role key):
+
+- `NEXT_PUBLIC_SUPABASE_URL` — the Supabase project HTTPS URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+Symptom when they are missing: every protected route returns
+500 `MIDDLEWARE_INVOCATION_FAILED` ("Your project's URL and Key are
+required to create a Supabase client!") while public pages (/install,
+/downloads, /login) still render. Add both variables for the
+**Production** environment and redeploy. Then set the repository
+variable `SOPHIRA_APP_URL` to `https://sophira.vercel.app` — the native
+shells load this URL.
+
 ## One-time repository configuration (Settings → Secrets and variables → Actions)
 
 1. **Variable `SOPHIRA_APP_URL`** — the deployed Sophira web URL the native

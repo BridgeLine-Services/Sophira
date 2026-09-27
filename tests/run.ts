@@ -577,7 +577,7 @@ function finish() {
 // PUBLIC pages render without Supabase config; PROTECTED routes fail fast.
 // ---------------------------------------------------------------------------
 export async function run(): Promise<void> {
-  const { middleware } = await import("../src/middleware");
+  const { middleware, config } = await import("../src/middleware");
   const { NextRequest } = await import("next/server");
   const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -591,6 +591,11 @@ export async function run(): Promise<void> {
     let protectedThrew = false;
     try { await middleware(new NextRequest("http://localhost/dashboard")); }
     catch { protectedThrew = true; }
+    assert(protectedThrew, "middleware: /dashboard still fails fast without Supabase env");
+    const matcher = (config.matcher as string[])[0];
+    assert(matcher.includes("icons/"), "matcher: /icons/* assets skip the auth middleware (was: only non-existent icons/manifest.webmanifest)");
+    assert(matcher.includes("favicon.png"), "matcher: guessed /favicon.png never 500s via middleware (404s instead)");
+    assert(matcher.includes("sw.js") && matcher.includes("robots.txt") && matcher.includes("manifest.webmanifest"), "matcher: PWA shell files skip the auth middleware");
     assert(protectedThrew, "middleware: /dashboard still fails fast without Supabase env");
   } finally {
     if (savedUrl !== undefined) process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;

@@ -69,5 +69,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|icons/manifest.webmanifest|sw.js|favicon.ico|api/).*)"],
+  matcher: [
+      // Static assets never invoke the auth middleware: no Supabase session
+      // check per icon request, and no 500 when a browser guesses a missing
+      // path like /favicon.png (production debugging 2026-09-27: the old
+      // matcher excluded the non-existent icons/manifest.webmanifest but
+      // NOT the real /icons/ directory, so every app icon crashed the
+      // middleware in deployments without Supabase env).
+      "/((?!_next/static|_next/image|api/|icons/|manifest.webmanifest|sw.js|robots.txt|favicon.ico|favicon.png|apple-touch-icon.png).*)",
+    ],
 };
