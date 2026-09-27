@@ -308,7 +308,7 @@ section("7e. Document structure extraction (upgrade spec §3, §5)");
 }
 
 section("7f. Spreadsheet + presentation parsers (integration, offline)");
-(async () => {
+const __fileTests = (async () => {
   // Build a real XLSX in memory with the same library the app uses, then parse it.
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
@@ -331,7 +331,7 @@ section("7f. Spreadsheet + presentation parsers (integration, offline)");
   assert(pptx.text.includes("Compute the limit"), "PPTX slide body extracted");
   assert(pptx.text.includes("Speaker notes: Emphasize epsilon-delta"), "PPTX speaker notes extracted");
 
-  finish();
+  
 })();
 
 section("8. Inheritance wording — more specific layers override general ones (spec §33)");
@@ -571,3 +571,31 @@ function finish() {
     process.exit(1);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Middleware degraded-mode regression (spec §24 / release-acceptance round):
+// PUBLIC pages render without Supabase config; PROTECTED routes fail fast.
+// ---------------------------------------------------------------------------
+export async function run(): Promise<void> {
+  const { middleware } = await import("../src/middleware");
+  const { NextRequest } = await import("next/server");
+  const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  try {
+    const res = await middleware(new NextRequest("http://localhost/install"));
+    assert(res !== undefined && res.status >= 200 && res.status < 400, "middleware: /install renders without Supabase env (no 500)");
+    const res2 = await middleware(new NextRequest("http://localhost/downloads"));
+    assert(res2 !== undefined && res2.status >= 200 && res2.status < 400, "middleware: /downloads renders without Supabase env (no 500)");
+    let protectedThrew = false;
+    try { await middleware(new NextRequest("http://localhost/dashboard")); }
+    catch { protectedThrew = true; }
+    assert(protectedThrew, "middleware: /dashboard still fails fast without Supabase env");
+  } finally {
+    if (savedUrl !== undefined) process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+    if (savedKey !== undefined) process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
+  }
+}
+
+__fileTests.then(() => run()).then(finish).catch((e) => { console.error(e); process.exit(1); });

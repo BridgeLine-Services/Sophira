@@ -173,3 +173,38 @@ Beyond §22 (build), the AppImage was actually LAUNCHED headlessly:
 
 Environment: Debian 12, Xvfb, GTK 3, webkit2gtk-4.1 2.50.6, AppImage from §22
 (SHA-256 60a460f4…76781c, i.e. the exact artifact a user would download).
+
+## 24. Release-acceptance round (2026-09-27)
+
+**Workflow activation retested and still blocked.** Copied
+`.workflows-pending/{ci,release}.yml` to `.github/workflows/` and pushed;
+GitHub rejected the push exactly as before: *"refusing to allow a Personal
+Access Token to create or update workflow `.github/workflows/ci.yml` without
+`workflow` scope"*. The local commit was reset so master stays pushable.
+Exact blocker: the git credential must be a PAT **with the `workflow` scope**
+(or an OAuth app / GitHub App with workflow-write). No other repo change is
+required — the workflow files themselves are complete.
+
+**Real bug found and fixed: middleware crashed public pages without Supabase
+config.** A local production-serve smoke test (`next build` + `next start`,
+then HTTP requests) returned 500 on EVERY route, including public
+`/install` and `/downloads`: the middleware created its Supabase client
+before the public-path check. Fix (src/middleware.ts): public paths
+(`+ /downloads`) short-circuit when Supabase env is absent; every protected
+route keeps the exact same fail-fast behavior; no auth check weakened when
+the environment IS configured. 3 regression tests added
+(144 assertions total). Verified by re-serving: `/install` → 200,
+`/downloads` → 200, `/` → 500 (protected, unconfigured env — correct
+fail-fast). This would have hit any misconfigured production deployment.
+
+**Also this round:** confirmed `/install` is platform-aware (UA detection
+for iOS/Android/Windows/macOS/Linux with per-platform native guidance and
+PWA fallback), and the service worker audited: network-first everywhere,
+HTML/API never cached — no academic data, Supabase responses, or AI output
+enters any cache; app-shell-only precache.
+
+Still blocked (unchanged, credential/environment-specific): workflow scope
+token; hosting credentials to deploy the web app and set SOPHIRA_APP_URL
+(the sandbox has no Vercel/Netlify/hosting credential and cannot deploy a
+server-rendered Next.js app on GitHub Pages); Android signing secrets;
+Apple signing credentials; physical devices; live Supabase/AI credentials.
