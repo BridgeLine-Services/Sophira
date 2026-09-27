@@ -3,11 +3,15 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC = ["/login", "/signup", "/reset-password", "/auth/callback", "/install", "/downloads"];
 
-// Degraded-mode guard (found by the local production-serve smoke test, §24):
-// without Supabase env config, PUBLIC pages must still render (install
-// instructions and downloads are static public content); PROTECTED routes
-// keep failing fast exactly as before. No auth behavior changes when the
-// environment IS configured.
+// Degraded-mode guard (found by the local production-serve smoke test, §24
+// and the 2026-09-27 production 500s): without Supabase env config, PUBLIC
+// pages must still render (install instructions and downloads are static
+// public content). PROTECTED routes cannot be auth-checked at all without
+// Supabase, so they REDIRECT TO /LOGIN instead of throwing — the previous
+// behavior 500-crashed every non-public path (including "/") with
+// MIDDLEWARE_INVOCATION_FAILED in deployments missing env vars. No auth
+// behavior changes when the environment IS configured: with env present,
+// this branch never runs.
 function hasSupabaseEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
@@ -16,7 +20,13 @@ export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC.some((p) => path === p || path.startsWith(p + "/"));
-  if (isPublic && !hasSupabaseEnv()) return NextResponse.next();
+  if (!hasSupabaseEnv()) {
+    if (isPublic) return NextResponse.next();
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
