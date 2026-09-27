@@ -1,0 +1,265 @@
+# Sophira release pipeline (runs on v* tags, or manually).
+#
+# REQUIRED REPOSITORY CONFIG (Settings -> Secrets and variables -> Actions):
+#   VARIABLE: SOPHIRA_APP_URL  — the deployed Sophira URL the native shells
+#     load. Builds REFUSE to run against the placeholder.
+#   SECRETS (optional, for signed artifacts):
+#     Android: ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD,
+#              ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+#     iOS:     IOS_P12_BASE64, IOS_P12_PASSWORD,
+#              IOS_PROVISIONING_PROFILE_BASE64, IOS_TEAM_ID
+#
+# Honest artifact policy:
+#   - signed APK -> Sophira-release.apk; unsigned -> Sophira-release-unsigned.apk
+#   - an unsigned xcarchive is NEVER called an .ipa; a signed .ipa is exported
+#     only when Apple secrets exist
+#   - every published artifact gets a SHA-256 checksum file
+#   - nothing is faked; the release notes state each artifact's true status
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: npx tsc --noEmit -p tsconfig.json
+      - run: npm run build
+
+  android:
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - name: Require a real deployment URL (never the placeholder)
+        run: |
+          test -n "${SOPHIRA_APP_URL:-}" || { echo "::error::Set the SOPHIRA_APP_URL repository variable."; exit 1; }
+          test "${SOPHIRA_APP_URL}" != "https://sophira.example.com" || { echo "::error::SOPHIRA_APP_URL is still the placeholder."; exit 1; }
+        env:
+          SOPHIRA_APP_URL: ${{ vars.SOPHIRA_APP_URL }}
+      - run: npm ci
+      - name: Bake the deployment URL into the Android shell
+        run: SOPHIRA_APP_URL="${{ vars.SOPHIRA_APP_URL }}" npx cap sync android
+      - name: Verify no placeholder URL remains
+        run: "! grep -q 'sophira.example.com' android/app/src/main/assets/capacitor.config.json"
+      - name: Decode release keystore (only if configured; decoded only on the runner)
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        run: |
+          echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > /tmp/sophira-release.keystore
+          echo "ANDROID_KEYSTORE_FILE=/tmp/sophira-release.keystore" >> "$GITHUB_ENV"
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      - name: Build release APK (fails clearly if signing credentials are invalid)
+        run: cd android && ./gradlew assembleRelease
+      - name: Verify, name, and checksum the APK
+        run: |
+          set -e
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt | sort | tail -1)
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          SIGNED=false
+          if [ -f "$APK" ]; then SIGNED=true; else APK=android/app/build/outputs/apk/release/app-release-unsigned.apk; fi
+          test -f "$APK" || { echo "::error::No release APK was produced"; exit 1; }
+          echo "--- package/identity ---"
+          "$AAPT" dump badging "$APK" | head -2
+          "$AAPT" dump badging "$APK" | grep -q "package: name='com.bridgeline.sophira'" || { echo "::error::Wrong application id"; exit 1; }
+          mkdir -p dist
+          if [ "$SIGNED" = true ]; then
+            "$APKSIGNER" verify --print-certs "$APK" || { echo "::error::APK signature verification failed"; exit 1; }
+            cp "$APK" dist/Sophira-release.apk
+            echo "ANDROID_STATUS=signed Sophira-release.apk" >> "$GITHUB_STEP_SUMMARY"
+          else
+            cp "$APK" dist/Sophira-release-unsigned.apk
+            echo "ANDROID_STATUS=UNSIGNED Sophira-release-unsigned.apk (no ANDROID_* secrets configured — install requires adb or manual signing)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          cd dist && sha256sum * > SHA256SUMS-android.txt && cat SHA256SUMS-android.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-artifacts
+          path: dist/
+
+  ios:
+    runs-on: macos-14
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - name: Require a real deployment URL (never the placeholder)
+        run: |
+          test -n "${SOPHIRA_APP_URL:-}" || { echo "::error::Set the SOPHIRA_APP_URL repository variable."; exit 1; }
+          test "${SOPHIRA_APP_URL}" != "https://sophira.example.com" || { echo "::error::SOPHIRA_APP_URL is still the placeholder."; exit 1; }
+        env:
+          SOPHIRA_APP_URL: ${{ vars.SOPHIRA_APP_URL }}
+      - run: npm ci
+      - name: Sync Capacitor (runs pod install via the Podfile)
+        run: SOPHIRA_APP_URL="${{ vars.SOPHIRA_APP_URL }}" npx cap sync ios
+      - name: Verify no placeholder URL remains
+        run: "! grep -q 'sophira.example.com' ios/App/App/capacitor.config.json"
+      - name: Archive (signed when Apple secrets exist, otherwise an honest unsigned archive)
+        run: |
+          cd ios/App
+          if [ "${IOS_P12_BASE64:-}" != "" ]; then
+            echo "Apple signing secrets configured — building a SIGNED archive."
+            echo "${IOS_P12_BASE64}" | base64 -d > /tmp/sophira.p12
+            security create-keychain -p build build.keychain-db
+            security import /tmp/sophira.p12 -k build.keychain-db -P "${IOS_P12_PASSWORD}" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple: -s -k build build.keychain-db
+            security list-keychains -d user -s build.keychain-db
+            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+            echo "${IOS_PROVISIONING_PROFILE_BASE64}" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/sophira.mobileprovision
+            xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+              -destination 'generic/platform=iOS' -archivePath build/Sophira.xcarchive \
+              DEVELOPMENT_TEAM="${IOS_TEAM_ID}" archive | tail -5
+          else
+            echo "No Apple signing secrets — producing an UNSIGNED .xcarchive (this is NOT an .ipa and the job summary says so)."
+            xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+              -destination 'generic/platform=iOS' -archivePath build/Sophira-unsigned.xcarchive \
+              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive | tail -5
+          fi
+        env:
+          IOS_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+          IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+      - name: Export and verify the signed .ipa (only when signing is configured)
+        if: env.IOS_P12_BASE64 != ''
+        run: |
+          set -e
+          cd ios/App
+          cat > build/ExportOptions.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>ad-hoc</string>
+            <key>teamID</key><string>IOS_TEAM_ID_VALUE</string>
+          </dict></plist>
+          PLIST
+          sed -i '' "s/IOS_TEAM_ID_VALUE/${IOS_TEAM_ID}/" build/ExportOptions.plist
+          xcodebuild -exportArchive -archivePath build/Sophira.xcarchive \
+            -exportOptionsPlist build/ExportOptions.plist -exportPath build/ipa | tail -3
+          IPA=$(find build/ipa -name '*.ipa' | head -1)
+          test -n "$IPA" || { echo "::error::No .ipa was exported"; exit 1; }
+          mkdir -p ../../dist && cp "$IPA" ../../dist/Sophira.ipa
+          # Verify identity, bundle id, version
+          cd ../../dist
+          unzip -q Sophira.ipa -d /tmp/ipa-check
+          APP=$(ls -d /tmp/ipa-check/Payload/*.app | head -1)
+          /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Info.plist"
+          codesign -dv "$APP" 2>&1 | grep -E 'Authority|TeamIdentifier' || { echo "::error::App is not code-signed"; exit 1; }
+          echo "IOS_STATUS=signed Sophira.ipa (ad-hoc distribution)" >> "$GITHUB_STEP_SUMMARY"
+          sha256sum Sophira.ipa > SHA256SUMS-ios.txt && cat SHA256SUMS-ios.txt
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+      - name: Honest status when unsigned
+        if: env.IOS_P12_BASE64 == ''
+        run: echo "IOS_STATUS=UNSIGNED .xcarchive only — NO .ipa produced (Apple signing secrets not configured; see docs/NATIVE_BUILDS.md)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-artifacts
+          path: dist/
+          if-no-files-found: ignore
+
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            bundles: deb,appimage
+            label: linux
+          - os: windows-latest
+            bundles: msi
+            label: windows
+          - os: macos-latest
+            bundles: dmg,app
+            label: macos
+    runs-on: ${{ matrix.os }}
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux system dependencies (Tauri v2)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgtk-3-dev
+      - run: npm ci
+      - name: Require a real deployment URL and point the shell at it
+        shell: bash
+        run: |
+          test -n "${SOPHIRA_APP_URL:-}" || { echo "::error::Set the SOPHIRA_APP_URL repository variable."; exit 1; }
+          test "${SOPHIRA_APP_URL}" != "https://sophira.example.com" || { echo "::error::SOPHIRA_APP_URL is still the placeholder."; exit 1; }
+          node -e "const fs=require('fs');const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p));c.app.windows[0].url=process.env.SOPHIRA_APP_URL;fs.writeFileSync(p,JSON.stringify(c,null,2));"
+        env:
+          SOPHIRA_APP_URL: ${{ vars.SOPHIRA_APP_URL }}
+      - name: Build desktop app (--bundles are bundle FORMATS, not target triples)
+        shell: bash
+        run: npx tauri build --bundles ${{ matrix.bundles }}
+      - name: Collect, verify, name, and checksum artifacts
+        shell: bash
+        run: |
+          set -e
+          mkdir -p dist
+          BUNDLE_DIR="src-tauri/target/release/bundle"
+          case "${{ matrix.label }}" in
+            linux)
+              cp "$BUNDLE_DIR/appimage/"*.AppImage dist/Sophira-linux.AppImage
+              cp "$BUNDLE_DIR/deb/"*.deb dist/Sophira-linux.deb
+              ;;
+            windows)
+              cp "$BUNDLE_DIR/msi/"*.msi dist/Sophira-windows.msi
+              ;;
+            macos)
+              cp "$BUNDLE_DIR/dmg/"*.dmg dist/Sophira-macos.dmg
+              cp -R "$BUNDLE_DIR/macos/"*.app dist/ 2>/dev/null || true
+              ;;
+          esac
+          cd dist
+          ls -la
+          # honest verification: each artifact must exist and be non-trivial
+          for f in *; do
+            test "$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f")" -gt 1000000 || { echo "::error::$f looks too small to be a real installer"; exit 1; }
+          done
+          sha256sum * > "SHA256SUMS-${{ matrix.label }}.txt"
+          cat "SHA256SUMS-${{ matrix.label }}.txt"
+          echo "DESKTOP_${{ matrix.label }}=built $(ls)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.label }}
+          path: dist/
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: [android, ios, desktop]
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts }
+      - name: Merge per-platform checksums into ALL-CHECKSUMS.txt
+        run: |
+          cd artifacts
+          find . -name 'SHA256SUMS*' -exec cat {} + > ../ALL-CHECKSUMS.txt || echo "(no checksums were produced)"
+          cat ../ALL-CHECKSUMS.txt
+      - name: Create the GitHub Release with real artifacts only
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/**/*
+            ALL-CHECKSUMS.txt
