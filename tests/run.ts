@@ -795,8 +795,11 @@ function finish() {
 }
 
 // ---------------------------------------------------------------------------
-// Middleware degraded-mode regression (spec §24 / release-acceptance round):
-// PUBLIC pages render without Supabase config; PROTECTED routes fail fast.
+// Middleware degraded-mode regression (spec §24 / release-acceptance round,
+// updated 2026-09-27 after the live MIDDLEWARE_INVOCATION_FAILED 500s):
+// PUBLIC pages render without Supabase config; PROTECTED routes REDIRECT to
+// /login — they must never crash the middleware into a 500 (the production
+// homepage was a 500 for exactly this reason).
 // ---------------------------------------------------------------------------
 export async function run(): Promise<void> {
   const { middleware, config } = await import("../src/middleware");
@@ -811,14 +814,15 @@ export async function run(): Promise<void> {
     const res2 = await middleware(new NextRequest("http://localhost/downloads"));
     assert(res2 !== undefined && res2.status >= 200 && res2.status < 400, "middleware: /downloads renders without Supabase env (no 500)");
     let protectedThrew = false;
-    try { await middleware(new NextRequest("http://localhost/dashboard")); }
+    let protectedRes: { status?: number; headers?: { get(k: string): string | null } } | null = null;
+    try { protectedRes = await middleware(new NextRequest("http://localhost/dashboard")); }
     catch { protectedThrew = true; }
-    assert(protectedThrew, "middleware: /dashboard still fails fast without Supabase env");
+    assert(!protectedThrew, "middleware: /dashboard never CRASHES without Supabase env (no MIDDLEWARE_INVOCATION_FAILED)");
+    assert(protectedRes !== null && protectedRes.status === 307 && (protectedRes.headers?.get("location") ?? "").includes("/login"), "middleware: protected route redirects to /login in degraded mode (was a 500 in production)");
     const matcher = (config.matcher as string[])[0];
     assert(matcher.includes("icons/"), "matcher: /icons/* assets skip the auth middleware (was: only non-existent icons/manifest.webmanifest)");
     assert(matcher.includes("favicon.png"), "matcher: guessed /favicon.png never 500s via middleware (404s instead)");
     assert(matcher.includes("sw.js") && matcher.includes("robots.txt") && matcher.includes("manifest.webmanifest"), "matcher: PWA shell files skip the auth middleware");
-    assert(protectedThrew, "middleware: /dashboard still fails fast without Supabase env");
   } finally {
     if (savedUrl !== undefined) process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
     if (savedKey !== undefined) process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
