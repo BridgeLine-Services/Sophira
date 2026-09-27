@@ -82,3 +82,55 @@ Per `docs/ACCEPTANCE_TESTS.md` (10 sections, ready to run):
 | `/install` — platform-aware: PWA always primary, native option links to /downloads | ✅ IMPLEMENTED |
 | Android release signing via env (secrets never committed) | ✅ IMPLEMENTED |
 | Actual signed .ipa / .apk / desktop binaries produced | ⬜ NOT-YET-VERIFIED — requires Android SDK run or Apple certs + CI secrets; the pipeline reports this honestly instead of faking it |
+
+
+## 20. Native pipeline compliance + honest limits (added 2026-09-26)
+
+| Requirement | Status |
+| --- | --- |
+| Workflows fixed per spec (Tauri --bundles formats, SHA256SUMS-<platform>.txt, ALL-CHECKSUMS.txt, iOS workspace+pod+ad-hoc export, aapt/apksigner/codesign/PlistBuddy verification, signed-vs-unsigned job summaries, placeholder-URL refusal) | ✅ IMPLEMENTED (YAML-validated; staged in .workflows-pending/) |
+| Workflows ACTIVE under .github/workflows | ❌ BLOCKED — repo PAT has no GitHub `workflow` scope (verified via API: no X-OAuth-Scopes; pushes rejected). Exact manual step in .workflows-pending/README.md |
+| Android project genuinely builds | ✅ VERIFIED LOCALLY: real `gradlew assembleDebug` + `assembleRelease` executed with Temurin JDK 21 + Android SDK (platform 36, build-tools 34) — see §21 |
+| Sophira-release.apk (signed, production URL) | ⬜ NOT-YET-VERIFIED — requires keystore secrets AND a deployed SOPHIRA_APP_URL (does not exist yet); pipeline refuses placeholder builds |
+| Sophira.ipa | ⬜ NOT BUILDABLE HERE — requires macOS + Apple Developer cert + provisioning; workflow path implemented and honest |
+| Windows .msi / macOS .dmg / Linux .AppImage+.deb | ⬜ CI-BUILDABLE ONLY — no Windows/macOS/Rust+webkit toolchain in this sandbox; matrix implemented in release.yml |
+| First GitHub Release | ⬜ requires workflow activation + SOPHIRA_APP_URL |
+| Downloads page: per-platform sections, inline SHA-256 (checksum-file fetch with graceful fallback), unsigned badges, honest empty states | ✅ IMPLEMENTED + tsc/build verified |
+| docs/DEVICE_ACCEPTANCE.md — all rows honestly NOT TESTED (no physical devices in agent sandbox) | ✅ CREATED |
+| docs/RELEASE_PROCESS.md — one-time config, release steps, artifact honesty table | ✅ CREATED |
+| Live Supabase / real AI / real upload acceptance | ⬜ NOT TESTED — no backend credentials in sandbox; scripts and step lists ready in docs/MASTER_ACCEPTANCE_WORKFLOW.md |
+
+
+## 21. Local Android build verification (2026-09-27, agent sandbox)
+
+Real Gradle build executed (not CI, not simulated). Environment: Debian 12,
+Temurin JDK 21.0.12, Android SDK platform 36 / build-tools 34.0.0, Gradle
+8.11.1 wrapper.
+
+| Artifact | Result |
+| --- | --- |
+| `app-debug.apk` — 8,141,000 bytes (8.1 MB) | ✅ BUILT, debug-signed (`CN=Android Debug`), SHA-256 `dc26e08f5c17839b0f7900e84eae63fb87bcb3b9fbd97d0500f32a80ee0ad731` |
+| `app-release.apk` (signed path, TEST keystore) | ✅ BUILT, verified with `apksigner verify --print-certs`, SHA-256 `e29033aaf22ba02ab45e643a1f34958730b171e1e4d0a8ef9e3f9da72501ea83` |
+| `app-release-unsigned.apk` (no credentials) | ✅ BUILT — honest unsigned default, exactly what CI produces without ANDROID_* secrets |
+| Invalid credentials | ✅ FAILS CLEARLY (KeytoolException with a precise message; nothing fake is emitted) |
+| `aapt dump badging` | ✅ `package: name='com.bridgeline.sophira' versionCode='1' versionName='1.0.0'`, minSdk 24, compileSdk 36 |
+| Secret leak scan | ✅ NO keystore passwords in either APK (byte-level scan of packaged assets) |
+| Placeholder URL | ⚠️ PRESENT in these verification builds (built against the placeholder on purpose) — the release workflow REFUSES to run against it, and these sandbox artifacts are explicitly NOT release artifacts |
+
+### Build fixes discovered by the real build (also required by CI)
+
+1. AGP 8.7.2 → **8.9.1** (androidx.core 1.17.0 requires it; Gradle 8.11.1
+   wrapper already supports it)
+2. compileSdkVersion 35 → **36** (androidx.core 1.17.0 AAR metadata)
+3. minSdkVersion 23 → **24** (io.ionic.libs:ioncamera-android requires 24)
+4. JDK **21** toolchain required by Capacitor 8 plugins (CI already uses
+   setup-java 17 — updated to 21)
+
+These were invisible to tsc/tests and would have broken the first CI run.
+
+### What this does NOT claim
+
+- No physical Android device was available: NOT device-tested.
+- The release workflow still cannot run until the token gains `workflow`
+  scope, `SOPHIRA_APP_URL` exists (deploy the web app), and real signing
+  secrets are set. The APKs above are sandbox verification artifacts only.

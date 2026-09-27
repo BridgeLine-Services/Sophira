@@ -42,7 +42,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm }
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: 17 }
+        with: { distribution: temurin, java-version: 21 }
       - name: Require a real deployment URL (never the placeholder)
         run: |
           test -n "${SOPHIRA_APP_URL:-}" || { echo "::error::Set the SOPHIRA_APP_URL repository variable."; exit 1; }
