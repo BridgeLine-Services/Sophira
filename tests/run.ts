@@ -29,6 +29,10 @@ import { PacingController } from "../src/lib/pacing-controller";
 import { estimateWorkMinutes, parseEstimatedWorkMinutes } from "../src/lib/workload";
 import { passageById, pickPassage, TYPING_PASSAGES } from "../src/lib/typing-passage";
 import { buildChecklist, auditDraft, mergeSemanticResults, failedCriteriaForRevision, countWords } from "../src/lib/rubric";
+import { searchProviderConfigured, getSearchProvider, SearchNotConfiguredError } from "../src/lib/research/provider";
+import { fetchAndVerify, titlesCorrespond } from "../src/lib/research/verify";
+import { formatCitation, buildBibliography, extractCitationMarkers, quoteInContent, claimSupportsDeterministic, parseISODateLoose } from "../src/lib/research/citation";
+import { generateQueries, normalizeUrl, dedupeSources, rankCandidates } from "../src/lib/research/research";
 import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
 import { readFileSync } from "fs";
@@ -821,4 +825,144 @@ export async function run(): Promise<void> {
   }
 }
 
-__fileTests.then(() => run()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+const __researchTests = (async () => {
+  // ---- provider configuration honesty ----
+  section("15f. Research provider: server-side config, honest when missing");
+  {
+    const savedProvider = process.env.SEARCH_PROVIDER, savedKey = process.env.SEARCH_API_KEY, savedBase = process.env.SEARCH_BASE_URL;
+    delete process.env.SEARCH_PROVIDER; delete process.env.SEARCH_API_KEY; delete process.env.SEARCH_BASE_URL;
+    assert(!searchProviderConfigured(), "research: no key configured → reported as not configured");
+    let threw = false;
+    try { getSearchProvider(); } catch (e) { threw = e instanceof SearchNotConfiguredError; }
+    assert(threw, "research: getSearchProvider refuses to run without a real key (never fabricates results)");
+    process.env.SEARCH_API_KEY = "test-key";
+    assert(searchProviderConfigured(), "research: key present → configured");
+    let badCustom = false;
+    process.env.SEARCH_PROVIDER = "custom";
+    delete process.env.SEARCH_API_KEY;
+    try { getSearchProvider(); } catch { badCustom = true; }
+    assert(badCustom, "research: custom provider without SEARCH_BASE_URL is refused");
+    if (savedProvider) process.env.SEARCH_PROVIDER = savedProvider; else delete process.env.SEARCH_PROVIDER;
+    if (savedKey) process.env.SEARCH_API_KEY = savedKey; else delete process.env.SEARCH_API_KEY;
+    if (savedBase) process.env.SEARCH_BASE_URL = savedBase; else delete process.env.SEARCH_BASE_URL;
+  }
+
+  // ---- URL verification with an injected deterministic fetcher ----
+  const html = (title: string, body: string, extra = "") =>
+    new Response(`<!doctype html><html><head><title>${title}</title>${extra}</head><body>${body}</body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+
+  section("15g. Source verification: real fetch checks, honest statuses (spec §9)");
+  {
+    // dead page
+    const dead = await fetchAndVerify("https://dead.example.com/x", { fetchImpl: (async () => new Response("", { status: 404 })) as unknown as typeof fetch });
+    assert(dead.status === "failed" && dead.notes.join(" ").includes("dead"), "research: 404 → failed (dead link), never verified");
+
+    // redirect followed manually, final URL recorded
+    const redirecting = await fetchAndVerify("https://short.example.com/a", {
+      fetchImpl: (async (url: string) =>
+        String(url).includes("short.example.com")
+          ? new Response("", { status: 301, headers: { location: "https://real.example.com/paper" } })
+          : html("The Paper", "<p>".concat("Substantial text. ".repeat(80), "</p>")) ) as unknown as typeof fetch,
+    });
+    assert(redirecting.status === "verified" && redirecting.finalUrl === "https://real.example.com/paper", "research: redirects followed, final URL stored");
+    assert(redirecting.redirectCount === 1 && redirecting.domain === "real.example.com", "research: redirect count and domain recorded");
+
+    // unrelated-domain redirect is flagged
+    const crossDomain = await fetchAndVerify("https://old.example.com/a", {
+      fetchImpl: (async (url: string) =>
+        String(url).includes("old.example.com")
+          ? new Response("", { status: 302, headers: { location: "https://totally-other.example.org/b" } })
+          : html("Unrelated", "<p>".concat("Content here. ".repeat(90), "</p>")) ) as unknown as typeof fetch,
+    });
+    assert(crossDomain.notes.join(" ").includes("DIFFERENT domain"), "research: unrelated redirect detected and flagged");
+
+    // login/paywall wall
+    const paywalled = await fetchAndVerify("https://pay.example.com/doc", {
+      fetchImpl: (async () => html("Locked", "<p>Please sign in to continue reading the full article. ".repeat(20) + "</p>")) as unknown as typeof fetch,
+    });
+    assert(paywalled.status === "inaccessible" && paywalled.notes.join(" ").includes("blocked"), "research: login/paywall wall → inaccessible");
+
+    // thin page
+    const thin = await fetchAndVerify("https://thin.example.com/", {
+      fetchImpl: (async () => html("Thin", "<p>Hi.</p>")) as unknown as typeof fetch,
+    });
+    assert(thin.status === "partially_verified" && thin.notes.join(" ").includes("threshold"), "research: thin content → partially verified, not 'verified'");
+
+    // good page with metadata
+    const goodHtml = `<!doctype html><html><head><title>Climate Effects on Coral</title><meta name="author" content="Maria Chen"><meta name="citation_publication_date" content="2023-05-01"><link rel="canonical" href="https://marine.example.org/coral-canonical"></head><body>${"<p>Coral bleaching events have increased in frequency across tropical reefs, with substantial documented impacts on biodiversity and fisheries yields. ".repeat(8)}</p>"}</body></html>`;
+    const good = await fetchAndVerify("https://marine.example.org/coral", {
+      fetchImpl: (async () => new Response(goodHtml, { status: 200, headers: { "content-type": "text/html" } })) as unknown as typeof fetch,
+    });
+    assert(good.status === "verified", "research: live meaningful page → verified");
+    assert(good.title === "Climate Effects on Coral", "research: real page title extracted");
+    assert(good.author === "Maria Chen", "research: author taken from meta, never invented");
+    assert((good.publicationDate ?? "").startsWith("2023-05"), "research: publication date from citation meta");
+    assert(good.canonicalUrl === "https://marine.example.org/coral-canonical", "research: canonical URL recorded");
+    assert(good.hash.length === 64 && good.textChars > 400, "research: content stored with integrity hash");
+
+    // non-http URL refused
+    const bad = await fetchAndVerify("ftp://not-a-web-url.example/x", { fetchImpl: (async () => { throw new Error("must not be called"); }) as unknown as typeof fetch });
+    assert(bad.status === "failed" && bad.notes.join(" ").includes("rejected"), "research: fabricated/non-http URL refused before fetching");
+    assert(titlesCorrespond("Climate Effects on Coral Reefs 2023", "Climate Effects on Coral"), "research: title correspondence detected");
+    assert(!titlesCorrespond("Climate Effects on Coral", "Top 10 Pasta Recipes"), "research: unrelated titles do not correspond");
+  }
+
+  section("15h. Citations: deterministic from records, quotes verified (specs §11-13)");
+  {
+    const src = {
+      title: "Coral bleaching frequency in tropical reefs",
+      author: "Maria Chen",
+      publisher: "marine.example.org",
+      publicationDate: "2023-05-01",
+      url: "https://marine.example.org/coral",
+      accessedISO: "2026-09-27T00:00:00.000Z",
+      doi: null,
+    };
+    const mla = formatCitation(src, "MLA");
+    assert(mla.startsWith("Chen, Maria.") && mla.includes('"Coral bleaching frequency in tropical reefs."'), "citation: MLA author-last, quoted title");
+    const apa = formatCitation(src, "APA");
+    assert(apa.includes("(2023).") && apa.includes("marine.example.org"), "citation: APA year + source");
+    const chicago = formatCitation(src, "CHICAGO");
+    assert(chicago.includes("Accessed"), "citation: Chicago includes access date");
+    assert(formatCitation(src, "unknown-style").includes("Retrieved"), "citation: unknown styles fall back to generic honestly");
+    const noMeta = formatCitation({ title: "Untitled page", author: null, publisher: null, publicationDate: null, url: "https://x.example.org/p", accessedISO: "2026-09-27T00:00:00.000Z", doi: null }, "MLA");
+    assert(noMeta.includes("n.d.") && noMeta.includes("x.example.org"), "citation: missing dates/authors render honestly, never invented");
+    const bib = buildBibliography([src, { ...src, author: "Aaron Diaz", title: "Second source" }], "APA");
+    assert(bib.split("\n\n").length === 2 && bib.includes("Diaz"), "citation: bibliography built from source records, alphabetized");
+    const markers = extractCitationMarkers("Claim one [1]. Claim two (Smith 2020). Claim three (Jones et al., 2021).");
+    assert(markers.length === 3 && markers[0].refNumber === 1, "citation: [n] and (Author Year) markers extracted");
+    const content = "The bleaching events of 2020 caused a 40 percent decline in coral cover across the sampled reef sites.";
+    assert(quoteInContent("The bleaching events of 2020 caused a 40 percent decline", content), "citation: a real quote is found in retrieved content");
+    assert(!quoteInContent("Ninety-five percent of corals died instantly", content), "citation: a fabricated quote is NOT found — rejected");
+    assert(claimSupportsDeterministic("Coral bleaching caused a decline in coral cover on reef sites", content), "citation: claim support check (deterministic pre-pass)");
+    assert(!claimSupportsDeterministic("Pasta recipes require basil and garlic", content), "citation: unrelated claim fails the support pre-check");
+    assert(parseISODateLoose("Published May 1, 2023") === null, "citation: loose dates are NOT coerced into fabricated ISO dates");
+    assert(parseISODateLoose("2023-05-01") === "2023-05-01", "citation: real ISO dates parse");
+  }
+
+  section("15i. Research workflow: queries, dedupe, objective ranking (specs §7, §10, §14)");
+  {
+    const qs = generateQueries({ topic: "coral bleaching effects", academicLevel: "high school", sourceType: "peer-reviewed", thesis: "bleaching threatens fisheries" }, 3);
+    assert(qs.length === 3 && qs[0].query.includes("study journal"), "research: peer-reviewed requirement shapes the query");
+    assert(qs.every((q) => q.rationale.length > 0), "research: every query states its rationale");
+    assert(normalizeUrl("https://x.example.org/p?utm_source=feed&keep=1#frag") === "https://x.example.org/p?keep=1", "research: tracking params stripped for dedupe");
+    const hits = [
+      { title: "A", url: "https://site.example.org/one", snippet: "s" },
+      { title: "A", url: "https://site.example.org/one?utm_source=x", snippet: "s" },
+      { title: "B", url: "https://site.example.org/two", snippet: "s" },
+      { title: "C", url: "https://site.example.org/three", snippet: "s" },
+      { title: "D", url: "https://other.example.org/doc", snippet: "s" },
+    ];
+    const deduped = dedupeSources(hits, 2);
+    assert(deduped.length === 3, "research: duplicates removed and per-domain cap enforced");
+    const ranked = rankCandidates([
+      { title: "edu study", url: "https://www.harvard.edu/research", snippet: "s" },
+      { title: "random blog", url: "http://blog.example.net/post", snippet: "s" },
+      { title: "gov data", url: "https://www.noaa.gov/data", snippet: "s" },
+    ]);
+    assert(ranked[0].url.includes("noaa.gov") || ranked[0].url.includes("harvard.edu"), "research: official/academic domains rank first (objective quality)");
+    assert(!ranked.some((h) => h.url.startsWith("http://blog.example.net")), "research: plain-http low-value hit filtered");
+  }
+})();
+
+__fileTests.then(() => __researchTests).then(() => run()).then(finish).catch((e) => { console.error(e); process.exit(1); });

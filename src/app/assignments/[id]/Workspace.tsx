@@ -11,6 +11,7 @@ import { ResultBody } from "@/components/app/ResultBody";
 import { PacedOutput } from "@/components/app/PacedOutput";
 import { SchedulePanel } from "@/components/app/SchedulePanel";
 import { RubricAuditPanel } from "@/components/app/RubricAuditPanel";
+import { ResearchPanel } from "@/components/app/ResearchPanel";
 import { MODE_MAP } from "@/lib/modes";
 import type { AiResponse, Assignment, Course, Teacher, WorkSession } from "@/lib/types";
 import { AlertTriangle, BookOpen, Check, Copy, Pencil, Save, Send, X } from "lucide-react";
@@ -314,6 +315,11 @@ export function Workspace({
           <SchedulePanel assignmentId={assignment.id} />
         </CardContent>
       </Card>
+
+      {/* Verified web research (specs §7-§15) — real server-side search +
+          URL verification, source approval, citation-aware essay generation
+          and a citation audit. Expandable so the writing UI stays clean. */}
+      <ResearchPanel assignmentId={assignment.id} defaultTopic={assignment.title} latestResponseId={latestResponse?.id ?? null} />
 
       {/* Rubric compliance audit (spec §6) — deterministic checks first,
           AI-assessed semantics labeled, revision loop, persisted audit. */}
