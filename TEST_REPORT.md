@@ -262,3 +262,41 @@ middleware untouched by the round (re-verified by the build).
 - No browser automation run in this environment; pacing/scheduler UI claims
   are logic-level, not Selenium-level.
 - Native builds unchanged this round; §21/§22 local build results stand.
+
+## 27. FIRST LIVE verification of production (2026-09-27, 17:40–18:00 UTC) — homepage 500 found and fixed live
+
+**A real production incident was found, diagnosed, fixed, and verified live.**
+
+`https://sophira.vercel.app` returned **HTTP 500 (MIDDLEWARE_INVOCATION_FAILED)**
+for every non-public path including the homepage, while matcher-excluded paths
+(`/install`, `/downloads`, `/api/health`) were 200 — the exact signature of the
+known missing-Supabase-env condition: the degraded-mode guard rendered public
+pages but let protected paths fall into `createServerClient(undefined!)` and throw.
+
+**Fix** (`f8b9878`, regression test updated `837adb8`): in degraded mode,
+non-public paths redirect to `/login` instead of crashing. With env vars
+configured the branch never runs — real auth behavior unchanged.
+
+**Verified against the live deployment (curl + real browser session):**
+
+| Check | Before fix | After fix (live) |
+|---|---|---|
+| `/` | 500 MIDDLEWARE_INVOCATION_FAILED | **307 → /login** |
+| `/login` | (crashed) | **200 — full sign-in UI renders, "Have an invitation? Create your account" present** |
+| `/install` | 200 | 200 — full PWA install instructions render in a real browser |
+| `/downloads` | 200 | 200 — honestly says "No native release has been published yet" (no fake links) |
+| `/manifest.webmanifest` | 200 | 200 — PWA manifest serves |
+| `/api/health` | 200 | 200 — `{"ok":true,"name":"sophira"}` |
+| Deploy pipeline | — | **auto-deploys master; fix live within ~2 min of push** |
+
+Offline suite after the fix: **277/277** (two assertions updated from "protected
+routes crash without env" to "protected routes redirect without crashing").
+
+### Honest limits of this live pass
+- Production is still in DEGRADED MODE: the Vercel production environment has
+  no Supabase/AI/search env vars. Auth, database flows, writing, research —
+  none of those can be live-tested until the owner sets the production env
+  vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, optional
+  `SEARCH_PROVIDER`/`SEARCH_API_KEY`).
+- `.env.example` now documents all research provider variables (server-side only).
