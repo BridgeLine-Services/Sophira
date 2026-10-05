@@ -13,8 +13,12 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm }
       - run: npm ci
-      - name: Unit and integration tests (offline, 144 assertions)
+      - name: Unit and integration tests (offline)
         run: npm test
+      - name: Deployment-verify script self-test (rules mirrored from src/lib/deployment.ts)
+        run: node scripts/verify-deployment.mjs --self-test
+      - name: Legal-placeholder status (informational — owner must complete them; never fails CI)
+        run: node scripts/legal-status.mjs || true
       - name: TypeScript strict check
         run: npx tsc --noEmit -p tsconfig.json
       - name: Production build

@@ -381,7 +381,17 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     correction: citationOk ? "" : "Fix the citation/bibliography requirements above.",
   });
 
+  /* -- Machine enforcement (content) -------------------------------- */
+  const failedReq = requirements.filter((r) => r.status === "fail");
+  const blockers = failedReq
+    .filter((r) => r.hard)
+    .map((r) => `${r.label}: ${r.evidence}${r.correction ? ` (${r.correction})` : ""}`);
+
   /* -- 8. Deadline feasibility (honest warning, never a fake pass) -- */
+  // The workload estimate is a CONSERVATIVE UPPER BOUND (from
+  // estimateWorkMinutes): the gate uses it only while content blockers
+  // exist. A gate-passing draft has nothing left to fix, so a stale
+  // estimate can never make ready content look late or unfeasible.
   if (input.dueMs !== null) {
     if (input.dueMs <= input.nowMs) {
       push({
@@ -394,7 +404,8 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
       });
     } else {
       const hoursLeft = Math.max(0, (input.dueMs - input.nowMs) / 3_600_000);
-      const needs = input.estimatedRemainingWorkMinutes;
+      const hasBlockers = blockers.length > 0;
+      const needs = hasBlockers ? input.estimatedRemainingWorkMinutes : 0;
       const feasible = needs === null ? true : needs * 60 * 1000 <= input.dueMs - input.nowMs;
       push({
         id: "deadline",
@@ -402,19 +413,16 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
         status: feasible ? "pass" : "warn",
         hard: false,
         evidence: feasible
-          ? `${hoursLeft < 24 ? `${Math.round(hoursLeft)} hour(s)` : `${Math.round(hoursLeft / 24)} day(s)`} left before the deadline${needs !== null ? `; about ${needs} min of estimated work remaining.` : "."}`
-          : `Only ${Math.round(hoursLeft)} hour(s) left but about ${needs} minutes of estimated work remain — the schedule system warned this will not fit.`,
+          ? hasBlockers && needs !== null
+            ? `${hoursLeft < 24 ? `${Math.round(hoursLeft)} hour(s)` : `${Math.round(hoursLeft / 24)} day(s)`} left — enough for the ~${needs} min (conservative upper-bound) estimated remaining work.`
+            : `${hoursLeft < 24 ? `${Math.round(hoursLeft)} hour(s)` : `${Math.round(hoursLeft / 24)} day(s)`} left before the deadline; no content blockers remain.`
+          : `Only ${Math.round(hoursLeft)} hour(s) left but about ${needs} minutes of estimated work remain (workload estimator upper bound) — the schedule warned this will not fit.`,
         correction: "",
       });
     }
   }
 
-  /* -- Machine enforcement ------------------------------------------ */
-  const failedReq = requirements.filter((r) => r.status === "fail");
   const warnings = requirements.filter((r) => r.status === "warn");
-  const blockers = failedReq
-    .filter((r) => r.hard)
-    .map((r) => `${r.label}: ${r.evidence}${r.correction ? ` (${r.correction})` : ""}`);
 
   return {
     submission_ready: blockers.length === 0,

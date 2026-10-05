@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { buildChecklist, type RubricAuditResult } from "@/lib/rubric";
+import { estimateWorkMinutes } from "@/lib/workload";
 import { evaluateFinalGate, formatFinalGate } from "@/lib/readiness/finalGate";
 import type { TeacherDoc } from "@/lib/types";
 
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   const { data: assignment } = await supabase
     .from("assignments")
-    .select("id, teacher_id, instructions_text, due_at")
+    .select("id, teacher_id, instructions_text, due_at, mode, task_type, output_type")
     .eq("id", assignmentId)
     .single();
   if (!assignment) return NextResponse.json({ error: "Assignment not found." }, { status: 404 });
@@ -149,7 +150,18 @@ export async function GET(request: NextRequest) {
         }
       : null,
     dueMs: assignment.due_at ? Date.parse(assignment.due_at) : null,
-    estimatedRemainingWorkMinutes: null, // honest: unknown at gate time; deadline still checked
+    // Conservative upper-bound remaining-work estimate from the workload
+    // estimator (same transparent heuristic the schedule system uses).
+    // The gate applies it only while content blockers exist.
+    estimatedRemainingWorkMinutes: estimateWorkMinutes({
+      mode: assignment.mode,
+      task_type: assignment.task_type,
+      output_type: assignment.output_type,
+      word_count_target: checklist.criteria.find((x) => x.kind === "word_count_min")?.params.minWords ?? null,
+      has_rubric: checklist.criteria.some((x) => x.source === "rubric"),
+      requires_research: !!project,
+      source_count: approvedSources,
+    }).minutes,
   });
 
   // Persist the machine verdict with the draft it evaluated — the UI can

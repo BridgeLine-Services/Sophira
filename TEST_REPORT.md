@@ -535,3 +535,50 @@ weakened — all 393 prior assertions still pass. `tsc` clean;
 `estimatedRemainingWorkMinutes` is passed as null by the route today
 (the deadline check still runs) — wiring the workload estimator into
 the gate remains future work.
+
+## 33. Remaining in-repo gaps closed (2026-10-05) — 440/440 offline
+
+Push state confirmed first: everything from this conversation was already
+on origin/master. The three remaining PARTIAL audit items
+(production-release-gate, production-env-config, legal-docs) share
+external blockers (Vercel Production env vars, the SOPHIRA_APP_URL repo
+variable, owner legal facts + attorney review) — this round closed every
+remaining IN-REPOSITORY gap so the external steps are all that is left.
+
+**1. Workload estimator wired into the final gate** (the explicitly noted
+future work from §32): `/api/readiness/final` now passes
+`estimateWorkMinutes(...)` (assignment mode, task/output type, rubric
+word-count target, research linkage, source count) into the gate. The
+gate uses the estimate ONLY while content blockers exist — a READY draft
+has nothing left to fix, so a stale estimate can never make ready content
+look late. Blocked content with a deadline the estimate cannot meet gets
+an honest infeasibility WARNING (deadline stays non-blocking by design).
+
+**2. Release-gate hardening (production-release-gate):** the release
+workflow now refuses to ship against a misconfigured deployment. Each
+native job runs `node scripts/verify-deployment.mjs "$SOPHIRA_APP_URL"`
+which checks the target's live `/api/health` and fails when any required
+capability (supabase, supabase_service_role, ai, ok, service name) is not
+configured; search is optional (research degrades gracefully). Rules live
+in `src/lib/deployment.ts` (unit-tested) and are mirrored in the
+dependency-free script, which carries a `--self-test` (7 assertions)
+run in CI — both must stay in sync.
+
+**3. Legal-placeholder status (legal-docs):** `scripts/legal-status.mjs`
+(+ `npm run legal:status`, `--json` mode) scans LICENSE + docs/legal/*.md
+for the bracketed owner facts, reports them per file, and exits 0 once
+all are completed. CI reports it informationally (never fails — the
+placeholders are intentional until the owner fills them). Current status:
+17 owner facts remain across LICENSE/ToS/Privacy — honestly machine-
+visible instead of a vague "needs review".
+
+**Tests: 14 new assertions (sections 17 + 17b + 2 updated gate deadline
+assertions), suite total 440/440 PASSED.** During development one test
+run failed: execFileSync treats the legal script's by-design exit code 1
+as an error — the test now asserts that exit code explicitly. `tsc`
+clean; `next build` passes; the verifier self-test passes 7/7.
+
+**Still external (honest limits):** the owner must set the Vercel
+Production env vars, set the SOPHIRA_APP_URL repo variable, complete the
+legal owner facts, obtain attorney review, and run one real gated
+release. None of these can be done from the repository.

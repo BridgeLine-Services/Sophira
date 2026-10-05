@@ -659,9 +659,14 @@ section("8d. Stale-pattern detection (pattern lifecycle round)");
     const pastDue = evaluateFinalGate(baseInput({ dueMs: NOW - 86_400_000 }));
     assert(pastDue.submission_ready === true && pastDue.warnings.some((w) => w.id === "deadline" && w.evidence.includes("passed")),
       "gate: a passed deadline is an honest WARNING — the deadline is not a content requirement, and ready drafts stay ready");
-    const infeasible = evaluateFinalGate(baseInput({ dueMs: NOW + 3_600_000, estimatedRemainingWorkMinutes: 600 }));
-    assert(infeasible.warnings.some((w) => w.id === "deadline" && w.status === "warn"),
-      "gate: an infeasible schedule warns honestly instead of pretending the work fits");
+    const infeasible = evaluateFinalGate(baseInput({ draft: shortDraft, persistedAudit: withSemantic(shortDraft, "satisfied"), dueMs: NOW + 3_600_000, estimatedRemainingWorkMinutes: 600 }));
+    assert(infeasible.submission_ready === false &&
+      infeasible.warnings.some((w) => w.id === "deadline" && w.evidence.includes("600") && w.status === "warn"),
+      "gate: blocked content + a deadline the estimated remaining work cannot meet → honest infeasibility warning with the estimate shown");
+    const readyDespiteEstimate = evaluateFinalGate(baseInput({ dueMs: NOW + 3_600_000, estimatedRemainingWorkMinutes: 600 }));
+    assert(readyDespiteEstimate.submission_ready === true &&
+      readyDespiteEstimate.requirements.some((r) => r.id === "deadline" && r.status === "pass"),
+      "gate: a READY draft ignores the workload estimate (nothing left to fix) — the deadline check passes honestly");
 
     // -- 12. No draft at all --
     const noDraft = evaluateFinalGate(baseInput({ draft: null, persistedAudit: null }));
@@ -1685,4 +1690,66 @@ async function runHealthTests(): Promise<void> {
 }
 
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+// ---------------------------------------------------------------------------
+// Deployment readiness + legal-placeholder status (2026-10-05, closing the
+// in-repo gaps of the production-release-gate / production-env-config /
+// legal-docs audit items): the release workflow now refuses to ship against
+// a misconfigured deployment by checking the live /api/health of the target
+// URL; the remaining legal owner facts are machine-visible instead of a
+// vague "needs review".
+// ---------------------------------------------------------------------------
+async function runDeploymentTests(): Promise<void> {
+  section("17. Deployment readiness + legal-placeholder status (release-gate hardening)");
+  {
+    const { evaluateDeploymentReadiness } = await import("../src/lib/deployment");
+
+    const full = evaluateDeploymentReadiness({ ok: true, name: "sophira", configuration: { supabase: true, supabase_service_role: true, ai: true, search: true } });
+    assert(full.ready === true && full.missing.length === 0, "deployment: a fully configured deployment is ready to release against");
+
+    const noSearch = evaluateDeploymentReadiness({ ok: true, name: "sophira", configuration: { supabase: true, supabase_service_role: true, ai: true, search: false } });
+    assert(noSearch.ready === true && noSearch.optional_missing.length === 1,
+      "deployment: a missing search provider is OPTIONAL (research degrades) — never blocks the release");
+
+    const degraded = evaluateDeploymentReadiness({ ok: true, name: "sophira", configuration: { supabase: false, supabase_service_role: false, ai: false, search: false } });
+    assert(degraded.ready === false && degraded.missing.length === 3,
+      "deployment: a degraded deployment (the live §27 incident) is NOT ready — the release is refused");
+    assert(degraded.detail.includes("NOT ready"), "deployment: the refusal detail says exactly what is missing");
+
+    const wrongService = evaluateDeploymentReadiness({ ok: true, name: "someone-else", configuration: { supabase: true, supabase_service_role: true, ai: true } });
+    assert(wrongService.ready === false && wrongService.missing.some((m) => m.includes("not a Sophira deployment")),
+      "deployment: a health payload from a different service is refused");
+
+    const notOk = evaluateDeploymentReadiness({ ok: false, name: "sophira", configuration: { supabase: true, supabase_service_role: true, ai: true } });
+    assert(notOk.ready === false, "deployment: a health response that is not ok refuses the release");
+
+    const empty = evaluateDeploymentReadiness(null);
+    assert(empty.ready === false && empty.missing.length >= 3, "deployment: a null payload is refused — readiness is never guessed");
+
+    const noServiceRole = evaluateDeploymentReadiness({ ok: true, name: "sophira", configuration: { supabase: true, ai: true } });
+    assert(noServiceRole.ready === false && noServiceRole.missing.some((m) => m.includes("service-role")),
+      "deployment: the service-role key (AI/extract/account routes) is a required release dependency");
+  }
+
+  section("17b. Legal-placeholder status is machine-visible (owner facts, attorney review)");
+  {
+    const { spawnSync } = await import("node:child_process");
+    // Exit code 1 is EXPECTED while owner facts remain — read stdout either way.
+    const run = (args: string[]) => spawnSync("node", args, { cwd: process.cwd(), encoding: "utf8" as const });
+    const legal = run(["scripts/legal-status.mjs", "--json"]);
+    assert(legal.status === 1, "legal: the status script exits 1 while owner facts remain (machine-visible, by design)");
+    const status = JSON.parse(legal.stdout);
+    assert(status.complete === false && status.remaining > 0,
+      "legal: the bracketed owner facts are honestly reported as incomplete (they ARE incomplete)");
+    assert(status.files.some((f: { file: string; placeholders: string[] }) => f.file === "LICENSE" && f.placeholders.includes("JURISDICTION")),
+      "legal: LICENSE jurisdiction placeholder is machine-visible");
+    assert(status.files.every((f: { file: string; placeholders: string[] }) => Array.isArray(f.placeholders)),
+      "legal: every legal file reports its remaining owner facts");
+
+    // The verifier script's rules mirror src/lib/deployment.ts — both must pass.
+    const self = run(["scripts/verify-deployment.mjs", "--self-test"]);
+    assert(self.status === 0 && self.stdout.includes("7/7"), "deployment: the release-workflow verifier script's self-test passes");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

@@ -49,6 +49,8 @@ jobs:
           test "${SOPHIRA_APP_URL}" != "https://sophira.example.com" || { echo "::error::SOPHIRA_APP_URL is still the placeholder."; exit 1; }
         env:
           SOPHIRA_APP_URL: ${{ vars.SOPHIRA_APP_URL }}
+      - name: Verify the target deployment is configured (refuse to release against a misconfigured deployment)
+        run: node scripts/verify-deployment.mjs "${{ vars.SOPHIRA_APP_URL }}"
       - run: npm ci
       - name: Bake the deployment URL into the Android shell
         run: SOPHIRA_APP_URL="${{ vars.SOPHIRA_APP_URL }}" npx cap sync android
@@ -103,6 +105,8 @@ jobs:
           test "${SOPHIRA_APP_URL}" != "https://sophira.example.com" || { echo "::error::SOPHIRA_APP_URL is still the placeholder."; exit 1; }
         env:
           SOPHIRA_APP_URL: ${{ vars.SOPHIRA_APP_URL }}
+      - name: Verify the target deployment is configured (refuse to release against a misconfigured deployment)
+        run: node scripts/verify-deployment.mjs "${{ vars.SOPHIRA_APP_URL }}"
       - run: npm ci
       - name: Sync Capacitor (runs pod install via the Podfile)
         run: SOPHIRA_APP_URL="${{ vars.SOPHIRA_APP_URL }}" npx cap sync ios
@@ -208,6 +212,8 @@ jobs:
           node -e "const fs=require('fs');const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p));c.app.windows[0].url=process.env.SOPHIRA_APP_URL;fs.writeFileSync(p,JSON.stringify(c,null,2));"
         env:
           SOPHIRA_APP_URL: ${{ vars.SOPHIRA_APP_URL }}
+      - name: Verify the target deployment is configured (refuse to release against a misconfigured deployment)
+        run: node scripts/verify-deployment.mjs "${{ vars.SOPHIRA_APP_URL }}"
       - name: Build desktop app (--bundles are bundle FORMATS, not target triples)
         shell: bash
         run: npx tauri build --bundles ${{ matrix.bundles }}

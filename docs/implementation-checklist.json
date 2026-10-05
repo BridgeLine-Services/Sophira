@@ -5,7 +5,7 @@
     "auditor": "repository implementation audit against requirements (Prompt 1)",
     "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
     "verification": {
-      "offline_tests": "426/426 passed (393 prior + 33 final-submission-gate assertions added 2026-10-05, fourth round)",
+      "offline_tests": "440/440 passed (426 prior + 14 deployment-readiness/legal-status/gate-deadline assertions added 2026-10-05, fifth round)",
       "typecheck": "tsc --noEmit strict: clean",
       "build": "next build: 38/38 routes compiled",
       "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 \u2014 production is in the documented DEGRADED mode (no Supabase/AI env configured)",
@@ -802,12 +802,14 @@
       "id": "legal-docs",
       "title": "Legal documents",
       "status": "PARTIAL",
-      "notes": "Complete ToS/Privacy templates + review notice + proprietary LICENSE exist; bracketed placeholders (entity, address, jurisdiction, contact, effective date) require owner facts and attorney review \u2014 external by design.",
+      "notes": "Complete ToS/Privacy templates + review notice + proprietary LICENSE; bracketed owner facts (entity, address, jurisdiction, contact, effective date) are now MACHINE-VISIBLE: scripts/legal-status.mjs (npm run legal:status, --json) lists every remaining bracket per file and exits 0 once all are completed (17 remain today). Completion still requires owner facts + qualified attorney review \u2014 external by design.",
       "files": [
+        ".github/workflows/ci.yml",
         "LICENSE",
-        "docs/legal/TERMS_OF_SERVICE.md",
+        "docs/legal/LEGAL_REVIEW_NOTICE.md",
         "docs/legal/PRIVACY_POLICY.md",
-        "docs/legal/LEGAL_REVIEW_NOTICE.md"
+        "docs/legal/TERMS_OF_SERVICE.md",
+        "scripts/legal-status.mjs"
       ],
       "functions": [],
       "tables": [],
@@ -816,7 +818,7 @@
         "tests/run.ts section 16: license + legal presence checks"
       ],
       "tests_missing": [
-        "Owner completion of placeholders"
+        "Owner completion of the bracketed facts (then legal:status exits 0) + attorney review sign-off"
       ],
       "env": [],
       "blockers": [
@@ -827,12 +829,14 @@
       "id": "production-env-config",
       "title": "Production environment configuration",
       "status": "PARTIAL",
-      "notes": "Production deployment is LIVE but DEGRADED: Vercel Production has no Supabase/AI env vars, so auth/db/AI cannot run there. All variables are documented (.env.example, RELEASE_PROCESS). This round fixed the runbook (README listed 5 of 12 migrations and the removed first-user-becomes-owner rule) and added the missing machine-checkable readiness signal (/api/health configuration booleans).",
+      "notes": "Production deployment is LIVE but DEGRADED: Vercel Production has no Supabase/AI env vars, so auth/db/AI cannot run there. All variables are documented (.env.example, RELEASE_PROCESS). The readiness signal is now MACHINE-ENFORCED at release time: /api/health configuration booleans (per-capability) + scripts/verify-deployment.mjs refuses releases against misconfigured deployments. Remaining external blocker: owner must set the Vercel Production env vars and redeploy (cannot be done from the repository).",
       "files": [
         ".env.example",
-        "docs/RELEASE_PROCESS.md",
         "README.md",
-        "src/app/api/health/route.ts"
+        "docs/RELEASE_PROCESS.md",
+        "scripts/verify-deployment.mjs",
+        "src/app/api/health/route.ts",
+        "src/lib/deployment.ts"
       ],
       "functions": [
         "health GET configuration block"
@@ -895,15 +899,19 @@
       "id": "production-release-gate",
       "title": "Production release gate",
       "status": "PARTIAL",
-      "notes": "Gate mechanics exist and are honest: release workflow refuses placeholder URLs, refuses without a real deployment, produces checksums, CI must be green. Remaining gaps: SOPHIRA_APP_URL variable unset keeps the workflow dormant, and until this round no programmatic deployment-readiness check existed (now /api/health configuration booleans + runbook step).",
+      "notes": "Gate mechanics exist and are honest: release workflow refuses placeholder URLs, refuses without a real deployment, produces checksums, CI must be green, and \u2014 added 2026-10-05 \u2014 REFUSES to ship against a misconfigured deployment: every native job runs scripts/verify-deployment.mjs against the live /api/health of $SOPHIRA_APP_URL (required: supabase, supabase_service_role, ai, ok, name=sophira; search optional). Rules unit-tested in src/lib/deployment.ts; script carries --self-test run in CI. Remaining external blockers: SOPHIRA_APP_URL repo variable unset (owner), one real gated release to run.",
       "files": [
-        ".github/workflows/release.yml",
         ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
         "docs/RELEASE_PROCESS.md",
-        "src/app/api/health/route.ts"
+        "scripts/verify-deployment.mjs",
+        "src/app/api/health/route.ts",
+        "src/lib/deployment.ts"
       ],
       "functions": [
+        "evaluateDeploymentReadiness",
         "placeholder-URL refusal steps",
+        "scripts/verify-deployment.mjs",
         "signed-vs-unsigned job summaries"
       ],
       "tables": [],
@@ -912,7 +920,8 @@
       ],
       "tests_existing": [
         "CI green (last documented run)",
-        "release YAML validation"
+        "release YAML validation",
+        "9 assertions in section 17 + verifier script self-test (7) in section 17b"
       ],
       "tests_missing": [
         "One real gated release"

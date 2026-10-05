@@ -32,6 +32,30 @@ honestly instead of fabricating sources. A deployment is production-ready
 when `supabase`, `supabase_service_role` and `ai` are `true` (`search` is
 optional).
 
+**Machine-enforced (2026-10-05):** the release workflow now refuses to
+ship native shells against a misconfigured deployment — each native job
+runs `node scripts/verify-deployment.mjs "$SOPHIRA_APP_URL"`, which
+checks the live `/api/health` of the target and fails the release when
+any required capability is `false`. Locally:
+
+```bash
+node scripts/verify-deployment.mjs https://your-sophira-domain
+```
+
+## Legal documents (owner facts + attorney review)
+
+The ToS / Privacy Policy / LICENSE templates are complete except for the
+bracketed owner facts (legal entity, address, jurisdiction, contact,
+effective date). They are machine-visible:
+
+```bash
+npm run legal:status   # or: node scripts/legal-status.mjs --json
+```
+
+The script exits 0 once every owner fact is filled in. Completing them is
+an owner action, and qualified counsel must review before production use
+(see docs/legal/LEGAL_REVIEW_NOTICE.md).
+
 **One-time Supabase bootstrap (fresh installs only).** Migration 0008
 makes signup invitation-only at the database level and fail-closed: no
 account at all can be created until the owner email is configured. In the

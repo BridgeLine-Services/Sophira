@@ -14,7 +14,8 @@
     "android:debug": "cap sync android && cd android && ./gradlew assembleDebug",
     "ios:sync": "cap sync ios",
     "desktop:build": "tauri build",
-    "desktop:dev": "tauri dev"
+    "desktop:dev": "tauri dev",
+    "legal:status": "node scripts/legal-status.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
