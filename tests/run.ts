@@ -42,6 +42,11 @@ import {
   breakWindowFor,
   type ExecutionRow, type ExecutionAction,
 } from "../src/lib/schedule-execution";
+import {
+  recomputeTypingProfile, effectiveTypingPace, trustworthyObservations,
+  RECENT_WINDOW, PLAUSIBLE_MAX_WPM, type ObservedTypingAttempt,
+} from "../src/lib/typing-profile";
+import * as fs from "fs";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
 import { PacingController } from "../src/lib/pacing-controller";
@@ -2112,4 +2117,104 @@ async function runExecutionTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+// ---------------------------------------------------------------------------
+// OPTIONAL ADAPTIVE TYPING PROFILE (2026-10-05): built on top of the
+// UNCHANGED typing test (computeTypingResult/adoptBaseline/canonical
+// passages/suspicious flags). Pacing never changes unless the user enables
+// it; only valid unflagged attempts become observations.
+// ---------------------------------------------------------------------------
+function obs(wpm: number, valid = true, flags: string[] = [], dateMs = Date.now()): ObservedTypingAttempt {
+  return { wpm, testDateMs: dateMs, valid, flags };
+}
+
+async function runTypingProfileTests(): Promise<void> {
+  const T0 = Date.parse("2026-10-05T09:00:00.000Z");
+  const at = (min: number) => T0 + min * 60_000;
+
+  section("20. Optional adaptive typing profile (pacing never changes unless enabled)");
+  {
+    // ---- 1. First calibration ----------------------------------------
+    const first = recomputeTypingProfile({
+      baselineWpm: 62, attempts: [obs(62, true, [], at(0))],
+      calibrationAtMs: at(0), autoAdjustEnabled: false,
+    });
+    assert(first.baseline_wpm === 62 && first.recent_average_wpm === 62 &&
+      first.recommended_wpm === 62 && first.confidence === "LOW" &&
+      first.sample_count === 1 && first.auto_adjust_enabled === false,
+      "first calibration: the baseline IS the initial profile (recent, recommended, LOW confidence, adaptive off)");
+    assert(effectiveTypingPace(first).wpm === 62 && effectiveTypingPace(first).basis === "baseline",
+      "first calibration: paced output uses the fixed baseline — nothing adapts yet");
+
+    // ---- 2. Repeated calibration ------------------------------------
+    const retake = recomputeTypingProfile({
+      baselineWpm: 66,
+      attempts: [obs(62, true, [], at(0)), obs(66, true, [], at(10))],
+      calibrationAtMs: at(10), autoAdjustEnabled: false,
+    });
+    assert(retake.baseline_wpm === 66 && retake.recent_average_wpm === 64 &&
+      Date.parse(retake.last_calibration_at as string) === at(10),
+      "repeated calibration: reselecting the baseline updates the profile baseline and calibration time");
+    // Baseline stays user-controlled — the average never overwrites it.
+    assert(retake.baseline_wpm === 66 && retake.recommended_wpm >= Math.round(66 * 0.75),
+      "repeated calibration: recommended stays clamped near the baseline");
+
+    // ---- 3. Adaptive update (the example: 62 baseline / 67 recent) ---
+    const adaptive = recomputeTypingProfile({
+      baselineWpm: 62,
+      attempts: [obs(62, true, [], at(0)), obs(68, true, [], at(30)), obs(67, true, [], at(60)), obs(68, true, [], at(90)), obs(70, true, [], at(120))],
+      calibrationAtMs: at(120), autoAdjustEnabled: true,
+    });
+    assert(adaptive.recent_average_wpm === 67 && adaptive.recommended_wpm === 64 &&
+      adaptive.confidence === "HIGH" && adaptive.sample_count === RECENT_WINDOW,
+      "adaptive update: baseline 62 + recent average 67 → recommended 64, HIGH confidence (the documented example)");
+    assert(effectiveTypingPace({ ...adaptive, auto_adjust_enabled: true }).wpm === 64 &&
+      effectiveTypingPace({ ...adaptive, auto_adjust_enabled: true }).basis === "adaptive",
+      "adaptive update: with auto-adjust ON the recommended pace takes effect");
+
+    // ---- 4. Disabled auto-adjustment --------------------------------
+    assert(effectiveTypingPace({ ...adaptive, auto_adjust_enabled: false }).wpm === 62 &&
+      effectiveTypingPace({ ...adaptive, auto_adjust_enabled: false }).basis === "baseline",
+      "disabled auto-adjustment: identical data, adaptive OFF → pacing stays at the fixed 62 baseline (never changes automatically)");
+
+    // ---- 5. Suspicious attempt --------------------------------------
+    const withSuspicious = recomputeTypingProfile({
+      baselineWpm: 62,
+      attempts: [obs(62, true, [], at(0)), obs(68, true, [], at(30)), obs(66, true, [], at(60)), obs(400, false, ["implausibly_fast"], at(90)), obs(10, true, ["too_short"], at(95))],
+      calibrationAtMs: at(120), autoAdjustEnabled: true,
+    });
+    assert(withSuspicious.recent_average_wpm === 65.3 && withSuspicious.sample_count === 3,
+      "suspicious attempt: flagged/invalid attempts NEVER become observations — the rolling estimate is untouched");
+    assert(trustworthyObservations([obs(400, false, ["implausibly_fast"]), obs(50, true, []), obs(0, true, []), obs(999, true, [])]).length === 1,
+      "suspicious attempt: only valid, unflagged, plausible WPM values pass the trust filter");
+
+    // ---- 6. User-selected preferred pace ----------------------------
+    const manual = { ...adaptive, manual_wpm: 58 };
+    assert(effectiveTypingPace(manual).wpm === 58 && effectiveTypingPace(manual).basis === "manual",
+      "user-selected pace: a manual preference overrides both adaptive and baseline");
+    const manualWithAutoOff = { ...adaptive, auto_adjust_enabled: false, manual_wpm: 70 };
+    assert(effectiveTypingPace(manualWithAutoOff).wpm === 70,
+      "user-selected pace: the preference wins even with adaptive off");
+    assert(effectiveTypingPace({ ...adaptive, manual_wpm: null }).wpm === 64,
+      "user-selected pace: clearing the preference falls back to adaptive (here enabled)"); 
+
+    // ---- 7. RLS isolation -------------------------------------------
+    const migration = fs.readFileSync("supabase/migrations/0018_adaptive_typing_profile.sql", "utf8");
+    assert(migration.includes("alter table public.typing_profiles enable row level security") &&
+      migration.includes("using (user_id = auth.uid())") &&
+      migration.includes("with check (user_id = auth.uid())") &&
+      migration.includes("references auth.users(id) on delete cascade"),
+      "RLS isolation: typing_profiles is row-level-security scoped to auth.uid() with per-user cascade (schema-enforced)");
+    assert(migration.includes("unique references auth.users(id)"),
+      "RLS isolation: one profile per user, structurally unique");
+
+    // ---- Existing typing behavior preserved ---------------------------
+    const attempt = computeTypingResult({
+      startedAtMs: 0, endedAtMs: 60_000, typed: "a".repeat(250), reference: "a".repeat(250),
+    });
+    assert(attempt.validAttempt && Math.abs(attempt.wpm - 50) < 0.01,
+      "preserved: the existing typing engine (WPM/accuracy/net-WPM/flags) is untouched — 250 chars/min → 50 WPM");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

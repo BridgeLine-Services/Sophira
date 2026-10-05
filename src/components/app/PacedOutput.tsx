@@ -42,7 +42,16 @@ export function PacedOutput({ text, responseId }: { text: string; responseId: st
         if (cancelled) return;
         if (res.ok) {
           const baseline = json.data.baseline;
-          const wpm = baseline ? Number(baseline.wpm) : null;
+          const profile = json.data.profile;
+          // The effective pace honors the user's adaptive profile ONLY when
+          // they enabled it (or picked a preferred pace); otherwise this is
+          // exactly the previous baseline-only behavior.
+          let wpm = baseline ? Number(baseline.wpm) : null;
+          if (baseline && profile) {
+            const auto = profile.auto_adjust_enabled === true;
+            const manual = profile.manual_wpm === null || profile.manual_wpm === undefined ? null : Number(profile.manual_wpm);
+            wpm = manual ?? (auto ? Number(profile.recommended_wpm) : Number(baseline.wpm));
+          }
           setBaselineWpm(wpm && wpm > 0 ? wpm : null);
           if (wpm && wpm > 0) {
             // Calibrated: default to a paced reveal of the finished text.

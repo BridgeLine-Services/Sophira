@@ -3,6 +3,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner, useToast } from "@/components/ui";
 import { Gauge, RefreshCw, Target } from "lucide-react";
 
+export interface TypingProfileRow {
+  baseline_wpm: number;
+  recent_average_wpm: number;
+  recommended_wpm: number;
+  confidence: "LOW" | "MEDIUM" | "HIGH";
+  sample_count: number;
+  last_calibration_at: string | null;
+  auto_adjust_enabled: boolean;
+  manual_wpm: number | null;
+}
+
 export interface TypingAttemptRow {
   id: string;
   test_date: string;
@@ -34,6 +45,8 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
   const [passage, setPassage] = useState<Passage | null>(null);
   const [attempts, setAttempts] = useState<TypingAttemptRow[]>([]);
   const [baseline, setBaseline] = useState<TypingAttemptRow | null>(null);
+  const [profile, setProfile] = useState<TypingProfileRow | null>(null);
+  const [manualPace, setManualPace] = useState("");
   const [loading, setLoading] = useState(true);
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
@@ -49,6 +62,8 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
         setPassage(json.data.passage);
         setAttempts(json.data.attempts ?? []);
         setBaseline(json.data.baseline ?? null);
+        setProfile(json.data.profile ?? null);
+        setManualPace(json.data.profile?.manual_wpm != null ? String(Math.round(Number(json.data.profile.manual_wpm))) : "");
         onBaselineChange?.(json.data.baseline ?? null);
       } else {
         toast("error", json.error || "Could not load the typing test.");
@@ -124,6 +139,36 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
     }
   }
 
+  async function patchProfile(patch: { auto_adjust_enabled?: boolean; manual_wpm?: number | null }) {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/typing/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setProfile(json.data.profile);
+        const pace = json.data.effective_pace;
+        toast(
+          "success",
+          pace?.basis === "manual"
+            ? `Paced writing will use your preferred ${Math.round(pace.wpm)} WPM.`
+            : pace?.basis === "adaptive"
+              ? `Adaptive pacing on — paced writing will use ${Math.round(pace.wpm)} WPM.`
+              : "Pacing follows your fixed baseline."
+        );
+      } else {
+        toast("error", json.error || "Could not update the profile.");
+      }
+    } catch {
+      toast("error", "Could not reach the server.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner className="h-4 w-4" /> Loading the typing test…</div>;
   }
@@ -132,6 +177,52 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
 
   return (
     <div className="space-y-4">
+      {baseline && profile && (
+        <div className="rounded-lg border border-line px-3 py-3 text-sm">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-soft">
+            <span>Baseline <strong className="text-ink">{Math.round(Number(profile.baseline_wpm))} WPM</strong></span>
+            <span>Recent average <strong className="text-ink">{Math.round(Number(profile.recent_average_wpm))} WPM</strong></span>
+            <span>Recommended <strong className="text-ink">{Math.round(Number(profile.recommended_wpm))} WPM</strong></span>
+            <span>Confidence <strong className="text-ink">{profile.confidence}</strong> ({profile.sample_count} sample{profile.sample_count === 1 ? "" : "s"})</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-1.5 text-ink-soft">
+              <input
+                type="checkbox"
+                checked={profile.auto_adjust_enabled}
+                disabled={busy}
+                onChange={(e) => patchProfile({ auto_adjust_enabled: e.target.checked })}
+              />
+              Adaptive pacing (follow the recommended pace — off by default)
+            </label>
+            <span className="text-ink-soft">Preferred pace (optional):</span>
+            <input
+              className="w-20 rounded-md border border-line px-2 py-1"
+              type="number"
+              min={1}
+              max={220}
+              placeholder="e.g. 64"
+              value={manualPace}
+              disabled={busy}
+              onChange={(e) => setManualPace(e.target.value)}
+              onBlur={() => {
+                const v = manualPace.trim();
+                if (v === "" && profile.manual_wpm !== null) patchProfile({ manual_wpm: null });
+                else if (v !== "" && Number(v) !== profile.manual_wpm) patchProfile({ manual_wpm: Number(v) });
+              }}
+            />
+            {profile.manual_wpm !== null && (
+              <button className="text-xs underline" disabled={busy} onClick={() => patchProfile({ manual_wpm: null })}>
+                clear
+              </button>
+            )}
+          </div>
+          <p className="mt-1.5 text-xs text-ink-soft">
+            Your baseline stays fixed unless you reselect it; the recommended pace only applies while adaptive pacing is on, and a
+            preferred pace always wins. Suspicious attempts never affect this profile.
+          </p>
+        </div>
+      )}
       {baseline ? (
         <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent">
           <strong>Your paced-writing baseline: {baselineWpm} net-adjusted WPM</strong> (from {new Date(baseline.test_date).toLocaleDateString()}).

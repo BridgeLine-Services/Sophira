@@ -717,3 +717,60 @@ minutes) — the fixed expectations assert the machine's exact semantics.
 server-side and tested purely offline; the API layer (Supabase RLS
 queries) is exercised only by `tsc` and build, not by a live server run
 (same standing limit as every prior round — no production env yet).
+
+## 36. Optional adaptive typing profile (2026-10-05) — 520/520 offline
+
+Upgrade of the EXISTING typing-speed system (0009, src/lib/typing.ts and
+typing-passage.ts — canonical passage, server-side timing, WPM, accuracy,
+net WPM, suspicious-attempt detection, user-selected baseline, retesting,
+RLS isolation, paced output — ALL unchanged and still tested). The typing
+test itself is untouched; nothing was replaced.
+
+**1. Profile storage (migration 0018):** `typing_profiles` per user holds
+baseline_wpm, recent_average_wpm, recommended_wpm, confidence
+(LOW/MEDIUM/HIGH), sample_count, last_calibration_at, auto_adjust_enabled
+(default FALSE), plus an optional manual_wpm preferred pace. Strict
+per-user RLS (own_all policy, auth.uid()), one row per user.
+
+**2. Pure engine (`src/lib/typing-profile.ts`):**
+recomputeTypingProfile builds a rolling estimate over the most recent 5
+VALID, UNFLAGGED, plausible attempts only — suspicious or invalid timing
+data (implausibly fast, too short, incomplete, wpm ≤ 0 or > 220) can never
+corrupt the profile. Recommended pace = floor of the midpoint between the
+user-selected baseline and the recent average, clamped to [0.75, 1.25] ×
+baseline (documented example: 62 + 67 → 64, HIGH confidence at 4+
+consistent samples, spread ≤ 12 WPM). Deterministic, explainable, bounded.
+
+**3. Pacing NEVER changes automatically (machine-enforced):**
+effectiveTypingPace resolves manual preferred pace → adaptive recommended
+ONLY when auto_adjust_enabled is true → otherwise the fixed baseline
+(exactly the pre-existing behavior). PacedOutput uses the effective pace
+with a baseline fallback — no behavior change unless the user opts in.
+TypingTest shows the profile (baseline/recent/recommended/confidence/
+samples) with an adaptive checkbox (off by default) and an optional
+preferred-pace field with clear. Retake calibration stays: PATCH baseline
+selection re-syncs baseline_wpm + last_calibration_at.
+
+**4. API:** GET /api/typing now also returns the profile; POST only syncs
+the profile for valid, unflagged attempts; PATCH (baseline select) syncs
+on repeated calibration. New /api/typing/profile GET/PATCH
+(auto_adjust_enabled, manual_wpm) creates the row on first use from the
+user's selected baseline.
+
+**Tests: 15 new assertions (section 20), suite total 520/520 PASSED** —
+all seven required scenarios: first calibration, repeated calibration,
+adaptive update (the documented 62/67→64 example), disabled
+auto-adjustment (identical data → pacing stays at the fixed baseline),
+suspicious attempt (flagged data never becomes an observation),
+user-selected baseline (manual preference wins; clearing falls back), and
+RLS isolation (migration asserted: row-level security, auth.uid()
+policies, per-user cascade + unique). Plus a preservation check that the
+original typing engine still computes 250 chars/min → 50 WPM validly.
+Two fixture arithmetic mistakes were found and corrected during
+development (the engine was right both times). `tsc` clean; `next build`
+passes.
+
+**Honest limits:** as in every prior round, the Supabase-backed API layer
+is compile-checked and build-checked but not exercised against a live
+server (no production env yet); the profile math and trust filter are
+fully offline-tested.
