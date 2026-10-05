@@ -214,6 +214,8 @@ export function buildSystemPrompt(args: {
   taskType?: string | null;
   mathTopicSystem?: string | null;
   learningPatterns?: import("../learning/patterns").LearningPattern[] | null;
+  /** Long-term student memory lines (§28) — relevance-selected, capped. */
+  memoryLines?: string[] | null;
   patternContext?: {
     subject?: string | null;
     course_id?: string | null;
@@ -222,7 +224,7 @@ export function buildSystemPrompt(args: {
     task_type?: string | null;
   };
 }): { systemPrompt: string; conflicts: ContextConflict[] } {
-  const { profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask, subject, taskType, mathTopicSystem, learningPatterns, patternContext } = args;
+  const { profile, course, teacherName, teacherProfile, writingProfile, mode, isWritingTask, subject, taskType, mathTopicSystem, learningPatterns, memoryLines, patternContext } = args;
 
   const workflow = routeSubject(subject ?? course?.subject, taskType);
   const composed = composeAcademicContext({
@@ -249,6 +251,13 @@ export function buildSystemPrompt(args: {
   }
 
   if (mathTopicSystem) parts.push(mathTopicSystem);
+
+  if (memoryLines && memoryLines.length) {
+    parts.push(
+      "LONG-TERM STUDENT MEMORY (evidence-backed profile; AI-observed entries are hypotheses to ADAPT to — adjust explanation style, difficulty, hints, examples, study recommendations, and priorities accordingly; NEVER state them as diagnoses to the student unless the student asks about their memory):\n" +
+        memoryLines.map((l) => `- ${l}`).join("\n")
+    );
+  }
 
   parts.push(`Format your final answer in clean Markdown (headings, lists, LaTeX-free plain math notation like x^2, tables where helpful). Respond ONLY with a JSON object of the form:
 {

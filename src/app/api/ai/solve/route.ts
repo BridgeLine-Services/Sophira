@@ -38,6 +38,8 @@ import {
   type IntegrityReport,
 } from "@/lib/research/claims";
 import type { Mode } from "@/lib/types";
+import { selectRelevantMemories, RETRIEVABLE_STATUSES, type StudentMemory } from "@/lib/memory/engine";
+import { recordMemoryEvidence } from "@/lib/memory/store";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -175,6 +177,34 @@ export async function POST(request: NextRequest) {
   // response (spec §40: real backend state, never a fabricated badge).
   const patternDecisions = explainPatternDecisions(learningPatterns, patternContext);
 
+  // --- Stage 2c: long-term student memory (workflow §28) --------------------
+  // Retrieve ONLY memories relevant to this academic context (subject tags,
+  // retrievable statuses, relevance-ranked, hard cap) — never a dump of the
+  // student's entire memory history.
+  const { data: memoryRows } = await supabase
+    .from("student_memories")
+    .select("id, user_id, category, statement, details, subject, subject_tags, confidence, status, improvement_trend, origin, source, first_observed, last_observed, last_used_at, created_at, updated_at")
+    .eq("user_id", user.id)
+    .in("status", ["active", "monitoring", "improving"]);
+  const memories = (memoryRows || []) as StudentMemory[];
+  const memorySelection = selectRelevantMemories(memories, {
+    subject: patternContext.subject ?? null,
+    task_type: patternContext.task_type ?? null,
+    mode,
+  });
+  // Genuinely used memories: record usage (drives recency ranking).
+  if (memorySelection.decisions.length > 0) {
+    const nowISO = new Date().toISOString();
+    for (const d of memorySelection.decisions) {
+      await supabase
+        .from("student_memories")
+        .update({ last_used_at: nowISO, updated_at: nowISO })
+        .eq("id", d.id)
+        .eq("user_id", user.id)
+        .then(() => undefined);
+    }
+  }
+
   // Applied patterns were genuinely USED in this response — record it
   // (resets time decay; drives the confidence-decay engine's staleness).
   if (applicablePatterns.length > 0) {
@@ -200,6 +230,7 @@ export async function POST(request: NextRequest) {
     taskType: classification?.task_type ?? null,
     mathTopicSystem,
     learningPatterns: applicablePatterns,
+    memoryLines: memorySelection.lines,
     patternContext,
   });
 
@@ -214,6 +245,7 @@ export async function POST(request: NextRequest) {
   const contextApplied = {
     ...composed.applied,
     pattern_decisions: patternDecisions,
+    memory_decisions: memorySelection.decisions,
     classification: classification
       ? { subject: classification.subject, task_type: classification.task_type, level: classification.academic_level }
       : null,
@@ -326,6 +358,13 @@ export async function POST(request: NextRequest) {
     method_compliance?: { status: "compliant" | "partial" | "non_compliant" | "not_applicable"; checks: { name: string; passed: boolean; detail: string }[]; notes: string };
     warnings: string[];
   } = { status: "unverified", verification_method: "none", checks: [], warnings: [] };
+  // Machine-verified check results, hoisted so post-verification learning
+  // hooks (§28 improvement evidence) can read them after the try block.
+  let machineResults: {
+    results: import("@/lib/ai/mathverify").MachineCheckResult[];
+    allPassed: boolean;
+    kinds: string[];
+  } = { results: [], allPassed: false, kinds: [] };
   try {
     const raw = await aiChat(
       [
@@ -359,7 +398,7 @@ export async function POST(request: NextRequest) {
       // --- Independent verification (spec §10) --------------------------------
       // Re-compute the model's claimed arithmetic identities with mathjs — a
       // deterministic engine, not the same language model checking itself.
-      const machineResults = workflow.machineVerifiable
+      machineResults = workflow.machineVerifiable
         ? runMachineChecks(parsed.machine_checks)
         : { results: [] as never[], allPassed: false, kinds: [] as string[] };
 
@@ -449,6 +488,70 @@ export async function POST(request: NextRequest) {
           })
           .then(() => undefined);
       }
+      // Long-term student memory (§28): a CLEAN machine-verified answer is
+      // positive evidence for this subject's weakness-type memories — the
+      // recency-weighted recompute turns consecutive correct solutions into
+      // an 'improving' trend (never a sudden claim that the weakness is gone).
+      const cleanAnswer =
+        mode === "check"
+        && workflow.machineVerifiable
+        && machineResults.allPassed
+        && (machineResults.results?.length ?? 0) > 0
+        && observed.length === 0;
+      if (cleanAnswer && memoryRows) {
+        const subjectTag = (patternContext.subject || "").toLowerCase();
+        const weaknessMemories = (memoryRows as StudentMemory[]).filter(
+          (mm) =>
+            (mm.category === "weakness" ||
+              mm.category === "recurring_mistake" ||
+              mm.category === "conceptual_misunderstanding")
+            && RETRIEVABLE_STATUSES.includes(mm.status)
+            && (!subjectTag || mm.subject_tags.some((t) => t.toLowerCase() === subjectTag)),
+        );
+        for (const wm of weaknessMemories.slice(0, 3)) {
+          await recordMemoryEvidence(supabase, user.id, {
+            category: wm.category,
+            statement: wm.statement.slice(0, 200),
+            subject: wm.subject ?? patternContext.subject ?? null,
+            evidence: {
+              evidence_type: "correct_solution",
+              // A correct solution CONTRADICTS the weakness hypothesis —
+              // negative polarity lowers its confidence and drives the
+              // 'improving' trend (evidence-backed, never an instant cure).
+              polarity: "negative",
+              summary: "Correct solution with no observed mistakes (machine-verified)",
+              evidence_ref: {
+                assignment_id: patternContext.assignment_id ?? null,
+                course_id: patternContext.course_id ?? null,
+                machine_checks: machineResults.results?.length ?? 0,
+              },
+            },
+            source: "ai/solve",
+          }).then(() => undefined);
+        }
+      }
+      // Long-term student memory (§28): the observed mistake is EVIDENCE
+      // for a weakness-type memory — an AI-inferred hypothesis that
+      // starts in 'monitoring' (never asserted as fact) whose confidence
+      // recomputes from ALL evidence with recency weighting. Recorded for
+      // EVERY observed mistake, whether the pattern was new or recurring.
+      await recordMemoryEvidence(supabase, user.id, {
+        category: "recurring_mistake",
+        statement: m.description.slice(0, 200),
+        subject: m.subject || patternContext.subject || null,
+        details: "Observed in the student's own submitted work.",
+        evidence: {
+          evidence_type: "incorrect_problem",
+          polarity: "positive",
+          summary: `Mistake observed: ${m.description.slice(0, 160)}`,
+          evidence_ref: {
+            assignment_id: patternContext.assignment_id ?? null,
+            course_id: patternContext.course_id ?? null,
+            teacher_id: patternContext.teacher_id ?? null,
+          },
+        },
+        source: "ai/solve",
+      }).then(() => undefined);
     }
   }
 

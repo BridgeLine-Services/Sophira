@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { BookOpen, GraduationCap, Home, Library, LogOut, PenLine, Settings, ClipboardCheck, ShieldCheck, AlertTriangle } from "lucide-react";
+import { BookOpen, Brain, GraduationCap, Home, Library, LogOut, PenLine, Settings, ClipboardCheck, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const NAV = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/library", label: "Library", icon: Library },
   { href: "/proposals", label: "Changes", icon: ClipboardCheck },
   { href: "/corrections", label: "Learning", icon: AlertTriangle },
+  { href: "/memories", label: "Memory", icon: Brain },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

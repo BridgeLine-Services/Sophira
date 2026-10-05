@@ -11,7 +11,7 @@
  * Matrix (all enforced by the database, not hidden UI):
  *   1. OWNER → USER_A: assignment, essay, teacher profile, writing
  *      samples, feedback, learning patterns, research, typing results,
- *      uploaded files  → NO ACCESS (all nine categories).
+ *      uploaded files, student memories → NO ACCESS (all ten categories).
  *   2. USER_A → USER_B data → NO ACCESS; USER_B → USER_A → NO ACCESS.
  *   3. Unauthenticated → private data → NO ACCESS.
  *   4. Revoked user → other users' data → NO ACCESS (revocation also
@@ -44,7 +44,7 @@ import { createClient } from "@supabase/supabase-js";
 const RUN_TAG = `secreg-${Date.now().toString(36)}`;
 const EMAIL = (name) => `${name}.${RUN_TAG}@sophira-security-test.local`;
 
-// The nine private-data categories the OWNER is explicitly tested against.
+// The ten private-data categories the OWNER is explicitly tested against.
 const PRIVATE_CATEGORIES = [
   { label: "assignment", table: "assignments", column: "title", seed: () => ({ title: "A-private assignment", subject: "History" }) },
   { label: "essay", table: "responses", column: "content", seed: () => ({ content: "A-private essay body" }) },
@@ -55,6 +55,7 @@ const PRIVATE_CATEGORIES = [
   { label: "research", table: "research_projects", column: "topic", seed: () => ({ topic: "A-private research topic" }) },
   { label: "typing results", table: "typing_attempts", column: "wpm", seed: () => ({ duration_ms: 60000, characters_typed: 300, wpm: 60, accuracy: 0.95, net_wpm: 57, valid_attempt: true, flags: [] }) },
   { label: "uploaded files", table: "assignment_files", column: "file_name", seed: () => ({ file_name: "A-private-file.pdf", storage_path: "private/a.pdf" }) },
+  { label: "student memories", table: "student_memories", column: "statement", seed: () => ({ category: "weakness", statement: "A-private algebra weakness", status: "monitoring", origin: "ai_inferred", confidence: 0.78, source: "rls-regression" }) },
 ];
 
 // ---- harness ------------------------------------------------------------
@@ -96,7 +97,7 @@ async function signInAs(url, anonKey, email, password) {
 // ---- self-test -----------------------------------------------------------
 async function selfTest() {
   const t = (name, cond) => { if (!cond) { console.error(`SELF-TEST FAILED: ${name}`); process.exit(1); } };
-  t("nine owner-tested categories present", PRIVATE_CATEGORIES.length === 9);
+  t("ten owner-tested categories present", PRIVATE_CATEGORIES.length === 10);
   t("every category has a table", PRIVATE_CATEGORIES.every((c) => c.table && c.column && c.seed));
   t("matrix includes A↔B, anon, revoked, deleted", true); // structural: asserted below by runMatrix coverage
   t("fail-closed on partial env config", (() => {

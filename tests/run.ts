@@ -47,6 +47,12 @@ import {
   RECENT_WINDOW, PLAUSIBLE_MAX_WPM, type ObservedTypingAttempt,
 } from "../src/lib/typing-profile";
 import {
+  clampConfidence, recencyWeight, recomputeConfidence, confidenceAfterEvidence,
+  computeTrend, statusAfterRecompute, studentTransition, selectRelevantMemories,
+  MEMORY_CATEGORIES, MAX_PROMPT_MEMORIES, RETRIEVABLE_STATUSES, MONITORING_BELOW,
+  type StudentMemory, type MemoryEvidenceRow,
+} from "../src/lib/memory/engine";
+import {
   validateNativeAppUrl, resolveNativeServerUrl, isReleaseBuild,
   REMOVED_FALLBACK_URL, DEV_DEFAULT_URL,
 } from "../src/lib/native-url";
@@ -2406,8 +2412,8 @@ async function runSecurityRegressionTests(): Promise<void> {
 
     // ---- the live matrix suite exists and is wired into acceptance -------
     const live = fs.readFileSync(path.join(process.cwd(), "tests", "security", "rls-regression.mjs"), "utf8");
-    assert(live.includes("PRIVATE_CATEGORIES.length === 9") || /nine owner-tested categories/.test(live),
-      "security: the live suite tests all NINE owner-vs-USER_A categories");
+    assert(live.includes("PRIVATE_CATEGORIES.length === 10") || /ten owner-tested categories/.test(live),
+      "security: the live suite tests all TEN owner-vs-USER_A categories (including long-term student memories)");
     for (const required of [
       "OWNER", "USER_A", "USER_B", "UNAUTHORIZED",
       "revoked", "deleteUser", "network_stats",
@@ -2926,4 +2932,268 @@ async function runAccessControlTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+/* ------------------------------------------------------------------ */
+/* 28. LONG-TERM STUDENT MEMORY (workflow §28) — structured academic   */
+/*     memory layer: evidence-backed hypotheses, recency-weighted     */
+/*     confidence, lifecycle, relevance retrieval, isolation.         */
+/* ------------------------------------------------------------------ */
+async function runMemoryTests(): Promise<void> {
+  const NOW = "2026-10-05T20:00:00.000Z";
+  const daysAgo = (d: number) => new Date(Date.parse(NOW) - d * 86_400_000).toISOString();
+
+  const memoryBase = (over: Partial<StudentMemory>): StudentMemory => ({
+    id: "m1", user_id: "u1", category: "weakness", statement: "Algebra weakness",
+    details: "", subject: "algebra", subject_tags: ["algebra"], confidence: 0.78,
+    status: "monitoring", improvement_trend: "", origin: "ai_inferred", source: "ai/solve",
+    first_observed: daysAgo(30), last_observed: daysAgo(1), last_used_at: null,
+    created_at: daysAgo(30), updated_at: daysAgo(1), ...over,
+  });
+
+  const evidenceRow = (over: Partial<MemoryEvidenceRow>): MemoryEvidenceRow => ({
+    id: "e1", memory_id: "m1", evidence_type: "incorrect_problem", polarity: "positive",
+    summary: "7 incorrect problems", evidence_ref: {}, observed_at: daysAgo(1), ...over,
+  });
+
+  section("28. Long-term student memory — pure engine");
+  {
+    // ---- 1. Confidence bounds ------------------------------------------
+    assert(clampConfidence(1.7) === 0.95 && clampConfidence(-3) === 0.05 &&
+      clampConfidence(0.5) === 0.5, "memory: confidence clamps to [0.05, 0.95]");
+
+    // ---- 2. Recency weighting -------------------------------------------
+    assert(recencyWeight(NOW, NOW) === 1, "memory: fresh evidence weighs 1.0");
+    assert(Math.abs(recencyWeight(daysAgo(120), NOW) - 0.5) < 1e-9,
+      "memory: evidence at the 120-day half-life weighs 0.5 — recent evidence dominates stale evidence");
+    assert(recencyWeight(daysAgo(480), NOW) < 0.1,
+      "memory: two-year-old evidence is nearly weightless — outdated behavior never permanently defines the student");
+
+    // ---- 3. Evidence-weighted confidence recompute ----------------------
+    const allPositive = [
+      evidenceRow({ observed_at: daysAgo(1) }),
+      evidenceRow({ observed_at: daysAgo(2), evidence_type: "conceptual_error" }),
+      evidenceRow({ observed_at: daysAgo(3) }),
+    ];
+    const c1 = recomputeConfidence(allPositive, NOW);
+    assert(c1 > 0.85, "memory: several recent supporting evidence rows raise confidence above 0.85");
+    const oldNegative = evidenceRow({ polarity: "negative", observed_at: daysAgo(400), summary: "early regression" });
+    assert(recomputeConfidence([...allPositive, oldNegative], NOW) > 0.8 &&
+      recomputeConfidence([...allPositive, oldNegative], NOW) < c1,
+      "memory: one stale contradicting row barely dents well-supported recent evidence");
+    const recentNegative = evidenceRow({ polarity: "negative", observed_at: daysAgo(0) });
+    assert(recomputeConfidence([evidenceRow({ observed_at: daysAgo(400) }), recentNegative], NOW) < 0.5,
+      "memory: a fresh contradiction outweighs old support");
+    assert(recomputeConfidence([], NOW) === 0.05,
+      "memory: no evidence at all → floor confidence (never a confident claim)");
+
+    // ---- 4. Diminishing-return single-step confidence -------------------
+    const firstStep = confidenceAfterEvidence(0.5, { evidence_type: "incorrect_problem", polarity: "positive", summary: "" }, 0);
+    const tenthStep = confidenceAfterEvidence(0.5, { evidence_type: "incorrect_problem", polarity: "positive", summary: "" }, 10);
+    assert(firstStep > 0.6 && tenthStep < firstStep,
+      "memory: each new evidence row moves confidence less than the first (diminishing returns)");
+    assert(confidenceAfterEvidence(0.8, { evidence_type: "contradiction", polarity: "negative", summary: "" }, 5) < 0.8,
+      "memory: negative evidence lowers confidence");
+
+    // ---- 5. Improvement trend (the example's shape) ---------------------
+    const weaknessWithHistory: MemoryEvidenceRow[] = [
+      evidenceRow({ observed_at: daysAgo(30), summary: "7 incorrect problems" }),
+      evidenceRow({ observed_at: daysAgo(20), evidence_type: "conceptual_error", summary: "3 related conceptual errors" }),
+      evidenceRow({ observed_at: daysAgo(10), summary: "another incorrect problem" }),
+    ];
+    assert(computeTrend({ category: "weakness" }, weaknessWithHistory, NOW) === "regressing",
+      "memory: weakness with recent mistakes trends regressing, not improving");
+    const improving = [
+      ...weaknessWithHistory,
+      evidenceRow({ evidence_type: "correct_solution", polarity: "negative", observed_at: daysAgo(2), summary: "correct" }),
+      evidenceRow({ evidence_type: "correct_solution", polarity: "negative", observed_at: daysAgo(1), summary: "correct" }),
+      evidenceRow({ evidence_type: "correct_solution", polarity: "negative", observed_at: daysAgo(0), summary: "correct" }),
+    ];
+    assert(computeTrend({ category: "weakness" }, improving, NOW) === "improving",
+      "memory: 3 consecutive correct solutions after a weakness → trend 'improving' (the documented example)");
+    assert(computeTrend({ category: "weakness" }, [], NOW) === "" &&
+      computeTrend({ category: "strength" }, weaknessWithHistory, NOW) === "improving" &&
+      computeTrend({ category: "strength" }, [
+        evidenceRow({ polarity: "negative", observed_at: daysAgo(0), summary: "contradicted" }),
+        evidenceRow({ polarity: "negative", observed_at: daysAgo(1), summary: "contradicted" }),
+        evidenceRow({ polarity: "negative", observed_at: daysAgo(2), summary: "contradicted" }),
+      ], NOW) === "regressing",
+      "memory: no evidence → no trend; a recently confirmed strength improves; a contradicted one regresses");
+
+    // ---- 6. Status lifecycle ---------------------------------------------
+    assert(statusAfterRecompute({ status: "monitoring", origin: "ai_inferred", category: "weakness" }, 0.3, "") === "monitoring",
+      "memory: an AI-inferred hypothesis below the monitoring threshold is NEVER promoted to an asserted fact");
+    assert(statusAfterRecompute({ status: "monitoring", origin: "ai_inferred", category: "weakness" }, 0.8, "") === "active",
+      "memory: enough supporting evidence promotes the hypothesis to active");
+    assert(statusAfterRecompute({ status: "monitoring", origin: "ai_inferred", category: "weakness" }, 0.4, "improving") === "improving",
+      "memory: an improving trend is surfaced even while confidence stays below threshold");
+    assert(statusAfterRecompute({ status: "disabled", origin: "student_supplied", category: "goal" }, 0.9, "improving") === "disabled",
+      "memory: a student-disabled memory is never auto-re-enabled by evidence");
+    assert(studentTransition("active", "disabled").allowed &&
+      studentTransition("active", "forgotten").allowed &&
+      studentTransition("disabled", "active").allowed &&
+      studentTransition("archived", "active").allowed,
+      "memory: the student can disable, forget, and re-enable their own memories");
+    assert(!studentTransition("forgotten", "active").allowed &&
+      !studentTransition("active", "monitoringX" as never).allowed,
+      "memory: forgotten stays forgotten — no silent resurrection");
+    assert(studentTransition("improving", "active").allowed &&
+      studentTransition("contradicted", "monitoring").allowed,
+      "memory: improving/contradicted memories remain under student lifecycle control");
+
+    // ---- 7. Relevance retrieval — never every memory ----------------------
+    const pool: StudentMemory[] = [
+      memoryBase({ id: "m-sub", subject_tags: ["algebra"], statement: "Algebra weakness", confidence: 0.8 }),
+      memoryBase({ id: "m-goal", category: "goal", statement: "A in calculus", subject: null, subject_tags: [], confidence: 0.9, status: "active", origin: "student_supplied" }),
+      memoryBase({ id: "m-off", statement: "Unrelated biology note", subject_tags: ["biology"], status: "archived" }),
+      memoryBase({ id: "m-off2", statement: "Disabled note", subject_tags: ["algebra"], status: "disabled" }),
+      memoryBase({ id: "m-off3", statement: "Forgotten note", subject_tags: ["algebra"], status: "forgotten" }),
+    ];
+    for (let i = 0; i < 20; i++) {
+      pool.push(memoryBase({ id: `m-many-${i}`, statement: `History item ${i}`, subject: null, subject_tags: ["history"], status: "active", confidence: 0.4 }));
+    }
+    const sel = selectRelevantMemories(pool, { subject: "algebra", task_type: "problem set" }, NOW);
+    assert(sel.lines.length <= MAX_PROMPT_MEMORIES && sel.lines.length === sel.decisions.length,
+      "memory: prompt retrieval is hard-capped and every selected memory carries an explanation");
+    assert(sel.decisions.some((d) => d.id === "m-sub") && sel.decisions.some((d) => d.id === "m-goal"),
+      "memory: subject-matching weakness AND cross-subject goals are retrieved");
+    assert(!sel.decisions.some((d) => d.id === "m-off") && !sel.decisions.some((d) => d.id === "m-off2") &&
+      !sel.decisions.some((d) => d.id === "m-off3"),
+      "memory: archived, disabled, and forgotten memories are NEVER injected into prompts");
+    assert(sel.lines.length === MAX_PROMPT_MEMORIES &&
+      sel.decisions.findIndex((d) => d.id === "m-sub") === 0 &&
+      sel.decisions.findIndex((d) => d.id === "m-goal") < sel.decisions.findIndex((d) => d.id.startsWith("m-many")),
+      "memory: a context with 20+ lower-relevance memories gets a hard-capped selection with relevant memories ranked first");
+    assert(sel.lines.some((l) => l.includes("AI-observed hypothesis")) &&
+      sel.lines.some((l) => l.includes("student-stated")),
+      "memory: prompt lines clearly distinguish AI-observed hypotheses from student-stated facts");
+    assert(selectRelevantMemories([], { subject: "algebra" }, NOW).lines.length === 0,
+      "memory: no memories → no memory section (nothing invented)");
+
+    // ---- 8. The documented example's metadata shape ---------------------
+    const example = memoryBase({ confidence: 0.78, status: "monitoring" });
+    assert(example.category === "weakness" && example.origin === "ai_inferred" &&
+      RETRIEVABLE_STATUSES.includes(example.status) && example.confidence === 0.78 &&
+      !!example.first_observed && !!example.last_observed,
+      "memory: the 'Algebra weakness' example carries category, confidence 0.78, origin, first/last observed, and status");
+    assert(MEMORY_CATEGORIES.length === 13 &&
+      MEMORY_CATEGORIES.includes("goal") && MEMORY_CATEGORIES.includes("strength") &&
+      MEMORY_CATEGORIES.includes("weakness") && MEMORY_CATEGORIES.includes("learning_preference") &&
+      MEMORY_CATEGORIES.includes("explanation_preference") && MEMORY_CATEGORIES.includes("study_habit") &&
+      MEMORY_CATEGORIES.includes("recurring_mistake") && MEMORY_CATEGORIES.includes("conceptual_misunderstanding") &&
+      MEMORY_CATEGORIES.includes("academic_history") && MEMORY_CATEGORIES.includes("subject_preference") &&
+      MEMORY_CATEGORIES.includes("motivation_pattern") && MEMORY_CATEGORIES.includes("effective_strategy") &&
+      MEMORY_CATEGORIES.includes("ineffective_strategy"),
+      "memory: all 13 required memory categories are supported");
+    assert(MONITORING_BELOW === 0.5 && RETRIEVABLE_STATUSES.length === 3,
+      "memory: monitoring threshold and the 3 retrievable statuses are stable constants");
+  }
+
+  section("28. Long-term student memory — persistence, AI integration, and isolation");
+  {
+    const migration = fs.readFileSync(path.join(process.cwd(), "supabase", "migrations", "0020_student_memory.sql"), "utf8");
+    const memoryRoute = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "memory", "route.ts"), "utf8");
+    const memoryIdRoute = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "memory", "[id]", "route.ts"), "utf8");
+    const solveRoute = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "ai", "solve", "route.ts"), "utf8");
+    const store = fs.readFileSync(path.join(process.cwd(), "src", "lib", "memory", "store.ts"), "utf8");
+    const engine = fs.readFileSync(path.join(process.cwd(), "src", "lib", "memory", "engine.ts"), "utf8");
+    const manager = fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "MemoryManager.tsx"), "utf8");
+    const memoriesPage = fs.readFileSync(path.join(process.cwd(), "src", "app", "memories", "page.tsx"), "utf8");
+    const appShell = fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "AppShell.tsx"), "utf8");
+
+    // ---- 9. Schema: structured relational data, RLS own-row --------------
+    assert(migration.includes("create table if not exists public.student_memories") &&
+      migration.includes("create table if not exists public.student_memory_evidence"),
+      "memory: memories and evidence are separate structured tables (no vector store)");
+    assert(!/\bvector\s*\(|halfvec|pgvector|embedding\s*\(/i.test(migration) &&
+      !/embedding/i.test(engine) && !/embedding/i.test(store),
+      "memory: no vector/embedding store — structured relational data with transparent matching (the documented decision)");
+    assert(migration.includes("enable row level security") &&
+      (migration.match(/enable row level security/g) || []).length === 2,
+      "memory: RLS is enabled on BOTH memory tables");
+    assert(migration.includes("student_memories_own_all") && migration.includes("student_memory_evidence_own_all") &&
+      migration.includes("using (user_id = auth.uid())") && migration.includes("with check (user_id = auth.uid())"),
+      "memory: strict own-row RLS policies — a user can only ever touch their own memories and evidence");
+    assert(migration.includes("references public.student_memories(id) on delete cascade"),
+      "memory: forgetting a memory cascades to all its evidence rows");
+    const migrationFlat = migration.replace(/\s+/g, " ");
+    assert(migrationFlat.includes("check (confidence >= 0 and confidence <= 1)") &&
+      migrationFlat.includes("'student_supplied', 'ai_inferred'") &&
+      migrationFlat.includes("'active', 'monitoring', 'improving', 'contradicted', 'archived', 'disabled', 'forgotten'"),
+      "memory: schema enforces confidence range, origin, and the full lifecycle");
+
+    // ---- 10. API authorization -------------------------------------------
+    assert(memoryRoute.includes("requireUser") && memoryIdRoute.includes("requireUser"),
+      "memory: every memory API route requires an authenticated, active user (requireUser)");
+    assert((memoryRoute.match(/guard\.data\.user\.id/g) || []).length >= 2 &&
+      (memoryIdRoute.match(/guard\.data\.user\.id/g) || []).length >= 4,
+      "memory: every API operation is scoped to the requesting user in code AND by RLS — defense in depth");
+    assert(memoryRoute.includes('origin: "student_supplied"') && memoryRoute.includes("confidence: 1"),
+      "memory: manually added memories are stored as student-stated facts, clearly distinct from AI inference");
+    assert(memoryIdRoute.includes("DELETE") && memoryIdRoute.includes("student_memory_evidence") &&
+      memoryIdRoute.includes("body.action") && memoryIdRoute.includes("studentMemoryAction") &&
+      memoryIdRoute.includes("listEvidence"),
+      "memory: the memory by id route supports evidence inspection, lifecycle actions, and hard forget");
+
+    // ---- 11. AI retrieval integration ------------------------------------
+    assert(solveRoute.includes("selectRelevantMemories") && solveRoute.includes("memoryLines: memorySelection.lines"),
+      "memory: the AI solve route retrieves ONLY relevance-selected memories and injects them as a bounded prompt section");
+    assert(solveRoute.includes('".in("status", ["active", "monitoring", "improving"])') ||
+      solveRoute.includes('.in("status", ["active", "monitoring", "improving"])'),
+      "memory: retrieval is status-filtered — archived/disabled/forgotten never reach the prompt");
+    assert(solveRoute.includes("memory_decisions: memorySelection.decisions"),
+      "memory: retrieval decisions are persisted with the response for auditability");
+    assert(solveRoute.includes("recordMemoryEvidence") &&
+      solveRoute.includes("evidence_type: \"incorrect_problem\""),
+      "memory: observed mistakes become structured evidence on weakness memories");
+    assert(solveRoute.includes('evidence_type: "correct_solution"') && solveRoute.includes("cleanAnswer") &&
+      solveRoute.includes('polarity: "negative"'),
+      "memory: machine-verified clean answers become CONTRADICTING evidence on weaknesses — confidence drops, trend improves");
+    assert(solveRoute.includes("last_used_at"),
+      "memory: genuinely used memories record usage (recency ranking)");
+    const aiClient = fs.readFileSync(path.join(process.cwd(), "src", "lib", "ai", "client.ts"), "utf8");
+    assert(aiClient.includes("NEVER state them as diagnoses") &&
+      aiClient.includes("hypotheses to ADAPT to"),
+      "memory: the prompt instructs the AI to adapt to memories, never to assert them as diagnoses");
+
+    // ---- 12. Store: no service-role path ----------------------------------
+    assert(!store.includes("asServiceRole") && !store.toLowerCase().includes("service_role") &&
+      !store.includes("createAdminClient"),
+      "memory: the memory store never uses a service-role/admin client — no owner path to student memories");
+    assert((store.match(/eq\("user_id", userId\)/g) || []).length >= 4,
+      "memory: every store query is user-scoped — isolation is enforced per operation");
+    assert(store.includes("recomputeConfidence") && store.includes("computeTrend") && store.includes("statusAfterRecompute"),
+      "memory: evidence recording recomputes confidence, trend, and status from the full weighted history");
+
+    // ---- 13. Student controls ---------------------------------------------
+    assert(fs.existsSync(path.join(process.cwd(), "src", "app", "memories", "page.tsx")),
+      "memory: the Memory Management page exists at /memories");
+    assert(memoriesPage.includes("eq(\"user_id\", user.id)") && memoriesPage.includes("neq(\"status\", \"forgotten\")"),
+      "memory: the page reads only the signed-in student's own rows (RLS + explicit scoping)");
+    assert(manager.includes("student-stated fact") && manager.includes("AI-inferred"),
+      "memory: the UI clearly distinguishes manually supplied facts from AI-inferred observations");
+    assert(manager.includes("Inspect evidence") && manager.includes("evidence"),
+      "memory: the student can inspect the structured evidence behind each memory");
+    assert(manager.includes('"disable"') && manager.includes('"restore"') && manager.includes("DELETE"),
+      "memory: the student can disable, re-enable, and permanently forget memories");
+    assert(manager.includes("Search your memories") && manager.includes("All categories"),
+      "memory: the student can search and filter memories");
+    assert(manager.includes("confidence {Math.round(m.confidence * 100)}%") ||
+      manager.includes("confidence") && manager.includes("first observed") && manager.includes("last observed"),
+      "memory: each memory displays confidence, first observed, and last observed");
+    assert(appShell.includes("/memories"),
+      "memory: Memory Management is reachable from the app navigation");
+
+    // ---- 14. Owner cannot see another student's memories ------------------
+    const statsRoute = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "network", "stats", "route.ts"), "utf8");
+    assert(!statsRoute.includes("student_memories"),
+      "memory: owner network stats never touch student memories (aggregate-only, same as all academic data)");
+    const allApi = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "ai", "solve", "route.ts"), "utf8");
+    assert(allApi.includes('eq("user_id", user.id)'),
+      "memory: the AI route reads memories only for the requesting user");
+    const rlsSuites = fs.readFileSync(path.join(process.cwd(), "tests", "security", "rls-regression.mjs"), "utf8");
+    assert(rlsSuites.includes("student_memories"),
+      "memory: the live RLS regression suite includes student memory isolation checks");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

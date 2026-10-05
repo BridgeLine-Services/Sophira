@@ -140,6 +140,26 @@ The student gives feedback: "my professor requires completing the square".
 - In the installed PWA, reopen the assignment from step 8 and continue work:
   data, learning, and writing state all present. [DEVICE-VERIFIED required]
 
+### 28. MEMORY MANAGEMENT (LONG-TERM STUDENT MEMORY)
+- Open Memory from the navigation. Search and filter memories by category
+  and status; every AI-inferred memory is an evidence-backed hypothesis:
+  inspect the structured evidence rows (type, supports/contradicts,
+  summary, date) behind it, with confidence, first/last observed, and
+  trend. [IMPLEMENTED — suite §28 offline; DEVICE-VERIFIED required]
+- Add a memory manually (badged `student-stated fact`, trusted at full
+  confidence — clearly distinct from AI-inferred observations), edit it,
+  then disable it, re-enable it, and finally permanently Forget it with
+  the confirmation dialog (memory + all evidence deleted).
+- Solve/check a few problems in one subject: observed mistakes accumulate
+  as `incorrect_problem` evidence on a weakness memory (status
+  `monitoring` — never asserted as fact); three clean machine-verified
+  answers then flip the trend to `improving`. Only memories relevant to
+  the current subject appear in AI responses (hard cap 8, archived/
+  disabled/forgotten never retrieved).
+- Isolation: a second member's memory page shows ONLY their own memories;
+  the owner's network stats contain no memory content (live RLS matrix,
+  tenth category: owner NO ACCESS to student memories).
+
 ## Sign-off table
 
 | Area | Implemented | Automated tests | Live backend | Real device |
