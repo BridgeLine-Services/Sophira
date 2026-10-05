@@ -1163,3 +1163,57 @@ can turn PASS).
 of the guide) requires the deployed production URL and physical devices —
 the owner's steps are in the guide. Suite **931/931**, `tsc` clean,
 `next build` passes.
+
+## 44. Final regression audit (2026-10-05) — 931/931, remediation applied
+
+Full regression audit over all 32 capabilities (19 pre-existing + 13 new)
+plus the 16-point regression checklist.
+
+**Executed:** npm test 931/931; tsc --noEmit clean; next build compiled
+successfully; both security suites' self-tests pass (RLS 4/4, invitation
+3/3); gate self-test (38 checks); native-url self-test 11/11;
+verify-deployment self-test 7/7; npm ls clean; npm audit; RLS/migration
+scan; placeholder/fabricated-URL scan; routes and API call check.
+
+**Dependency security remediation (targeted, test-verified):**
+- mathjs 14.0.0 → 15.2.0 (GHSA-29qv-4j9f-fjw5, unsafe property setter) —
+  runtime math engine; full math verification suite re-verified.
+- xlsx 0.18.5 (npm, last published) → 0.20.3 from the official SheetJS
+  distribution (GHSA-4r6h-8v6p-xvw6, prototype pollution in parsing —
+  reachable via document ingestion) — spreadsheet ingestion re-verified.
+- postcss 8.4.38 → 8.5.29 via overrides + direct devDependency bump
+  (GHSA-qx2v-qp2m-jg93, XSS in stringify output) — build pipeline
+  re-verified.
+- Transitive fixes: braces → 3.0.3 (latest published), uuid advisory
+  cleared.
+
+**Audit regression caught and corrected during this audit:** `npm audit
+fix --force` silently upgraded Next 14.2.35 → 16.3.8, which broke the
+build (cookies() became async — tsc errors in src/lib/supabase/server.ts).
+Reverted to the pinned 14.2.35; tsc/build re-verified clean. Recorded here
+as proof the audit genuinely exercises the build.
+
+**Remaining npm audit findings — documented honestly, not hidden:**
+- next critical (GHSA-9g9p-9gw9-jx7f, Image Optimizer DoS via
+  remotePatterns): NOT REACHABLE in Sophira — the app uses no next/image
+  component and no images.remotePatterns configuration (verified in
+  next.config.mjs and src/). The only fix is a semver-major upgrade
+  (16.3.8) which BREAKS the current build (verified). Owner-side decision:
+  schedule the Next 15/16 migration deliberately, not mid-audit.
+- 6 high: braces/chokidar/micromatch/fast-glob/tailwindcss/
+  tailwindcss-animate — all DEV-TIME build tooling (Tailwind 3.4.3's glob
+  chain), never shipped to users; braces 3.0.3 IS the latest published
+  release (no fix released yet; fixAvailable: false).
+
+**All 16 regression checklist items clean.** No TypeScript errors, no build
+errors, no migration errors (0001-0018 intact, RLS enabled on every
+policy-bearing table), no RLS/auth errors, no broken routes (24 API route
+groups + all pages compile), no broken API calls, no missing env vars
+beyond the documented owner-side production setup, no dependency conflicts
+(capacitor deduped on 8.5.2), secrets scan clean (no committed secrets),
+no incorrect permissions, no duplicated logic introduced (native-url
+mirror pair is self-test-synced by design), no dead code from the fixes,
+no placeholder production URLs (the only example.com reference is the
+REMOVED_FALLBACK enforcement constant), no fabricated research links
+(citations derive from verified records only), no unsupported factual
+claims (unverifiable claims marked UNVERIFIED by design).
