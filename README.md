@@ -160,21 +160,36 @@ Key design decisions:
 ### 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run the migrations in order:
-   `0001_init.sql` → `0002_owner_only_invitations.sql` →
-   `0003_profile_versions_and_context.sql` → `0004_sources_and_audit.sql` →
-   `0005_owner_membership_and_learning.sql`.
-   (This creates all tables with RLS, the signup trigger, the private
-   `private-docs` storage bucket, owner-only invitation policies, invitation
-   requests, the learning-pattern lifecycle, the privacy-safe aggregate
-   owner-analytics function, and invitation expiry (default 14 days, enforced
-   in the token-lookup function and accept route).
-3. In **Authentication → Providers**, keep Email enabled. For a truly closed
+2. In the SQL editor, run **all migrations in order**:
+   `supabase/migrations/0001_init.sql` through `0012_research_tables.sql`
+   (0001 schema + RLS + private `private-docs` bucket; 0002 owner-only
+   invitations; 0003 profile versioning; 0004 sources + audit trail;
+   0005 owner membership, invitation requests, learning patterns, aggregate
+   owner analytics; 0006 invitation expiry; 0007 intentional habits;
+   0008 invitation-only signup; 0009 typing calibration; 0010 deadline
+   scheduling; 0011 rubric audits; 0012 research tables).
+3. **Configure the owner email (required — signup is fail-closed without
+   it).** Migration 0008 removed the old "first user to sign up becomes
+   owner" rule (any stranger could claim ownership of a fresh install).
+   The initial owner is now taken from `public.app_config`. Run once,
+   replacing the address with the owner's real email:
+
+   ```sql
+   insert into public.app_config (key, value)
+   values ('owner_email', to_jsonb('owner@example.com'::text))
+   on conflict (key) do update set value = excluded.value;
+   ```
+
+   Until this is set, **every** signup (including the first) is rejected by
+   the database with a clear operator-facing message — that is the intended
+   fail-closed behavior, not a bug.
+4. In **Authentication → Providers**, keep Email enabled. For a truly closed
    group, also set **Authentication → Sign In / Up → "Confirm email" on**, and
-   consider disabling anonymous access. The app UI is invite-only; note that
-   Supabase-level direct signups are a platform setting beyond the app's control —
-   the first user to sign up becomes `owner` automatically.
-4. From **Project Settings → API**, copy the project URL, anon key, and
+   consider disabling anonymous access. Signup is invitation-only **at the
+   database level** (migration 0008): an account is only created when the
+   registering email has a pending, unexpired invitation, or when the very
+   first signup matches the configured owner email above.
+5. From **Project Settings → API**, copy the project URL, anon key, and
    service-role key.
 
 ### 2. Environment
@@ -198,8 +213,8 @@ npm install
 npm run dev        # http://localhost:3000
 ```
 
-The first account you sign up with (via an invitation or directly at /signup with a
-token) becomes the **owner**. The owner manages membership from the **Owner Dashboard**
+The account configured as `owner_email` in `app_config` (step 3 above) becomes the
+**owner** on first signup. The owner manages membership from the **Owner Dashboard**
 (`/owner`): invite by email, copy the one-time `/signup?invite=TOKEN` link, approve or
 reject invitation requests from members (the owner can grant a member permission to
 *request* invitations for others — requests never create access on their own), and
@@ -223,7 +238,7 @@ optional and not required to use Sophira.
 
 ## Testing
 
-- `npm test` — 141 unit/integration assertions: isolation, conditionality,
+- `npm test` — 285 unit/integration assertions: isolation, conditionality,
   conflicts, injection defense, subject + math-topic routing, all six verifier
   kinds, method-compliance honesty guards, offline round-trip parsing of a
   real XLSX and PPTX, the learning-pattern lifecycle (confirm → corrected →

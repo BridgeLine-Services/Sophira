@@ -300,3 +300,38 @@ routes crash without env" to "protected routes redirect without crashing").
   `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, optional
   `SEARCH_PROVIDER`/`SEARCH_API_KEY`).
 - `.env.example` now documents all research provider variables (server-side only).
+
+## 28. Implementation-audit round (2026-10-05) — 285/285 offline
+
+Prompt 1 requested a full implementation audit against the requirements
+checklist, then implementation of **only the CRITICAL BLOCKERS**. The audit
+(see `docs/IMPLEMENTATION_AUDIT.md` + machine-readable
+`docs/implementation-checklist.json`) verified every requirement area against
+actual code — statuses, files, functions, tables, APIs, tests, env
+dependencies, and blockers — and independently re-ran the suite at the base
+commit (277/277), `tsc` (clean), `next build` (38/38 routes), and a live HTTP
+probe of production (still degraded: `/` 307 → /login, public pages 200).
+
+**Audit verdict:** no BROKEN systems. Two required features are MISSING
+(submission readiness; stale-pattern detection), one item is PARTIAL for
+stale detection, legal placeholders are external-by-design, and the
+production/release blockers are owner-credential actions.
+
+**Critical blockers fixed in the repository this round:**
+
+| Blocker | Fix |
+|---|---|
+| CB2: fresh-install bring-up was un-runnable from the docs — README listed only 5 of 12 migrations and stated the REMOVED "first user becomes owner" rule (migration 0008 replaced it with fail-closed `app_config.owner_email`); the bootstrap SQL existed only inside the migration file | README setup rewritten (all 12 migrations + the mandatory `owner_email` insert + fail-closed explanation); `docs/RELEASE_PROCESS.md` gains the same bring-up step |
+| CB3: no machine-checkable deployment-configuration signal — the exact blind spot behind the days-long §27 production 500s | `/api/health` now reports per-capability booleans (`supabase`, `supabase_service_role`, `ai`, `search`) — never values — with `force-dynamic`; 8 regression tests cover degraded/partial/full/custom-provider states and assert no secret value ever appears in the response |
+
+**Critical blockers that remain OPEN (external, cannot be done from the
+repository):** Vercel Production env vars (verify after setting with
+`curl /api/health` — all booleans must read true); the `SOPHIRA_APP_URL`
+Actions variable (audit token confirmed HTTP 403 on the variables API —
+needs an owner with variables:write); native signing secrets/certs.
+
+**Offline suite after this round: 285 passed / 0 failed** (277 + 8 health
+assertions), `tsc` clean, `next build` passes. No working functionality was
+removed, duplicated, or replaced; HIGH (submission readiness, stale-pattern
+detection) and lower categories were NOT implemented — they await explicit
+authorization per Prompt 1.

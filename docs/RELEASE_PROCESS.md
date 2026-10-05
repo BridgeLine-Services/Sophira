@@ -10,12 +10,45 @@ NEVER the service-role key):
 
 - `NEXT_PUBLIC_SUPABASE_URL` — the Supabase project HTTPS URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only (needed by admin routes)
+- `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`, `SOPHIRA_MODEL`) — AI features
+- `SEARCH_PROVIDER` / `SEARCH_API_KEY` (optional) — verified web research
+- `NEXT_PUBLIC_SITE_URL` — the public URL, used in invitation links
 
-Symptom when they are missing: every protected route returns
-500 `MIDDLEWARE_INVOCATION_FAILED` ("Your project's URL and Key are
-required to create a Supabase client!") while public pages (/install,
-/downloads, /login) still render. Add both variables for the
-**Production** environment and redeploy. Then set the repository
+**Verify the deployment in one command** (matcher-excluded from the auth
+middleware, works even while degraded):
+
+```bash
+curl -s https://your-sophira-domain/api/health
+# {"ok":true,"name":"sophira","configuration":{"supabase":true,"supabase_service_role":true,"ai":true,"search":true}}
+```
+
+Every capability reports an honest boolean — no values are ever exposed.
+A `false` names exactly what still needs configuring: `supabase` false
+means protected routes stay in degraded mode (redirect to /login, no
+500s — the §27 fix); `ai` false means every AI feature returns a clear
+503 "not configured"; `search` false means the research workflow reports
+honestly instead of fabricating sources. A deployment is production-ready
+when `supabase`, `supabase_service_role` and `ai` are `true` (`search` is
+optional).
+
+**One-time Supabase bootstrap (fresh installs only).** Migration 0008
+makes signup invitation-only at the database level and fail-closed: no
+account at all can be created until the owner email is configured. In the
+Supabase SQL editor, once, replacing the address with the real owner:
+
+```sql
+insert into public.app_config (key, value)
+values ('owner_email', to_jsonb('owner@example.com'::text))
+on conflict (key) do update set value = excluded.value;
+```
+
+(Already documented in README setup step 3; repeated here because the
+release checklist is the operator's bring-up path.) Until this runs, the
+first signup is rejected with a clear operator-facing message — intended
+fail-closed behavior.
+
+After the environment is configured, set the repository
 variable `SOPHIRA_APP_URL` to `https://sophira.vercel.app` — the native
 shells load this URL.
 
@@ -49,7 +82,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The release workflow then: runs the 144 tests, TypeScript check, production
+The release workflow then: runs the offline test suite (285 assertions), TypeScript check, production
 build → Android APK (signed or honestly unsigned) → iOS archive (signed .ipa
 export or honest unsigned archive) → desktop matrix (Windows .msi, macOS
 .dmg, Linux .AppImage + .deb) → per-platform SHA256SUMS files → GitHub
@@ -83,7 +116,7 @@ The in-app Downloads page also displays the per-artifact SHA-256 directly.
 
 ## CI (non-release)
 
-`.github/workflows/ci.yml` runs on every push/PR: npm ci, the 144 tests,
+`.github/workflows/ci.yml` runs on every push/PR: npm ci, the offline test suite (285 assertions; the CI step label still says "144" from an older round — cosmetic only),
 TypeScript strict check, production build, and validation that the Android,
 iOS and Tauri projects are intact. It fails loudly and never fabricates a
 successful build.
