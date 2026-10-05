@@ -36,6 +36,12 @@ import {
   LOWER_CONFIDENCE_BELOW, TIME_DECAY_GRACE_DAYS,
   type EvidenceType, type PatternEvidence,
 } from "../src/lib/learning/evidence";
+import {
+  createExecutionRow, reconcileExecution, applyExecutionAction,
+  replanExecution, executionView, planSessionsOf, totalWorkSeconds,
+  breakWindowFor,
+  type ExecutionRow, type ExecutionAction,
+} from "../src/lib/schedule-execution";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
 import { PacingController } from "../src/lib/pacing-controller";
@@ -1954,4 +1960,156 @@ async function runPatternEvidenceTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+// ---------------------------------------------------------------------------
+// PERSISTENT SCHEDULE EXECUTION STATE MACHINE (2026-10-05): a server-side
+// persisted execution state on top of the UNCHANGED scheduler
+// (planSchedule/clampBreak — the 10s minimum and 6h maximum stay). No
+// background computing: state is timestamp-driven and reconciled on
+// reconnect. All scenarios use an injected clock — fully offline.
+// ---------------------------------------------------------------------------
+function mkExecRow(plan: { sessions: { startMs: number; workSeconds: number; breakSeconds: number }[] }, deadlineIso: string, urgency = "normal"): ExecutionRow {
+  return createExecutionRow({
+    id: "exec-1", user_id: "u1", assignment_id: "a1", schedule_id: "s1",
+    deadline: deadlineIso, urgency, plan,
+  });
+}
+
+async function runExecutionTests(): Promise<void> {
+  const T0 = Date.parse("2026-10-05T09:00:00.000Z");
+  const at = (min: number) => T0 + min * 60_000;
+  const iso = (min: number) => new Date(at(min)).toISOString();
+  const HOUR = 60, DAY = 24 * HOUR;
+  const deadlineIso = iso(7 * DAY); // due in one week
+  // A real multi-session plan from the UNCHANGED scheduler: 300 min work.
+  const planWeek = planSchedule({ nowMs: T0, deadlineMs: at(7 * DAY), estimatedWorkMinutes: 300, urgency: "normal" });
+  const sessions = planSessionsOf(planWeek);
+  assert(sessions.length > 1 && totalWorkSeconds(sessions) === 300 * 60,
+    "exec: fixture plan from the existing scheduler has multiple work sessions");
+
+  section("19. Persistent schedule execution state machine (timestamp-driven, no background computing)");
+  {
+    // ---- 1. Refresh during work -------------------------------------
+    let row = mkExecRow(planWeek, deadlineIso);
+    let started = applyExecutionAction(row, "start", planWeek, T0);
+    assert(started.error === null && started.row.state === "WORKING" && started.row.started_at === iso(0),
+      "exec: start → WORKING with the session start persisted");
+    const refreshMidWork = reconcileExecution(started.row, planWeek, at(20));
+    assert(refreshMidWork.row.state === "WORKING" &&
+      refreshMidWork.row.started_at === iso(0) &&
+      refreshMidWork.row.expected_end_at === started.row.expected_end_at &&
+      refreshMidWork.changes.length === 0,
+      "refresh: mid-session refresh changes NOTHING — same start, same expected end, no restart");
+    const v1 = executionView(refreshMidWork.row, planWeek, at(20));
+    assert(v1.noBackgroundComputing === true && v1.accumulatedWorkMinutes === 20,
+      "refresh: the view derives 20 min of worked time honestly and states noBackgroundComputing");
+
+    // ---- 2. Refresh during break ------------------------------------
+    const workEnd = Date.parse(started.row.expected_end_at as string); // 50 min in
+    const duringBreak = reconcileExecution(refreshMidWork.row, planWeek, at((workEnd - T0) / 60000 + 5));
+    assert(duringBreak.row.state === "BREAKING" &&
+      duringBreak.row.break_started_at !== null && duringBreak.row.break_end_at !== null,
+      "refresh: crossing the session boundary while away begins the break with BOTH timestamps persisted");
+    const bSecs = (Date.parse(duringBreak.row.break_end_at as string) - Date.parse(duringBreak.row.break_started_at as string)) / 1000;
+    assert(bSecs >= MIN_BREAK_SECONDS && bSecs <= MAX_BREAK_SECONDS && bSecs === clampBreak(sessions[0].breakSeconds),
+      "exec: the persisted break window respects the existing 10s minimum and 6h maximum exactly");
+    const refreshMidBreak = reconcileExecution(duringBreak.row, planWeek, at((workEnd - T0) / 60000 + 8));
+    assert(refreshMidBreak.row.state === "BREAKING" && refreshMidBreak.row.break_end_at === duringBreak.row.break_end_at,
+      "refresh: mid-break refresh keeps the SAME persisted break end — no drift");
+
+    // ---- 3. App closed during break (past break end) ---------------
+    const breakMin = bSecs / 60;
+    const afterBreak = reconcileExecution(duringBreak.row, planWeek, at((workEnd - T0) / 60000 + breakMin + 60));
+    assert(afterBreak.row.state === "NEXT_WORK_SESSION" &&
+      afterBreak.row.session_index === 1 &&
+      afterBreak.row.accumulated_work_time === sessions[0].workSeconds &&
+      afterBreak.row.accumulated_break_time === bSecs &&
+      Math.abs(afterBreak.row.remaining_work - (300 * 60 - sessions[0].workSeconds)) < 1e-6,
+      "closed: returning after the break elapsed advances to NEXT_WORK_SESSION with work AND break accumulated per the persisted schedule");
+    assert(reconcileExecution(afterBreak.row, planWeek, at((workEnd - T0) / 60000 + breakMin + 61)).changes.length === 0,
+      "closed: reconciliation is IDEMPOTENT — replaying it twice changes nothing");
+
+    // ---- 4. Reconnect after break → next session starts clean --------
+    const nextStart = applyExecutionAction(afterBreak.row, "start", planWeek, at((workEnd - T0) / 60000 + breakMin + 62));
+    assert(nextStart.error === null && nextStart.row.state === "WORKING" &&
+      nextStart.row.session_index === 1 &&
+      Date.parse(nextStart.row.started_at as string) === at((workEnd - T0) / 60000 + breakMin + 62),
+      "reconnect: the next work session starts at the RECONNECT time — the schedule does not run itself while offline");
+
+    // ---- 5. Deadline changes adapt, never restart -------------------
+    const tightPlan = planSchedule({ nowMs: at(120), deadlineMs: at(120 + HOUR), estimatedWorkMinutes: 300, urgency: "urgent" });
+    const adapted = replanExecution(afterBreak.row, tightPlan, iso(120 + HOUR), "urgent", at(120));
+    assert(adapted.row.schedule_version === 2 && adapted.row.accumulated_work_time === sessions[0].workSeconds,
+      "deadline: a re-plan bumps the schedule version and PRESERVES accumulated progress");
+    assert(adapted.row.state === afterBreak.row.state && adapted.row.session_index === afterBreak.row.session_index,
+      "deadline: the execution state is preserved — the schedule never restarts from zero");
+    const longBreak = breakWindowFor(sessions[0], T0).seconds;
+    const tightBreak = breakWindowFor(planSessionsOf(tightPlan)[0], T0).seconds;
+    assert(tightBreak < longBreak && tightBreak >= MIN_BREAK_SECONDS,
+      "deadline: due in one hour → breaks shrink vs one week out (existing calculation, still bounded at the 10s minimum)");
+
+    // ---- 6. Pause/resume (freeze semantics) --------------------------
+    const paused = applyExecutionAction(started.row, "pause", planWeek, at(10));
+    assert(paused.error === null && paused.row.state === "PAUSED" && paused.row.paused_from === "WORKING" &&
+      paused.row.accumulated_work_time === 10 * 60,
+      "pause: pausing freezes the session and counts exactly the 10 worked minutes");
+    const threeDaysLater = reconcileExecution(paused.row, planWeek, at(3 * DAY));
+    assert(threeDaysLater.row.state === "PAUSED" && threeDaysLater.changes.length === 0,
+      "pause: PAUSED across days advances NOTHING — pause time is never work time");
+    const resumed = applyExecutionAction(paused.row, "resume", planWeek, at(3 * DAY));
+    const pausedMs = at(3 * DAY) - at(10); // 3 days minus the 10 worked minutes
+    assert(resumed.error === null && resumed.row.state === "WORKING" &&
+      Date.parse(resumed.row.expected_end_at as string) === workEnd + pausedMs &&
+      Date.parse(resumed.row.started_at as string) === T0 + pausedMs,
+      "resume: the session window SHIFTS by the pause duration — no progress lost, no time fabricated");
+    const vRes = executionView(resumed.row, planWeek, at(3 * DAY));
+    assert(vRes.workLeftInSessionMs === sessions[0].workSeconds * 1000 - 10 * 60_000,
+      "resume: exactly 40 minutes remain in the session (50 planned − 10 worked)");
+
+    // ---- 7. Missed session (away across a full cycle) ----------------
+    // Away from WORKING well past session 1's end + break, still inside
+    // the deadline: reconciliation lands on NEXT_WORK_SESSION, and only
+    // the SCHEDULED work counts — never the wall-clock gap.
+    const away = reconcileExecution(started.row, planWeek, at(6 * DAY));
+    assert(away.row.state === "NEXT_WORK_SESSION" &&
+      away.row.accumulated_work_time === sessions[0].workSeconds &&
+      away.row.accumulated_work_time <= sessions[0].workSeconds,
+      "missed: being away 6 days mid-session consumes at most the session's PLANNED 50 min — never the 6-day gap");
+
+    // ---- 8. Duplicate session prevention -----------------------------
+    const dup = applyExecutionAction(started.row, "start", planWeek, at(30));
+    assert(dup.error !== null && dup.error.includes("already running") && dup.row.state === "WORKING" &&
+      dup.row.started_at === started.row.started_at,
+      "duplicate: a second start while WORKING is REJECTED — the original session is untouched");
+    const pauseDup = applyExecutionAction(paused.row, "start", planWeek, at(10));
+    assert(pauseDup.error !== null && pauseDup.error.includes("resume"),
+      "duplicate: a paused schedule refuses start and points the user at resume");
+
+    // ---- 9. Expired deadline → FAILED -------------------------------
+    const overdue = reconcileExecution(started.row, planWeek, at(8 * DAY));
+    assert(overdue.row.state === "FAILED" && overdue.row.failure_reason.includes("minutes of planned work remaining"),
+      "expired: past the deadline with work remaining → FAILED with an honest reason");
+    const afterFail = applyExecutionAction(overdue.row, "start", planWeek, at(8 * DAY + 5));
+    assert(afterFail.error !== null && afterFail.row.state === "FAILED",
+      "expired: FAILED is terminal — no zombie sessions after the deadline");
+
+    // ---- Break behavior sanity ---------------------------------------
+    const earlyBreak = applyExecutionAction(started.row, "begin_break", planWeek, at(15));
+    assert(earlyBreak.error === null && earlyBreak.row.state === "BREAKING" &&
+      earlyBreak.row.accumulated_work_time === 15 * 60 &&
+      earlyBreak.row.current_session_remaining_seconds === sessions[0].workSeconds - 15 * 60,
+      "break: an early break counts the 15 worked minutes and preserves the 35-minute remainder to resume later");
+    const resumeRemainder = applyExecutionAction(
+      { ...earlyBreak.row, state: "BREAK_PENDING", break_started_at: null, break_end_at: null } as ExecutionRow,
+      "start", planWeek, at(90)
+    );
+    assert(resumeRemainder.error === null &&
+      (Date.parse(resumeRemainder.row.expected_end_at as string) - at(90)) / 60000 === sessions[0].workSeconds / 60 - 15,
+      "break: resuming an early-ended session schedules ONLY the un-worked 35 minutes");
+    const completed = applyExecutionAction({ ...afterBreak.row, session_index: sessions.length - 1, state: "NEXT_WORK_SESSION" } as ExecutionRow, "complete", planWeek, at(200));
+    assert(completed.error === null && completed.row.state === "COMPLETED" && completed.row.completed_at !== null,
+      "complete: the user can mark the execution COMPLETED at any live state");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

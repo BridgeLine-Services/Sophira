@@ -651,3 +651,69 @@ normalized and never trusted blindly (an AI-reported conflict is evidence,
 not certainty). Semantic contradiction detection (opposite wording of
 similar phrases) is deliberately NOT attempted mechanically — it would be
 guessing.
+
+## 35. Persistent schedule execution state machine (2026-10-05) — 505/505 offline
+
+Upgrade of the EXISTING deadline scheduler (0010, src/lib/scheduler.ts —
+planSchedule, clampBreak, urgency, feasibility, and the 10-second
+minimum / 6-hour maximum break bounds are ALL unchanged and still the
+only place break durations are computed). Nothing was replaced.
+
+**1. Persisted execution state (migration 0017):** `schedule_executions`
+holds the full machine state per assignment: state
+(WORKING / BREAK_PENDING / BREAKING / NEXT_WORK_SESSION / PAUSED /
+COMPLETED / FAILED), started_at, expected_end_at, break_started_at,
+break_end_at, accumulated_work_time, accumulated_break_time,
+remaining_work, deadline, urgency, schedule_version (+ paused_from,
+paused_at, current_session_remaining_seconds for early-ended sessions).
+A partial unique index allows at most ONE live execution per
+assignment — duplicate work sessions are structurally impossible.
+
+**2. Timestamp-driven machine (`src/lib/schedule-execution.ts`, pure):**
+reconcileExecution replays the PERSISTED schedule against the server
+clock on every reconnect: crossing a work-session boundary while away
+consumes only the session's PLANNED minutes (never the wall-clock gap),
+starts the break at the session end with both break timestamps persisted
+(bounded by the existing clampBreak), advances to NEXT_WORK_SESSION
+when the break elapses, and fails honestly when the deadline passes with
+work remaining. PAUSED is frozen (pause time is never work time; the
+session window SHIFTS by the pause duration on resume). Reconciliation
+is idempotent and deterministic — all 505 tests run offline against an
+injected clock.
+
+**3. Deadline changes never restart the schedule:** POST /api/schedule
+(re-plan) re-bases a LIVE execution onto the new plan via
+replanExecution — schedule_version bumps, accumulated history is
+preserved, state kept, next session uses the new plan's durations.
+Due in one week → longer breaks; due in one hour → breaks shrink to
+the 10s floor (existing calculation, asserted in tests).
+
+**4. API (/api/schedule/executions):** GET restores + reconciles the
+state (refresh / browser close / reconnect — nothing lost, nothing
+restarted); POST starts and returns an existing live execution with
+already_active (duplicate prevention, backed by the DB index); PATCH
+runs all actions through the validated pure machine. work_schedules
+status stays roughly mirrored for older readers.
+
+**5. HONESTY — no background computing:** there is no timer, worker or
+AI running while the app is closed, and none is claimed. The UI states
+it explicitly; the API returns the same note; the machine is reconciled
+on reconnect from persisted timestamps. This is the honest
+implementation the requirement asks for when autonomous background
+execution is unavailable.
+
+**Tests: 25 new assertions (section 19), suite total 505/505 PASSED**
+— all nine required scenarios (refresh during work, refresh during
+break, app closed during break, reconnect after break, deadline
+changes, pause/resume, missed session, duplicate session prevention,
+expired deadline) plus idempotent reconciliation, pause-freeze
+semantics, early-break remainder resume, and break bounds. During
+development two test-math bugs were found and fixed (absolute vs
+relative epoch minutes; a resume expectation that ignored the worked
+minutes) — the fixed expectations assert the machine's exact semantics.
+`tsc` clean; `next build` passes.
+
+**Honest limits:** state persistence and reconciliation are
+server-side and tested purely offline; the API layer (Supabase RLS
+queries) is exercised only by `tsc` and build, not by a live server run
+(same standing limit as every prior round — no production env yet).

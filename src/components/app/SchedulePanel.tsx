@@ -1,7 +1,8 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Spinner, useToast } from "@/components/ui";
-import { CalendarClock, Pause, Play, SkipForward, CheckCircle2, AlertTriangle } from "lucide-react";
+import { CalendarClock, Pause, Play, SkipForward, CheckCircle2, AlertTriangle, Coffee, Clock4 } from "lucide-react";
+import { executionView, type ExecutionRow, type ExecutionView } from "@/lib/schedule-execution";
 
 export interface SchedulePlanShape {
   feasible?: boolean;
@@ -55,6 +56,9 @@ function fmtClock(ms: number): string {
 export function SchedulePanel({ assignmentId }: { assignmentId: string }) {
   const { toast } = useToast();
   const [schedule, setSchedule] = useState<WorkScheduleRow | null>(null);
+  const [execution, setExecution] = useState<ExecutionRow | null>(null);
+  const [view, setView] = useState<ExecutionView | null>(null);
+  const [restoreNote, setRestoreNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -70,6 +74,14 @@ export function SchedulePanel({ assignmentId }: { assignmentId: string }) {
       const json = await res.json();
       if (res.ok) setSchedule(json.data.schedule ?? null);
       else toast("error", json.error || "Could not load the schedule.");
+      // RESTORE the persisted execution state (refresh, close, reconnect).
+      const res2 = await fetch(`/api/schedule/executions?assignment_id=${assignmentId}`, { cache: "no-store" });
+      const json2 = await res2.json();
+      if (res2.ok) {
+        setExecution(json2.data.execution ?? null);
+        setView(json2.data.view ?? null);
+        setRestoreNote(json2.data.restored ? json2.data.restore_explanation : null);
+      }
     } catch {
       toast("error", "Could not reach the server.");
     } finally {
@@ -86,40 +98,50 @@ export function SchedulePanel({ assignmentId }: { assignmentId: string }) {
   }, []);
 
   const remainingMs = schedule ? Date.parse(schedule.deadline) - now : 0;
+  const view2Completion = schedule?.plan?.estimatedCompletionMs ? new Date(schedule.plan.estimatedCompletionMs).toLocaleString() : "—";
   const sessions = schedule?.plan?.sessions ?? [];
-  const current = schedule && sessions.length ? sessions[Math.min(schedule.session_index, sessions.length - 1)] : null;
 
-  const view = useMemo(() => {
-    if (!schedule || !current) return null;
-    const workLeftThisSessionMs =
-      schedule.status === "running" && schedule.work_started_at
-        ? Math.max(0, current.workSeconds * 1000 - (now - Date.parse(schedule.work_started_at)))
-        : current.workSeconds * 1000;
-    return {
-      workLeft: fmtClock(workLeftThisSessionMs),
-      nextBreak: current.breakSeconds > 0 ? fmtClock(current.breakSeconds * 1000) : "none (final session)",
-      completion: schedule.plan?.estimatedCompletionMs ? new Date(schedule.plan.estimatedCompletionMs).toLocaleString() : "—",
-    };
-  }, [schedule, current, now]);
-
-  async function act(action: string) {
+  async function execAct(action: string) {
     if (!schedule) return;
     setBusy(true);
     try {
-      const res = await fetch("/api/schedule", {
+      // No live execution yet → POST starts (or restores) it.
+      if (!execution) {
+        const res = await fetch("/api/schedule/executions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assignment_id: assignmentId }),
+        });
+        const json = await res.json();
+        if (res.ok) {
+          setExecution(json.data.execution);
+          setView(json.data.view);
+          if (json.data.already_active) toast("info", "An active session was restored — no duplicate created.");
+        } else {
+          toast("error", json.error || "Could not start the session.");
+        }
+        return;
+      }
+      const res = await fetch("/api/schedule/executions", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedule_id: schedule.id, action }),
+        body: JSON.stringify({ execution_id: execution.id, action }),
       });
       const json = await res.json();
-      if (res.ok) setSchedule(json.data.schedule);
-      else toast("error", json.error || "Could not update the schedule.");
+      if (res.ok) {
+        setExecution(json.data.execution);
+        setView(json.data.view);
+      } else {
+        toast("error", json.error || "Could not update the session.");
+      }
     } catch {
       toast("error", "Could not reach the server.");
     } finally {
       setBusy(false);
     }
   }
+
+  const TERMINAL = view?.state === "COMPLETED" || view?.state === "FAILED";
 
   async function createPlan(e: React.FormEvent) {
     e.preventDefault();
@@ -204,7 +226,28 @@ export function SchedulePanel({ assignmentId }: { assignmentId: string }) {
           {schedule.status === "running" ? "Working" : schedule.status === "paused" ? "Paused" : schedule.status === "done" ? "Done" : "Planned"}
         </Badge>
         <Badge tone="neutral">~{schedule.estimated_work_minutes} min of work · urgency: {schedule.urgency}</Badge>
+        {view && (
+          <Badge tone={view.state === "WORKING" ? "success" : view.state === "BREAKING" ? "accent" : view.state === "PAUSED" ? "warn" : view.state === "FAILED" ? "warn" : "neutral"}>
+            <Clock4 className="mr-1 h-3 w-3" />
+            {view.stateLabel}
+            {view.scheduleVersion > 1 ? ` · schedule v${view.scheduleVersion}` : ""}
+          </Badge>
+        )}
       </div>
+
+      {view?.failureReason && (
+        <p className="flex items-start gap-2 rounded-lg bg-danger/10 p-3 text-sm text-ink">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+          <span>{view.failureReason}</span>
+        </p>
+      )}
+
+      {restoreNote && (
+        <p className="flex items-start gap-2 rounded-lg bg-accent/10 p-3 text-sm text-ink">
+          <Clock4 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span><strong>Restored your session.</strong> {restoreNote}</span>
+        </p>
+      )}
 
       {p?.feasible === false && p.warning && (
         <p className="flex items-start gap-2 rounded-lg bg-danger/10 p-3 text-sm text-ink">
@@ -215,35 +258,66 @@ export function SchedulePanel({ assignmentId }: { assignmentId: string }) {
 
       {view && (
         <ul className="space-y-1 text-sm text-ink">
-          <li>Next work session: {view.workLeft} of work{schedule.session_index > 0 ? ` (session ${schedule.session_index + 1} of ${sessions.length})` : ""}</li>
-          <li>Next break: {view.nextBreak}</li>
-          <li>Estimated completion: {view.completion}</li>
+          <li>Work session {view.sessionNumber} of {view.totalSessions}{view.state === "WORKING" ? ` — ${fmtClock(view.workLeftInSessionMs)} left in this session` : ""}</li>
+          {view.state === "BREAKING" && <li>On break — {fmtClock(view.breakLeftMs)} left (persists across refresh/close; resumed on reconnect)</li>}
+          <li>Worked {view.accumulatedWorkMinutes} min · breaks taken {view.accumulatedBreakMinutes} min · {view.remainingWorkMinutes} min of planned work left</li>
+          <li>Estimated completion: {view2Completion}</li>
         </ul>
       )}
 
       <div className="flex flex-wrap gap-2">
-        {schedule.status === "running" ? (
-          <Button size="sm" variant="secondary" onClick={() => act("pause")} disabled={busy}>
-            <Pause className="h-3.5 w-3.5" /> Pause work
-          </Button>
-        ) : schedule.status !== "done" ? (
-          <Button size="sm" onClick={() => act(schedule.status === "paused" ? "resume" : "start")} disabled={busy}>
-            <Play className="h-3.5 w-3.5" /> {schedule.status === "paused" ? "Resume work" : "Start work session"}
-          </Button>
-        ) : null}
-        {schedule.status !== "done" && schedule.session_index < sessions.length - 1 && (
-          <Button size="sm" variant="ghost" onClick={() => act("next_session")} disabled={busy}>
-            <SkipForward className="h-3.5 w-3.5" /> Move to next session
+        {view?.state === "WORKING" && (
+          <>
+            <Button size="sm" variant="secondary" onClick={() => execAct("pause")} disabled={busy}>
+              <Pause className="h-3.5 w-3.5" /> Pause
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => execAct("begin_break")} disabled={busy}>
+              <Coffee className="h-3.5 w-3.5" /> End work, take the break
+            </Button>
+          </>
+        )}
+        {view?.state === "PAUSED" && (
+          <Button size="sm" onClick={() => execAct("resume")} disabled={busy}>
+            <Play className="h-3.5 w-3.5" /> Resume
           </Button>
         )}
-        {schedule.status !== "done" && (
-          <Button size="sm" variant="ghost" onClick={() => act("complete")} disabled={busy}>
+        {view?.state === "BREAK_PENDING" && (
+          <Button size="sm" onClick={() => execAct("begin_break")} disabled={busy}>
+            <Coffee className="h-3.5 w-3.5" /> Start the break
+          </Button>
+        )}
+        {view?.state === "BREAKING" && (
+          <>
+            <Button size="sm" onClick={() => execAct("end_break")} disabled={busy}>
+              <Play className="h-3.5 w-3.5" /> Back to work
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => execAct("pause")} disabled={busy}>
+              <Pause className="h-3.5 w-3.5" /> Pause the break
+            </Button>
+          </>
+        )}
+        {(view?.state === "NEXT_WORK_SESSION" || (!execution && schedule.status !== "done")) && !TERMINAL && (
+          <Button size="sm" onClick={() => execAct("start")} disabled={busy}>
+            <Play className="h-3.5 w-3.5" /> Start work session
+          </Button>
+        )}
+        {view && !TERMINAL && view.state !== "WORKING" && (
+          <Button size="sm" variant="ghost" onClick={() => execAct("next_session")} disabled={busy}>
+            <SkipForward className="h-3.5 w-3.5" /> Next session
+          </Button>
+        )}
+        {view && !TERMINAL && (
+          <Button size="sm" variant="ghost" onClick={() => execAct("complete")} disabled={busy}>
             <CheckCircle2 className="h-3.5 w-3.5" /> Mark done
           </Button>
         )}
       </div>
       <p className="text-xs text-ink-soft">
         The schedule controls work/break sessions; paced writing separately reveals finished text at your calibrated speed during active work.
+      </p>
+      <p className="text-xs text-ink-soft">
+        Progress is timestamped and persisted server-side: refresh, close or reconnect and your session is restored — nothing restarts.
+        Sophira does <strong>not</strong> compute while the app is closed; state resumes on reconnect.
       </p>
     </div>
   );

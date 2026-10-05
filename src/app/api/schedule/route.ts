@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { planSchedule, type Urgency } from "@/lib/scheduler";
+import { replanExecution, type ExecutionRow } from "@/lib/schedule-execution";
 import { estimateWorkMinutes, parseEstimatedWorkMinutes } from "@/lib/workload";
 import type { Mode } from "@/lib/types";
 
@@ -125,7 +126,38 @@ export async function POST(request: NextRequest) {
     .eq("id", assignmentId);
   if (updErr) return badAction("Schedule saved, but the assignment deadline could not be updated: " + updErr.message, 500);
 
-  return NextResponse.json({ data: { schedule, workload_basis: basis } });
+  // DEADLINE CHANGES ADAPT A LIVE EXECUTION — they never restart it.
+  // The new plan (recomputed by the unchanged planSchedule) is re-based
+  // onto the existing execution: version bumps, accumulated work/break
+  // history is preserved, and the state is reconciled (execution state
+  // machine, migration 0017 + src/lib/schedule-execution.ts).
+  const { data: live } = await supabase
+    .from("schedule_executions")
+    .select("*")
+    .eq("assignment_id", assignmentId)
+    .eq("user_id", user.id)
+    .in("state", ["WORKING", "BREAK_PENDING", "BREAKING", "NEXT_WORK_SESSION", "PAUSED"])
+    .order("updated_at", { ascending: false })
+    .maybeSingle();
+  let replanNote: string | null = null;
+  if (live) {
+    const adapted = replanExecution(
+      live as ExecutionRow,
+      plan,
+      new Date(dueMs).toISOString(),
+      urgency,
+      Date.now()
+    );
+    const { id: rid, ...rpatch } = adapted.row;
+    await supabase
+      .from("schedule_executions")
+      .update({ ...rpatch, updated_at: new Date().toISOString() })
+      .eq("id", rid)
+      .then(() => undefined);
+    replanNote = adapted.explanation;
+  }
+
+  return NextResponse.json({ data: { schedule, workload_basis: basis, execution_adapted: replanNote } });
 }
 
 export async function GET(request: NextRequest) {
