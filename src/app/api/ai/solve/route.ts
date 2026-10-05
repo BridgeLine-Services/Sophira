@@ -8,6 +8,11 @@ import {
   bumpedConfidence,
   type LearningPattern,
 } from "@/lib/learning/patterns";
+import {
+  selectApplicablePatternsAdaptive,
+  explainPatternDecisions,
+  recordPatternEvidence,
+} from "@/lib/learning/evidence";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import {
   buildClassificationPrompt,
@@ -165,7 +170,24 @@ export async function POST(request: NextRequest) {
     assignment_id: body.assignment_id ?? null,
     task_type: classification?.task_type ?? null,
   };
-  const applicablePatterns = selectApplicablePatterns(learningPatterns, patternContext);
+  const applicablePatterns = selectApplicablePatternsAdaptive(learningPatterns, patternContext);
+  // WHY each pattern was selected or ignored — persisted with the
+  // response (spec §40: real backend state, never a fabricated badge).
+  const patternDecisions = explainPatternDecisions(learningPatterns, patternContext);
+
+  // Applied patterns were genuinely USED in this response — record it
+  // (resets time decay; drives the confidence-decay engine's staleness).
+  if (applicablePatterns.length > 0) {
+    const nowISO = new Date().toISOString();
+    for (const p of applicablePatterns) {
+      await supabase
+        .from("learning_patterns")
+        .update({ last_used_at: nowISO, updated_at: nowISO })
+        .eq("id", p.id)
+        .eq("user_id", user.id)
+        .then(() => undefined);
+    }
+  }
 
   // --- Stage 3: solve + self-verification in one call -------------------------
   const workflow = routeSubject(classification?.subject ?? course?.subject, classification?.task_type);
@@ -191,6 +213,7 @@ export async function POST(request: NextRequest) {
   });
   const contextApplied = {
     ...composed.applied,
+    pattern_decisions: patternDecisions,
     classification: classification
       ? { subject: classification.subject, task_type: classification.task_type, level: classification.academic_level }
       : null,
@@ -294,6 +317,7 @@ export async function POST(request: NextRequest) {
 
   let content = "";
   let observedMistakesRaw: unknown = null;
+  let observedPatternConflictsRaw: unknown = null;
   let verification: {
     status: "verified" | "needs_verification" | "unverified";
     verification_method?: "computational" | "self_check" | "none";
@@ -316,12 +340,14 @@ export async function POST(request: NextRequest) {
       machine_checks?: unknown;
       method_compliance?: unknown;
       observed_mistakes?: unknown;
+      observed_pattern_conflicts?: unknown;
       factual_claims?: unknown;
       verification?: { status?: string; checks?: unknown; warnings?: unknown };
     }>(raw);
     if (parsed && typeof parsed.answer === "string" && parsed.answer.trim()) {
       content = parsed.answer;
       observedMistakesRaw = parsed.observed_mistakes;
+      observedPatternConflictsRaw = parsed.observed_pattern_conflicts;
       factualClaimsRaw = parsed.factual_claims;
       const v = parsed.verification || {};
       const selfChecks: { name: string; passed: boolean; detail: string; method?: "computational" | "self_check" }[] = Array.isArray(v.checks)
@@ -423,6 +449,35 @@ export async function POST(request: NextRequest) {
           })
           .then(() => undefined);
       }
+    }
+  }
+
+  // --- Stage 3c: PATTERN-CONFLICT evidence (confidence-decay round) -----------
+  // Teacher and CURRENT assignment instructions ALWAYS override learned
+  // patterns. When the model — which sees both the applied patterns and
+  // the teacher/assignment instructions in its context — reports a
+  // genuine conflict, that is NEGATIVE evidence: the pattern's confidence
+  // decays deterministically (src/lib/learning/evidence.ts) and its
+  // status demotes down the ladder (never a delete). Defensive
+  // normalization: only conflicts matching a pattern the model could
+  // actually see (the applied ones) are recorded; never trusted blindly.
+  if (observedPatternConflictsRaw && applicablePatterns.length > 0) {
+    const conflicts = normalizeObservedMistakes(observedPatternConflictsRaw);
+    for (const m of conflicts) {
+      const hit = applicablePatterns.find(
+        (p) => p.kind !== "mistake" && matchesExistingPattern(p, m.description)
+      );
+      if (!hit) continue;
+      const outcome = recordPatternEvidence(hit, {
+        type: "instruction_conflict",
+        note: "reported while solving with teacher/assignment instructions present",
+      });
+      await supabase
+        .from("learning_patterns")
+        .update(outcome.updates)
+        .eq("id", hit.id)
+        .eq("user_id", user.id)
+        .then(() => undefined);
     }
   }
 

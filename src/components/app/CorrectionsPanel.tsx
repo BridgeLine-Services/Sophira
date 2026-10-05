@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardContent, EmptyState, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { describePatternStatus, describeStaleness, type LearningPattern } from "@/lib/learning/patterns";
+import { applyTimeDecay, LOWER_CONFIDENCE_BELOW } from "@/lib/learning/evidence";
 import { AlertTriangle, CheckCircle2, Pencil, RotateCcw, Trash2 } from "lucide-react";
 
 /**
@@ -73,7 +74,9 @@ export function CorrectionsPanel({ initialPatterns }: { initialPatterns: Learnin
     }
   }
 
-  const active = patterns.filter((p) => ["candidate", "active", "recurring", "temporary"].includes(p.status));
+  const active = patterns.filter((p) =>
+    ["candidate", "active", "recurring", "temporary", "lower_confidence"].includes(p.status)
+  );
   const corrected = patterns.filter((p) => ["corrected", "inactive"].includes(p.status));
   const required = patterns.filter((p) => p.status === "teacher_required");
 
@@ -87,7 +90,15 @@ export function CorrectionsPanel({ initialPatterns }: { initialPatterns: Learnin
             <Badge>{p.scope}{p.subject ? `: ${p.subject}` : ""}</Badge>
             <Badge>{describePatternStatus(p.status)}</Badge>
             {p.intentional && <Badge>preserved writing habit</Badge>}
+            {p.status === "lower_confidence" && <Badge tone="warn">lower confidence — applied with caution</Badge>}
             {describeStaleness(p) && <Badge tone="warn">stale — excluded from AI context</Badge>}
+            {!describeStaleness(p) &&
+              (() => {
+                const decay = applyTimeDecay(p);
+                return decay.windows > 0 && decay.confidence < LOWER_CONFIDENCE_BELOW ? (
+                  <Badge tone="warn">decayed — excluded from AI context</Badge>
+                ) : null;
+              })()}
           </p>
           {describeStaleness(p) && (
             <p className="mt-1 flex items-center gap-1 text-xs text-danger">
@@ -97,6 +108,21 @@ export function CorrectionsPanel({ initialPatterns }: { initialPatterns: Learnin
           <p className="mt-0.5 text-xs text-ink-soft">
             first observed {fmtDate(p.first_observed)} · last observed {fmtDate(p.last_observed)} ·
             seen {p.observation_count}× · confidence {Math.round(p.confidence * 100)}% · source: {p.source}
+          </p>
+          <p className="mt-0.5 text-xs text-ink-soft">
+            {(() => {
+              const decay = applyTimeDecay(p);
+              const dropped = decay.confidence < p.confidence - 0.001;
+              return [
+                `confirmed ${p.confirmation_count ?? 0}×${p.last_confirmed_at ? ` (last ${fmtDate(p.last_confirmed_at)})` : ""}`,
+                `contradicted ${p.contradiction_count ?? 0}×`,
+                `corrected ${p.correction_count ?? 0}×`,
+                p.last_used_at ? `last used in a response ${fmtDate(p.last_used_at)}` : "never used in a response yet",
+                dropped
+                  ? `effective confidence ${Math.round(decay.confidence * 100)}% after time decay`
+                  : `effective confidence ${Math.round(decay.confidence * 100)}%`,
+              ].join(" · ");
+            })()}
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
@@ -122,7 +148,7 @@ export function CorrectionsPanel({ initialPatterns }: { initialPatterns: Learnin
               {p.intentional ? "Stop matching" : "Match in my writing"}
             </Button>
           )}
-          {["corrected", "inactive"].includes(p.status) && (
+          {["corrected", "inactive", "lower_confidence"].includes(p.status) && (
             <Button size="sm" variant="secondary" disabled={busyId === p.id} onClick={() => act(p.id, "reactivate")}>
               <RotateCcw className="h-4 w-4" /> It came back
             </Button>

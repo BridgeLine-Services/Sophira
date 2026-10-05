@@ -29,6 +29,13 @@ import {
   evaluateFinalGate, formatFinalGate, findUnresolvedPlaceholders,
   type FinalGateInput, type FinalGateResearch,
 } from "../src/lib/readiness/finalGate";
+import {
+  recordPatternEvidence, applyTimeDecay, applyContradictionDecay,
+  explainPatternDecisions, selectApplicablePatternsAdaptive,
+  EVIDENCE_TYPES, CONFIDENCE_FLOOR, CONFIDENCE_CAP,
+  LOWER_CONFIDENCE_BELOW, TIME_DECAY_GRACE_DAYS,
+  type EvidenceType, type PatternEvidence,
+} from "../src/lib/learning/evidence";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
 import { PacingController } from "../src/lib/pacing-controller";
@@ -1752,4 +1759,199 @@ async function runDeploymentTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+// ---------------------------------------------------------------------------
+// PATTERN EVIDENCE & CONFIDENCE DECAY (2026-10-05): upgrades the existing
+// learning-pattern lifecycle (candidate/active/corrected/inactive/recurring,
+// scope isolation, 180-day staleness — ALL unchanged and still tested above)
+// with evidence-driven confidence updates, deterministic bounded decay
+// (time + contradictions) and the lower_confidence demotion step. Patterns
+// are NEVER abruptly deleted; demoted patterns recover via later evidence.
+// Teacher and current assignment instructions ALWAYS override patterns.
+// ---------------------------------------------------------------------------
+function mkEvidencePattern(over: Partial<LearningPattern> & Record<string, unknown> = {}): LearningPattern {
+  const now = Date.parse("2026-10-05T00:00:00.000Z");
+  const ago = (d: number) => new Date(now - d * 86_400_000).toISOString();
+  return {
+    id: "p1", user_id: "u1", kind: "method", scope: "subject", subject: "algebra",
+    course_id: null, teacher_id: null, assignment_id: null, task_type: null,
+    description: "Use substitution before simplifying", examples: [],
+    status: "active", first_observed: ago(400), last_observed: ago(30),
+    observation_count: 5, confidence: 0.94, source: "ai_observation",
+    correction_source: "", intentional: false, created_at: ago(400), updated_at: ago(30),
+    last_confirmed_at: ago(30), last_used_at: ago(30),
+    confirmation_count: 2, contradiction_count: 0, correction_count: 0,
+    ...over,
+  } as LearningPattern;
+}
+
+async function runPatternEvidenceTests(): Promise<void> {
+  const NOW = "2026-10-05T00:00:00.000Z";
+  const ago = (d: number) => new Date(Date.parse(NOW) - d * 86_400_000).toISOString();
+  const CTX = { subject: "algebra" };
+
+  section("18. Pattern evidence & confidence decay — deterministic, bounded, explainable");
+  {
+    // -- Required metadata: every pattern tracks the evidence fields ------
+    const p = mkEvidencePattern();
+    assert(!!p.id && !!p.user_id && !!p.kind && !!p.scope && typeof p.confidence === "number" &&
+      !!p.created_at && !!p.last_confirmed_at && !!p.last_used_at &&
+      typeof p.observation_count === "number" && typeof (p as LearningPattern & { confirmation_count: number }).confirmation_count === "number" &&
+      typeof (p as LearningPattern & { contradiction_count: number }).contradiction_count === "number" &&
+      typeof (p as LearningPattern & { correction_count: number }).correction_count === "number" && !!p.status,
+      "evidence: every pattern carries the required tracking metadata");
+    assert(EVIDENCE_TYPES.length === 9, "evidence: all evidence types are enumerated");
+
+    // -- 1. Old pattern remaining active when still relevant -------------
+    const decay = applyTimeDecay(p, NOW);
+    assert(decay.windows === 0 && Math.abs(decay.confidence - 0.94) < 1e-9 && decay.reason === null,
+      "decay: a pattern confirmed/used 30 days ago decays NOTHING (inside the 90-day grace)");
+    const olderButUsed = mkEvidencePattern({ confidence: 0.9, last_confirmed_at: ago(150), last_used_at: ago(40), last_observed: ago(150), first_observed: ago(500) });
+    const d2 = applyTimeDecay(olderButUsed, NOW);
+    assert(d2.windows === 0 && d2.confidence === 0.9,
+      "decay: the anchor is the MOST RECENT activity (last_used_at) — genuine use resets decay");
+    const decisions1 = explainPatternDecisions([p], CTX, NOW);
+    assert(decisions1[0].applied === true && decisions1[0].reasons.some((r) => r.includes("no decay")),
+      "decay: a still-relevant pattern is selected with the no-decay reason stated");
+
+    // -- Time decay math: deterministic geometric windows -----------------
+    const old1 = mkEvidencePattern({ confidence: 0.94, last_confirmed_at: ago(91), last_used_at: ago(91), last_observed: ago(91) });
+    const d91 = applyTimeDecay(old1, NOW);
+    assert(d91.windows === 1 && Math.abs(d91.confidence - 0.94 * 0.8) < 1e-9,
+      "decay: 91 days idle = one window = ×0.8 (90-day grace, then 90-day windows)");
+    const old4 = mkEvidencePattern({ confidence: 0.94, last_confirmed_at: ago(400), last_used_at: ago(400), last_observed: ago(400) });
+    const d400 = applyTimeDecay(old4, NOW);
+    assert(d400.windows === 1 + Math.floor((400 - TIME_DECAY_GRACE_DAYS) / 90) && Math.abs(d400.confidence - Math.max(CONFIDENCE_FLOOR, 0.94 * Math.pow(0.8, d400.windows))) < 1e-9,
+      "decay: windows are computed deterministically (grace + full windows only)");
+    const floorCase = mkEvidencePattern({ confidence: 0.05, last_confirmed_at: ago(400), last_used_at: ago(400), last_observed: ago(400) });
+    const dFloor = applyTimeDecay(floorCase, NOW);
+    assert(dFloor.windows > 0 && dFloor.confidence >= CONFIDENCE_FLOOR && dFloor.confidence === CONFIDENCE_FLOOR,
+      "decay: time decay is BOUNDED below by the floor — never zero, never a silent delete");
+
+    // -- 2. Explicit user correction --------------------------------------
+    const corrected = recordPatternEvidence(p, { type: "user_correction" }, NOW);
+    assert(Math.abs((corrected.updates.confidence ?? 0) - 0.47) < 1e-9,
+      "correction: an explicit user correction halves 94% → 47%");
+    assert(corrected.updates.status === "lower_confidence",
+      "correction: explicit correction demotes the status to lower_confidence (never a delete)");
+    assert((corrected.updates.correction_count ?? 0) === 1 && (corrected.updates.contradiction_count ?? 0) === 1,
+      "correction: the correction and contradiction counts are recorded");
+    assert(corrected.changes.some((ch) => ch.includes("47%")) && corrected.explanation.includes("explicitly corrected"),
+      "correction: the outcome explains the exact change");
+
+    // -- 3. Teacher override ----------------------------------------------
+    const tr = mkEvidencePattern({ status: "teacher_required", confidence: 0.9, scope: "teacher", teacher_id: "t1", subject: null, kind: "preference" });
+    const tOver = recordPatternEvidence(tr, { type: "teacher_contradicts" }, NOW);
+    assert((tOver.updates.confidence ?? 0) === 0.45 && tOver.updates.status === "lower_confidence",
+      "teacher: a teacher contradiction demotes even a teacher_required pattern — teacher instructions ALWAYS win");
+    assert((tOver.updates.contradiction_count ?? 0) === 1 && tOver.explanation.includes("ALWAYS overrides"),
+      "teacher: the override is recorded as negative evidence with an explicit explanation");
+    const demotedTr = { ...tr, ...tOver.updates } as LearningPattern;
+    const tDec = explainPatternDecisions([demotedTr], { teacher_id: "t1" }, NOW);
+    assert(tDec[0].applied === true && tDec[0].reasons.some((r) => r.includes("ALWAYS override")),
+      "teacher: a demoted pattern is applied only WITH the always-overridden caution label");
+    assert(explainPatternDecisions([tr], { teacher_id: "t2" }, NOW)[0].applied === false,
+      "teacher: a teacher-scoped pattern never reaches another teacher's work (scope isolation unchanged)");
+
+    // -- 4. Repeated contradictory behavior — the requested ladder -------
+    let cur = mkEvidencePattern({ confidence: 0.94, contradiction_count: 0 });
+    const ladder: number[] = [];
+    const statuses: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const out = recordPatternEvidence(cur, { type: "alternative_method_used" }, NOW);
+      cur = { ...cur, ...out.updates } as LearningPattern;
+      ladder.push(out.updates.confidence ?? 0);
+      statuses.push(out.updates.status ?? cur.status);
+    }
+    assert(ladder.length === 3 &&
+      Math.abs(ladder[0] - 0.94 * 0.92) < 0.005 &&   // ≈ 87%
+      Math.abs(ladder[1] - 0.94 * 0.92 * 0.83) < 0.005 && // ≈ 73%
+      Math.abs(ladder[2] - 0.94 * 0.92 * 0.83 * 0.74) < 0.005, // ≈ 51%
+      "ladder: repeated contradictions decay 94% → ≈87% → ≈73% → ≈51% (deterministic ×0.92, ×0.83, ×0.74)");
+    assert(statuses[2] === "inactive",
+      "ladder: after the third contradiction (confidence < 55%) the pattern becomes INACTIVE — the requested 51% → INACTIVE");
+    assert(cur.id === "p1" && statuses[2] !== "deleted" && (cur as { confidence: number }).confidence >= CONFIDENCE_FLOOR,
+      "ladder: the pattern is NEVER deleted — the record survives, just inactive and bounded at the floor");
+
+    // -- 5. Pattern becoming inactive (confidence floor path) ------------
+    const rejected = recordPatternEvidence(mkEvidencePattern({ confidence: 0.3, status: "candidate" }), { type: "user_rejects" }, NOW);
+    assert((rejected.updates.confidence ?? 1) === 0.15 && rejected.updates.status === "inactive",
+      "inactive: a rejected low-confidence pattern falls below the 20% floor to inactive (bounded, not deleted)");
+
+    // -- 6. Inactive pattern becoming active again ------------------------
+    const back1 = recordPatternEvidence(mkEvidencePattern({ status: "inactive", confidence: 0.3, contradiction_count: 1 }), { type: "user_confirm" }, NOW);
+    assert(back1.updates.status === "recurring" && (back1.updates.confidence ?? 0) >= 0.85,
+      "revival: confirming an inactive pattern returns it as recurring (existing lifecycle) with established confidence");
+    const back2 = recordPatternEvidence(mkEvidencePattern({ status: "recurring", confidence: 0.6, contradiction_count: 1 }), { type: "teacher_supports" }, NOW);
+    assert(back2.updates.status === "active" && (back2.updates.confidence ?? 0) >= 0.5,
+      "revival: a recurring pattern becomes ACTIVE again when later evidence confirms it");
+    const back3 = recordPatternEvidence(mkEvidencePattern({ status: "lower_confidence", confidence: 0.47, confirmation_count: 0 }), { type: "teacher_supports" }, NOW);
+    assert(back3.updates.status === "active",
+      "revival: a lower_confidence pattern climbs back to active when evidence restores confidence above the demotion threshold");
+    assert((back3.updates.confirmation_count ?? 0) === 1 && !!back3.updates.last_confirmed_at,
+      "revival: the confirming evidence records the confirmation count and last-confirmed date");
+
+    // -- 7. Current assignment overriding a historical pattern -------------
+    const conflict = recordPatternEvidence(mkEvidencePattern({ confidence: 0.6, contradiction_count: 2 }), { type: "instruction_conflict" }, NOW);
+    assert(conflict.updates.status === "inactive" && (conflict.updates.contradiction_count ?? 0) === 3,
+      "assignment: a pattern repeatedly conflicting with newer instructions becomes inactive — current instructions win");
+    const afterConflict = mkEvidencePattern({ status: "inactive", confidence: 0.3, contradiction_count: 3 });
+    assert(selectApplicablePatternsAdaptive([afterConflict], CTX, NOW).length === 0 &&
+      explainPatternDecisions([afterConflict], CTX, NOW)[0].reasons.some((r) => r.includes("inactive")),
+      "assignment: an inactive pattern no longer enters the AI context, with the reason stated");
+    const decayedOut = mkEvidencePattern({ confidence: 0.55, last_confirmed_at: ago(150), last_used_at: ago(150), last_observed: ago(150) });
+    const dd = explainPatternDecisions([decayedOut], CTX, NOW);
+    assert(dd[0].applied === false && dd[0].reasons.some((r) => r.includes("decayed")),
+      "assignment: a time-decayed pattern below the demotion threshold stops influencing responses (with the decay reason)");
+    const decayedHigh = mkEvidencePattern({ confidence: 0.94, last_confirmed_at: ago(150), last_used_at: ago(150), last_observed: ago(150) });
+    assert(selectApplicablePatternsAdaptive([decayedHigh], CTX, NOW).length === 1,
+      "assignment: a 150-day-old pattern with high effective confidence (75%) still applies — decay is gradual, never a cliff");
+
+    // -- Determinism + bounds (the decay contract) ------------------------
+    const e1 = recordPatternEvidence(mkEvidencePattern({ confidence: 0.6 }), { type: "alternative_method_used" }, NOW);
+    const e2 = recordPatternEvidence(mkEvidencePattern({ confidence: 0.6 }), { type: "alternative_method_used" }, NOW);
+    assert(JSON.stringify(e1) === JSON.stringify(e2),
+      "decay: the same evidence on the same state ALWAYS produces the same outcome (deterministic)");
+    let c2 = 0.9;
+    for (let i = 1; i <= 50; i++) c2 = applyContradictionDecay(c2, i);
+    assert(c2 >= CONFIDENCE_FLOOR && c2 < 0.9,
+      "decay: 50 contradictions never break the floor or the cap — bounded");
+    assert(recordPatternEvidence(mkEvidencePattern({ confidence: 0.94 }), { type: "teacher_supports" }, NOW).updates.confidence === CONFIDENCE_CAP,
+      "decay: positive evidence is capped at 95% — never certainty");
+
+    // -- Metadata exposure: every decision is explainable ----------------
+    const mixed = explainPatternDecisions([
+      mkEvidencePattern({ id: "sel", description: "Uses substitution before simplifying" }),
+      mkEvidencePattern({ id: "wrong-scope", subject: "biology" }),
+      mkEvidencePattern({ id: "inactive-one", status: "inactive", confidence: 0.1 }),
+      mkEvidencePattern({ id: "cand", status: "candidate", confidence: 0.3 }),
+      mkEvidencePattern({ id: "demoted", status: "lower_confidence", confidence: 0.45 }),
+    ], CTX, NOW);
+    const byId = (id: string) => mixed.find((d) => d.pattern_id === id)!;
+    assert(byId("sel").applied === true && byId("sel").reasons.length >= 3,
+      "metadata: a selected pattern explains WHY (scope, confidence, history)");
+    assert(byId("wrong-scope").applied === false && byId("wrong-scope").reasons.some((r) => r.includes("scope")),
+      "metadata: an ignored pattern names its reason (scope mismatch)");
+    assert(byId("inactive-one").applied === false && byId("inactive-one").reasons.some((r) => r.includes("inactive")),
+      "metadata: an inactive pattern's exclusion is explained");
+    assert(byId("cand").applied === true && byId("cand").reasons.some((r) => r.includes("cautiously")),
+      "metadata: candidates are applied cautiously, clearly labeled");
+    assert(byId("demoted").applied === true && byId("demoted").reasons.some((r) => r.includes("ALWAYS override")),
+      "metadata: lower_confidence patterns are applied with the always-overridden caution reason");
+    assert(mixed.every((d) => d.reasons.length > 0 && typeof d.effective_confidence === "number"),
+      "metadata: every decision carries non-empty reasons and the effective (post-decay) confidence");
+
+    // -- Evidence bookkeeping on the positive path ------------------------
+    const used = recordPatternEvidence(mkEvidencePattern({ observation_count: 5, confidence: 0.6, status: "candidate" }), { type: "repeated_use" }, NOW);
+    assert((used.updates.observation_count ?? 0) === 6 && !!used.updates.last_used_at && !!used.updates.last_observed,
+      "evidence: repeated use bumps observation/last-used/last-observed (activity resets time decay)");
+    const approved = recordPatternEvidence(mkEvidencePattern({ confidence: 0.6 }), { type: "user_approves_work" }, NOW);
+    assert(Math.abs((approved.updates.confidence ?? 0) - 0.7) < 1e-9 && !!approved.updates.last_used_at,
+      "evidence: approving generated work that used the pattern is positive evidence (+10%)");
+    const confirmedTwice = recordPatternEvidence(mkEvidencePattern({ confidence: 0.4, confirmation_count: 1, status: "candidate" }), { type: "user_confirm" }, NOW);
+    assert((confirmedTwice.updates.confirmation_count ?? 0) === 2 && (confirmedTwice.updates.status as string) === "active",
+      "evidence: explicit confirmation establishes the pattern and counts the confirmation");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

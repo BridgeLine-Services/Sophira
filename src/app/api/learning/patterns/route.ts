@@ -88,6 +88,16 @@ export async function PATCH(request: NextRequest) {
     source: "user" as PatternSource,
     correctionSource: body.correction_source,
   });
+  // Confirming IS positive evidence (confidence-decay round 2026-10-05):
+  // the confirmation count and last-confirmed date are recorded so time
+  // decay resets and the UI can show why confidence moved.
+  const confirmEvidence =
+    action === "confirm"
+      ? {
+          confirmation_count: (pattern.confirmation_count ?? 0) + 1,
+          last_confirmed_at: new Date().toISOString(),
+        }
+      : {};
   const { data: updated, error } = await supabase
     .from("learning_patterns")
     .update({
@@ -96,6 +106,7 @@ export async function PATCH(request: NextRequest) {
       intentional: false, // any state change re-evaluates habit preservation
       ...(t.source ? { source: t.source } : {}),
       ...(t.correction_source !== undefined ? { correction_source: t.correction_source } : {}),
+      ...confirmEvidence,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

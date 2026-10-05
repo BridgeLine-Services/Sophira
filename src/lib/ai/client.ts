@@ -267,6 +267,7 @@ export function buildSystemPrompt(args: {
     "notes": "<anything about method requirements that could not be met or verified>"
   },
   "observed_mistakes": [{"description": "<a distinct mistake pattern you found in the STUDENT'S OWN submitted work, short and concrete>", "subject": "<subject if known>"}] (only when reviewing the student's own work — omit otherwise; never invent mistakes),
+  "observed_pattern_conflicts": [{"description": "<a LEARNED METHOD/PREFERENCE from the context that the TEACHER'S or THIS ASSIGNMENT'S instructions genuinely contradict — teacher and assignment instructions always win over learned patterns; report ONLY a real conflict you can quote, never invent one>"}] (omit when no learned pattern conflicts with the teacher's or assignment's instructions),
   "verification": {
     "status": "verified" | "needs_verification" | "unverified",
     "checks": [{"name": "<check>", "passed": true|false, "detail": "<what you actually checked and how>", "method": "self_check"}],

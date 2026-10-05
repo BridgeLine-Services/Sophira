@@ -16,6 +16,7 @@ export type PatternKind = "mistake" | "method" | "preference" | "correction";
 export type PatternStatus =
   | "candidate"
   | "active"
+  | "lower_confidence"
   | "corrected"
   | "inactive"
   | "recurring"
@@ -48,6 +49,16 @@ export interface LearningPattern {
   intentional: boolean;
   created_at: string;
   updated_at: string;
+  /* --- Evidence tracking (confidence-decay round, 2026-10-05) --------
+   * Optional on legacy rows; the evidence engine falls back to
+   * first_observed/created_at when null. */
+  /** Last time the user/teacher explicitly confirmed this pattern. */
+  last_confirmed_at?: string | null;
+  /** Last time this pattern actually entered an AI response context. */
+  last_used_at?: string | null;
+  confirmation_count?: number;
+  contradiction_count?: number;
+  correction_count?: number;
 }
 
 /** Statuses that make a pattern eligible for use in the AI context. */
@@ -57,6 +68,7 @@ export const APPLYABLE_STATUSES: PatternStatus[] = [
   "recurring",
   "temporary",
   "teacher_required",
+  "lower_confidence", // demoted, still applied WITH a caution label (soft decay)
 ];
 
 /** Statuses that mean "no longer happening" (must not be applied). */
@@ -264,7 +276,11 @@ export function patternsForPrompt(patterns: LearningPattern[]): PatternsForPromp
         );
         break;
       case "method":
-        methodPreferences.push(`- Learned method this student uses: ${p.description}${seen}`);
+        methodPreferences.push(
+          `- Learned method this student uses: ${p.description}${seen}${
+            p.status === "lower_confidence" ? " [lower confidence — recent contradictory evidence; teacher/assignment instructions always win over it]" : ""
+          }`
+        );
         break;
       case "correction":
         methodPreferences.push(`- Established correction: ${p.description}${seen}`);
@@ -299,6 +315,7 @@ export function describePatternStatus(status: PatternStatus): string {
   switch (status) {
     case "candidate": return "Observed but not yet confirmed — used cautiously";
     case "active": return "Confirmed and currently applied";
+    case "lower_confidence": return "Demoted — repeated contradictions reduced confidence; applied only with caution";
     case "corrected": return "You marked this corrected — no longer applied";
     case "inactive": return "Inactive — no longer applied";
     case "recurring": return "Returned after being corrected — applied again";

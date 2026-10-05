@@ -5,7 +5,7 @@
     "auditor": "repository implementation audit against requirements (Prompt 1)",
     "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
     "verification": {
-      "offline_tests": "440/440 passed (426 prior + 14 deployment-readiness/legal-status/gate-deadline assertions added 2026-10-05, fifth round)",
+      "offline_tests": "480/480 passed (440 prior + 40 pattern-evidence/confidence-decay assertions added 2026-10-05, sixth round)",
       "typecheck": "tsc --noEmit strict: clean",
       "build": "next build: 38/38 routes compiled",
       "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 \u2014 production is in the documented DEGRADED mode (no Supabase/AI env configured)",
@@ -196,17 +196,28 @@
       "id": "pattern-lifecycle-stale-detection",
       "title": "Pattern lifecycle and stale-pattern detection",
       "status": "IMPLEMENTED",
-      "notes": "Lifecycle (candidate/active/corrected/recurring/temporary, confidence, scope isolation) was already implemented and tested. Stale-pattern detection added 2026-10-05: isPatternStale/describeStaleness in src/lib/learning/patterns.ts \u2014 a pattern unobserved for 180 days no longer shapes AI context (excluded at application time, never deleted or silently demoted; re-observation self-heals). CorrectionsPanel shows staleness badges with the honest reason.",
+      "notes": "Lifecycle (candidate/active/corrected/recurring/temporary, confidence, scope isolation) implemented and tested; stale-pattern detection (isPatternStale, 180 days) added earlier. CONFIDENCE DECAY + BEHAVIORAL ADAPTATION added 2026-10-05 (migration 0016 + src/lib/learning/evidence.ts, pure): every pattern tracks last_confirmed_at/last_used_at/confirmation_count/contradiction_count/correction_count + new lower_confidence status; evidence-driven confidence (positive: confirm/repeated use/teacher support/approved work; negative: correction/rejection/teacher contradiction/alternative method/instruction conflict); deterministic bounded decay (contradiction ladder \u00d70.92/\u00d70.83/\u00d70.74/\u00d70.55 \u2014 94\u219287\u219273\u219251\u2192INACTIVE; time decay \u00d70.8 per 90d window after a 90d grace, floor 0.05); ladder transitions never delete; demoted/inactive patterns revive via later confirming evidence; teacher + current assignment instructions always override (solve-route conflict loop + prompt precedence + teacher_contradicts demoting teacher_required); explainPatternDecisions exposes why each pattern was selected/ignored, persisted per response and shown in the panel.",
       "files": [
-        "src/lib/learning/patterns.ts",
+        "src/app/api/ai/solve/route.ts",
+        "src/app/api/learning/patterns/evidence/route.ts",
+        "src/app/api/learning/patterns/route.ts",
         "src/components/app/CorrectionsPanel.tsx",
-        "src/app/api/learning/patterns/route.ts"
+        "src/lib/ai/client.ts",
+        "src/lib/learning/evidence.ts",
+        "src/lib/learning/patterns.ts",
+        "supabase/migrations/0016_pattern_evidence.sql"
       ],
       "functions": [
-        "selectApplicablePatterns",
-        "transitionPattern",
+        "applyContradictionDecay",
+        "applyTimeDecay",
+        "describeStaleness",
+        "explainPatternDecisions",
         "isPatternStale",
-        "describeStaleness"
+        "recomputeStatus",
+        "recordPatternEvidence",
+        "selectApplicablePatterns",
+        "selectApplicablePatternsAdaptive",
+        "transitionPattern"
       ],
       "tables": [
         "learning_patterns (first_observed, last_observed, observation_count stored but never used for staleness)"
@@ -218,7 +229,8 @@
         "lifecycle (14)",
         "scope leakage (7)",
         "honest applied-context (9)",
-        "stale-pattern detection (13 assertions, section 8d)"
+        "stale-pattern detection (13 assertions, section 8d)",
+        "40 assertions in section 18 (evidence ladder, decay math, all 7 required scenarios, determinism/bounds)"
       ],
       "tests_missing": [],
       "env": [],

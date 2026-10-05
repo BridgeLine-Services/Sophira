@@ -582,3 +582,72 @@ clean; `next build` passes; the verifier self-test passes 7/7.
 Production env vars, set the SOPHIRA_APP_URL repo variable, complete the
 legal owner facts, obtain attorney review, and run one real gated
 release. None of these can be done from the repository.
+
+## 34. Pattern evidence, confidence decay & behavioral adaptation (2026-10-05) — 480/480 offline
+
+Upgrade of the EXISTING learning-pattern lifecycle (0005, workflow §9–§12,
+candidate/active/corrected/inactive/recurring/temporary/teacher_required —
+unchanged and still tested) — nothing was replaced or deleted. Added:
+
+**1. Evidence tracking (migration 0016):** `learning_patterns` gains
+`last_confirmed_at`, `last_used_at`, `confirmation_count`,
+`contradiction_count`, `correction_count` and the intermediate
+`lower_confidence` status, completing the required field set
+(pattern_id/user_id/pattern_type(kind)/pattern_scope(scope)/confidence/
+created_at/status/observation_count already existed). Ladder:
+candidate → active → lower_confidence → inactive — never a delete.
+
+**2. Evidence engine (`src/lib/learning/evidence.ts`, pure):** confidence
+changes ONLY from recorded evidence. Positive: user_confirm (delegates to
+the existing lifecycle confirm), repeated_use (existing growth rule),
+teacher_supports, user_approves_work. Negative: user_correction /
+user_rejects / teacher_contradicts (halve confidence ×0.5), 
+alternative_method_used (deterministic ladder ×0.92, ×0.83, ×0.74, then
+×0.55), instruction_conflict (×0.85). Status recomputed from confidence
++ contradiction history: <0.2 inactive; <0.55 with ≥3 contradictions
+inactive; <0.5 lower_confidence; recovery ≥0.5 → lower_confidence→active,
+inactive→recurring (existing semantics), recurring→active on later
+confirmation. The requested example reproduces: 94% → 86.5% → 71.8% →
+53.1% → INACTIVE (3-contradiction rule).
+
+**3. Time decay (deterministic, bounded, explainable):** 90-day grace
+then ×0.8 per 90-day window without confirmation OR use (anchor = most
+recent activity). Floor 0.05, cap 0.95. A time-decayed pattern below the
+demotion threshold stops entering the AI context even while its status
+reads active; high-confidence old patterns still apply (gradual, not a
+cliff). Applied patterns get `last_used_at` recorded — genuine use only.
+
+**4. Teacher/assignment override, machine-enforced:** the solve route
+asks the model to report genuine conflicts between applied patterns and
+teacher/assignment instructions (defensively normalized, matched only
+against patterns it could actually see); each conflict records
+instruction_conflict evidence → decay + demotion. Prompt lines label
+demoted patterns "teacher/assignment instructions always win over it";
+`teacher_contradicts` demotes even teacher_required patterns.
+
+**5. Explainable metadata:** `explainPatternDecisions` returns per-pattern
+{pattern_id, status, effective_confidence, applied, reasons[]} — why
+selected (scope match, confidence, history) or ignored (resolved status,
+scope mismatch, 180-day staleness, time decay). Persisted with each
+response (spec §40); the Corrections panel shows evidence counts,
+effective confidence and decay badges.
+
+**API:** POST /api/learning/patterns/evidence (record one event);
+PATCH confirm now also records confirmation_count/last_confirmed_at.
+
+**Tests: 40 new assertions (section 18), suite total 480/480 PASSED**
+— all seven required scenarios plus determinism (same evidence twice =
+identical outcome), bounds (50 contradictions never break the floor;
+cap 0.95), time-decay window math, anchor-reset on use, and the metadata
+explanations. During development three test failures were fixed: a
+pre-evidence snapshot explained instead of the demoted pattern, a floor
+case whose fixture was too fresh to decay, and a default count in a
+fixture. `tsc` clean; `next build` passes.
+
+**Honest limits:** evidence quality is bounded by what the system can
+actually observe — the conflict loop records only conflicts the model
+reports while seeing both the pattern and the instructions, defensively
+normalized and never trusted blindly (an AI-reported conflict is evidence,
+not certainty). Semantic contradiction detection (opposite wording of
+similar phrases) is deliberately NOT attempted mechanically — it would be
+guessing.
