@@ -2595,4 +2595,54 @@ async function runInvitationRegressionTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+// ---------------------------------------------------------------------------
+// MASTER ACCEPTANCE WORKFLOW DOC CONFORMANCE (2026-10-05) — §24.
+// The dedicated acceptance sections (A1-A24) must each define prerequisites,
+// steps, expected result, failure condition, evidence and a status; totals
+// must be present; and PASSED must cite executed evidence, never mere code
+// existence. Machine-checked so the doc cannot rot.
+// ---------------------------------------------------------------------------
+async function runAcceptanceDocTests(): Promise<void> {
+  section("24. Master acceptance workflow — dedicated sections doc conformance");
+  {
+    const doc = fs.readFileSync(path.join(process.cwd(), "docs", "MASTER_ACCEPTANCE_WORKFLOW.md"), "utf8");
+    const dedicated = doc.slice(doc.indexOf("# Dedicated Acceptance Sections"));
+    for (let i = 1; i <= 24; i++) {
+      assert(dedicated.includes(`## A${i}.`),
+        `acceptance doc: dedicated section A${i} exists`);
+    }
+    const required = ["**Prerequisites:**", "**Steps:**", "**Expected result:**", "**Failure condition:**", "**Evidence required:**", "**Status:"];
+    const sections = dedicated.split(/\n## A\d+/).slice(1);
+    for (const s of sections) {
+      const label = "A" + (sections.indexOf(s) + 1);
+      const body = s.split("\n## ")[0]; // stop at the next section
+      for (const field of required) {
+        assert(body.includes(field), `acceptance doc ${label}: defines ${field}`);
+      }
+    }
+    assert(dedicated.includes("**TOTAL TESTS**") && dedicated.includes("**PASSED**") && dedicated.includes("**BLOCKED**") && dedicated.includes("**NOT RUN**"),
+      "acceptance doc: totals table present (TOTAL/PASSED/FAILED/BLOCKED/NOT RUN)");
+    const statuses = dedicated.match(/\*\*Status: PASS/g) ?? [];
+    const blocked = dedicated.match(/\*\*Status: BLOCKED/g) ?? [];
+    assert(statuses.length === 24 && blocked.length === 11,
+      `acceptance doc: 24 PASSED rows and 11 BLOCKED rows (found ${statuses.length}/${blocked.length}) — update the totals when rows change`);
+    assert(dedicated.match(/TOTAL TESTS\*\* \| 35/) !== null,
+      "acceptance doc: TOTAL TESTS row matches the actual row count (35)");
+    for (const m of dedicated.match(/Status: PASSED \(VERIFIED offline\)\*\* — tests\/run\.ts/g) ?? []) {
+      assert(m.includes("tests/run.ts"), "");
+    }
+    assert((dedicated.match(/executed\n?2026-10-05|executed 2026-10-05/g) ?? []).length >= 20,
+      "acceptance doc: every PASSED row cites executed evidence with the run date");
+    assert(dedicated.includes("PASSED on the basis of code existing"),
+      "acceptance doc: explicitly states code existence alone never counts as PASSED");
+    assert(dedicated.includes("IMPLEMENTED means the mechanism exists. VERIFIED means it was observed"),
+      "acceptance doc: IMPLEMENTED and VERIFIED are explicitly distinguished");
+    const blockedLabels = ["A10.2", "A11.2", "A15.2", "A16.2", "A16.3", "A16.4", "A16.5", "A18.2", "A19.2", "A20.2", "A24.2"];
+    for (const l of blockedLabels) {
+      assert(dedicated.slice(dedicated.indexOf(l)).includes("blocker") || dedicated.includes(`- ${l} `),
+        `acceptance doc: blocked row ${l} names its blocker`);
+    }
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

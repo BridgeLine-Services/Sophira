@@ -5,7 +5,7 @@
     "auditor": "repository implementation audit against requirements (Prompt 1)",
     "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
     "verification": {
-      "offline_tests": "633/633 passed (621 prior + 12 legal-configuration assertions added 2026-10-05)",
+      "offline_tests": "838/838 passed (633 prior + 205 master-acceptance doc-conformance assertions added 2026-10-05)",
       "typecheck": "tsc --noEmit strict: clean",
       "build": "next build: 38/38 routes compiled",
       "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 \u2014 production is in the documented DEGRADED mode (no Supabase/AI env configured)",
@@ -926,14 +926,14 @@
       "id": "automated-acceptance-testing",
       "title": "Automated acceptance testing",
       "status": "IMPLEMENTED",
-      "notes": "285 offline assertions (verified this audit: 285/285), strict typecheck, production build, CI active on GitHub. Live acceptance runbook exists (ACCEPTANCE_TESTS.md, MASTER_ACCEPTANCE_WORKFLOW.md) and is blocked only on credentials.",
+      "notes": "285 offline assertions (verified this audit: 285/285), strict typecheck, production build, CI active on GitHub. Live acceptance runbook exists (ACCEPTANCE_TESTS.md, MASTER_ACCEPTANCE_WORKFLOW.md) and is blocked only on credentials. MASTER ACCEPTANCE DEDICATED SECTIONS (2026-10-05): the 27-step end-to-end workflow is preserved; added 24 dedicated acceptance sections (A1-A24: typing calibration/paced output/adaptive profile, deadline scheduling, persisted sessions + break persistence, rubric audit, submission readiness, research provider config/retrieval/verification/claim-evidence/citations/authority, PWA, native builds, native URL validation, invitation security, owner privacy, RLS isolation, confidence decay, teacher precedence, correction learning, legal readiness). Every row: prerequisites/steps/expected/failure condition/evidence/status. IMPLEMENTED vs VERIFIED explicitly distinguished; PASSED only cites executed verification (never code existence). Totals: 35 rows = 24 PASSED (executed offline evidence, dated) + 0 FAILED + 11 BLOCKED (blockers named) + 0 NOT RUN. Machine-checked by suite \u00a724 (205 assertions: sections present, fields complete, counts match totals). 838/838.",
       "files": [
-        "tests/run.ts",
-        "tests/tsconfig.json",
         ".github/workflows/ci.yml",
         "docs/ACCEPTANCE_TESTS.md",
+        "docs/DEVICE_ACCEPTANCE.md",
         "docs/MASTER_ACCEPTANCE_WORKFLOW.md",
-        "docs/DEVICE_ACCEPTANCE.md"
+        "tests/run.ts",
+        "tests/tsconfig.json"
       ],
       "functions": [
         "assert/section harness",

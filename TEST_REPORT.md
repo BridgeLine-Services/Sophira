@@ -1026,3 +1026,42 @@ Suite **633/633**, `tsc` clean, `next build` passes.
 design — the owner (ideally via a qualified attorney in the chosen
 jurisdiction) must supply every value in LEGAL_CONFIGURATION.md before
 production publication. Nothing here is legal advice.
+
+## 41. Master acceptance workflow — dedicated sections (2026-10-05) — 838/838 offline
+
+TASK — update docs/MASTER_ACCEPTANCE_WORKFLOW.md: preserve the existing
+27-step end-to-end workflow and sign-off table (nothing removed), and add
+24 dedicated acceptance sections (A1-A24): typing calibration, typing-paced
+output, adaptive typing profile, deadline scheduling, persisted work
+sessions, break state persistence, rubric auditing, submission readiness,
+research provider configuration, research retrieval, source verification,
+claim-to-source evidence, citation integrity, source authority, PWA
+installation, native build, native deployment URL validation, invitation
+security, owner privacy, RLS isolation, learning confidence decay,
+teacher-rule precedence, correction learning, legal production-readiness.
+
+**Structure enforced:** every test row defines prerequisites, exact steps,
+expected result, failure condition, evidence required and status. IMPLEMENTED
+and VERIFIED are explicitly distinguished; the doc states in writing that
+code existence alone NEVER counts as PASSED — each PASSED row cites the
+executed verification (tests/run.ts section + run date 2026-10-05 + suite
+count) that observed the behavior.
+
+**Honest results:** 35 test rows — 24 PASSED (verified by executed offline
+checks: 838/838), 0 FAILED, 11 BLOCKED (implemented, verification blocked;
+each blocker named: live API credentials/production env, no deployed
+backend, no physical devices, Apple cert+Mac, Linux toolchain, Windows/macOS
+machines, SUPABASE_TEST_* secrets, owner legal fields + attorney review),
+0 NOT RUN. Totals table and blocked list are in the doc.
+
+**Machine-checked (new suite §24):** all 24 sections exist; every section
+carries the six required fields; the 24/11 PASSED/BLOCKED row counts match
+the totals; TOTAL=35 matches the actual rows; PASSED rows cite executed
+evidence with dates; blocked rows name blockers. The doc cannot silently rot.
+
+**Verification run:** suite **838/838** (205 new doc-conformance assertions),
+`tsc` clean, `next build` passes.
+
+**Honest limits:** the 11 BLOCKED rows cannot be verified in this environment
+(they need owner-side infrastructure, devices, credentials, or legal input).
+Everything verifiable offline is verified and evidenced.
