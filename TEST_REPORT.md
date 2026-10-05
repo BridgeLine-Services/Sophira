@@ -385,3 +385,47 @@ overlap remains a deterministic heuristic, honestly labeled by its
 reasons; the system's guarantee is mechanical: nothing reaches
 "verified" without a verbatim, figure-consistent, overlapping passage
 in the retrieved content.
+
+## 30. Stale-pattern detection + submission readiness (2026-10-05) — 350/350 offline
+
+Follow-up round ("push what you completed, then continue working"): the
+two repo-owned HIGH-priority gaps from the implementation audit were
+implemented on top of existing systems — nothing deleted, nothing
+rebuilt, no behavior replaced.
+
+**H2 — Stale-pattern detection (was MISSING).** A learning pattern not
+observed for 180 days (`STALE_AFTER_DAYS`) no longer shapes AI context:
+`isPatternStale`/`describeStaleness` in `src/lib/learning/patterns.ts`,
+enforced inside `selectApplicablePatterns` (excluded at application
+time). The pattern is never deleted and never silently demoted in the
+database — that stays in the student's hands, consistent with the
+existing user-owns-lifecycle philosophy; re-observation (last_observed
+bumps) self-heals automatically. CorrectionsPanel shows a
+"stale — excluded from AI context" badge with the honest reason.
+Unparseable observation dates cannot be judged and are never silently
+dropped.
+
+**H1 — Submission readiness (was MISSING).** `src/lib/readiness.ts`
+(pure `buildReadiness`) + `GET /api/readiness?assignment_id=` +
+`ReadinessPanel` in the workspace: one mechanical verdict aggregating the
+systems that already exist — draft present, independent verification
+(failed machine checks block; "needs verification" is an honest warning,
+never a silent pass), teacher method compliance, the persisted rubric
+audit (missing audit with criteria present blocks), and research
+integrity (unsupported claims block with the exact counts). Not
+applicable checks never block; anything undeterminable is reported as
+not-ready with the reason — the verdict is never guessed, and the panel
+says "not ready means not ready, with exact reasons."
+
+**Tests: 24 new assertions (sections 8d + 15j), suite total 350/350
+PASSED.** During development 11 existing tests failed after the
+staleness change — root cause: their fixtures carried fixed January
+2026 observation dates, which are genuinely stale now; the fix was in
+the fixtures (now observed-yesterday by default, so the suite can never
+rot with time), NOT a weakening of the feature. Final run 0 failed.
+`tsc` clean; `next build` passes.
+
+**Honest limits:** no live run (external credentials still absent);
+readiness reflects stored records only — it does not re-run the rubric
+audit or the research audit itself, it reports their latest persisted
+results.

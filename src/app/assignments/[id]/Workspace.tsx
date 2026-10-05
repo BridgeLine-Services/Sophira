@@ -11,6 +11,7 @@ import { ResultBody } from "@/components/app/ResultBody";
 import { PacedOutput } from "@/components/app/PacedOutput";
 import { SchedulePanel } from "@/components/app/SchedulePanel";
 import { RubricAuditPanel } from "@/components/app/RubricAuditPanel";
+import { ReadinessPanel } from "@/components/app/ReadinessPanel";
 import { ResearchPanel } from "@/components/app/ResearchPanel";
 import { MODE_MAP } from "@/lib/modes";
 import type { AiResponse, Assignment, Course, Teacher, WorkSession } from "@/lib/types";
@@ -324,6 +325,11 @@ export function Workspace({
       {/* Rubric compliance audit (spec §6) — deterministic checks first,
           AI-assessed semantics labeled, revision loop, persisted audit. */}
       <RubricAuditPanel assignmentId={assignment.id} responseId={latestResponse?.id ?? null} />
+
+      {/* Submission readiness (audit item H1) — one mechanical verdict that
+          aggregates draft, verification, method compliance, rubric audit and
+          research integrity. Not ready means not ready, with exact reasons. */}
+      <ReadinessPanel assignmentId={assignment.id} />
 
       {/* What was ACTUALLY applied (spec §40) — real backend state, not badges */}
       {contextApplied && (

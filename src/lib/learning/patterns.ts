@@ -106,9 +106,43 @@ export function scopeMatches(p: Pick<LearningPattern, "scope" | "subject" | "cou
  * applyable status AND matching scope. Resolved (corrected/inactive)
  * patterns are excluded — an old fixed mistake must not be reproduced.
  */
-export function selectApplicablePatterns(patterns: LearningPattern[], ctx: PatternContext): LearningPattern[] {
+/**
+ * Stale-pattern detection (lifecycle round, 2026-10-05): a pattern that has
+ * not been observed for this many days no longer shapes AI output — old
+ * habits must not fossilize into permanent instructions. The pattern is
+ * NOT deleted and NOT silently demoted in the database: it is excluded at
+ * application time and surfaced as stale in the UI; the moment it is
+ * observed again (last_observed bumps) it returns automatically.
+ */
+export const STALE_AFTER_DAYS = 180;
+
+export function isPatternStale(
+  p: Pick<LearningPattern, "last_observed" | "status">,
+  nowISO?: string
+): boolean {
+  if (!APPLYABLE_STATUSES.includes(p.status)) return false; // resolved patterns are excluded anyway
+  const last = Date.parse(p.last_observed);
+  if (!Number.isFinite(last)) return false; // unknown date: cannot determine — never silently drop user data
+  const now = nowISO !== undefined ? Date.parse(nowISO) : Date.now();
+  if (!Number.isFinite(now)) return false;
+  return now - last > STALE_AFTER_DAYS * 86_400_000;
+}
+
+/** Human-facing staleness note, or null when the pattern is fresh. */
+export function describeStaleness(
+  p: Pick<LearningPattern, "last_observed" | "status">,
+  nowISO?: string
+): string | null {
+  if (!isPatternStale(p, nowISO)) return null;
+  return `Not observed in over ${Math.round(STALE_AFTER_DAYS / 30)} months — stale. It is excluded from AI context until it is observed again (or you mark it corrected).`;
+}
+
+export function selectApplicablePatterns(patterns: LearningPattern[], ctx: PatternContext, nowISO?: string): LearningPattern[] {
   return patterns.filter(
-    (p) => APPLYABLE_STATUSES.includes(p.status) && scopeMatches(p, ctx)
+    (p) =>
+      APPLYABLE_STATUSES.includes(p.status) &&
+      scopeMatches(p, ctx) &&
+      !isPatternStale(p, nowISO)
   );
 }
 

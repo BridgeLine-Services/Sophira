@@ -5,7 +5,7 @@
     "auditor": "repository implementation audit against requirements (Prompt 1)",
     "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
     "verification": {
-      "offline_tests": "326/326 passed (285 prior + 41 claim-traceability assertions added 2026-10-05)",
+      "offline_tests": "350/350 passed (326 prior + 24 stale-pattern/readiness assertions added 2026-10-05, second round)",
       "typecheck": "tsc --noEmit strict: clean",
       "build": "next build: 38/38 routes compiled",
       "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 \u2014 production is in the documented DEGRADED mode (no Supabase/AI env configured)",
@@ -195,17 +195,18 @@
     {
       "id": "pattern-lifecycle-stale-detection",
       "title": "Pattern lifecycle and stale-pattern detection",
-      "status": "PARTIAL",
-      "notes": "Lifecycle is IMPLEMENTED and tested (candidate/active/corrected/recurring/temporary, confidence, scope isolation, corrections UI). Stale-pattern detection is MISSING: no code ages or demotes patterns by last_observed/first_observed; CorrectionsPanel only displays dates; selectApplicablePatterns ignores observation age.",
+      "status": "IMPLEMENTED",
+      "notes": "Lifecycle (candidate/active/corrected/recurring/temporary, confidence, scope isolation) was already implemented and tested. Stale-pattern detection added 2026-10-05: isPatternStale/describeStaleness in src/lib/learning/patterns.ts \u2014 a pattern unobserved for 180 days no longer shapes AI context (excluded at application time, never deleted or silently demoted; re-observation self-heals). CorrectionsPanel shows staleness badges with the honest reason.",
       "files": [
         "src/lib/learning/patterns.ts",
-        "src/app/api/learning/patterns/route.ts",
-        "src/components/app/CorrectionsPanel.tsx"
+        "src/components/app/CorrectionsPanel.tsx",
+        "src/app/api/learning/patterns/route.ts"
       ],
       "functions": [
         "selectApplicablePatterns",
         "transitionPattern",
-        "describePatternStatus"
+        "isPatternStale",
+        "describeStaleness"
       ],
       "tables": [
         "learning_patterns (first_observed, last_observed, observation_count stored but never used for staleness)"
@@ -216,11 +217,10 @@
       "tests_existing": [
         "lifecycle (14)",
         "scope leakage (7)",
-        "honest applied-context (9)"
+        "honest applied-context (9)",
+        "stale-pattern detection (13 assertions, section 8d)"
       ],
-      "tests_missing": [
-        "staleness/aging tests (feature absent)"
-      ],
+      "tests_missing": [],
       "env": [],
       "blockers": []
     },
@@ -379,15 +379,33 @@
     {
       "id": "submission-readiness",
       "title": "Submission readiness",
-      "status": "MISSING",
-      "notes": "No feature computes a 'ready to submit' verdict for an assignment (e.g. verification passed + rubric criteria satisfied + no unresolved conflicts + source citations audited). The workspace renders results, rubric audits and research audits as separate panels with no aggregate readiness state. Grep for 'submission/readiness' across src/ returns nothing functional.",
-      "files": [],
-      "functions": [],
-      "tables": [],
-      "apis": [],
-      "tests_existing": [],
+      "status": "IMPLEMENTED",
+      "notes": "Implemented 2026-10-05 (audit item H1). src/lib/readiness.ts (pure buildReadiness) aggregates draft presence, independent verification (failed machine checks block), teacher method compliance, the persisted rubric audit, and research integrity (unsupported claims block with exact counts) into one mechanical per-assignment verdict. Anything undeterminable is reported as not-ready with the reason \u2014 never guessed. GET /api/readiness?assignment_id=\u2026 + ReadinessPanel in the workspace.",
+      "files": [
+        "src/lib/readiness.ts",
+        "src/app/api/readiness/route.ts",
+        "src/components/app/ReadinessPanel.tsx",
+        "src/app/assignments/[id]/Workspace.tsx"
+      ],
+      "functions": [
+        "buildReadiness",
+        "GET /api/readiness"
+      ],
+      "tables": [
+        "responses",
+        "rubric_audits",
+        "research_projects",
+        "assignments",
+        "teachers"
+      ],
+      "apis": [
+        "/api/readiness"
+      ],
+      "tests_existing": [
+        "24 assertions in tests/run.ts sections 8d (stale) + 15j (readiness)"
+      ],
       "tests_missing": [
-        "All \u2014 feature is absent"
+        "Live end-to-end with a configured backend (external credentials)"
       ],
       "env": [],
       "blockers": []
@@ -990,12 +1008,14 @@
       {
         "id": "H1",
         "title": "Submission readiness feature MISSING \u2014 no aggregate 'ready to submit' verdict (verification + rubric audit + citation audit + conflicts)",
-        "authorized": false
+        "authorized": true,
+        "status": "IMPLEMENTED 2026-10-05 (round: continue working)"
       },
       {
         "id": "H2",
         "title": "Stale-pattern detection MISSING \u2014 learning patterns have first/last_observed but no aging/demotion logic",
-        "authorized": false
+        "authorized": true,
+        "status": "IMPLEMENTED 2026-10-05 (round: continue working)"
       },
       {
         "id": "H3",

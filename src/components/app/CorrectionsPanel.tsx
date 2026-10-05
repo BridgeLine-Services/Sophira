@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardContent, EmptyState, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import { describePatternStatus, type LearningPattern } from "@/lib/learning/patterns";
+import { describePatternStatus, describeStaleness, type LearningPattern } from "@/lib/learning/patterns";
 import { AlertTriangle, CheckCircle2, Pencil, RotateCcw, Trash2 } from "lucide-react";
 
 /**
@@ -87,7 +87,13 @@ export function CorrectionsPanel({ initialPatterns }: { initialPatterns: Learnin
             <Badge>{p.scope}{p.subject ? `: ${p.subject}` : ""}</Badge>
             <Badge>{describePatternStatus(p.status)}</Badge>
             {p.intentional && <Badge>preserved writing habit</Badge>}
+            {describeStaleness(p) && <Badge tone="warn">stale — excluded from AI context</Badge>}
           </p>
+          {describeStaleness(p) && (
+            <p className="mt-1 flex items-center gap-1 text-xs text-danger">
+              <AlertTriangle className="h-3.5 w-3.5" /> {describeStaleness(p)}
+            </p>
+          )}
           <p className="mt-0.5 text-xs text-ink-soft">
             first observed {fmtDate(p.first_observed)} · last observed {fmtDate(p.last_observed)} ·
             seen {p.observation_count}× · confidence {Math.round(p.confidence * 100)}% · source: {p.source}

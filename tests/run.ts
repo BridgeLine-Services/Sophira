@@ -21,8 +21,10 @@ import { docxHtmlToStructuredText, parsePptx, parseSpreadsheet, parseCsv } from 
 import {
   scopeMatches, selectApplicablePatterns, bumpedConfidence, normalizeObservedMistakes,
   matchesExistingPattern, transitionPattern, patternsForPrompt, describePatternStatus,
-  intentionalWritingHabits, type LearningPattern,
+  intentionalWritingHabits, isPatternStale, describeStaleness, STALE_AFTER_DAYS,
+  type LearningPattern,
 } from "../src/lib/learning/patterns";
+import { buildReadiness, type ReadinessInput } from "../src/lib/readiness";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
 import { PacingController } from "../src/lib/pacing-controller";
@@ -379,11 +381,104 @@ function mkPattern(over: Partial<LearningPattern>): LearningPattern {
     course_id: null, teacher_id: null, assignment_id: null, task_type: null,
     description: "Sign error when moving terms across the equation",
     examples: [], status: "candidate", first_observed: "2026-01-01",
-    last_observed: "2026-01-01", observation_count: 1, confidence: 0.3,
+    // Fresh by default (observed yesterday) — patterns not observed for
+    // STALE_AFTER_DAYS no longer shape AI output, and fixtures with fixed
+    // old dates would silently rot as time passes.
+    last_observed: new Date(Date.now() - 86_400_000).toISOString(), observation_count: 1, confidence: 0.3,
     source: "ai_observation", correction_source: "", created_at: "", updated_at: "",
     ...over,
   } as LearningPattern;
 }
+
+section("8d. Stale-pattern detection (pattern lifecycle round)");
+  {
+    const now = "2026-10-05T00:00:00.000Z";
+    const daysAgo = (d: number) => new Date(Date.parse(now) - d * 86_400_000).toISOString();
+    const stale = mkPattern({ status: "active", last_observed: daysAgo(200) });
+    const fresh = mkPattern({ status: "active", last_observed: daysAgo(10) });
+    const correctedOld = mkPattern({ status: "corrected", last_observed: daysAgo(400) });
+
+    assert(isPatternStale(stale, now) === true, "stale: an active pattern unobserved for 200 days is stale");
+    assert(isPatternStale(fresh, now) === false, "stale: a pattern observed 10 days ago is not stale");
+    assert(isPatternStale(correctedOld, now) === false, "stale: a corrected pattern is excluded anyway (staleness only applies to applyable patterns)");
+    assert(isPatternStale(mkPattern({ status: "active", last_observed: "not-a-date" }), now) === false,
+      "stale: an unparseable observation date cannot be judged — the pattern is never silently dropped");
+    assert(isPatternStale(mkPattern({ status: "active", last_observed: daysAgo(STALE_AFTER_DAYS) }), now) === false,
+      "stale: exactly at the threshold the pattern is still fresh (strictly-greater rule)");
+
+    assert(describeStaleness(stale, now)?.includes("stale") === true, "stale: staleness note is surfaced for humans");
+    assert(describeStaleness(fresh, now) === null, "stale: fresh patterns carry no staleness note");
+
+    const ctx = { subject: null, academic_level: null };
+    const selected = selectApplicablePatterns([stale, fresh, correctedOld], ctx, now);
+    assert(selected.length === 1 && selected[0].id === fresh.id,
+      "stale: stale patterns no longer shape AI context; fresh ones still do; nothing is deleted");
+
+    // Self-healing: a stale pattern observed again returns on its own —
+    // no user action and no data loss.
+    const revived = { ...stale, last_observed: daysAgo(1) };
+    assert(isPatternStale(revived, now) === false, "stale: a re-observed pattern stops being stale automatically");
+  }
+
+  section("15j. Submission readiness (audit item H1)");
+  {
+    const base: ReadinessInput = {
+      hasDraft: true, draftWords: 650,
+      verification: { status: "verified", failedChecks: [] },
+      methodCompliance: { status: "compliant" },
+      hasRubricCriteria: true,
+      rubricAudit: { passed: 6, partial: 0, failed: 0, needsSemantic: 0, allPassed: true, aiAssessed: false },
+      research: { linked: false, researchComplete: null, claimsSupported: null, claimsTotal: null, urlsResolve: null, urlsTotal: null },
+    };
+    const ok = buildReadiness(base);
+    assert(ok.ready === true && ok.blockers.length === 0, "readiness: all checks pass → ready to submit");
+    assert(ok.checks.every((c) => c.passed !== false), "readiness: no failed checks when everything passes");
+
+    assert(buildReadiness({ ...base, hasDraft: false, draftWords: 0 }).ready === false,
+      "readiness: no draft → NOT ready");
+    assert(buildReadiness({ ...base, draftWords: 4 }).ready === false,
+      "readiness: a 4-word draft is not submittable");
+
+    const vfail = buildReadiness({ ...base, verification: { status: "needs_verification", failedChecks: ["arithmetic identity 2x = x + x"] } });
+    assert(vfail.ready === false && vfail.blockers.some((b) => b.includes("arithmetic identity")),
+      "readiness: a FAILED machine check blocks submission with the check named");
+
+    const vwarn = buildReadiness({ ...base, verification: { status: "needs_verification", failedChecks: [] } });
+    assert(vwarn.ready === true && vwarn.checks.find((c) => c.id === "verification")?.passed === null,
+      "readiness: needs_verification with no failures is a warning, never a silent pass nor a false block");
+
+    const mc = buildReadiness({ ...base, methodCompliance: { status: "non_compliant", notes: "Teacher requires showing all steps." } });
+    assert(mc.ready === false && mc.blockers.some((b) => b.includes("required methods")),
+      "readiness: non-compliance with the teacher's method blocks submission");
+
+    const mcNa = buildReadiness({ ...base, methodCompliance: { status: "not_applicable" } });
+    assert(mcNa.checks.find((c) => c.id === "method_compliance")?.passed === null && mcNa.ready === true,
+      "readiness: no method requirements → not applicable, never blocking");
+
+    const noAudit = buildReadiness({ ...base, rubricAudit: null });
+    assert(noAudit.ready === false && noAudit.blockers.some((b) => b.includes("not been run")),
+      "readiness: rubric criteria exist but the audit was never run → blocked");
+    const failedAudit = buildReadiness({ ...base, rubricAudit: { passed: 4, partial: 1, failed: 1, needsSemantic: 0, allPassed: false, aiAssessed: true } });
+    assert(failedAudit.ready === false && failedAudit.blockers.some((b) => b.includes("1 failed") && b.includes("1 partial")),
+      "readiness: failed and partial rubric criteria block, with honest counts");
+    const noRubric = buildReadiness({ ...base, hasRubricCriteria: false, rubricAudit: null });
+    assert(noRubric.checks.find((c) => c.id === "rubric")?.passed === null && noRubric.ready === true,
+      "readiness: assignment without rubric criteria → not applicable, never blocking");
+
+    const researchNone = buildReadiness({ ...base, research: { linked: true, researchComplete: null, claimsSupported: null, claimsTotal: null, urlsResolve: null, urlsTotal: null } });
+    assert(researchNone.ready === false && researchNone.blockers.some((b) => b.includes("integrity report")),
+      "readiness: linked research with NO integrity report yet → blocked (never guessed as fine)");
+    const researchBad = buildReadiness({ ...base, research: { linked: true, researchComplete: false, claimsSupported: 16, claimsTotal: 18, urlsResolve: 17, urlsTotal: 18 } });
+    assert(researchBad.ready === false && researchBad.blockers.some((b) => b.includes("16/18")),
+      "readiness: unsupported research claims block with the exact counts");
+    const researchOk = buildReadiness({ ...base, research: { linked: true, researchComplete: true, claimsSupported: 18, claimsTotal: 18, urlsResolve: 18, urlsTotal: 18 } });
+    assert(researchOk.ready === true && researchOk.checks.find((c) => c.id === "research_integrity")?.passed === true,
+      "readiness: fully supported research passes the check");
+
+    const empty = buildReadiness({ hasDraft: false, draftWords: 0, verification: null, methodCompliance: null, hasRubricCriteria: false, rubricAudit: null, research: null });
+    assert(empty.ready === false && empty.blockers.length === 1,
+      "readiness: an assignment with nothing done has exactly one blocker (the draft) — n/a checks never block");
+  }
 
 section("9. Learning-pattern lifecycle (workflow §10-§12)");
 {
