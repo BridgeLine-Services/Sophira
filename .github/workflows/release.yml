@@ -51,6 +51,48 @@ jobs:
       - run: npx tsc --noEmit -p tsconfig.json
       - run: npm run build
 
+  # The single authoritative release gate (docs/RELEASE_GATE.md). Reports
+  # GO/BLOCKED with every blocker named; publishes the full report to the
+  # job summary. It re-runs the suite/build/typecheck itself so its status
+  # is self-contained evidence, not borrowed state.
+  release-gate:
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Run the authoritative release gate
+        env:
+          SOPHIRA_APP_URL: ${{ vars.SOPHIRA_APP_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+          SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+          SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SEARCH_API_KEY: ${{ secrets.SEARCH_API_KEY }}
+          SEARCH_PROVIDER: ${{ vars.SEARCH_PROVIDER }}
+          SEARCH_BASE_URL: ${{ vars.SEARCH_BASE_URL }}
+        run: |
+          node scripts/release-gate.mjs --self-test
+          set +e
+          node scripts/release-gate.mjs --report > gate-report.txt
+          GATE_EXIT=$?
+          set -e
+          {
+            echo '### Sophira Release Gate'
+            echo '```'
+            cat gate-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Gate exit code: $GATE_EXIT (enforcement mode returns the same status; 0 = GO)"
+          if [ "$GATE_EXIT" -ne 0 ]; then
+            echo "::warning::RELEASE STATUS: BLOCKED — see the step summary for every blocker. Do not publish until the listed owner-side prerequisites are satisfied."
+          fi
+
   android:
     runs-on: ubuntu-latest
     needs: tests

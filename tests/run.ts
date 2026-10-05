@@ -2645,4 +2645,61 @@ async function runAcceptanceDocTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+// ---------------------------------------------------------------------------
+// RELEASE GATE CONFORMANCE (2026-10-05) — §25.
+// docs/RELEASE_GATE.md + scripts/release-gate.mjs are the single
+// authoritative gate. Machine-check: the doc lists all 38 checks, states
+// the GO/BLOCKED-only semantics and that NOT RUN is never PASS, the script
+// registers exactly 38 checks, its self-test passes, and the release
+// workflow runs the gate.
+// ---------------------------------------------------------------------------
+async function runReleaseGateTests(): Promise<void> {
+  section("25. Release gate — single authoritative GO/BLOCKED gate");
+  {
+    const doc = fs.readFileSync(path.join(process.cwd(), "docs", "RELEASE_GATE.md"), "utf8");
+    assert(doc.includes("RELEASE STATUS: GO") && doc.includes("RELEASE STATUS: BLOCKED"),
+      "gate doc: declares exactly the two final states GO and BLOCKED");
+    assert(/NOT RUN.*never/i.test(doc) && /BLOCKED.*never treated as PASS/i.test(doc),
+      "gate doc: NOT RUN and BLOCKED are explicitly never treated as PASS");
+    for (const s of ["**PASS**", "**FAIL**", "**BLOCKED**", "**NOT RUN**"]) {
+      assert(doc.includes(s), `gate doc: defines status ${s}`);
+    }
+    const requiredChecks = [
+      "Production URL works", "Database migrations applied", "AI provider configured", "Search provider configured",
+      "Search provider live test passes", "Invitation-only signup tested", "Invitation approval tested",
+      "Owner privacy tested", "RLS isolation tested", "Student-to-student isolation tested", "Writing profile tested",
+      "Teacher-specific rules tested", "Teacher rules override old personal habits", "Learning corrections tested",
+      "Learning stale-pattern detection tested", "Typing test tested", "Typing-paced output tested",
+      "Deadline scheduler tested", "Persisted break/session state tested", "Rubric audit tested",
+      "Submission readiness gate tested", "Research retrieval tested", "Claim-to-source verification tested",
+      "Citation integrity tested", "Source authority ranking tested", "PWA tested on Android",
+      "PWA tested on iPhone", "APK built if supported", "APK tested on physical Android device if available",
+      "Native URL configured", "Capacitor versions aligned",
+      "Legal placeholders removed or explicitly blocked pending owner input",
+      "Production environment variables verified", "No secrets committed", "npm test passes",
+      "npm build passes", "Type checking passes", "Security tests pass",
+    ];
+    assert(requiredChecks.length === 38, "gate doc check list has exactly 38 entries");
+    for (const name of requiredChecks) {
+      assert(doc.includes(name), `gate doc: lists required check "${name}"`);
+    }
+    const gate = fs.readFileSync(path.join(process.cwd(), "scripts", "release-gate.mjs"), "utf8");
+    const checkCount = (gate.match(/^  check\(/gm) ?? []).length;
+    assert(checkCount === 38, `gate script: registers exactly 38 checks (found ${checkCount})`);
+    assert(gate.includes("RELEASE STATUS: GO") && gate.includes("RELEASE STATUS: BLOCKED"),
+      "gate script: emits exactly one final state GO or BLOCKED");
+    assert(gate.includes("BLOCKERS:") && /process.exit\(go \? 0 : 1\)/.test(gate),
+      "gate script: lists numbered blockers and exits nonzero when blocked");
+    assert(gate.includes("--self-test") && gate.includes("--fast") && gate.includes("--report"),
+      "gate script: repeatable — supports --self-test/--fast/--report modes");
+    const wf = fs.readFileSync(path.join(process.cwd(), ".github", "workflows", "release.yml"), "utf8");
+    assert(wf.includes("release-gate") && wf.includes("scripts/release-gate.mjs"),
+      "release workflow: runs the authoritative gate in CI");
+    const { spawnSync: sp } = await import("node:child_process");
+    const selfTest = sp("node", ["scripts/release-gate.mjs", "--self-test"], { encoding: "utf8" });
+    assert(selfTest.status === 0,
+      "gate script: --self-test passes (doc semantics + 38-check registry verified)");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

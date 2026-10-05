@@ -1065,3 +1065,49 @@ evidence with dates; blocked rows name blockers. The doc cannot silently rot.
 **Honest limits:** the 11 BLOCKED rows cannot be verified in this environment
 (they need owner-side infrastructure, devices, credentials, or legal input).
 Everything verifiable offline is verified and evidenced.
+
+## 42. Single authoritative release gate (2026-10-05) — 889/889 offline
+
+TASK — one authoritative production/testing release gate:
+`docs/RELEASE_GATE.md` + the executable `node scripts/release-gate.mjs`.
+
+**The gate** evaluates all 38 required checks (production URL live check,
+database migration probe of the newest migration table, AI/search provider
+configuration, live search test, the five live security-matrix checks,
+15 offline-verified core behaviors, PWA Android/iPhone device rows, APK
+build + device test, native URL, Capacitor alignment, legal placeholders,
+production env vars, secrets scan, npm test, npm build, typecheck, security
+tests). Every check prints evidence. Statuses are exactly PASS / FAIL /
+BLOCKED / NOT RUN; NOT RUN and BLOCKED are NEVER treated as PASS; the only
+final states are `RELEASE STATUS: GO` (all 38 PASS) or
+`RELEASE STATUS: BLOCKED` with EVERY blocker numbered and named. Exit
+codes: 0 GO, 1 blocked/failed in enforcement mode; `--report` for
+reporting, `--fast` for reuse of a same-job suite run, `--self-test` for
+the gate's own rules.
+
+**Executed today (full mode):** 38 checks → 20 PASS, 0 FAIL, 17 BLOCKED,
+1 NOT RUN (Gradle APK artifact not present in the tree; run the android
+build before deployment). RELEASE STATUS: BLOCKED with 18 numbered
+blockers, all owner-side prerequisites (production URL, DB credentials,
+provider keys, SUPABASE_TEST_* secrets, physical devices, legal owner
+facts). Honest: everything verifiable offline passed, including the
+secrets scan (306 tracked files clean) and Capacitor alignment (all
+@capacitor/* on major 8). Full report saved: docs/RELEASE_GATE_REPORT.txt.
+
+**Wiring:** the release workflow gained a `release-gate` job (needs:
+tests) that runs the gate with all available secrets/vars, publishes the
+full report to the job summary, and emits a BLOCKED warning — CI can now
+never silently claim readiness. The gate is repeatable: run it before
+every production deployment.
+
+**Machine-checked (new suite §25):** the doc lists all 38 required
+checks by name, declares the two-state semantics, defines the four
+statuses, states NOT RUN/BLOCKED are never PASS; the script registers
+exactly 38 checks, emits GO/BLOCKED with numbered blockers, exits nonzero
+when blocked, supports the three repeatability modes; the workflow runs
+the gate; the script's --self-test passes. Suite **889/889**, `tsc`
+clean, `next build` passes, release.yml YAML-validated.
+
+**Honest limits:** the gate reports BLOCKED until the owner supplies the
+production prerequisites. That is the gate working as designed — a
+release cannot be claimed ready while they are missing.
