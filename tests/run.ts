@@ -25,6 +25,10 @@ import {
   type LearningPattern,
 } from "../src/lib/learning/patterns";
 import { buildReadiness, type ReadinessInput } from "../src/lib/readiness";
+import {
+  evaluateFinalGate, formatFinalGate, findUnresolvedPlaceholders,
+  type FinalGateInput, type FinalGateResearch,
+} from "../src/lib/readiness/finalGate";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
 import { PacingController } from "../src/lib/pacing-controller";
@@ -484,6 +488,204 @@ section("8d. Stale-pattern detection (pattern lifecycle round)");
     const empty = buildReadiness({ hasDraft: false, draftWords: 0, verification: null, methodCompliance: null, hasRubricCriteria: false, rubricAudit: null, research: null });
     assert(empty.ready === false && empty.blockers.length === 1,
       "readiness: an assignment with nothing done has exactly one blocker (the draft) — n/a checks never block");
+  }
+
+  section("15k. FINAL SUBMISSION READINESS GATE — machine-enforced (never Ready while a hard requirement fails)");
+  {
+    const NOW = Date.parse("2026-10-05T00:00:00.000Z");
+    const DUE = Date.parse("2026-10-08T00:00:00.000Z"); // 3 days out
+
+    const GATE_DRAFT = [
+      "Introduction",
+      "",
+      "Coral reefs have declined sharply across recent decades (Smith 12). Rising ocean temperatures drive repeated bleaching events that stress entire ecosystems (Jones 5). Scientists widely agree the trend threatens marine biodiversity (Lee 8).",
+      "",
+      "Body",
+      "",
+      "The evidence shows consistent regional loss with few exceptions. Monitoring programs report shrinking cover year after year, and recovery windows keep narrowing. Policy responses remain uneven at best across regions and decades.",
+      "",
+      "Conclusion",
+      "",
+      "The data leave little doubt that reefs face sustained pressure (Smith 13). Continued monitoring matters because these ecosystems support enormous biological diversity along tropical coastlines worldwide today.",
+      "",
+      "Works Cited",
+      "",
+      "Smith, A. The Reef. 2020.",
+      "Jones, B. Oceans. 2019.",
+      "Lee, C. Seas. 2021.",
+    ].join("\n");
+
+    const gateChecklist = buildChecklist({
+      rubricText: "MLA format. Include a Works Cited section.",
+      instructionsText: "at least 80 words. must include: Introduction, Body, Conclusion. No first-person.",
+      teacherDocs: [],
+    });
+
+    // A stored AI-assessed rubric result resolving the semantic catch-all.
+    const withSemantic = (draft: string, status: "satisfied" | "not_satisfied") =>
+      mergeSemanticResults(auditDraft(draft, gateChecklist), [
+        { id: "semantic_rubric", status, evidence: "The rubric was read against the draft (test fixture)" },
+      ]);
+
+    const baseInput = (over: Partial<FinalGateInput> = {}): FinalGateInput => ({
+      nowMs: NOW,
+      draft: GATE_DRAFT,
+      checklist: gateChecklist,
+      persistedAudit: withSemantic(GATE_DRAFT, "satisfied"),
+      verification: { status: "verified", failedChecks: [] },
+      methodCompliance: { status: "compliant", notes: null },
+      research: null,
+      dueMs: DUE,
+      estimatedRemainingWorkMinutes: 30,
+      ...over,
+    });
+
+    // -- 1. Everything genuinely satisfied → READY --
+    const ready = evaluateFinalGate(baseInput());
+    assert(ready.submission_ready === true && ready.status === "READY" && ready.blockers.length === 0,
+      "gate: a fully satisfying draft is READY TO SUBMIT");
+    assert(ready.requirements.some((r) => r.id.startsWith("rubric:wc_min") && r.status === "pass"),
+      "gate: word count is evaluated and passes honestly");
+    assert(ready.requirements.some((r) => r.id.startsWith("rubric:style") && r.status === "pass"),
+      "gate: citation style (MLA) is evaluated");
+    assert(ready.requirements.some((r) => r.id === "rubric:bibliography" && r.status === "pass"),
+      "gate: Works Cited presence is evaluated");
+    assert(ready.requirements.some((r) => r.id === "rubric:semantic_rubric" && r.status === "pass"),
+      "gate: semantic requirements pass only via the stored AI-assessed result");
+    assert(ready.rubric_status.passed >= 5, "gate: rubric status counts are reported");
+    assert(ready.citation_integrity.status === "pass" && ready.citation_integrity.bibliography_ok === true,
+      "gate: citation integrity summary reports pass");
+    assert(ready.requirements.some((r) => r.id === "deadline" && r.status === "pass"),
+      "gate: a feasible deadline passes as a requirement");
+
+    // -- 2. THE central proof: ONE hard failure prevents Ready-to-Submit --
+    const shortDraft = "Introduction\n\nToo short.\n\nConclusion";
+    const oneFail = evaluateFinalGate(baseInput({ draft: shortDraft, persistedAudit: withSemantic(shortDraft, "satisfied") }));
+    assert(oneFail.submission_ready === false && oneFail.status === "NOT_READY",
+      "gate: a single hard failure (word count) ⇒ NOT READY — never labeled ready");
+    assert(oneFail.blockers.some((b) => b.toLowerCase().includes("words")),
+      "gate: the blocker names the exact failed requirement");
+
+    // -- 3. Machine enforcement invariant --
+    assert(oneFail.submission_ready === (oneFail.blockers.length === 0),
+      "gate: submission_ready is machine-enforced — exactly no blockers ⇔ ready");
+
+    // -- 4. Unresolved placeholders block --
+    const placeholderDraft = GATE_DRAFT.replace("The evidence shows consistent regional loss with few exceptions.",
+      "The evidence shows consistent regional loss with few exceptions. [insert quote here]");
+    assert(findUnresolvedPlaceholders(placeholderDraft).length === 1,
+      "gate: placeholder detection finds [insert quote here]");
+    const phGate = evaluateFinalGate(baseInput({ draft: placeholderDraft, persistedAudit: withSemantic(placeholderDraft, "satisfied") }));
+    assert(phGate.submission_ready === false && phGate.blockers.some((b) => b.includes("placeholder")),
+      "gate: unresolved placeholders block submission");
+
+    // -- 5. Missing bibliography blocks + citation integrity fails --
+    const noBibDraft = GATE_DRAFT.split("Works Cited")[0].replace(/\(Smith 12\)\./, ".").replace(/\(Jones 5\)\./, ".").replace(/\(Lee 8\)\./, ".").replace(/\(Smith 13\)\./, ".") + "\nWorks Consulted\n\nSmith, A. The Reef. 2020.";
+    const noBib = evaluateFinalGate(baseInput({ draft: noBibDraft, persistedAudit: withSemantic(noBibDraft, "satisfied") }));
+    assert(noBib.submission_ready === false && noBib.citation_integrity.status === "fail" && noBib.citation_integrity.bibliography_ok === false,
+      "gate: missing Works Cited/Bibliography blocks and fails citation integrity");
+    const noMla = evaluateFinalGate(baseInput({ draft: GATE_DRAFT.replace(/\(Smith 12\)/g, "").replace(/\(Jones 5\)/g, "").replace(/\(Lee 8\)/g, "").replace(/\(Smith 13\)/g, ""), persistedAudit: null }));
+    assert(noMla.submission_ready === false,
+      "gate: no MLA markers at all and no AI assessment → NOT READY");
+
+    // -- 6. Semantic requirements: unverified or failed both block --
+    const unresolved = evaluateFinalGate(baseInput({ persistedAudit: null }));
+    assert(unresolved.submission_ready === false && unresolved.blockers.some((b) => b.includes("could not be verified")),
+      "gate: an unverifiable semantic requirement blocks — never silently passes");
+    const aiFailed = evaluateFinalGate(baseInput({ persistedAudit: withSemantic(GATE_DRAFT, "not_satisfied") }));
+    assert(aiFailed.submission_ready === false && aiFailed.blockers.some((b) => b.includes("rubric")),
+      "gate: an AI-assessed FAILED semantic requirement blocks");
+
+    // -- 7. Prohibited elements block (teacher rule never weakened) --
+    const firstPersonDraft = GATE_DRAFT.replace("The evidence shows consistent regional loss with few exceptions.",
+      "I think I must say I found the evidence striking to me. It shows consistent regional loss.");
+    const banned = evaluateFinalGate(baseInput({ draft: firstPersonDraft, persistedAudit: withSemantic(firstPersonDraft, "satisfied") }));
+    assert(banned.submission_ready === false && banned.blockers.some((b) => b.includes("first person")),
+      "gate: prohibited first-person usage blocks submission (teacher rule enforced)");
+
+    // -- 8. Failed machine verification blocks --
+    const vfail = evaluateFinalGate(baseInput({ verification: { status: "needs_verification", failedChecks: ["arithmetic identity 2x = x + x"] } }));
+    assert(vfail.submission_ready === false && vfail.blockers.some((b) => b.includes("arithmetic identity")),
+      "gate: a failed independent machine check blocks submission");
+
+    // -- 9. Teacher method non-compliance blocks --
+    const mc = evaluateFinalGate(baseInput({ methodCompliance: { status: "non_compliant", notes: "Teacher requires showing all steps." } }));
+    assert(mc.submission_ready === false && mc.blockers.some((b) => b.includes("required methods")),
+      "gate: non-compliance with the teacher's required method blocks submission");
+
+    // -- 10. Research requirements block --
+    const researchInput = (over: Partial<FinalGateResearch>): FinalGateResearch => ({
+      linked: true, minSources: 4, approvedSources: 4,
+      integrity: {
+        research_complete: true, claims_supported: 18, claims_total: 18,
+        urls_resolve: 18, urls_total: 18, authority_satisfied: 4, authority_total: 4, failures: [],
+      },
+      ...over,
+    });
+    const researchOk = evaluateFinalGate(baseInput({ research: researchInput({}) }));
+    assert(researchOk.submission_ready === true && researchOk.research_integrity.status === "pass",
+      "gate: complete research (sources, integrity, authority) passes");
+    const tooFew = evaluateFinalGate(baseInput({ research: researchInput({ approvedSources: 2 }) }));
+    assert(tooFew.submission_ready === false && tooFew.blockers.some((b) => b.includes("required source")),
+      "gate: fewer approved sources than required blocks");
+    const claimsFail = evaluateFinalGate(baseInput({ research: researchInput({
+      integrity: {
+        research_complete: false, claims_supported: 11, claims_total: 18,
+        urls_resolve: 17, urls_total: 18, authority_satisfied: 4, authority_total: 4,
+        failures: [{ claim_text: "Source #4 does not support claim #12", reason: "The passage contradicts the claim." }],
+      },
+    }) }));
+    assert(claimsFail.submission_ready === false &&
+      claimsFail.research_integrity.status === "fail" &&
+      claimsFail.research_integrity.unsupported_claims.some((u) => u.includes("claim #12")) &&
+      claimsFail.blockers.some((b) => b.includes("11/18")),
+      "gate: unsupported factual claims block submission with exact counts and claim names");
+    const authorityFail = evaluateFinalGate(baseInput({ research: researchInput({
+      integrity: {
+        research_complete: true, claims_supported: 18, claims_total: 18,
+        urls_resolve: 18, urls_total: 18, authority_satisfied: 2, authority_total: 4, failures: [],
+      },
+    }) }));
+    assert(authorityFail.submission_ready === false && authorityFail.blockers.some((b) => b.includes("authority")),
+      "gate: a source that fails the authority requirement blocks");
+    const noReport = evaluateFinalGate(baseInput({ research: { linked: true, minSources: 2, approvedSources: 2, integrity: null } }));
+    assert(noReport.submission_ready === false,
+      "gate: linked research without an integrity report blocks — acceptance is never guessed");
+    const notLinked = evaluateFinalGate(baseInput({ research: { linked: false, minSources: null, approvedSources: 0, integrity: null } }));
+    assert(notLinked.research_integrity.status === "not_applicable" && notLinked.submission_ready === true,
+      "gate: no research linked → research checks not applicable, never blocking");
+
+    // -- 11. Deadline feasibility: an honest warning, not a fake pass or a fake block --
+    const pastDue = evaluateFinalGate(baseInput({ dueMs: NOW - 86_400_000 }));
+    assert(pastDue.submission_ready === true && pastDue.warnings.some((w) => w.id === "deadline" && w.evidence.includes("passed")),
+      "gate: a passed deadline is an honest WARNING — the deadline is not a content requirement, and ready drafts stay ready");
+    const infeasible = evaluateFinalGate(baseInput({ dueMs: NOW + 3_600_000, estimatedRemainingWorkMinutes: 600 }));
+    assert(infeasible.warnings.some((w) => w.id === "deadline" && w.status === "warn"),
+      "gate: an infeasible schedule warns honestly instead of pretending the work fits");
+
+    // -- 12. No draft at all --
+    const noDraft = evaluateFinalGate(baseInput({ draft: null, persistedAudit: null }));
+    assert(noDraft.submission_ready === false && noDraft.blockers.length >= 1,
+      "gate: no draft → NOT READY");
+
+    // -- 13. Citation count requirement --
+    const citesList = buildChecklist({ instructionsText: "at least 3 sources required.", rubricText: "", teacherDocs: [] });
+    const citeDraft = "Smith (2020) found decline. Jones (2021) noted warming. Lee (2022) concluded recovery is slow. Conclusion";
+    const citesOk = evaluateFinalGate(baseInput({ checklist: citesList, draft: citeDraft, persistedAudit: null }));
+    assert(citesOk.submission_ready === true,
+      "gate: 3 distinct citations satisfy an explicit citation-count requirement");
+    const citesBad = evaluateFinalGate(baseInput({ checklist: citesList, draft: "Only one citation here. Smith (2020) found decline.", persistedAudit: null }));
+    assert(citesBad.submission_ready === false && citesBad.blockers.some((b) => b.includes("cited sources")),
+      "gate: fewer citations than required blocks submission");
+
+    // -- 14. The rendered block matches the required shape --
+    const text = formatFinalGate(oneFail);
+    assert(text.includes("SUBMISSION READINESS") && text.includes("FAIL") &&
+      text.includes("✗") && text.includes("STATUS: NOT READY") && text.includes("BLOCKED BY"),
+      "gate: the rendered SUBMISSION READINESS block shows PASS/FAIL lines and STATUS: NOT READY");
+    const readyText = formatFinalGate(ready);
+    assert(readyText.includes("STATUS: READY TO SUBMIT") && readyText.includes("✓"),
+      "gate: the rendered block shows ✓ passes and STATUS: READY TO SUBMIT");
   }
 
 section("9. Learning-pattern lifecycle (workflow §10-§12)");

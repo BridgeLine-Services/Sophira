@@ -478,3 +478,60 @@ final run is 0 failed. `tsc` clean; `next build` passes.
 **Existing research verification untouched:** redirect/dead-link
 detection, canonical URL, metadata, hashing, ranking fallback, provider
 and verify suites all pass unchanged.
+
+## 32. FINAL SUBMISSION READINESS GATE (2026-10-05) — 426/426 offline
+
+Prompt: upgrade the existing assignment/rubric validation with a
+MANDATORY final submission gate. The rubric engine (src/lib/rubric.ts)
+was NOT replaced — the gate composes it, the readiness aggregator
+(src/lib/readiness.ts stays untouched) and the stored verification /
+research-integrity records.
+
+**`src/lib/readiness/finalGate.ts`** (pure) + **`/api/readiness/final`**
++ migration **0015** (persisted `responses.submission_gate`) + an
+upgraded ReadinessPanel that renders PASS/FAIL lines and can never
+display "Ready to Submit" unless the machine result computed it.
+
+**Machine-enforced invariant (tested):**
+`submission_ready === (blockers.length === 0)` — ONE hard failure of
+any teacher, rubric, formatting, research or assignment requirement
+⇒ `submission_ready = false`, `STATUS: NOT READY`, with the exact
+blocking reason. A requirement that cannot be VERIFIED also blocks
+("not verified" is never silently treated as satisfied).
+
+**Evaluated by the gate (live, on the CURRENT draft — never a stale
+badge):** assignment instructions, teacher instructions, rubric
+requirements, word count, required sections, formatting, citation
+count, citation style, bibliography/Works Cited/References, required
+sources (approved & verified vs the spec), prohibited elements,
+semantic requirements (stored AI-assessed results reused honestly;
+unresolved semantic blocks), research integrity, claim-to-source
+verification (unsupported claims listed by name — "Source #4 does not
+support claim #12" style), source authority requirements, unresolved
+placeholders (new deterministic detector), unsupported factual claims,
+missing required sections, and deadline feasibility. Deadline
+feasibility is an honest WARNING, not a content requirement: a passed
+deadline warns loudly but does not mark ready content not-ready.
+
+**API returns:** overall status, per-requirement results with evidence
+and corrections, passed requirements, failed requirements, warnings,
+research integrity status, citation integrity status, rubric status
+counts, and the exact blockers. The rendered `formatFinalGate` block
+matches the requested SUBMISSION READINESS / PASS|FAIL / ✓✗ /
+STATUS: NOT READY shape.
+
+**Tests: 33 new assertions (section 15k), suite total 426/426 PASSED.**
+Central proof: a word-count-only failure flips a fully-ready draft to
+NOT READY; placeholders, missing bibliography, unresolved/failed
+semantic criteria, prohibited first person, failed machine checks,
+method non-compliance, too few sources, unsupported claims (with exact
+counts), authority failures, missing integrity report and citation
+shortfalls each block individually; a feasible deadline passes and a
+passed deadline warns honestly. Existing teacher/rubric rules were NOT
+weakened — all 393 prior assertions still pass. `tsc` clean;
+`next build` passes.
+
+**Honest limits:** no live run (external credentials still absent);
+`estimatedRemainingWorkMinutes` is passed as null by the route today
+(the deadline check still runs) — wiring the workload estimator into
+the gate remains future work.

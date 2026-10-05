@@ -5,7 +5,7 @@
     "auditor": "repository implementation audit against requirements (Prompt 1)",
     "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
     "verification": {
-      "offline_tests": "393/393 passed (350 prior + 43 assignment-aware authority assertions added 2026-10-05, third round)",
+      "offline_tests": "426/426 passed (393 prior + 33 final-submission-gate assertions added 2026-10-05, fourth round)",
       "typecheck": "tsc --noEmit strict: clean",
       "build": "next build: 38/38 routes compiled",
       "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 \u2014 production is in the documented DEGRADED mode (no Supabase/AI env configured)",
@@ -380,29 +380,38 @@
       "id": "submission-readiness",
       "title": "Submission readiness",
       "status": "IMPLEMENTED",
-      "notes": "Implemented 2026-10-05 (audit item H1). src/lib/readiness.ts (pure buildReadiness) aggregates draft presence, independent verification (failed machine checks block), teacher method compliance, the persisted rubric audit, and research integrity (unsupported claims block with exact counts) into one mechanical per-assignment verdict. Anything undeterminable is reported as not-ready with the reason \u2014 never guessed. GET /api/readiness?assignment_id=\u2026 + ReadinessPanel in the workspace.",
+      "notes": "IMPLEMENTED and UPGRADED 2026-10-05 (audit item H1 \u2192 final gate round). Level 1: src/lib/readiness.ts (pure buildReadiness) aggregates stored records. Level 2 (mandatory final gate): src/lib/readiness/finalGate.ts \u2014 machine-enforced submission_ready=false when ANY hard teacher/rubric/formatting/research/assignment requirement fails; unverifiable requirements block too; live auditDraft on the current draft merged with stored AI-assessed semantics; placeholders, claims, authority, sources, deadline feasibility; result persisted (migration 0015 responses.submission_gate) and rendered as a PASS/FAIL block that can never show a misleading Ready state.",
       "files": [
         "src/lib/readiness.ts",
+        "src/lib/readiness/finalGate.ts",
         "src/app/api/readiness/route.ts",
+        "src/app/api/readiness/final/route.ts",
         "src/components/app/ReadinessPanel.tsx",
-        "src/app/assignments/[id]/Workspace.tsx"
+        "src/app/assignments/[id]/Workspace.tsx",
+        "supabase/migrations/0015_submission_gate.sql"
       ],
       "functions": [
         "buildReadiness",
-        "GET /api/readiness"
+        "evaluateFinalGate",
+        "findUnresolvedPlaceholders",
+        "formatFinalGate",
+        "GET /api/readiness/final"
       ],
       "tables": [
-        "responses",
+        "responses (submission_gate, migration 0015)",
+        "assignments",
+        "teachers",
         "rubric_audits",
         "research_projects",
-        "assignments",
-        "teachers"
+        "research_sources"
       ],
       "apis": [
-        "/api/readiness"
+        "/api/readiness",
+        "/api/readiness/final"
       ],
       "tests_existing": [
-        "24 assertions in tests/run.ts sections 8d (stale) + 15j (readiness)"
+        "24 assertions in sections 8d+15j",
+        "33 assertions in section 15k (final gate, machine enforcement)"
       ],
       "tests_missing": [
         "Live end-to-end with a configured backend (external credentials)"
