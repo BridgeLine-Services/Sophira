@@ -969,4 +969,62 @@ const __researchTests = (async () => {
   }
 })();
 
-__fileTests.then(() => __researchTests).then(() => run()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+// ---------------------------------------------------------------------------
+// /api/health deployment-configuration readiness (implementation-audit round
+// 2026-10-05, critical blocker CB3): the endpoint must report WHICH
+// capabilities are configured (booleans only, never values) so a degraded
+// production deployment is diagnosable in one curl. The live §27 production
+// incident (500s for days because nobody could tell env vars were missing)
+// is exactly what this prevents.
+// ---------------------------------------------------------------------------
+async function runHealthTests(): Promise<void> {
+  const KEYS = [
+    "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY",
+    "SEARCH_API_KEY", "SEARCH_BASE_URL", "SEARCH_PROVIDER",
+  ];
+  const saved: Record<string, string | undefined> = {};
+  for (const k of KEYS) { saved[k] = process.env[k]; delete process.env[k]; }
+  try {
+    const { GET } = await import("../src/app/api/health/route");
+    const bodyOf = async () => { const r = await GET(); return r.json() as Promise<{ ok: boolean; name: string; configuration: { supabase: boolean; supabase_service_role: boolean; ai: boolean; search: boolean } }>; };
+
+    const degraded = await bodyOf();
+    assert(degraded.ok === true && degraded.name === "sophira", "health: liveness ok even with nothing configured (no 500)");
+    assert(degraded.configuration.supabase === false && degraded.configuration.supabase_service_role === false, "health: degraded deployment honestly reports supabase NOT configured");
+    assert(degraded.configuration.ai === false && degraded.configuration.search === false, "health: degraded deployment honestly reports ai/search NOT configured");
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://demo.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
+    const partial = await bodyOf();
+    assert(partial.configuration.supabase === true && partial.configuration.ai === false, "health: partial configuration reported per-capability, no all-or-nothing guess");
+
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+    process.env.OPENAI_API_KEY = "sk-test";
+    process.env.SEARCH_API_KEY = "search-key";
+    const full = await bodyOf();
+    assert(full.configuration.supabase_service_role === true && full.configuration.ai === true && full.configuration.search === true, "health: fully configured deployment reports every capability true");
+
+    delete process.env.SEARCH_API_KEY;
+    process.env.SEARCH_PROVIDER = "custom";
+    const customNoBase = await bodyOf();
+    assert(customNoBase.configuration.search === false, "health: custom search provider without SEARCH_BASE_URL is honestly unconfigured");
+    process.env.SEARCH_API_KEY = "search-key";
+    process.env.SEARCH_BASE_URL = "https://search-proxy.example/search";
+    const customOk = await bodyOf();
+    assert(customOk.configuration.search === true, "health: custom provider with base URL + key reports configured");
+
+    // No secret VALUE may ever appear in the response body.
+    const raw = JSON.stringify(customOk);
+    assert(!raw.includes("sk-test") && !raw.includes("service-key") && !raw.includes("search-proxy"), "health: response leaks NO secret values, only booleans");
+  } finally {
+    for (const k of KEYS) {
+      if (saved[k] !== undefined) process.env[k] = saved[k];
+      else delete process.env[k];
+    }
+  }
+}
+
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
