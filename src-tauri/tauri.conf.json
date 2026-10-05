@@ -8,7 +8,7 @@
     "windows": [
       {
         "title": "Sophira",
-        "url": "https://sophira.example.com",
+        "url": "http://localhost:3000",
         "width": 1280,
         "height": 832,
         "minWidth": 360,

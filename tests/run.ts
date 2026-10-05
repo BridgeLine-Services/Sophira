@@ -46,6 +46,10 @@ import {
   recomputeTypingProfile, effectiveTypingPace, trustworthyObservations,
   RECENT_WINDOW, PLAUSIBLE_MAX_WPM, type ObservedTypingAttempt,
 } from "../src/lib/typing-profile";
+import {
+  validateNativeAppUrl, resolveNativeServerUrl, isReleaseBuild,
+  REMOVED_FALLBACK_URL, DEV_DEFAULT_URL,
+} from "../src/lib/native-url";
 import * as fs from "fs";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
@@ -2217,4 +2221,72 @@ async function runTypingProfileTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+// ---------------------------------------------------------------------------
+// NATIVE APP URL — no silent production fallback (2026-10-05). Release
+// builds REQUIRE a defined, valid, non-placeholder https SOPHIRA_APP_URL;
+// dev builds use an explicit development configuration. A provided URL is
+// always strictly validated — there is no fallback to hide behind.
+// ---------------------------------------------------------------------------
+async function runNativeUrlTests(): Promise<void> {
+  section("21. Native app URL — no silent production fallback");
+  {
+    const throwsMsg = (fn: () => unknown, name: string) => {
+      let threw = false;
+      try { fn(); } catch { threw = true; }
+      assert(threw, name);
+    };
+    // ---- Release builds must fail without a real URL ---------------
+    assert(isReleaseBuild({ SOPHIRA_NATIVE_RELEASE: "1" }) === true &&
+      isReleaseBuild({ SOPHIRA_NATIVE_RELEASE: "true" }) === true &&
+      isReleaseBuild({}) === false,
+      "url: release mode is explicit (SOPHIRA_NATIVE_RELEASE=1|true), never guessed");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_NATIVE_RELEASE: "1" }),
+      "url: a release build WITHOUT SOPHIRA_APP_URL fails — no silent fallback");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_NATIVE_RELEASE: "1", SOPHIRA_APP_URL: REMOVED_FALLBACK_URL }),
+      "url: a release build with the old placeholder fails");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_NATIVE_RELEASE: "1", SOPHIRA_APP_URL: "https://myapp.example.com" }),
+      "url: a release build with any example.com placeholder fails");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_NATIVE_RELEASE: "1", SOPHIRA_APP_URL: "https://your-sophira-domain.com" }),
+      "url: a release build with a your-* placeholder fails");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_NATIVE_RELEASE: "1", SOPHIRA_APP_URL: "not a url" }),
+      "url: a malformed release URL fails the build");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_NATIVE_RELEASE: "1", SOPHIRA_APP_URL: "http://sophira.app" }),
+      "url: a non-https release URL fails the build");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_NATIVE_RELEASE: "1", SOPHIRA_APP_URL: "https://localhost:3000" }),
+      "url: a release build cannot point at localhost");
+
+    // ---- Valid release URL -----------------------------------------
+    const ok = resolveNativeServerUrl({ SOPHIRA_NATIVE_RELEASE: "1", SOPHIRA_APP_URL: "https://sophira.real.app/" });
+    assert(ok.url === "https://sophira.real.app" && ok.cleartext === false && ok.mode === "release",
+      "url: a valid https release URL is accepted and normalized (no trailing slash, no cleartext)");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_NATIVE_RELEASE: "1", SOPHIRA_APP_URL: "https://user:pw@sophira.app" }),
+      "url: credentials in the URL are rejected");
+
+    // ---- Dev builds use the EXPLICIT development configuration ------
+    const dev = resolveNativeServerUrl({});
+    assert(dev.url === DEV_DEFAULT_URL && dev.cleartext === true && dev.mode === "dev",
+      "url: a dev build without SOPHIRA_APP_URL uses the explicit development configuration (localhost, cleartext allowed)");
+    assert(resolveNativeServerUrl({ SOPHIRA_APP_URL: "https://sophira.real.app" }).url === "https://sophira.real.app",
+      "url: a dev build WITH a provided URL uses it");
+    assert(resolveNativeServerUrl({ NEXT_PUBLIC_SITE_URL: "http://localhost:5173" }).url === "http://localhost:5173",
+      "url: NEXT_PUBLIC_SITE_URL is honored as the dev configuration");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_APP_URL: "https://sophira.example.com" }),
+      "url: a PROVIDED placeholder fails even in dev — no silent fallback anywhere");
+    throwsMsg(() => resolveNativeServerUrl({ SOPHIRA_APP_URL: "ftp://x" }),
+      "url: a provided non-http(s) URL fails even in dev");
+
+    // ---- The old fallback is gone from the config itself ------------
+    const capCfg = fs.readFileSync("capacitor.config.ts", "utf8");
+    assert(!capCfg.includes('|| "https://sophira.example.com"'),
+      "url: capacitor.config.ts contains NO silent placeholder fallback anymore");
+    const tauriCfg = fs.readFileSync("src-tauri/tauri.conf.json", "utf8");
+    assert(!tauriCfg.includes("sophira.example.com"),
+      "url: tauri.conf.json no longer hardcodes the fake production URL (dev default; release patches it via scripts/native-url.mjs)");
+    const urlValid = validateNativeAppUrl("https://sophira.app", "release");
+    assert(urlValid.ok === true && urlValid.url === "https://sophira.app",
+      "url: the pure validator accepts a clean https URL");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

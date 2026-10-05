@@ -10,10 +10,10 @@
     "lint": "next lint",
     "test": "tsc -p tests/tsconfig.json && node tests-dist/tests/run.js",
     "cap:sync": "cap sync android && cap sync ios",
-    "android:build": "cap sync android && cd android && ./gradlew assembleRelease",
+    "android:build": "SOPHIRA_NATIVE_RELEASE=1 npx cap sync android && cd android && ./gradlew assembleRelease",
     "android:debug": "cap sync android && cd android && ./gradlew assembleDebug",
     "ios:sync": "cap sync ios",
-    "desktop:build": "tauri build",
+    "desktop:build": "SOPHIRA_NATIVE_RELEASE=1 node scripts/native-url.mjs --write-tauri && tauri build",
     "desktop:dev": "tauri dev",
     "legal:status": "node scripts/legal-status.mjs"
   },
@@ -38,7 +38,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.6.9",
+    "@capacitor/cli": "^8.5.2",
     "@tauri-apps/cli": "^2.12.0",
     "@types/node": "20.12.12",
     "@types/react": "18.3.1",

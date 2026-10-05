@@ -29,8 +29,24 @@ All builds read the URL from one place:
 | Desktop | `src-tauri/tauri.conf.json` → `app.windows[0].url` | edit, or CI sets it from the variable |
 | CI | repository **variable** `SOPHIRA_APP_URL` | Settings → Secrets and variables → Actions → Variables |
 
-The placeholder `https://sophira.example.com` is deliberately refused by the
-release pipeline.
+**There is NO silent fallback (2026-10-05).** The old placeholder
+(`https://sophira.example.com`) was removed entirely from the build
+configuration. URL resolution is validated by `src/lib/native-url.ts`
+(unit-tested) and enforced at build time:
+
+- **Release builds** (`android:build`, `desktop:build`, and the release
+  workflow — all run with `SOPHIRA_NATIVE_RELEASE=1`): `SOPHIRA_APP_URL`
+  MUST be defined, valid, `https`, and not a placeholder. Missing,
+  placeholder, malformed, non-https, localhost, or credentialed URLs all
+  FAIL the build with a clear error.
+- **Development builds** (`cap:sync`, `android:debug`): an explicit
+  development configuration is used when `SOPHIRA_APP_URL` is not set —
+  `SOPHIRA_DEV_URL`, then `NEXT_PUBLIC_SITE_URL`, then
+  `http://localhost:3000` — chosen loudly, never silently. A *provided*
+  URL is still strictly validated: a placeholder fails even in dev.
+- The desktop release patches `src-tauri/tauri.conf.json` with the
+  validated URL via `scripts/native-url.mjs --write-tauri` (self-tested,
+  exit code 1 on any violation).
 
 ## Android
 

@@ -53,7 +53,7 @@ jobs:
         run: node scripts/verify-deployment.mjs "${{ vars.SOPHIRA_APP_URL }}"
       - run: npm ci
       - name: Bake the deployment URL into the Android shell
-        run: SOPHIRA_APP_URL="${{ vars.SOPHIRA_APP_URL }}" npx cap sync android
+        run: SOPHIRA_NATIVE_RELEASE=1 SOPHIRA_APP_URL="${{ vars.SOPHIRA_APP_URL }}" npx cap sync android
       - name: Verify no placeholder URL remains
         run: "! grep -q 'sophira.example.com' android/app/src/main/assets/capacitor.config.json"
       - name: Decode release keystore (only if configured; decoded only on the runner)
@@ -109,7 +109,7 @@ jobs:
         run: node scripts/verify-deployment.mjs "${{ vars.SOPHIRA_APP_URL }}"
       - run: npm ci
       - name: Sync Capacitor (runs pod install via the Podfile)
-        run: SOPHIRA_APP_URL="${{ vars.SOPHIRA_APP_URL }}" npx cap sync ios
+        run: SOPHIRA_NATIVE_RELEASE=1 SOPHIRA_APP_URL="${{ vars.SOPHIRA_APP_URL }}" npx cap sync ios
       - name: Verify no placeholder URL remains
         run: "! grep -q 'sophira.example.com' ios/App/App/capacitor.config.json"
       - name: Archive (signed when Apple secrets exist, otherwise an honest unsigned archive)
@@ -209,7 +209,7 @@ jobs:
         run: |
           test -n "${SOPHIRA_APP_URL:-}" || { echo "::error::Set the SOPHIRA_APP_URL repository variable."; exit 1; }
           test "${SOPHIRA_APP_URL}" != "https://sophira.example.com" || { echo "::error::SOPHIRA_APP_URL is still the placeholder."; exit 1; }
-          node -e "const fs=require('fs');const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p));c.app.windows[0].url=process.env.SOPHIRA_APP_URL;fs.writeFileSync(p,JSON.stringify(c,null,2));"
+          SOPHIRA_NATIVE_RELEASE=1 node scripts/native-url.mjs --write-tauri
         env:
           SOPHIRA_APP_URL: ${{ vars.SOPHIRA_APP_URL }}
       - name: Verify the target deployment is configured (refuse to release against a misconfigured deployment)

@@ -5,7 +5,7 @@
     "auditor": "repository implementation audit against requirements (Prompt 1)",
     "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
     "verification": {
-      "offline_tests": "520/520 passed (505 prior + 15 adaptive-typing-profile assertions added 2026-10-05)",
+      "offline_tests": "538/538 passed (520 prior + 18 native-URL gate assertions added 2026-10-05)",
       "typecheck": "tsc --noEmit strict: clean",
       "build": "next build: 38/38 routes compiled",
       "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 \u2014 production is in the documented DEGRADED mode (no Supabase/AI env configured)",
@@ -761,22 +761,32 @@
       "id": "capacitor-packaging",
       "title": "Native Capacitor packaging",
       "status": "IMPLEMENTED",
-      "notes": "android/ (Gradle, APK built+verified with checksums, TEST_REPORT \u00a721) and ios/ (Xcode project) load the deployed web app via server.url; do not fork logic. Not device-tested.",
+      "notes": "android/ (Gradle, APK built+verified with checksums, TEST_REPORT \u00a721) and ios/ (Xcode project) load the deployed web app via server.url; do not fork logic. Not device-tested. NATIVE BUILD CONFIG FIX (2026-10-05): silent placeholder fallback REMOVED (capacitor.config.ts + tauri.conf.json); src/lib/native-url.ts (pure, tested) + scripts/native-url.mjs (self-test 11/11); release builds (SOPHIRA_NATIVE_RELEASE=1) FAIL on missing/placeholder/malformed/non-https/localhost/credentialed SOPHIRA_APP_URL; dev builds use the explicit dev configuration (SOPHIRA_DEV_URL \u2192 NEXT_PUBLIC_SITE_URL \u2192 localhost:3000); release.yml android/ios sync + desktop tauri patch run in release mode; Capacitor aligned to one major: cli 7.6.9 \u2192 8.5.2 joining android/core/ios 8.5.2 (plugins app 8.1.1, camera 8.2.4); npm install + tsc + 538/538 tests + next build + cap sync android/ios verified in-sandbox; gradle/xcode/tauri builds run only in CI (no local toolchain).",
       "files": [
-        "capacitor.config.ts",
+        ".github/workflows/release.yml",
         "android/app/build.gradle",
+        "capacitor.config.ts",
         "ios/App/",
-        "src/app/downloads/page.tsx"
+        "package-lock.json",
+        "package.json",
+        "scripts/native-url.mjs",
+        "src-tauri/tauri.conf.json",
+        "src/app/downloads/page.tsx",
+        "src/lib/native-url.ts"
       ],
       "functions": [
         "cap sync",
-        "server.url remote loading"
+        "isReleaseBuild",
+        "resolveNativeServerUrl",
+        "server.url remote loading",
+        "validateNativeAppUrl"
       ],
       "tables": [],
       "apis": [],
       "tests_existing": [
         "CI native-project presence checks",
-        "real local Gradle build (\u00a721)"
+        "real local Gradle build (\u00a721)",
+        "section 21: 18 assertions \u2014 release gate, dev config, config-file absence of fallback"
       ],
       "tests_missing": [
         "Device install/launch runs"
@@ -792,20 +802,30 @@
       "id": "native-deployment-config",
       "title": "Native deployment configuration",
       "status": "IMPLEMENTED",
-      "notes": "Release pipeline complete (signing via secrets, checksums, honest unsigned fallback, placeholder-URL refusal) but DORMANT pending external repo config.",
+      "notes": "Release pipeline complete (signing via secrets, checksums, honest unsigned fallback, placeholder-URL refusal) but DORMANT pending external repo config. NATIVE BUILD CONFIG FIX (2026-10-05): silent placeholder fallback REMOVED (capacitor.config.ts + tauri.conf.json); src/lib/native-url.ts (pure, tested) + scripts/native-url.mjs (self-test 11/11); release builds (SOPHIRA_NATIVE_RELEASE=1) FAIL on missing/placeholder/malformed/non-https/localhost/credentialed SOPHIRA_APP_URL; dev builds use the explicit dev configuration (SOPHIRA_DEV_URL \u2192 NEXT_PUBLIC_SITE_URL \u2192 localhost:3000); release.yml android/ios sync + desktop tauri patch run in release mode; Capacitor aligned to one major: cli 7.6.9 \u2192 8.5.2 joining android/core/ios 8.5.2 (plugins app 8.1.1, camera 8.2.4); npm install + tsc + 538/538 tests + next build + cap sync android/ios verified in-sandbox; gradle/xcode/tauri builds run only in CI (no local toolchain).",
       "files": [
         ".github/workflows/release.yml",
+        "capacitor.config.ts",
         "docs/NATIVE_BUILDS.md",
-        "docs/RELEASE_PROCESS.md"
+        "docs/RELEASE_PROCESS.md",
+        "package-lock.json",
+        "package.json",
+        "scripts/native-url.mjs",
+        "src-tauri/tauri.conf.json",
+        "src/lib/native-url.ts"
       ],
       "functions": [
+        "SHA256SUMS generation",
+        "isReleaseBuild",
         "release matrix (Android/iOS/Windows/macOS/Linux)",
-        "SHA256SUMS generation"
+        "resolveNativeServerUrl",
+        "validateNativeAppUrl"
       ],
       "tables": [],
       "apis": [],
       "tests_existing": [
-        "workflow YAML validated; native presence checks in CI"
+        "workflow YAML validated; native presence checks in CI",
+        "section 21: 18 assertions \u2014 release gate, dev config, config-file absence of fallback"
       ],
       "tests_missing": [
         "A published release end-to-end"

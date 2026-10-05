@@ -774,3 +774,59 @@ passes.
 is compile-checked and build-checked but not exercised against a live
 server (no production env yet); the profile math and trust filter are
 fully offline-tested.
+
+## 37. Native build configuration: no silent production fallback + Capacitor 8 alignment (2026-10-05) — 538/538 offline
+
+TASK 1 — SOPHIRA_APP_URL. The silent fallback
+`url: process.env.SOPHIRA_APP_URL || "https://sophira.example.com"` was
+REMOVED from capacitor.config.ts, and the hardcoded placeholder in
+src-tauri/tauri.conf.json was replaced by the explicit development URL.
+The native architecture was NOT rebuilt — only URL resolution. New pure
+module `src/lib/native-url.ts` (unit-tested, §21) + CLI wrapper
+`scripts/native-url.mjs` (self-tested, 11/11):
+
+- RELEASE builds (`SOPHIRA_NATIVE_RELEASE=1` — used by `android:build`,
+  `desktop:build`, and all release-workflow sync/patch steps): FAIL when
+  SOPHIRA_APP_URL is missing, a placeholder (sophira.example.com, any
+  example.com/your-* pattern), malformed, non-https, localhost, or
+  credentialed. Verified live: all four failure classes abort `cap sync`
+  before any artifact is produced; a valid https URL syncs with
+  cleartext:false and the trailing slash normalized.
+- DEV builds: no SOPHIRA_APP_URL → the EXPLICIT development configuration
+  (SOPHIRA_DEV_URL → NEXT_PUBLIC_SITE_URL → http://localhost:3000,
+  cleartext only for localhost, stated loudly). A provided URL is still
+  strictly validated — a placeholder fails even in dev (no silent
+  fallback anywhere, verified).
+- CI release.yml now runs the android/ios syncs and the desktop tauri
+  patch in release mode as well, so the config-level gate backs up the
+  existing workflow guards.
+
+TASK 2 — Capacitor version alignment. The project ran @capacitor/cli 7.6.9
+against android/core/ios 8.5.2 (mixed majors). The compatible major for
+the existing project is **8** (all platforms and the plugins
+@capacitor/app 8.1.1, @capacitor/camera 8.2.4 are 8.x; Node 20/24 and
+the existing android/ios projects match Capacitor 8). Only the CLI was
+changed — no unrelated dependencies were touched. After `npm install`:
+
+    @capacitor/android 8.5.2
+    @capacitor/ios     8.5.2
+    @capacitor/core    8.5.2
+    @capacitor/cli     8.5.2   (was 7.6.9 — aligned)
+    @capacitor/app    8.1.1
+    @capacitor/camera 8.2.4
+
+All majors are 8 — no mixed versions remain.
+
+**Verification run:** dependency install ✓, `tsc --noEmit` ✓, suite
+**538/538** ✓ (18 new §21 assertions), `next build` ✓, `cap sync android`
+✓ (dev config baked; release gate verified), `cap sync ios` ✓. The native
+Gradle/Xcode builds and `tauri build` were NOT run here — this sandbox has
+no JDK/Gradle/CocoaPods/Rust toolchain; they run in the release workflow
+on GitHub runners (unchanged, already gated).
+
+**Tests: 18 new assertions (section 21), suite total 538/538 PASSED.**
+`tsc` clean; `next build` passes; `native-url.mjs --self-test` 11/11.
+
+**Honest limits:** live APK/ipa/desktop artifacts still require the owner
+to set the `SOPHIRA_APP_URL` repository variable and tag a release — the
+placeholder guards now fail closed instead of silently shipping a fake URL.
