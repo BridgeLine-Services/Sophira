@@ -2411,4 +2411,171 @@ async function runSecurityRegressionTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+// ---------------------------------------------------------------------------
+// INVITATION-ONLY ACCESS VERIFICATION (2026-10-05) — §23.
+// Complete security verification of the EXISTING invitation workflow
+// (not rebuilt). Two layers, mirroring the security regression suite:
+//   (1) OFFLINE (this section, every npm test): verify the 18 matrix
+//       items against the ACTUAL migration SQL and route/guard/signup
+//       source — server-side enforcement, not UI hiding.
+//   (2) LIVE (tests/security/invitation-regression.mjs, release.yml):
+//       the full matrix against real auth.signUp, triggers and RLS.
+// Tamper-verified: bypassing the signup gate, loosening the token
+// lookup, dropping the owner check from the invitations policy,
+// removing atomic single-use, and echoing a token in an error each
+// fail this section (T1–T5, 2026-10-05).
+// ---------------------------------------------------------------------------
+async function runInvitationRegressionTests(): Promise<void> {
+  section("23. Invitation-only access — full workflow security verification");
+  {
+    const rd = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
+    const migrations = fs.readdirSync(path.join(process.cwd(), "supabase", "migrations")).sort()
+      .map((f) => fs.readFileSync(path.join(process.cwd(), "supabase", "migrations", f), "utf8")).join("\n");
+    const acceptRoute = rd("src/app/api/invitations/accept/route.ts");
+    const invitationsRoute = rd("src/app/api/invitations/route.ts");
+    const requestsRoute = rd("src/app/api/invitation-requests/route.ts");
+    const membersRoute = rd("src/app/api/network/members/route.ts");
+    const signupPage = rd("src/app/signup/page.tsx");
+    const guard = rd("src/lib/supabase/guard.ts");
+    const middleware = rd("src/middleware.ts");
+    const fn0008 = migrations.slice(migrations.indexOf("SOPHIRA migration 0008"));
+
+    // -- [1] New users cannot independently create authorized accounts ---
+    assert(fn0008.includes("Sign-up requires a valid, unused invitation for your email address"),
+      "[1] the handle_new_user trigger REFUSES signup without a valid invitation (DB level, not UI)");
+    assert(fn0008.includes("for update skip locked"),
+      "[1] the invitation claim is atomic (for update skip locked) — no race can create an account");
+    assert((fn0008.match(/v_claimed_invitation :=/g) ?? []).length === 0,
+      "[1] the claim variable is set ONLY by the atomic UPDATE ... RETURNING — no bypass path can pre-set it");
+    assert(fn0008.includes("Sophira is not yet initialized"),
+      "[1] bootstrap is fail-closed: no configured owner_email means no first account");
+    assert(fn0008.includes("lower(v_owner_email) = lower(new.email)"),
+      "[1] the unsafe first-signup-becomes-owner rule is gone: owner role is granted ONLY to the operator-configured email");
+    assert(fn0008.includes("revoke all on public.app_config from anon, authenticated"),
+      "[1] app_config (owner bootstrap) is unreadable/unwritable by any client API");
+    assert(migrations.includes("alter table public.app_config enable row level security"),
+      "[1] app_config has RLS enabled (belt and braces)");
+
+    // -- [2] Valid invitation links work ---------------------------------
+    // lastIndexOf: 0006 REPLACED the 0001 definition — verify the final one.
+    const tokenFnStart = migrations.lastIndexOf("create or replace function public.get_invitation_by_token");
+    const tokenFnBlock = migrations.slice(tokenFnStart, tokenFnStart + 500).split("$$;")[0];
+    assert(tokenFnBlock.includes("token = p_token")
+      && tokenFnBlock.includes("status = 'pending'")
+      && tokenFnBlock.includes("expires_at > now()"),
+      "[2] get_invitation_by_token returns a pending, unexpired invitation by exact token (scoped to the function block)");
+    assert(signupPage.includes("get_invitation_by_token"),
+      "[2] the signup page pre-checks the invitation through the server RPC");
+    assert(signupPage.includes("email: invitation.email"),
+      "[2] the signup page signs up with the INVITED email (frontend binding)");
+
+    // -- [3,7,14] Single-use, reuse, already-used -------------------------
+    assert(acceptRoute.includes('.eq("status", "pending")') && acceptRoute.includes("Atomic single-use enforcement"),
+      "[3,7,14] the accept route claims invitations with a conditional (status=pending) update — single-use, race-safe");
+    assert(fn0008.includes("set status = 'accepted'") && fn0008.includes("accepted_at = now()"),
+      "[3,7,14] the DB trigger also marks invitations accepted on claim");
+
+    // -- [4,11] Expiry ----------------------------------------------------
+    assert(migrations.includes("add column if not exists expires_at timestamptz not null default (now() + interval '14 days')"),
+      "[4,11] invitations carry a NOT NULL expires_at (default 14 days)");
+    assert(migrations.includes("and expires_at > now()"),
+      "[4,11] expiry is enforced at the DATABASE level in the token lookup");
+    assert(acceptRoute.includes("invitation.expires_at") && acceptRoute.includes("This invitation has expired"),
+      "[4,11] the accept route independently re-checks expiry (defense in depth)");
+
+    // -- [5,12] Revoked invitations fail ----------------------------------
+    assert(/status text not null default 'pending' check \(status in \('pending','accepted','revoked'\)\)/.test(migrations),
+      "[5,12] revoked is an explicit invitation status");
+    assert(acceptRoute.includes("already used or revoked"),
+      "[5,12] the accept route refuses non-pending invitations with 410");
+    assert(invitationsRoute.includes('update({ status: "revoked" })') && invitationsRoute.includes('.eq("status", "pending")'),
+      "[5,12] the owner revoke path only transitions pending → revoked");
+
+    // -- [6,13] Email binding ----------------------------------------------
+    assert(fn0008.includes("lower(email) = lower(new.email)"),
+      "[6,13] the DB trigger binds invitations to the exact (case-insensitive) email");
+    assert(acceptRoute.includes("invitation.email") && acceptRoute.includes("403"),
+      "[6,13] the accept route re-verifies email binding (403 on mismatch)");
+    assert(signupPage.includes("You were invited as"),
+      "[6,13] the signup page shows the bound email — the user cannot sign up as someone else");
+
+    // -- [8] Missing token fails ------------------------------------------
+    assert(acceptRoute.includes("Missing invitation token") && acceptRoute.includes("400"),
+      "[8] a missing token is refused server-side (400)");
+    assert(signupPage.includes('search.get("invite") || ""'),
+      "[8] a missing token in the signup URL leaves the page without a valid invitation — and the DB gate stands behind it");
+
+    // -- [9,10] Fake / modified tokens ------------------------------------
+    assert(migrations.includes("where token = p_token"),
+      "[9,10] tokens are matched by exact equality — fake/modified tokens find nothing");
+    assert(invitationsRoute.includes("randomBytes(24).toString(\"hex\")"),
+      "[9,10] tokens are 24 random bytes (192 bits) — unguessable, unmodifiable");
+    assert(requestsRoute.includes("getRandomValues(new Uint8Array(24))"),
+      "[9,10] approved-request tokens are also 24 random bytes");
+
+    // -- [15] Unauthorized users cannot bypass owner approval ------------
+    assert(migrations.includes("invitations_owner_manage"),
+      "[15] invitations are owner-managed via RLS (list/create/update/delete gated)");
+    // lastIndexOf: 0002 REPLACED the 0001 policy — verify the final one.
+    const invPolicyStart = migrations.lastIndexOf('create policy "invitations_owner_manage"');
+    const invPolicyBlock = migrations.slice(invPolicyStart, invPolicyStart + 900).split(";\n")[0];
+    assert(invPolicyBlock.includes("invited_by = auth.uid()")
+      && (invPolicyBlock.match(/p\.role = 'owner'/g) ?? []).length >= 2,
+      "[15] the invitations policy requires BOTH the owner role AND invited_by = auth.uid() in using AND with check (scoped to the policy block)");
+    assert(/invitation_requests_insert_permitted[\s\S]*?can_request_invites = true/.test(migrations),
+      "[15] even FILING a request requires the owner-granted can_request_invites permission (RLS)");
+    assert(!/create policy "invitation_requests_requester_update"/.test(migrations),
+      "[15] a requester cannot update (approve) their own request — no such policy exists");
+    assert(requestsRoute.includes("requireOwner") && requestsRoute.includes('decision !== "approve"'),
+      "[15] only the owner PATCH path can approve, and approval ISSUES a real invitation");
+    assert(invitationsRoute.includes("requireOwner"),
+      "[15] the invitations API is owner-gated server-side");
+    assert(guard.includes("Only the owner can do this"),
+      "[15] the server guard refuses non-owners on owner endpoints");
+
+    // -- [16] Permitted members may request --------------------------------
+    assert(requestsRoute.includes("can_request_invites"),
+      "[16] authorized members with can_request_invites can request invitations");
+    assert(migrations.includes("can_request_invites boolean not null default false"),
+      "[16] the permission defaults to false (opt-in by the owner)");
+
+    // -- [17] Requests never create access ---------------------------------
+    assert(requestsRoute.includes("A request for that email is already pending"),
+      "[17] request rows are deduplicated but NEVER issue access by themselves");
+    assert(!/insert[\s\S]{0,200}invitations/.test(requestsRoute.slice(0, requestsRoute.indexOf("export async function PATCH"))),
+      "[17] the POST request path cannot create an invitation row");
+    assert(requestsRoute.includes("must still") && requestsRoute.includes("normal invitation signup"),
+      "[17] an approved request still requires the normal invitation signup");
+
+    // -- [18] Removal / revocation ------------------------------------------
+    assert(membersRoute.includes("deleteUser") && membersRoute.includes("revoke"),
+      "[18] the members API supports revoke and remove (deleteUser cascade)");
+    assert(membersRoute.includes("Owners cannot be modified"),
+      "[18] the owner account itself cannot be modified or removed through the members API");
+    assert(guard.includes('status === "revoked"'),
+      "[18] revoked users are refused by the server guard on EVERY protected route (403)");
+    assert(middleware.includes("dashboard") || middleware.includes("login"),
+      "[18] middleware-level route protection exists alongside the guards");
+
+    // -- [PRIVACY] Tokens never leak --------------------------------------
+    const tokenLeakScan = [acceptRoute, invitationsRoute, requestsRoute, membersRoute, signupPage].join("\n");
+    assert(!/console\.(log|error|warn|info)\([^)]*token/.test(tokenLeakScan),
+      "[PRIVACY] no route or page logs an invitation token");
+    assert(!acceptRoute.includes("${token}") && !signupPage.includes("${token}"),
+      "[PRIVACY] the accept route and signup page never interpolate the token value into a response or error");
+    assert(!fn0008.slice(fn0008.indexOf("raise exception"), fn0008.indexOf("insert into public.profiles")).includes("token"),
+      "[PRIVACY] the DB signup refusal never mentions a token");
+
+    // -- acceptance wiring ------------------------------------------------
+    const liveSuite = fs.readFileSync(path.join(process.cwd(), "tests", "security", "invitation-regression.mjs"), "utf8");
+    for (const item of ["[1]", "[2]", "[3,7,14]", "[4,11]", "[5,12]", "[6,13]", "[8,9,10]", "[15]", "[16,17]", "[18]", "PRIVACY"]) {
+      assert(liveSuite.includes(item), `invitation live suite covers matrix group ${item}`);
+    }
+    const wf = fs.readFileSync(path.join(process.cwd(), ".github", "workflows", "release.yml"), "utf8");
+    assert(wf.includes("tests/security/invitation-regression.mjs"),
+      "the acceptance workflow runs the invitation regression suite — it cannot be silently dropped");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

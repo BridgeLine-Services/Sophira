@@ -149,6 +149,23 @@ async function createUser(name) {
   return { id: data.user.id, email, password };
 }
 
+// Migration 0008 made signup invitation-only at the DB level (the very
+// boundary under test in the invitation suite): handle_new_user refuses
+// any account without a pending invitation, and the FIRST account requires
+// app_config.owner_email. Bootstrap accordingly — owner_email first, an
+// invitation for every test user before creating them.
+async function bootstrapSignupGate() {
+  const { error: cfgErr } = await admin.from("app_config")
+    .upsert({ key: "owner_email", value: JSON.stringify(EMAIL("owner")) });
+  if (cfgErr) throw new Error("app_config owner_email upsert failed (is migration 0008 applied?): " + cfgErr.message);
+}
+
+async function invite(name) {
+  const { error } = await admin.from("invitations")
+    .insert({ email: EMAIL(name), token: `${RUN_TAG}-${name}-` + Math.random().toString(16).slice(2, 14), status: "pending" });
+  if (error) throw new Error(`bootstrap invitation for ${name} failed: ${error.message}`);
+}
+
 async function cleanup(users) {
   for (const u of users) {
     try { await admin.auth.admin.deleteUser(u.id); } catch { /* already gone */ }
@@ -157,10 +174,15 @@ async function cleanup(users) {
 
 const created = [];
 try {
-  // ---- bootstrap test users ---------------------------------------------
+  // ---- bootstrap test users (invitation-only signup compatible) ---------
+  await bootstrapSignupGate();
+  await invite("owner");
   const OWNER = await createUser("owner");
+  await invite("user-a");
   const USER_A = await createUser("user-a");
+  await invite("user-b");
   const USER_B = await createUser("user-b");
+  await invite("unauthorized");
   const UNAUTHORIZED = await createUser("unauthorized");
   created.push(OWNER, USER_A, USER_B, UNAUTHORIZED);
   // handle_new_user creates each profile; make the OWNER the owner.

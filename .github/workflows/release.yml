@@ -35,7 +35,8 @@ jobs:
       # live privacy matrix runs against a real database whenever a
       # dedicated TEST project is configured. Fail-closed on partial config.
       - run: node tests/security/rls-regression.mjs --self-test
-      - name: Security RLS regression (live privacy matrix)
+      - run: node tests/security/invitation-regression.mjs --self-test
+      - name: Invitation workflow regression (live matrix)
         env:
           SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
           SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
@@ -43,8 +44,9 @@ jobs:
         run: |
           if [ -n "${SUPABASE_TEST_URL:-}" ] || [ -n "${SUPABASE_TEST_ANON_KEY:-}" ] || [ -n "${SUPABASE_TEST_SERVICE_ROLE_KEY:-}" ]; then
             node tests/security/rls-regression.mjs
+            node tests/security/invitation-regression.mjs
           else
-            echo "::warning::Live RLS regression NOT RUN — no Supabase test project configured (set SUPABASE_TEST_URL/ANON_KEY/SERVICE_ROLE_KEY secrets). Offline RLS conformance assertions passed in npm test."
+            echo "::warning::Live RLS + invitation regressions NOT RUN — no Supabase test project configured (set SUPABASE_TEST_URL/ANON_KEY/SERVICE_ROLE_KEY secrets). Offline conformance assertions passed in npm test."
           fi
       - run: npx tsc --noEmit -p tsconfig.json
       - run: npm run build

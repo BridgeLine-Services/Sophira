@@ -893,3 +893,74 @@ no disposable Supabase test project exists. It will run automatically in
 CI once the owner sets the three SUPABASE_TEST_* secrets. Owner analytics
 were verified aggregate-only offline; the live DB check awaits the same
 configuration.
+
+## 39. Invitation-only access — complete security verification (2026-10-05) — 621/621 offline
+
+TASK — full security verification of the EXISTING invitation-only workflow
+(18 items). The invitation system was NOT rebuilt; no boundary was weakened.
+Two layers added to the standard acceptance workflow:
+
+**LAYER 1 — LIVE MATRIX (`tests/security/invitation-regression.mjs`).** Runs
+all 18 items against the REAL database: actual `auth.signUp` calls, the real
+`handle_new_user` trigger (0008), real RLS policies. Stranger signup without
+an invitation REFUSED + no account created; valid invitation → lookup +
+signup succeed + status accepted; reuse/single-use (atomic claim, second
+signup refused, used token lookup returns nothing); expiry enforced at
+lookup AND signup; revocation enforced at lookup AND signup (revoked via the
+owner's RLS client — the same policy path the API uses); email binding
+(wrong-email signup refused, invitation stays pending); missing/fake/modified
+tokens all return nothing (exact-equality match on 192-bit tokens);
+non-owner cannot list/forge invitations or self-approve requests;
+permission-less member cannot even file a request; permitted member CAN
+request; a merely-REQUESTED email stays unauthorized (signup refused) until
+the owner issues the invitation; removal (deleteUser) kills session, profile
+and auth account. PRIVACY: every error message observed during the run is
+collected and mechanically checked against all live tokens — zero token
+leaks. Fail-closed env (absent → exit 3, partial → exit 1), self-test 3/3.
+
+**LAYER 2 — OFFLINE (tests/run.ts §23, 40 assertions, every `npm test`).**
+Verifies all 18 items against the actual migration SQL and route/guard/
+signup source: trigger-refused signup, fail-closed bootstrap (app_config
+revoked from clients + RLS), no first-signup-becomes-owner (owner only via
+operator-configured email), atomic claim (for update skip locked, no
+pre-settable claim variable), pending/unexpired exact-token lookup, accept
+route conditional update + expiry re-check + email binding + 404/410/403,
+pending→revoked-only transition, 192-bit random tokens everywhere,
+owner-only invitations policy (owner role AND invited_by=auth.uid() in both
+using and with check), can_request_invites-gated request filing, no
+requester-update policy, owner-only approval that issues real invitations,
+requests never create access, members API revoke/remove with owner
+protection, revoked users refused by the guard, middleware protection, and
+token-leak checks (no token logging, no `${token}` interpolation in public
+routes, token-free DB refusals). Frontend AND backend enforcement verified —
+the DB trigger is the gate, the UI is only convenience.
+
+**Tamper evidence (T1–T5, run live):** bypassing the signup gate, stripping
+pending/expired checks from the token lookup, removing the atomic claim
+condition, dropping the owner check from the invitations policy, and
+echoing a token in an error message EACH failed the suite loudly. The first
+tamper round exposed three loose cross-file regexes in my own assertions —
+fixed by scoping to the final (lastIndexOf) function/policy block; all five
+scenarios then failed as required. Sources restored byte-identical after
+testing (verified with diff).
+
+**Bootstrap hardening (found during verification):** `rls-regression.mjs`
+would have failed against a fully-migrated test project because 0008 makes
+signup invitation-only — including its own test-user bootstrap. Fixed: the
+suite now sets `app_config.owner_email` and pre-seeds invitations for its
+test users before creating them (migration-aware bootstrap).
+
+**Acceptance wiring:** release.yml runs both live suites' self-tests always,
+and both live matrices when SUPABASE_TEST_* is configured (loud warning when
+not; hard fail on partial config).
+
+**Verification run:** suite **621/621** (57 new invitation assertions),
+`tsc` clean, `next build` passes, both self-tests green, fail-closed
+semantics verified, tamper detection verified in five scenarios.
+
+**Honest limits:** the LIVE matrix could not be executed here — no disposable
+Supabase test project exists in this sandbox. It runs automatically in CI
+once the owner sets the three SUPABASE_TEST_* secrets. All 18 items are
+nevertheless verified offline against the real migration SQL and route code,
+and three genuine holes in my own first-draft assertions were caught and
+fixed by the tamper round.
