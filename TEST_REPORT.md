@@ -830,3 +830,66 @@ on GitHub runners (unchanged, already gated).
 **Honest limits:** live APK/ipa/desktop artifacts still require the owner
 to set the `SOPHIRA_APP_URL` repository variable and tag a release — the
 placeholder guards now fail closed instead of silently shipping a fake URL.
+
+## 38. Security regression suite — permanent privacy gate (2026-10-05) — 564/564 offline
+
+TASK — permanent automated security regression suite. NO existing RLS was
+weakened (migrations untouched; verified by `git status` + the conformance
+engine itself). Two layers, both part of the standard acceptance workflow:
+
+**LAYER 1 — LIVE MATRIX (`tests/security/rls-regression.mjs`).** Runs the
+privacy matrix against the ACTUAL database and RLS policies (real auth
+users, real per-user clients — not mocked authorization functions) whenever
+a disposable Supabase test project is configured
+(SUPABASE_TEST_URL/ANON_KEY/SERVICE_ROLE_KEY, all-or-none, fail-closed —
+verified: partial config exits 1, absent config exits 3). Test users
+created per run: OWNER, USER_A, USER_B, UNAUTHORIZED. Representative
+private data seeded for A and B across all NINE categories (assignments,
+responses, teacher_profiles, writing_samples, feedback, learning_patterns,
+research_projects, typing_attempts, assignment_files) with unique marker
+strings so any leak is mechanically detectable. Enforced matrix:
+OWNER → USER_A's nine categories → NO ACCESS; USER_A ↔ USER_B → NO ACCESS;
+unauthenticated → NO ACCESS (incl. profiles); revoked USER_B → others'
+data NO ACCESS (revocation also verified to work + restore via the same
+admin path the members API uses); DELETED user → session dead + cannot
+sign back in; data owner → full access to own data (read + write, all
+nine categories); OWNER membership management works (create/list
+invitations; USER_A cannot forge invitations); owner analytics
+(network_stats) → EXACTLY the eleven permitted aggregate columns,
+mechanically verified to contain ZERO private markers, aggregate counts
+visible, and USER_A/anon calls DENIED. Self-test mode (4/4) always runs
+in CI.
+
+**LAYER 2 — OFFLINE CONFORMANCE (tests/run.ts §22, 26 assertions, runs on
+EVERY `npm test`).** Parses the actual migration SQL and enforces: every
+created table has RLS enabled; every policy is auth.uid()-scoped; no
+`using (true)` permissive policy; network_stats is SECURITY DEFINER,
+owner-gated, returns exactly the permitted columns, reads content tables
+ONLY via count(*) (plus the documented subject_usage aggregate:
+subject + count only); get_invitation_by_token exposes only ONE pending
+invitation by exact token (the documented signup exception); the live
+suite exists and is wired into the acceptance workflow; revoked users are
+blocked at the guard/middleware layer.
+
+**Tamper evidence (run live):** removing RLS from `assignments`,
+adding a `using (true)` policy on `responses`, and adding essay content
+to `network_stats` each caused the suite to FAIL loudly. All tampering was
+reverted; migrations are byte-identical to before.
+
+**Acceptance wiring:** `.github/workflows/release.yml` tests job now runs
+the suite self-test ALWAYS, and the full live matrix whenever the
+SUPABASE_TEST_* secrets are configured (loud `::warning::` when not; hard
+fail on partial config). CI offline enforcement means a PR cannot silently
+drop a table's RLS, add a permissive policy, or leak content into owner
+analytics even without a test project.
+
+**Verification run:** suite **564/564** (26 new security assertions),
+`tsc` clean, `next build` passes, self-test 4/4, fail-closed semantics
+verified (exit 3 absent / exit 1 partial), tamper detection verified in
+three scenarios.
+
+**Honest limits:** the LIVE matrix could not be executed in this sandbox —
+no disposable Supabase test project exists. It will run automatically in
+CI once the owner sets the three SUPABASE_TEST_* secrets. Owner analytics
+were verified aggregate-only offline; the live DB check awaits the same
+configuration.

@@ -51,6 +51,7 @@ import {
   REMOVED_FALLBACK_URL, DEV_DEFAULT_URL,
 } from "../src/lib/native-url";
 import * as fs from "fs";
+import * as path from "path";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
 import { computeTypingResult, adoptBaseline } from "../src/lib/typing";
 import { PacingController } from "../src/lib/pacing-controller";
@@ -2289,4 +2290,125 @@ async function runNativeUrlTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+// ---------------------------------------------------------------------------
+// SECURITY REGRESSION (2026-10-05) — permanent privacy gate, part of the
+// standard acceptance suite. Two layers:
+//   (1) OFFLINE (this section, runs on every npm test/CI run): parse the
+//       ACTUAL migration SQL and enforce the privacy model — every content
+//       table has RLS enabled, every policy is auth.uid()-scoped, owner
+//       analytics are aggregate-only, and the live suite is wired into the
+//       acceptance workflow.
+//   (2) LIVE (tests/security/rls-regression.mjs, also run by the release
+//       workflow): the full OWNER/A/B/anon/revoked/deleted matrix against
+//       the actual database when a test project is configured.
+// DO NOT WEAKEN: these assertions exist so privacy cannot silently regress.
+// ---------------------------------------------------------------------------
+async function runSecurityRegressionTests(): Promise<void> {
+  section("22. Security regression — RLS conformance + live suite wiring");
+  {
+    const migDir = path.join(process.cwd(), "supabase", "migrations");
+    const files = fs.readdirSync(migDir).filter((f) => f.endsWith(".sql")).sort();
+    const sql = files.map((f) => fs.readFileSync(path.join(migDir, f), "utf8")).join("\n");
+
+    // ---- every created table must have RLS enabled --------------------
+    const tableRe = /create table (?:if not exists )?public\.(\w+)\s*\(/g;
+    const tables = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = tableRe.exec(sql)) !== null) tables.add(m[1]);
+    assert(tables.size >= 20, `security: found a sane number of tables (${tables.size}) to enforce RLS on`);
+    const noRls: string[] = [];
+    for (const t of Array.from(tables)) {
+      const enableRe = new RegExp(String.raw`alter table (?:if exists )?public\.${t}\s+enable row level security`, "i");
+      if (!enableRe.test(sql)) noRls.push(t);
+    }
+    assert(noRls.length === 0,
+      `security: EVERY table has RLS enabled (missing: ${noRls.join(", ") || "none"}) — no table may be world-readable`);
+
+    // ---- every policy must be auth.uid()-scoped (no permissive policy) --
+    const policyRe = /create policy\s+(?:"[^"]+"|\w+)\s+on\s+public\.(\w+)[\s\S]*?;(?:\n|$)/g;
+    const policies: { table: string; body: string }[] = [];
+    while ((m = policyRe.exec(sql)) !== null) policies.push({ table: m[1], body: m[0] });
+    assert(policies.length >= 30, `security: found a sane number of policies (${policies.length})`);
+    // get_invitation_by_token is a SECURITY DEFINER FUNCTION (not a policy)
+    // and only exposes ONE pending invitation by unguessable token — the
+    // documented signup exception; it is asserted below, not whitelisted blindly.
+    const unscoped = policies.filter((p) => !/auth\.uid\(\)/.test(p.body));
+    assert(unscoped.length === 0,
+      `security: every policy is scoped to auth.uid() (unscoped: ${unscoped.map((p) => p.table).join(", ") || "none"}) — no permissive policy can slip in`);
+    // No policy may be written as `using (true)` — that is world access.
+    const permissive = policies.filter((p) => /using\s*\(\s*true\s*\)|with check\s*\(\s*true\s*\)/.test(p.body));
+    assert(permissive.length === 0, "security: no `using (true)` / `with check (true)` policy exists anywhere");
+
+    // ---- owner analytics: aggregate-only, SECURITY DEFINER, owner-gated -
+    const fnMatch = sql.match(/create or replace function public\.network_stats\(\)\s*returns table\s*\(([\s\S]*?)\)\s*language plpgsql[\s\S]*?\$\$([\s\S]*?)\$\$;/);
+    assert(!!fnMatch, "security: the network_stats owner-analytics function exists in the migrations");
+    const returnedCols = (fnMatch as RegExpMatchArray)[1]
+      .split(",")
+      .map((s) => s.trim().split(/\s+/)[0])
+      .sort();
+    const permitted = [
+      "assignment_count", "can_request_invites", "created_at", "display_name",
+      "last_active_at", "onboarded", "response_count", "role", "status",
+      "subject_usage", "user_id",
+    ];
+    assert(JSON.stringify(returnedCols) === JSON.stringify(permitted),
+      "security: network_stats returns EXACTLY the permitted aggregate columns — never academic content");
+    const body = (fnMatch as RegExpMatchArray)[2];
+    assert(body.includes("role = 'owner'") && body.includes("raise exception"),
+      "security: network_stats raises unless the caller is the owner");
+    assert(/security definer/i.test(sql.slice(sql.indexOf("create or replace function public.network_stats"), sql.indexOf("create or replace function public.network_stats") + 800)),
+      "security: network_stats is SECURITY DEFINER (aggregate function with its own owner gate)");
+    // The body may only read membership metadata + counts — never content columns.
+    const reads = body.match(/from public\.(\w+)/g) ?? [];
+    const readable = new Set(reads.map((r) => r.replace("from public.", "")));
+    assert(["profiles", "assignments", "responses"].every((t) => readable.has(t)) && readable.size <= 3,
+      `security: network_stats reads ONLY profiles/assignments/responses (found: ${Array.from(readable).join(", ")})`);
+    // Every read of a content table inside the function must be an
+    // AGGREGATE read. responses: count(*) only. assignments: count(*),
+    // plus the documented subject_usage aggregate that selects ONLY
+    // a.subject + count(*) — never titles, instructions, or content.
+    const responsesReads = body.split("from public.responses").length - 1;
+    const responsesCounts = body.split("count(*) from public.responses").length - 1;
+    assert(responsesReads > 0 && responsesReads === responsesCounts,
+      "security: network_stats reads public.responses ONLY via count(*) — no essay content ever");
+    const assignmentsReads = body.split("from public.assignments").length - 1;
+    const assignmentsCounts = body.split("count(*) from public.assignments").length - 1;
+    assert(assignmentsReads === assignmentsCounts + 1 && assignmentsCounts > 0,
+      "security: network_stats reads public.assignments via count(*) plus exactly ONE extra aggregate");
+    const subjectUsage = body.match(/select a\.subject, count\(\*\) as c[\s\S]{0,120}from public\.assignments a/);
+    assert(!!subjectUsage,
+      "security: the single extra assignments read is the documented subject_usage aggregate (subject + count only)");
+    assert(!/from public\.(writing_samples|teacher_profiles|feedback|responses_[a-z_]+|research_[a-z_]+|assignment_files|typing_attempts)/.test(body),
+      "security: network_stats never touches content-bearing tables beyond assignments/responses counts");
+
+    // ---- the invitation-token function is the ONLY public read path -----
+    const tokenFn = sql.match(/create or replace function public\.get_invitation_by_token\([\s\S]*?\$\$;/);
+    assert(!!tokenFn && /status = 'pending'/.test(tokenFn[0]) && /token = p_token/.test(tokenFn[0]),
+      "security: get_invitation_by_token only returns a PENDING invitation by exact token (the documented signup exception)");
+
+    // ---- the live matrix suite exists and is wired into acceptance -------
+    const live = fs.readFileSync(path.join(process.cwd(), "tests", "security", "rls-regression.mjs"), "utf8");
+    assert(live.includes("PRIVATE_CATEGORIES.length === 9") || /nine owner-tested categories/.test(live),
+      "security: the live suite tests all NINE owner-vs-USER_A categories");
+    for (const required of [
+      "OWNER", "USER_A", "USER_B", "UNAUTHORIZED",
+      "revoked", "deleteUser", "network_stats",
+    ]) {
+      assert(live.includes(required), `security: live suite covers ${required}`);
+    }
+    const wf = fs.readFileSync(path.join(process.cwd(), ".github", "workflows", "release.yml"), "utf8");
+    assert(wf.includes("tests/security/rls-regression.mjs"),
+      "security: the acceptance workflow RUNS the security regression suite — it cannot be silently dropped");
+
+    // ---- revoked users are blocked at the app layer (middleware/guards) --
+    const guard = fs.readFileSync(path.join(process.cwd(), "src", "lib", "supabase", "guard.ts"), "utf8");
+    assert(/revoked/.test(guard),
+      "security: the server guard refuses revoked users on protected routes");
+    const middleware = fs.readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+    assert(/revoked/.test(middleware) || /requireUser|requireOwner/.test(middleware),
+      "security: middleware-side auth enforcement exists alongside RLS");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
