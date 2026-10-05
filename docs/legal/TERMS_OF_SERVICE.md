@@ -70,6 +70,11 @@ Redistributing the software or any part of it is prohibited except as expressly 
 ## 18. Intellectual property
 The software is proprietary and all rights are reserved by [LEGAL ENTITY NAME] under the LICENSE file in the repository.
 
+**Enforcement.** Unauthorized copying, redistribution, modification,
+sublicensing, or commercial exploitation of the software may constitute
+copyright infringement and/or a breach of these Terms and the License. The
+Operator reserves all rights and remedies available under applicable law.
+
 ## 19. Third-party services and AI providers
 The service relies on third-party providers (hosting, database, AI models, and search/retrieval providers where used). Your content is processed by those providers as described in the Privacy Policy.
 

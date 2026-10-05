@@ -1120,6 +1120,23 @@ section("16. Proprietary license and legal documents (spec §11–§14)");
   const privacy = readFileSync("docs/legal/PRIVACY_POLICY.md", "utf8");
   assert(privacy.includes("typing") && privacy.includes("third-party"), "legal: privacy covers typing data and third-party AI processing");
   assert(readFileSync("docs/legal/LEGAL_REVIEW_NOTICE.md", "utf8").includes("attorney"), "legal: attorney-review notice present");
+  const legalCfg = readFileSync("docs/legal/LEGAL_CONFIGURATION.md", "utf8");
+  assert(legalCfg.includes("Status: INCOMPLETE"), "legal: LEGAL_CONFIGURATION marks itself incomplete until the owner supplies values");
+  for (const field of ["[LEGAL ENTITY NAME]", "[ADDRESS]", "[CONTACT EMAIL]", "[JURISDICTION]", "[EFFECTIVE DATE]", "[RETENTION PERIOD]"]) {
+    assert(legalCfg.includes(field), `legal: configuration lists owner field ${field}`);
+  }
+  const allLegal = [license, tos, privacy, legalCfg].join("\n");
+  assert(!/legally guaranteed|attorney approved/i.test(allLegal),
+    "legal: no document claims to be legally guaranteed or attorney approved");
+  assert(tos.includes("may constitute") && tos.includes("reserves all rights and remedies"),
+    "legal: ToS uses cautious enforcement language (may constitute infringement/breach; rights and remedies reserved)");
+  const notice = readFileSync("docs/legal/LEGAL_REVIEW_NOTICE.md", "utf8");
+  assert(notice.includes("Neither the AI nor Base44 is the owner's lawyer"),
+    "legal: review notice states plainly that neither the AI nor Base44 is the owner's lawyer");
+  assert(notice.includes("NOT legal advice") && notice.includes("qualified attorney"),
+    "legal: review notice keeps the no-legal-advice and attorney-review statements");
+  assert(notice.includes("LEGAL_CONFIGURATION"),
+    "legal: review notice points to the configuration file of owner-supplied values");
 }
 
 function finish() {

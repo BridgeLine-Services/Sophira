@@ -5,7 +5,7 @@
     "auditor": "repository implementation audit against requirements (Prompt 1)",
     "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
     "verification": {
-      "offline_tests": "621/621 passed (564 prior + 57 invitation-workflow security assertions added 2026-10-05)",
+      "offline_tests": "633/633 passed (621 prior + 12 legal-configuration assertions added 2026-10-05)",
       "typecheck": "tsc --noEmit strict: clean",
       "build": "next build: 38/38 routes compiled",
       "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 \u2014 production is in the documented DEGRADED mode (no Supabase/AI env configured)",
@@ -857,10 +857,11 @@
       "id": "legal-docs",
       "title": "Legal documents",
       "status": "PARTIAL",
-      "notes": "Complete ToS/Privacy templates + review notice + proprietary LICENSE; bracketed owner facts (entity, address, jurisdiction, contact, effective date) are now MACHINE-VISIBLE: scripts/legal-status.mjs (npm run legal:status, --json) lists every remaining bracket per file and exits 0 once all are completed (17 remain today). Completion still requires owner facts + qualified attorney review \u2014 external by design.",
+      "notes": "Complete ToS/Privacy templates + review notice + proprietary LICENSE; bracketed owner facts (entity, address, jurisdiction, contact, effective date) are now MACHINE-VISIBLE: scripts/legal-status.mjs (npm run legal:status, --json) lists every remaining bracket per file and exits 0 once all are completed (17 remain today). Completion still requires owner facts + qualified attorney review \u2014 external by design. LEGAL CONFIGURATION GATE (2026-10-05): inspected all four legal documents (all preserved, nothing deleted); inventoried every placeholder ([LEGAL ENTITY NAME], [COPYRIGHT HOLDER LEGAL NAME], [ADDRESS], [CONTACT EMAIL], [LEGAL CONTACT NAME / EMAIL / ADDRESS], [EFFECTIVE DATE], [EFFECTIVE DATE YEAR], [JURISDICTION], [MAXIMUM LIABILITY AMOUNT...], [DISPUTE RESOLUTION METHOD...], [APPLICABLE RULES], [RETENTION PERIOD]); added docs/legal/LEGAL_CONFIGURATION.md \u2014 structured owner-supplied field list (identity/dates/jurisdiction/liability/dispute/retention/attorney review) with an INCOMPLETE status and a publication gate (all fields supplied + placeholders replaced + attorney review before production); strengthened ToS \u00a718 with cautious enforcement language ('may constitute copyright infringement and/or breach... reserves all rights and remedies available under applicable law' \u2014 zero 'legal trouble' phrasing, verified); extended LEGAL_REVIEW_NOTICE (still: templates, NOT legal advice, attorney review recommended) to state neither the AI nor Base44 is the owner's lawyer and no attorney approval/guarantee exists; verified all 21 required topics are addressed; 12 new test assertions (suite 633/633). No legal values invented \u2014 owner must supply every field before production release.",
       "files": [
         ".github/workflows/ci.yml",
         "LICENSE",
+        "docs/legal/LEGAL_CONFIGURATION.md",
         "docs/legal/LEGAL_REVIEW_NOTICE.md",
         "docs/legal/PRIVACY_POLICY.md",
         "docs/legal/TERMS_OF_SERVICE.md",
@@ -870,7 +871,8 @@
       "tables": [],
       "apis": [],
       "tests_existing": [
-        "tests/run.ts section 16: license + legal presence checks"
+        "tests/run.ts section 16: license + legal presence checks",
+        "section 16: 12 legal-configuration assertions (placeholders listed, no false approval claims, cautious enforcement language)"
       ],
       "tests_missing": [
         "Owner completion of the bracketed facts (then legal:status exits 0) + attorney review sign-off"

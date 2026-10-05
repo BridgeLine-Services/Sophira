@@ -964,3 +964,65 @@ once the owner sets the three SUPABASE_TEST_* secrets. All 18 items are
 nevertheless verified offline against the real migration SQL and route code,
 and three genuine holes in my own first-draft assertions were caught and
 fixed by the tamper round.
+
+## 40. Legal-document inspection & configuration gate (2026-10-05) — 633/633 offline
+
+TASK — inspect the EXISTING legal framework (LICENSE, TERMS_OF_SERVICE,
+PRIVACY_POLICY, LEGAL_REVIEW_NOTICE — all preserved, none deleted). Verified
+it addresses all 21 required topics; strengthened one gap and added an
+owner-configuration gate. NO legal values were invented anywhere.
+
+**Placeholders inventoried (all preserved as placeholders):**
+[LEGAL ENTITY NAME], [COPYRIGHT HOLDER LEGAL NAME], [ADDRESS],
+[CONTACT EMAIL], [LEGAL CONTACT NAME / EMAIL / ADDRESS], [EFFECTIVE DATE],
+[EFFECTIVE DATE YEAR], [JURISDICTION], [MAXIMUM LIABILITY AMOUNT / AS
+REQUIRED BY APPLICABLE LAW], [DISPUTE RESOLUTION METHOD...], [APPLICABLE
+RULES], [RETENTION PERIOD].
+
+**New: docs/legal/LEGAL_CONFIGURATION.md** — a structured table of every
+owner-supplied field (identity, dates, jurisdiction, liability cap, dispute
+method/forum, retention period, attorney review), where each appears, and a
+publication gate: all fields supplied + placeholders replaced + attorney
+review completed before production publication. Status marked INCOMPLETE.
+
+**Strengthened (ToS §18 enforcement):** added cautious language —
+unauthorized copying, redistribution, modification, sublicensing, or
+commercial exploitation *may constitute* copyright infringement and/or
+breach of the Terms and License; the Operator *reserves all rights and
+remedies available under applicable law*. No "legal trouble" phrasing
+exists anywhere (verified: zero matches). LICENSE §6 already carried the
+same cautious standard; unchanged.
+
+**LEGAL_REVIEW_NOTICE preserved and extended** — still states the documents
+are templates, are NOT legal advice, and that attorney review is
+recommended before production publication; now also states that neither the
+AI nor Base44 is the owner's lawyer, that the documents carry no guarantee
+of legal enforceability and have not been approved or reviewed by any
+attorney, and points to LEGAL_CONFIGURATION.md for the owner-supplied
+fields.
+
+**Coverage verified against the 21 required topics:** copyright ownership
+(LICENSE §1; ToS §18), proprietary status (LICENSE §1–2), unauthorized
+copying (LICENSE §3a, §6), redistribution (§3a; ToS §17), modification
+(§3c), sublicensing (§3b), commercial exploitation (§3b), source-code
+confidentiality (LICENSE §1, §4), IP enforcement (LICENSE §6; ToS §18,
+cautious language), account termination (ToS §22–23), acceptable use (ToS
+§6, §13–17), privacy/data processing (PP), user academic data (PP; ToS
+§7–8), security responsibilities (ToS §4, §25; PP security practices),
+third-party services (ToS §19; PP AI processing), disclaimers (ToS §27,
+academic notice), limitation of liability (ToS §28), dispute mechanism (ToS
+§31, owner to choose), governing law (LICENSE §7, ToS §30, owner to
+choose), effective date (headers, owner to set), contact information (ToS
+§35, owner to set).
+
+**Tests: 12 new assertions in section 16** — LEGAL_CONFIGURATION exists and
+is marked INCOMPLETE; every required field is listed; no document claims to
+be "legally guaranteed" or "attorney approved"; the ToS carries the cautious
+enforcement language; the review notice keeps the no-legal-advice and
+attorney-review statements and names the AI/Base44 non-representation.
+Suite **633/633**, `tsc` clean, `next build` passes.
+
+**Honest limits:** the documents remain templates with placeholders by
+design — the owner (ideally via a qualified attorney in the chosen
+jurisdiction) must supply every value in LEGAL_CONFIGURATION.md before
+production publication. Nothing here is legal advice.

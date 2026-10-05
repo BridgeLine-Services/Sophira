@@ -12,3 +12,15 @@ information, and effective date.
 
 No invented legal names, addresses, corporations, or jurisdictions have been
 inserted anywhere in these documents.
+
+
+## Relationship to this notice
+
+- These documents were prepared by an AI assistant at the direction of the
+  repository owner. **Neither the AI nor Base44 is the owner's lawyer**, and
+  this is not legal advice.
+- The documents carry no guarantee of legal enforceability and have not been
+  approved or reviewed by any attorney; they must not be described as such.
+- `LEGAL_CONFIGURATION.md` lists every placeholder and owner-supplied value
+  that must be provided — and attorney review completed — before the
+  documents are suitable for production publication.
