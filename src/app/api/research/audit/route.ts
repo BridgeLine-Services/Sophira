@@ -5,6 +5,15 @@ import { aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import { wrapUntrusted } from "@/lib/ai/context";
 import { fetchAndVerify } from "@/lib/research/verify";
 import { extractCitationMarkers, quoteInContent, formatCitation } from "@/lib/research/citation";
+import { titlesCorrespond } from "@/lib/research/verify";
+import {
+  buildIntegrityReport,
+  formatIntegrityReport,
+  authorityVerdict,
+  type ClaimEvidenceRecord,
+  type ClaimStatus,
+  type IntegrityReport,
+} from "@/lib/research/claims";
 
 export const runtime = "nodejs";
 export const maxDuration = 240;
@@ -51,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   const { data: sources } = await supabase
     .from("research_sources")
-    .select("id, title, author, publisher, publication_date, url:final_url, original_url, retrieval_date, verification_status, approval, content_extract, doi")
+    .select("id, title, listed_title, author, publisher, publication_date, url:final_url, original_url, domain, retrieval_date, verification_status, approval, content_extract, doi")
     .eq("project_id", projectId)
     .in("approval", ["approved"]);
   const approved = (sources ?? []).filter((s) => (s.verification_status === "verified" || s.verification_status === "partially_verified"));
@@ -143,7 +152,7 @@ export async function POST(request: NextRequest) {
 
   // 3. Live re-verification of every cited source.
   const citedIds = new Set(matched.map((m) => m.source_id));
-  const reverify: { source_id: string; status: string; notes: string }[] = [];
+  const reverify: { source_id: string; status: string; notes: string; live_title: string }[] = [];
   for (const s of approved) {
     if (!citedIds.has(s.id)) continue;
     const url = (s.url || s.original_url) as string;
@@ -167,7 +176,7 @@ export async function POST(request: NextRequest) {
       final_url: v.finalUrl,
       reachable: v.ok,
       content_chars: v.textChars,
-      title_match: true,
+      title_match: titlesCorrespond(s.listed_title, v.title),
       notes: notes.join(" "),
       status,
     });
@@ -177,7 +186,7 @@ export async function POST(request: NextRequest) {
         verification_notes: notes.join(" "),
       }).eq("id", s.id);
     }
-    reverify.push({ source_id: s.id, status, notes: notes.join(" ") });
+    reverify.push({ source_id: s.id, status, notes: notes.join(" "), live_title: v.title });
   }
 
   // 5. Bibliography generated from source RECORDS (never by the model).
@@ -193,6 +202,87 @@ export async function POST(request: NextRequest) {
     }, style))
     .join("\n\n");
   const essayHasBibliography = /works cited|bibliography|references/i.test(essay);
+
+  // --- Claim evidence re-verification (research-integrity round) ----------
+  // Stored claim→evidence rows from generation are re-checked against the
+  // LIVE source state: a source that became unavailable after initial
+  // verification means its claims can NO LONGER stand as verified — they are
+  // marked UNVERIFIED honestly, never silently kept.
+  const { data: storedClaims } = await supabase
+    .from("research_claims")
+    .select("id, claim_id, claim, source_id, source_url, source_title, evidence, evidence_start, evidence_end, status, confidence, authority_score, verified_at, reasons")
+    .eq("project_id", projectId)
+    .eq("response_id", responseId);
+  const liveBySource = new Map(reverify.map((r) => [r.source_id, r]));
+  const storedBySource = new Map(approved.map((s) => [s.id, s]));
+  const legacyStatus = (s: string): ClaimStatus =>
+    s === "verified" || s === "supported" ? "verified"
+    : s === "partially_supported" ? "partially_supported"
+    : s === "unsupported" ? "unsupported" : "unverified";
+  const claimReportRows: ClaimEvidenceRecord[] = [];
+  let synth = 0;
+  for (const row of (storedClaims ?? [])) {
+    let status = legacyStatus(row.status);
+    const src = storedBySource.get(row.source_id);
+    const live = src ? liveBySource.get(src.id) : undefined;
+    const srcNowDead =
+      (live ? live.status === "failed" || live.status === "inaccessible" : false) ||
+      (!live && src ? src.verification_status === "failed" || src.verification_status === "inaccessible" : false);
+    if (srcNowDead && (status === "verified" || status === "partially_supported")) {
+      status = "unverified"; // honest: the evidence page is gone
+      const reasons = Array.isArray(row.reasons) ? [...(row.reasons as string[])] : [];
+      reasons.push("Source became unavailable after initial verification — the claim can no longer stand as verified.");
+      await supabase.from("research_claims").update({
+        status: "unverified",
+        reasons,
+        verified_at: new Date().toISOString(),
+      }).eq("id", row.id).eq("user_id", guard.data.user.id);
+    }
+    claimReportRows.push({
+      claim_id: row.claim_id || `X${++synth}`,
+      assignment_id: null,
+      claim_text: row.claim,
+      source_id: row.source_id,
+      source_url: row.source_url || (src ? ((src.url || src.original_url) as string) : ""),
+      source_title: row.source_title || (src ? src.title : ""),
+      exact_supporting_passage: row.evidence ?? "",
+      evidence_start: row.evidence_start ?? null,
+      evidence_end: row.evidence_end ?? null,
+      verification_status: status,
+      confidence: row.confidence ?? 0,
+      authority_score: row.authority_score ?? 0,
+      verified_at: row.verified_at ?? new Date().toISOString(),
+      reasons: Array.isArray(row.reasons) ? (row.reasons as string[]) : [],
+    });
+  }
+  const sourceType = ((project.research_spec as { sourceType?: string })?.sourceType ?? null);
+  const url_resolves: Record<string, boolean> = {};
+  const title_match: Record<string, boolean> = {};
+  const authority_ok: Record<string, boolean> = {};
+  for (const s of approved) {
+    const live = liveBySource.get(s.id);
+    url_resolves[s.id] = live
+      ? live.status === "verified" || live.status === "partially_verified"
+      : s.verification_status === "verified" || s.verification_status === "partially_verified";
+    const liveTitle = live?.live_title || s.title;
+    title_match[s.id] = titlesCorrespond(s.listed_title, liveTitle);
+    authority_ok[s.id] = authorityVerdict({ domain: s.domain ?? "", doi: s.doi }, sourceType).ok;
+  }
+  let integrity: IntegrityReport | null = null;
+  if (claimReportRows.length > 0) {
+    integrity = buildIntegrityReport(claimReportRows, {
+      url_resolves, title_match, authority_ok,
+      authority_required: sourceType, now: new Date().toISOString(),
+    });
+    if (!integrity.research_complete) {
+      await supabase.from("research_projects").update({
+        status: "writing",
+        failure_reason: `Research integrity at finalization: ${integrity.claims_supported}/${integrity.claims_total} factual claims supported — failed claims must be revised or their sources replaced before submission.`,
+        research_integrity: integrity,
+        updated_at: new Date().toISOString(),
+      }).eq("id", projectId).eq("user_id", guard.data.user.id);
+    }
+  }
 
   // Persist claims + citations.
   const citationRows = approved.map((s) => ({
@@ -228,6 +318,9 @@ export async function POST(request: NextRequest) {
     ...unsupported.map((c) => `Unsupported claim (AI-assessed): ${c.claim} — ${c.reason}`),
     ...reverify.filter((r) => r.status === "failed" || r.status === "inaccessible").map((r) => r.notes),
     ...(essayHasBibliography ? [] : ["The essay has no Works Cited / Bibliography section."]),
+    ...(integrity && !integrity.research_complete
+      ? [`Research integrity FAILED: ${integrity.claims_supported}/${integrity.claims_total} factual claims supported.`]
+      : []),
   ];
 
   return NextResponse.json({
@@ -241,8 +334,10 @@ export async function POST(request: NextRequest) {
       bibliography,
       bibliography_present_in_essay: essayHasBibliography,
       all_cited_sources_live: reverify.every((r) => r.status === "verified" || r.status === "partially_verified"),
+      integrity,
+      integrity_text: integrity ? formatIntegrityReport(integrity) : null,
       problems,
-      pass: problems.length === 0,
+      pass: problems.length === 0 && (!integrity || integrity.research_complete),
     },
   });
 }

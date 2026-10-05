@@ -33,6 +33,12 @@ import { searchProviderConfigured, getSearchProvider, SearchNotConfiguredError }
 import { fetchAndVerify, titlesCorrespond } from "../src/lib/research/verify";
 import { formatCitation, buildBibliography, extractCitationMarkers, quoteInContent, claimSupportsDeterministic, parseISODateLoose } from "../src/lib/research/citation";
 import { generateQueries, normalizeUrl, dedupeSources, rankCandidates } from "../src/lib/research/research";
+import {
+  normalizeClaimCandidates, extractFactualSentences, locatePassage, claimNumbersSupported,
+  verifyClaimAgainstSource, verifyClaims, claimLevelStatus, buildIntegrityReport, formatIntegrityReport,
+  authorityScore, authorityVerdict,
+  type SourceForClaims, type ClaimEvidenceRecord, type IntegrityReportInput,
+} from "../src/lib/research/claims";
 import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
 import { readFileSync } from "fs";
@@ -966,6 +972,175 @@ const __researchTests = (async () => {
     ]);
     assert(ranked[0].url.includes("noaa.gov") || ranked[0].url.includes("harvard.edu"), "research: official/academic domains rank first (objective quality)");
     assert(!ranked.some((h) => h.url.startsWith("http://blog.example.net")), "research: plain-http low-value hit filtered");
+  }
+
+  section("16b. Claim evidence traceability: CLAIM → SOURCE → PASSAGE → URL → STATUS (research-integrity round)");
+  {
+    const nowISO = "2026-10-05T00:00:00.000Z";
+    const coralPassage = "The bleaching events of 2020 caused a 40 percent decline in coral cover across the sampled reef sites.";
+    const S1: SourceForClaims = {
+      id: "s1", url: "https://www.noaa.gov/coral-report", title: "Coral Bleaching Report",
+      content: `Introduction. Marine biologists surveyed reef sites in 2020 after record temperatures. ${coralPassage} Recovery is expected to take a decade.`,
+      verification_status: "verified", domain: "noaa.gov", doi: null,
+    };
+    const S2: SourceForClaims = {
+      id: "s2", url: "https://www.nature.com/articles/coral", title: "Reef Decline Study",
+      content: `Study findings. ${coralPassage} The authors link the decline to thermal stress.`,
+      verification_status: "verified", domain: "nature.com", doi: "10.1234/coral",
+    };
+    const S3: SourceForClaims = {
+      id: "s3", url: "https://recipes.example.net/pasta", title: "Pasta with Basil",
+      content: "Pasta with basil and garlic requires fresh ingredients. Bring salted water to a boil and cook for 12 minutes.",
+      verification_status: "verified", domain: "recipes.example.net", doi: null,
+    };
+    const S4: SourceForClaims = {
+      id: "s4", url: "https://dead.example.org/gone", title: "Dead Page",
+      content: "", verification_status: "failed", domain: "dead.example.org", doi: null,
+    };
+
+    // --- locatePassage: verbatim location with real offsets ---
+    const loc = locatePassage(coralPassage, S1.content);
+    assert(loc !== null, "claims: verbatim passage located in stored content");
+    assert(loc !== null && S1.content.slice(loc.start, loc.end).replace(/\s+/g, " ").trim() === coralPassage.replace(/\s+/g, " ").trim(),
+      "claims: evidence_start/end point at the exact passage in the stored content");
+    assert(locatePassage("This sentence was never retrieved from any source.", S1.content) === null,
+      "claims: a passage absent from the content is NOT located (fabricated evidence rejected)");
+
+    // --- 1. valid claim/source match → VERIFIED ---
+    const good = verifyClaimAgainstSource("The bleaching events of 2020 caused a 40 percent decline in coral cover.", coralPassage, S1);
+    assert(good.status === "verified", "claims: valid claim supported by a verbatim passage from the source content is VERIFIED");
+    assert(good.confidence > 0 && good.confidence <= 0.95, "claims: verified confidence is bounded, never certainty");
+    assert(good.evidence_start !== null && good.evidence_end !== null, "claims: verified claim records evidence location");
+
+    // --- 2. valid URL but unsupported claim (URL resolves, content does not support) ---
+    const urlFine = verifyClaimAgainstSource("Pasta sales rose 40 percent in 2020.", coralPassage, S1);
+    assert(urlFine.status === "unsupported", "claims: a live URL with real content but an unsupported claim is NOT verified");
+
+    // --- 3. dead URL / unavailable source content → UNVERIFIED, never guessed ---
+    const dead = verifyClaimAgainstSource("Coral cover declined after the 2020 bleaching.", coralPassage, S4);
+    assert(dead.status === "unverified" && dead.reasons.some((r) => r.includes("not available")),
+      "claims: dead source → claim is UNVERIFIED (never guessed, never silently verified)");
+
+    // --- 4. wrong source: passage exists in a DIFFERENT source than the one cited ---
+    const wrong = verifyClaimAgainstSource("The bleaching events of 2020 caused a 40 percent decline in coral cover.", coralPassage, S2);
+    assert(wrong.status === "verified", "sanity: the same passage exists in S2's content too (multi-source setup)");
+    const wrong2 = verifyClaimAgainstSource("Pasta with basil requires fresh ingredients.", coralPassage, S3);
+    assert(wrong2.status === "unsupported" || wrong2.status === "unverified",
+      "claims: claim whose evidence belongs to another source is not verified by an unrelated source");
+
+    // --- 5. unrelated source: cited source is real but topically unrelated ---
+    const unrelated = verifyClaimAgainstSource("Coral bleaching devastated reef systems along the coast.", "Pasta with basil and garlic requires fresh ingredients.", S3);
+    assert(unrelated.status === "unsupported", "claims: an unrelated source's real content does not verify the claim");
+
+    // --- 6. partially supported claim ---
+    const S5: SourceForClaims = {
+      id: "s5", url: "https://www.example.edu/reef-notes", title: "Reef Field Notes",
+      content: "Field notes. Coral cover declined 40 percent in 2020 after bleaching stress damaged the reefs.",
+      verification_status: "verified", domain: "example.edu", doi: null,
+    };
+    const partial = verifyClaimAgainstSource("Coral bleaching in 2020 caused mass mortality across reefs.", "Coral cover declined 40 percent in 2020 after bleaching stress damaged the reefs.", S5);
+    assert(partial.status === "partially_supported" && partial.confidence < good.confidence,
+      "claims: a partially supported claim is labeled PARTIALLY_SUPPORTED with lower confidence, not verified");
+
+    // --- 7. numeric mismatch: the figure must come from the source ---
+    const nums = claimNumbersSupported("Decline was 45 percent.", coralPassage);
+    assert(!nums.ok && nums.missing.includes("45"), "claims: a figure absent from the passage fails the numeric check");
+    const figMismatch = verifyClaimAgainstSource("The bleaching events of 2020 caused a 45 percent decline in coral cover.", coralPassage, S1);
+    assert(figMismatch.status === "unsupported" && figMismatch.reasons.some((r) => r.includes("not present")),
+      "claims: claim citing 45 percent against a 40 percent source is UNSUPPORTED — the number is the fact");
+
+    // --- 8. no supporting passage supplied → UNVERIFIED (system will not guess) ---
+    const noPassage = verifyClaimAgainstSource("Coral reefs are threatened by warming oceans.", "", S1);
+    assert(noPassage.status === "unverified" && noPassage.reasons.some((r) => r.includes("will not guess")),
+      "claims: a claim with no supplied passage is UNVERIFIED, never accepted silently");
+
+    // --- 9+10. multi-claim verification through verifyClaims ---
+    const candidates = normalizeClaimCandidates([
+      { claim: "The bleaching events of 2020 caused a 40 percent decline in coral cover.", sources: ["S1", "S2"], supporting_passage: coralPassage },
+      { claim: "Recovery is expected to take a decade after the bleaching.", sources: ["S1"], supporting_passage: "Recovery is expected to take a decade." },
+      { claim: "Pasta sales rose 40 percent in 2020.", sources: ["S1"], supporting_passage: coralPassage },
+      { claim: "junk", sources: [], supporting_passage: "" },
+      { claim: "A claim citing a source that does not exist.", sources: ["S99"], supporting_passage: coralPassage },
+    ], 2);
+    assert(candidates.length === 3 && candidates[0].claim_id === "C1" && candidates[2].claim_id === "C3",
+      "claims: extraction normalizes the model's claim list — junk and invalid source labels dropped, ids server-assigned");
+
+    const rows = verifyClaims(candidates, [S1, S2], { assignment_id: "a1", now: nowISO });
+    const statuses = claimLevelStatus(rows);
+    assert(statuses.get("C1") === "verified" && rows.filter((r) => r.claim_id === "C1").length === 2,
+      "claims: MULTIPLE SOURCES supporting one claim — both traced and the claim counts once as verified");
+    assert(statuses.get("C2") === "verified", "claims: ONE SOURCE supporting multiple claims — every claim is traced and verified");
+    assert(statuses.get("C3") === "unsupported",
+      "claims: claim whose cited source content does not support it is UNSUPPORTED");
+
+    const trace = rows.find((r) => r.claim_id === "C1" && r.source_id === "s1");
+    assert(trace !== undefined &&
+      trace.source_url === "https://www.noaa.gov/coral-report" &&
+      trace.source_title === "Coral Bleaching Report" &&
+      trace.exact_supporting_passage === coralPassage &&
+      trace.verification_status === "verified" &&
+      typeof trace.authority_score === "number" && trace.verified_at === nowISO,
+      "claims: each row carries the full chain CLAIM → SOURCE → PASSAGE → URL → TITLE → STATUS");
+
+    // --- 11. source becoming unavailable after initial verification ---
+    const before = verifyClaimAgainstSource("The bleaching events of 2020 caused a 40 percent decline in coral cover.", coralPassage, S1);
+    assert(before.status === "verified", "claims: initially verified claim (before the source disappears)");
+    const goneSource: SourceForClaims = { ...S1, verification_status: "failed", content: "" };
+    const after = verifyClaimAgainstSource("The bleaching events of 2020 caused a 40 percent decline in coral cover.", coralPassage, goneSource);
+    assert(after.status === "unverified" && after.reasons.some((r) => r.includes("never guessed")),
+      "claims: source becoming unavailable after initial verification demotes the claim to UNVERIFIED");
+
+    // --- authority: deterministic scores and requirement verdicts ---
+    assert(authorityScore({ domain: "noaa.gov", doi: null }) === 8, "claims: authority score — government domain");
+    assert(authorityScore({ domain: "nature.com", doi: "10.1234/x" }) === 9, "claims: authority score — journal with DOI");
+    assert(authorityScore({ domain: "harvard.edu", doi: null }) === 7, "claims: authority score — university domain");
+    assert(authorityScore({ domain: "wikipedia.org", doi: null }) === 4, "claims: authority score — encyclopedic");
+    assert(authorityScore({ domain: "randomblog.net", doi: null }) === 3, "claims: authority score — ordinary site");
+    assert(authorityVerdict({ domain: "nature.com", doi: "10.1/x" }, "peer-reviewed").ok === true, "claims: peer-reviewed requirement satisfied by a journal with DOI");
+    assert(authorityVerdict({ domain: "blog.example.com", doi: null }, "peer-reviewed").ok === false, "claims: peer-reviewed requirement NOT satisfied by an ordinary blog");
+    assert(authorityVerdict({ domain: "noaa.gov", doi: null }, "government").ok === true, "claims: government requirement satisfied by .gov");
+    assert(authorityVerdict({ domain: "noaa.org", doi: null }, "government").ok === false, "claims: government requirement NOT satisfied by a .org lookalike");
+    assert(authorityVerdict({ domain: "harvard.edu", doi: null }, "university").ok === true, "claims: university requirement satisfied by .edu");
+    assert(authorityVerdict({ domain: "anything.example", doi: null }, "any").ok === true, "claims: no source-type requirement → any source passes");
+
+    // --- integrity report: all supported ---
+    const allGoodInput: IntegrityReportInput = {
+      url_resolves: { s1: true, s2: true }, title_match: { s1: true, s2: true },
+      authority_ok: { s1: true, s2: true }, authority_required: "any", now: nowISO,
+    };
+    const goodRows = rows.filter((r) => r.claim_id !== "C3");
+    const reportOk = buildIntegrityReport(goodRows, allGoodInput);
+    assert(reportOk.claims_total === 2 && reportOk.claims_supported === 2 && reportOk.research_complete,
+      "claims: integrity report — every claim supported → research complete");
+    const textOk = formatIntegrityReport(reportOk);
+    assert(textOk.includes("Research Integrity") && textOk.includes("2/2 factual claims supported") &&
+      textOk.includes("2/2 URLs resolve") && textOk.includes("2/2 titles match") &&
+      textOk.includes("2/2 sources satisfy assignment authority requirements") && !textOk.includes("FAILED"),
+      "claims: integrity report renders the full counts format when everything passes");
+
+    // --- integrity report: failures block completion ---
+    const reportBad = buildIntegrityReport(rows, {
+      url_resolves: { s1: true, s2: false }, title_match: { s1: true, s2: true },
+      authority_ok: { s1: true, s2: true }, authority_required: "any", now: nowISO,
+    });
+    assert(!reportBad.research_complete && reportBad.claims_unsupported === 1 && reportBad.urls_resolve === 1 && reportBad.urls_total === 2,
+      "claims: one unsupported claim + one dead URL → research_complete is BLOCKED");
+    assert(reportBad.failures.some((f) => f.claim_id === "C3" && f.action.includes("revised or source replaced")),
+      "claims: failures list names the claim, the reason and the required action");
+    const textBad = formatIntegrityReport(reportBad);
+    assert(textBad.includes("FAILED:") && textBad.includes("Claim C3") && textBad.includes("Reason:") && textBad.includes("Action:"),
+      "claims: report renders the FAILED block with claim id, reason and action");
+    assert(buildIntegrityReport(goodRows, { ...allGoodInput, authority_ok: { s1: false, s2: true } }).failures.some((f) => f.reason.includes("authority requirement")),
+      "claims: a source that fails the assignment's authority requirement is listed as a failure");
+
+    // --- fallback extraction: factual sentences with figures, honestly ---
+    const sentences = extractFactualSentences("Reefs declined 40 percent in 2020. This is sad. Corals recover slowly, researchers note.", 5);
+    assert(sentences.length === 1 && sentences[0].startsWith("Reefs declined"),
+      "claims: deterministic extraction keeps only figure-bearing factual sentences (fallback, never invented)");
+
+    // --- never fabricate: fabricated passage is rejected end-to-end ---
+    const fabricated = verifyClaimAgainstSource("Corals recovered quickly.", "Corals recovered quickly, scientists announced.", S1);
+    assert(fabricated.status === "unsupported", "claims: an invented passage absent from the source is rejected — evidence is never fabricated");
   }
 })();
 

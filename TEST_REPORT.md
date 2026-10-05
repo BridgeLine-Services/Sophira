@@ -335,3 +335,53 @@ assertions), `tsc` clean, `next build` passes. No working functionality was
 removed, duplicated, or replaced; HIGH (submission readiness, stale-pattern
 detection) and lower categories were NOT implemented — they await explicit
 authorization per Prompt 1.
+
+## 29. Claim→evidence traceability round (2026-10-05) — 326/326 offline
+
+Prompt: upgrade the existing research system (NOT a rebuild) so every
+substantive factual claim traces **CLAIM → SOURCE → EXACT SUPPORTING
+PASSAGE → SOURCE URL → VERIFICATION STATUS**, and a citation is verified
+ONLY when the retrieved source content actually supports the claim — never
+merely because the URL resolves, the page exists, the title matches, or
+the domain is reputable.
+
+**What was added (all preserved on top of the existing stack — nothing
+deleted, no existing verification weakened):**
+
+| Piece | Detail |
+|---|---|
+| `src/lib/research/claims.ts` (NEW, pure) | Extraction-stage normalization (`normalizeClaimCandidates` — server-assigned claim ids, junk/invalid-labels dropped, never trusts the model), deterministic fallback extraction (`extractFactualSentences`), verbatim passage location with real character offsets (`locatePassage`), figure consistency (`claimNumbersSupported` — the number is the fact), mechanical claim→source verification (`verifyClaimAgainstSource`/`verifyClaims`), deterministic authority (`authorityScore` 1–9, `authorityVerdict` vs the assignment's source-type requirement), and the Research Integrity report (`buildIntegrityReport`/`formatIntegrityReport`) with the exact counts/failures format |
+| Migration `0013_claim_evidence.sql` | `research_claims` gains claim_id, assignment_id, source_url, source_title, evidence_start/end, confidence, authority_score, verified_at, reasons + the 'verified'/'unverified' statuses; `research_projects.research_integrity` stores the report |
+| `/api/ai/solve` (research path only) | The model must emit a `factual_claims` list (claim + [S#] sources + VERBATIM supporting passage) with the essay; the server verifies every claim×source pairing mechanically against the STORED retrieved content, persists the full trace rows, appends a final "Research Integrity" section to the essay (counts + FAILED claim/reason/action when applicable), returns `research_integrity`, and moves the project to status **'writing' — never 'complete'** — while any claim remains unsupported |
+| `/api/research/audit` | Stored claim rows are re-checked against LIVE source state: a source that became unavailable after initial verification demotes its claims to UNVERIFIED (never silently kept); the integrity report is rebuilt with live URL/title/authority results, returned as `integrity` + `integrity_text`, and `pass` now REQUIRES `research_complete` |
+| `ResearchPanel` UI | The audit block renders the Research Integrity counts and the FAILED list (claim, reason, required action); essay generation reports honestly when the essay is NOT research-complete |
+
+**Blocking rules enforced mechanically:** verified requires (a) source
+content available, (b) the passage located VERBATIM in it, (c) every
+figure of the claim present in the passage, (d) substantive claim↔passage
+overlap. Anything less is partially_supported / unsupported / unverified
+— the system never guesses evidence and never invents URLs, titles,
+authors, DOIs, dates, quotes, or evidence passages.
+
+**Automated tests: 41 new assertions in section 16b, suite total 326/326
+PASSED** (`npm test`, offline). Coverage mapped to the required
+scenarios: valid claim/source match ✓; valid URL but unsupported claim ✓;
+dead URL ✓; wrong source ✓; unrelated source ✓; partially supported
+claim ✓; multiple sources supporting one claim ✓; one source supporting
+multiple claims ✓; unsupported claim ✓; source becoming unavailable after
+initial verification ✓; plus fabricated-passage rejection, numeric
+mismatch (45% vs 40%), authority scoring/verdicts, report formatting
+(18/18-style counts and the FAILED block), and the full trace-row field
+chain. Three earlier test failures during this round were fixture bugs in
+the tests themselves (a passage not present in the fixture source; a
+claim whose figure its passage didn't contain) — fixed; final run 0
+failed. `tsc` clean; `next build` passes.
+
+**Honest limits:** no live run occurred (no AI key / search key in this
+environment) — the model-emitted-claims path is code-reviewed and its
+mechanical verification is fully offline-tested; the live end-to-end
+path still needs configured credentials. Semantic support beyond token
+overlap remains a deterministic heuristic, honestly labeled by its
+reasons; the system's guarantee is mechanical: nothing reaches
+"verified" without a verbatim, figure-consistent, overlapping passage
+in the retrieved content.

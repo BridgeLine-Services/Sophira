@@ -39,6 +39,22 @@ interface AuditData {
   all_cited_sources_live: boolean;
   problems: string[];
   pass: boolean;
+  integrity?: {
+    claims_total: number;
+    claims_supported: number;
+    claims_partially_supported: number;
+    claims_unsupported: number;
+    claims_unverified: number;
+    urls_total: number;
+    urls_resolve: number;
+    titles_total: number;
+    titles_match: number;
+    authority_total: number;
+    authority_satisfied: number;
+    research_complete: boolean;
+    failures: { claim_id: string; claim_text: string; reason: string; action: string }[];
+  } | null;
+  integrity_text?: string | null;
 }
 
 const VERIF_TONE: Record<string, "success" | "warn" | "danger" | "neutral"> = {
@@ -153,7 +169,12 @@ export function ResearchPanel({
       });
       const json = await res.json();
       if (res.ok) {
-        toast("success", "Researched essay generated with a verified bibliography.");
+        const ri = json?.data?.research_integrity;
+        if (ri && !ri.research_complete) {
+          toast("error", `Essay generated, but research is NOT complete: ${ri.claims_supported}/${ri.claims_total} factual claims are supported — see the Research Integrity section in the essay and revise the failed claims.`);
+        } else {
+          toast("success", "Researched essay generated with a verified bibliography.");
+        }
         onEssayGenerated?.();
       } else {
         toast("error", json.error || "The essay could not be generated.");
@@ -322,6 +343,33 @@ export function ResearchPanel({
                 {audit.ai_assessed && <Badge tone="neutral">semantic checks AI-assessed</Badge>}
                 <Badge tone={audit.all_cited_sources_live ? "success" : "warn"}>{audit.all_cited_sources_live ? "all cited sources live" : "some cited sources no longer resolve"}</Badge>
               </div>
+              {audit.integrity && (
+                <div className="rounded-md bg-ink/5 p-2.5 text-xs">
+                  <p className="flex items-center gap-1.5 font-semibold">
+                    <BookOpenCheck className="h-3.5 w-3.5 text-accent" /> Research Integrity
+                  </p>
+                  <p className="mt-1 text-ink-soft">
+                    {audit.integrity.claims_supported}/{audit.integrity.claims_total} factual claims supported
+                    {" · "}{audit.integrity.urls_resolve}/{audit.integrity.urls_total} URLs resolve
+                    {" · "}{audit.integrity.titles_match}/{audit.integrity.titles_total} titles match
+                    {" · "}{audit.integrity.authority_satisfied}/{audit.integrity.authority_total} sources satisfy assignment authority requirements
+                  </p>
+                  {audit.integrity.research_complete ? (
+                    <p className="mt-1 text-success">Every factual claim is traced to verified evidence.</p>
+                  ) : (
+                    <div className="mt-1 space-y-1.5">
+                      <p className="font-medium text-danger">FAILED — revise or remove these claims, or replace their sources:</p>
+                      {audit.integrity.failures.map((f, i) => (
+                        <p key={i} className="text-ink-soft">
+                          <span className="font-medium text-ink">{f.claim_id ? `Claim ${f.claim_id}: ` : ""}{f.claim_text}</span>
+                          <br />Reason: {f.reason}
+                          <br />Action: {f.action}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {audit.problems.map((p, i) => (
                 <p key={i} className="text-ink"><XCircle className="mr-1 inline h-3.5 w-3.5 text-danger" />{p}</p>
               ))}
