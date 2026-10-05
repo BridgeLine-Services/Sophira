@@ -2702,4 +2702,105 @@ async function runReleaseGateTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+// ---------------------------------------------------------------------------
+// PWA DIRECT-BROWSER READINESS (2026-10-05) — §26.
+// The PWA must be installable with NO app store: valid manifest, real icons
+// with the exact declared dimensions, a conservative service worker that
+// NEVER caches user/academic data, middleware that serves the shell, an
+// honest install page, and no false offline-AI claims anywhere in src/.
+// ---------------------------------------------------------------------------
+async function runPwaReadinessTests(): Promise<void> {
+  section("26. PWA direct-browser readiness — no app store required");
+  {
+    // ---- manifest validity ------------------------------------------------
+    const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), "public", "manifest.webmanifest"), "utf8"));
+    assert(manifest.name && manifest.short_name && manifest.start_url && manifest.scope,
+      "pwa: manifest has name, short_name, start_url and scope");
+    assert(manifest.display === "standalone", "pwa: manifest installs standalone (app-like window)");
+    const iconSizes = manifest.icons.filter((i: { sizes: string }) => i.sizes === "512x512").length;
+    assert(iconSizes >= 2, "pwa: manifest declares 512x512 icons for both any and maskable purposes");
+    assert(manifest.icons.some((i: { sizes: string }) => i.sizes === "192x192"),
+      "pwa: manifest declares a 192x192 icon");
+
+    // ---- icons actually exist with the exact declared dimensions ---------
+    const readPngSize = (p: string) => {
+      const b = fs.readFileSync(p);
+      assert(b.readUInt32BE(0) === 0x89504e47, `pwa: ${path.basename(p)} is a real PNG`);
+      return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+    };
+    for (const [file, w, h] of [["icon-192.png", 192, 192], ["icon-512.png", 512, 512], ["apple-touch-icon.png", 180, 180], ["favicon-32.png", 32, 32]] as const) {
+      const p = path.join(process.cwd(), "public", "icons", file);
+      assert(fs.existsSync(p), `pwa: icon asset ${file} exists`);
+      const size = readPngSize(p);
+      assert(size.w === w && size.h === h, `pwa: ${file} is exactly ${w}x${h} (found ${size.w}x${size.h})`);
+    }
+
+    // ---- service worker: conservative, user-data-safe ---------------------
+    const sw = fs.readFileSync(path.join(process.cwd(), "public", "sw.js"), "utf8");
+    assert(sw.includes("PRECACHE") && sw.includes("/manifest.webmanifest"),
+      "pwa: sw precaches only the static shell (icons + manifest)");
+    const precacheSrc = sw.match(/const PRECACHE = \[[\s\S]*?\];/)?.[0] ?? "";
+    const isStaticSrc = sw.match(/const isStatic =[^;]+;/s)?.[0] ?? "";
+    for (const forbidden of ["/api", "/dashboard", "/assignments", "/research", "/claim", "authorization", "bearer", "cookie"]) {
+      assert(!precacheSrc.toLowerCase().includes(forbidden.toLowerCase()) && !isStaticSrc.toLowerCase().includes(forbidden.toLowerCase()),
+        `pwa: sw precache + isStatic gate reference only static shell paths (found "${forbidden}")`);
+    }
+    const precacheEntries = (precacheSrc.match(/"[^"]+"/g) ?? []).map((e) => e.replace(/"/g, ""));
+    assert(precacheEntries.length > 0 && precacheEntries.every((e) => e.startsWith("/icons/") || e === "/manifest.webmanifest"),
+      "pwa: sw precache list contains ONLY icons and the manifest — no app routes, no user data");
+    assert(sw.includes("method !== \"GET\"") && sw.includes("url.origin !== self.location.origin"),
+      "pwa: sw handles same-origin GET requests only — no authenticated API or cross-origin caching");
+    const isStaticGate = sw.match(/const isStatic =[^;]+;/s);
+    assert(isStaticGate !== null && isStaticGate[0].includes("_next/static") && isStaticGate[0].includes("/icons/"),
+      "pwa: sw caches ONLY static asset paths (the isStatic gate)");
+    assert(sw.includes("cache-only the static app shell, never user or AI content"),
+      "pwa: sw documents its never-cache-user-data policy in code");
+    assert(sw.includes("Never cache HTML/API responses"),
+      "pwa: sw explicitly never caches HTML or API responses");
+
+    // ---- middleware serves the shell without auth friction ----------------
+    const matcher = fs.readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+    assert(/manifest\.webmanifest/.test(matcher) && /sw\.js/.test(matcher) && /icons/.test(matcher),
+      "pwa: middleware matcher lets the shell (manifest/sw/icons) load so the PWA can boot");
+
+    // ---- registration + honest install path -------------------------------
+    const reg = fs.readFileSync(path.join(process.cwd(), "src", "components", "pwa", "ServiceWorkerRegister.tsx"), "utf8");
+    assert(reg.includes("serviceWorker.register"),
+      "pwa: the app registers the service worker");
+    const install = fs.readFileSync(path.join(process.cwd(), "src", "app", "install", "page.tsx"), "utf8");
+    assert(install.includes("Add to Home Screen") && install.includes("Install app"),
+      "pwa: /install shows exact iPhone AND Android installation steps");
+    assert(install.includes("not an App Store / Google Play download"),
+      "pwa: /install states plainly that no app store is required");
+    assert(install.includes("beforeinstallprompt"),
+      "pwa: /install offers one-tap install where the browser supports it");
+
+    // ---- no false offline-AI claims ---------------------------------------
+    const offlineClaims: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (/\.(tsx?|jsx?)$/.test(e.name) && !/node_modules/.test(p)) {
+          const t = fs.readFileSync(p, "utf8");
+          if (/works offline|offline mode|offline AI|use Sophira offline/i.test(t)) offlineClaims.push(p);
+        }
+      }
+    };
+    walk(path.join(process.cwd(), "src"));
+    assert(offlineClaims.length === 0,
+      `pwa: no offline-AI/feature claims in the UI (offline offers shell only) — found ${offlineClaims.length}`);
+
+    // ---- guide exists and gives the exact owner steps ----------------------
+    const guide = fs.readFileSync(path.join(process.cwd(), "docs", "PWA_TESTING_GUIDE.md"), "utf8");
+    assert(guide.includes("No App Store or Google Play download is required"),
+      "pwa: guide states no app store is required or used");
+    for (const step of ["Opening the production URL", "Installing the PWA on Android", "Installing the PWA on iPhone", "Starting the first test"]) {
+      assert(guide.includes(step), `pwa: guide includes the "${step}" instructions`);
+    }
+    assert(guide.includes("There is NO offline AI, research, or solve functionality"),
+      "pwa: guide makes the offline limitation explicit and honest");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

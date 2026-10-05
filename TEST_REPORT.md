@@ -1111,3 +1111,55 @@ clean, `next build` passes, release.yml YAML-validated.
 **Honest limits:** the gate reports BLOCKED until the owner supplies the
 production prerequisites. That is the gate working as designed — a
 release cannot be claimed ready while they are missing.
+
+## 43. PWA direct-browser readiness (2026-10-05) — 931/931 offline
+
+TASK — prepare Sophira for immediate direct-browser/PWA testing with NO
+App Store or Google Play requirement. Verified the existing PWA against
+all 10 requirements and documented the exact owner testing steps.
+
+**10-point verification (docs/PWA_TESTING_GUIDE.md):** (1) runs from the
+production URL (deployment readiness script + health check; the URL itself
+is the owner-side prerequisite), (2) secure authentication (Supabase SSR
+cookie sessions + auth middleware, suite §1), (3) invitation-only signup
+refused at the DATABASE level (migrations + suite §23), (4) installable on
+mobile (valid manifest, one-tap prompt + exact Safari/Chrome steps on
+/install), (5) authenticated state retained across reloads/installs
+(cookie-based sessions), (6) all required assets present — icon-192.png
+(192x192), icon-512.png (512x512), apple-touch-icon.png (180x180),
+favicon-32.png (32x32) verified with exact PNG header dimensions, (7)
+works after installation (standalone, start_url /dashboard, shell files
+bypass the auth middleware by design), (8) offline/online transitions are
+DELIBERATELY limited and honestly documented: the service worker caches
+ONLY the static shell (icons, manifest, _next/static) — HTML and ALL API
+responses are never cached; there is NO offline AI/research/solve
+functionality and none is claimed anywhere in src/ (grep-verified),
+(9) reconnect keeps assignment state — everything is server-side; the
+timestamp-driven execution state machine reconciles on load (suite §19);
+honest limit: unsubmitted mid-request input can be lost, (10) clear
+installation path (/install with platform detection + step-by-step
+iPhone/Android instructions, linked from Settings).
+
+**Shared-device privacy (machine-checked):** the SW never stores HTML,
+API responses or any user content — cross-user cache leakage is
+impossible by construction; sessions are cookies (sign out before
+sharing a device, as with any website login).
+
+**Machine checks (new suite §26, 42 assertions):** manifest validity and
+required fields; every icon's exact PNG dimensions; the SW precache list
+contains ONLY icons + manifest; the isStatic gate references only static
+paths; same-origin GET-only handling; middleware serves the shell; SW
+registration exists; /install has the exact steps and the no-app-store
+statement; ZERO offline-AI claims in src/; the guide exists with all four
+owner instruction sections.
+
+**Exact owner steps documented:** opening the production URL, installing
+on Android (Chrome), installing on iPhone (Safari), and starting the
+first test (launch from home screen → dashboard → walk the master
+workflow, record in DEVICE_ACCEPTANCE.md so the release-gate device rows
+can turn PASS).
+
+**Honest limits:** live/device verification (rows 1, 4-7, 9 live aspects
+of the guide) requires the deployed production URL and physical devices —
+the owner's steps are in the guide. Suite **931/931**, `tsc` clean,
+`next build` passes.
