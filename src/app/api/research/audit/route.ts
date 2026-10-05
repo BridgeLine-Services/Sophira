@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   const { data: sources } = await supabase
     .from("research_sources")
-    .select("id, title, listed_title, author, publisher, publication_date, url:final_url, original_url, domain, retrieval_date, verification_status, approval, content_extract, doi")
+    .select("id, title, listed_title, author, publisher, publication_date, url:final_url, original_url, domain, retrieval_date, verification_status, approval, content_extract, doi, authority_decision")
     .eq("project_id", projectId)
     .in("approval", ["approved"]);
   const approved = (sources ?? []).filter((s) => (s.verification_status === "verified" || s.verification_status === "partially_verified"));
@@ -268,11 +268,30 @@ export async function POST(request: NextRequest) {
     title_match[s.id] = titlesCorrespond(s.listed_title, liveTitle);
     authority_ok[s.id] = authorityVerdict({ domain: s.domain ?? "", doi: s.doi }, sourceType).ok;
   }
+  // Stored authority decisions → the citation audit explains WHY each
+  // source was accepted (assignment-aware authority round).
+  const authorityReasons: Record<string, string> = {};
+  const authorityDecisions: Record<string, unknown> = {};
+  for (const s of approved) {
+    const d = (s as { authority_decision?: unknown }).authority_decision as
+      | { category?: string; tier?: number | null; tier_name?: string | null; teacher_required?: boolean; reasons?: string[] }
+      | null | undefined;
+    if (!d) continue;
+    authorityDecisions[s.id] = d;
+    const why: string[] = [];
+    if (d.tier_name) why.push(`accepted as tier ${d.tier} (${d.tier_name}) of the ${d.category} authority profile`);
+    if (d.teacher_required) why.push("matches the teacher's required source type");
+    if (d.reasons?.length) why.push(d.reasons.join(" "));
+    authorityReasons[s.id] = why.length
+      ? why.join("; ")
+      : `Accepted under the ${d.category} authority profile without a specific tier match.`;
+  }
   let integrity: IntegrityReport | null = null;
   if (claimReportRows.length > 0) {
     integrity = buildIntegrityReport(claimReportRows, {
       url_resolves, title_match, authority_ok,
       authority_required: sourceType, now: new Date().toISOString(),
+      authority_reasons: authorityReasons,
     });
     if (!integrity.research_complete) {
       await supabase.from("research_projects").update({
@@ -336,6 +355,7 @@ export async function POST(request: NextRequest) {
       all_cited_sources_live: reverify.every((r) => r.status === "verified" || r.status === "partially_verified"),
       integrity,
       integrity_text: integrity ? formatIntegrityReport(integrity) : null,
+      authority_decisions: authorityDecisions,
       problems,
       pass: problems.length === 0 && (!integrity || integrity.research_complete),
     },

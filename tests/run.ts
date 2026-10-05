@@ -41,6 +41,12 @@ import {
   authorityScore, authorityVerdict,
   type SourceForClaims, type ClaimEvidenceRecord, type IntegrityReportInput,
 } from "../src/lib/research/claims";
+import {
+  classifyAssignment, parseTeacherSourceType, rankCandidatesForAssignment,
+  registerAuthorityProfile, AUTHORITY_PROFILES,
+  type AuthorityDecision,
+} from "../src/lib/research/authority";
+import type { SearchHit } from "../src/lib/research/provider";
 import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
 import { readFileSync } from "fs";
@@ -1236,6 +1242,186 @@ const __researchTests = (async () => {
     // --- never fabricate: fabricated passage is rejected end-to-end ---
     const fabricated = verifyClaimAgainstSource("Corals recovered quickly.", "Corals recovered quickly, scientists announced.", S1);
     assert(fabricated.status === "unsupported", "claims: an invented passage absent from the source is rejected — evidence is never fabricated");
+  }
+
+  section("16c. Assignment-aware source authority (extends the existing ranking, never replaces it)");
+  {
+    const mkHit = (url: string, title: string, snippet: string, published?: string): SearchHit =>
+      ({ title, url, snippet, published });
+
+    // --- Classification: the task's subject determines the profile ---
+    const histSpec = { topic: "The French Revolution causes and primary sources" };
+    const bioSpec = { topic: "Coral bleaching and marine ecosystem health" };
+    const litSpec = { topic: "Symbolism and the white whale in Moby-Dick literary analysis" };
+    const newsSpec = { topic: "The 2026 election campaign finance debate", dateRange: "recent" };
+    const socSpec = { topic: "Income inequality and household census statistics" };
+    const generalSpec = { topic: "How to structure a persuasive essay" };
+
+    assert(classifyAssignment(histSpec).category === "history", "authority: history assignment classified");
+    assert(classifyAssignment(bioSpec).category === "science", "authority: biology/science assignment classified");
+    assert(classifyAssignment(litSpec).category === "literature", "authority: literature assignment classified");
+    assert(classifyAssignment(newsSpec).category === "current_events", "authority: current-events assignment classified");
+    assert(classifyAssignment(socSpec).category === "social_science", "authority: social-science assignment classified");
+    assert(classifyAssignment(generalSpec).category === "general", "authority: no subject signal → general (teacher/rubric requirements govern)");
+    assert(classifyAssignment(histSpec).rationale.length > 0, "authority: classification records its rationale");
+
+    assert(parseTeacherSourceType("peer-reviewed journals") === "peer_reviewed", "authority: teacher requirement parsed — peer-reviewed");
+    assert(parseTeacherSourceType("government documents") === "government", "authority: teacher requirement parsed — government");
+    assert(parseTeacherSourceType("university archives") === "university", "authority: teacher requirement parsed — university");
+    assert(parseTeacherSourceType("primary sources") === "primary", "authority: teacher requirement parsed — primary");
+    assert(parseTeacherSourceType("") === "any", "authority: no requirement parsed as any");
+    assert(parseTeacherSourceType("random blogs") === "unrecognized", "authority: unrecognized requirement is honest, never guessed");
+
+    // --- Shared fixtures ---
+    const locArchive = mkHit("https://www.loc.gov/revolution-letters", "Letters from the Revolution — Digital Collection",
+      "Primary source letters and original documents from the French Revolution era, digitized from the archive.", "2019-03-01");
+    const jstorHist = mkHit("https://www.jstor.org/stable/french-rev", "Revolutionary Causes: a scholarly analysis",
+      "Peer-reviewed scholarly article on the economic causes of the French Revolution, with citations.", "2015-06-01");
+    const eduHist = mkHit("https://www.columbia.edu/content/special-collections", "Special Collections: French Revolution manuscripts",
+      "University archive of French Revolution manuscripts and special collections.", "2012-01-01");
+    const museumHist = mkHit("https://www.metmuseum.org/art/revolution", "Revolution-era artifacts — Museum collection",
+      "Museum collection of artifacts and exhibits from the period.", "2018-05-01");
+    const blogHist = mkHit("https://historyblog.example.com/french-revolution", "My thoughts on the French Revolution",
+      "A personal blog post about the French Revolution with some numbers 1789.", "2020-02-02");
+    const natureBio = mkHit("https://www.nature.com/articles/coral-bleach", "Thermal stress and coral bleaching",
+      "Peer-reviewed research article on coral bleaching, thermal stress and marine ecosystem health.", "2024-01-01");
+    const pubmedBio = mkHit("https://pubmed.ncbi.nlm.nih.gov/12345/", "Coral bleaching thresholds: a PubMed-indexed study",
+      "PubMed-indexed study of coral bleaching thresholds and marine ecosystem decline.", "2023-04-01");
+    const eduBio = mkHit("https://www.brown.edu/courses/coral", "Marine biology course materials",
+      "University course page on marine ecosystem biology with lecture notes.", "2021-09-01");
+    const gutenbergLit = mkHit("https://www.gutenberg.org/files/2701/moby-dick", "Moby-Dick — full text",
+      "Herman Melville's Moby-Dick, complete full text of the novel.", "1997-01-01");
+    const jstorLit = mkHit("https://www.jstor.org/stable/moby-dick-crit", "Moby-Dick: a critical analysis",
+      "Scholarly criticism of Moby-Dick's symbolism and the white whale in American literature.", "2008-01-01");
+    const govLit = mkHit("https://www.congress.gov/literature-heritage", "Congress report on literary heritage",
+      "Government report on American literary heritage preservation efforts.", "2019-01-01");
+
+    // --- Ranking follows the HISTORY hierarchy: primary sources first ---
+    const histRanked = rankCandidatesForAssignment([blogHist, jstorHist, museumHist, eduHist, locArchive], histSpec);
+    assert(histRanked[0].hit.url.includes("loc.gov"), "authority: history — primary sources rank first");
+    assert(histRanked.findIndex((r) => r.hit.url.includes("jstor")) < histRanked.findIndex((r) => r.hit.url.includes("metmuseum")),
+      "authority: history — scholarly articles (tier 2) above museums (tier 4)");
+    assert(histRanked.findIndex((r) => r.hit.url.includes("columbia")) < histRanked.findIndex((r) => r.hit.url.includes("metmuseum")),
+      "authority: history — university archives (tier 3) rank above museums (tier 4), exactly as the hierarchy specifies");
+    assert(histRanked[histRanked.length - 1].hit.url.includes("historyblog"),
+      "authority: history — a personal blog ranks last under the history profile");
+    assert(histRanked[0].decision.tier === 1 && histRanked[0].decision.tier_name === "Primary sources",
+      "authority: decision records the tier that justified acceptance");
+    assert(histRanked[0].decision.primary_source === true, "authority: primary-source flag set for archive letters");
+    assert(histRanked[0].decision.reasons.some((r) => r.includes("Tier 1")), "authority: decision explains the tier acceptance");
+
+    // --- THE key requirement: ranking changes with assignment type ---
+    const shared = [locArchive, natureBio, gutenbergLit];
+    const asHistory = rankCandidatesForAssignment(shared, histSpec);
+    const asScience = rankCandidatesForAssignment(shared, bioSpec);
+    const asLiterature = rankCandidatesForAssignment(shared, litSpec);
+    assert(asHistory[0].hit.url.includes("loc.gov") && asScience[0].hit.url.includes("nature.com") && asLiterature[0].hit.url.includes("gutenberg"),
+      "authority: THE SAME sources rank differently — archive first for history, journal for science, primary text for literature");
+    assert(asScience[0].decision.category === "science" && asHistory[0].decision.category === "history",
+      "authority: the stored decision carries the assignment's classification");
+
+    // --- Science hierarchy: journals > NIH/PubMed > university > textbooks ---
+    const sciRanked = rankCandidatesForAssignment([eduBio, pubmedBio, natureBio], bioSpec);
+    assert(sciRanked[0].hit.url.includes("nature.com"), "authority: science — peer-reviewed journal first");
+    assert(sciRanked.findIndex((r) => r.hit.url.includes("pubmed")) < sciRanked.findIndex((r) => r.hit.url.includes("brown.edu")),
+      "authority: science — NIH/PubMed (tier 2) above university sources (tier 3)");
+    assert(sciRanked[0].decision.peer_reviewed === true, "authority: peer-review status recorded in the decision");
+
+    // --- Teacher requirements OVERRIDE generic ranking preferences ---
+    const litGovSpec = { ...litSpec, sourceType: "government documents" };
+    const govRanked = rankCandidatesForAssignment([jstorLit, govLit], litGovSpec);
+    assert(govRanked[0].hit.url.includes("congress.gov"),
+      "authority: teacher requires government sources → a .gov report OUTRANKS scholarly criticism despite the literature profile");
+    assert(govRanked[0].decision.teacher_required === true, "authority: teacher-required flag stored on the decision");
+    assert(govRanked[1].decision.reasons.some((r) => r.includes("teacher's required source type")),
+      "authority: non-satisfying sources get the honest downrank reason");
+    const noReqRanked = rankCandidatesForAssignment([jstorLit, govLit], litSpec);
+    assert(noReqRanked[0].hit.url.includes("jstor"),
+      "authority: without the teacher requirement the literature profile ranks scholarly criticism first again");
+
+    // --- .gov/.edu are NEVER blindly prioritized ---
+    const litRanked = rankCandidatesForAssignment([govLit, gutenbergLit, jstorLit], litSpec);
+    assert(litRanked[0].hit.url.includes("gutenberg") && litRanked[1].hit.url.includes("jstor") && litRanked[2].hit.url.includes("congress.gov"),
+      "authority: a random .gov page is LAST for literature — institutional domains only count where the profile values them");
+    assert(litRanked[2].decision.institutional === true && (litRanked[2].decision.tier === null),
+      "authority: institutional flag is recorded for explanation but gives no blind score boost");
+
+    // --- Publication date matters when the assignment requires recency ---
+    const news2026 = mkHit("https://www.bbc.com/news/election-finance", "Election campaign finance reports and analysis from the BBC newsroom",
+      "Election campaign finance reports and analysis from the BBC newsroom, updated coverage.", "2026-09-01");
+    const news2001 = mkHit("https://www.economist.com/election-finance-archive", "Election campaign finance reports and analysis",
+      "Election campaign finance reports and analysis from the newsroom, archive coverage.", "2001-05-05");
+    const newsRanked = rankCandidatesForAssignment([news2001, news2026], newsSpec);
+    assert(newsRanked[0].hit.url.includes("bbc.com"),
+      "authority: same-tier current-events sources — the fresh one ranks first under a recency requirement");
+    assert(newsRanked[0].decision.date_fit > 0 && newsRanked[1].decision.date_fit < 0,
+      "authority: date fit recorded honestly per source");
+
+    // --- Relevance and evidence quality break ties within a tier ---
+    const censusTopical = mkHit("https://www.census.gov/income", "Household income statistics and census data",
+      "Census data on household income inequality statistics across US states and demographics, 2023.", "2024-01-01");
+    const statsBland = mkHit("https://www.bls.gov/tables", "Table downloads",
+      "Downloadable statistical tables.", "2024-01-01");
+    const socRanked = rankCandidatesForAssignment([statsBland, censusTopical], socSpec);
+    assert(socRanked[0].hit.url.includes("census.gov"),
+      "authority: same tier — the source actually ABOUT the topic outranks the off-topic one");
+    assert(socRanked[1].decision.evidence_quality === 0 && socRanked[1].decision.reasons.some((r) => r.includes("Thin snippet")),
+      "authority: thin evidence quality recorded honestly");
+
+    // --- General: teacher/rubric requirements determine the hierarchy ---
+    const genReq = { topic: "How to structure a persuasive essay", sourceType: "peer-reviewed journals" };
+    const genRanked = rankCandidatesForAssignment([blogHist, govLit, jstorLit], genReq);
+    assert(genRanked[0].hit.url.includes("jstor"),
+      "authority: general assignment with a teacher requirement — satisfying sources rank first");
+    assert(genRanked.every((r) => r.decision.category === "general"), "authority: general classification stored on every decision");
+
+    // --- Configurable profiles: registering one changes the ranking ---
+    const originalLit = AUTHORITY_PROFILES.literature;
+    registerAuthorityProfile({
+      category: "literature",
+      description: "test profile: blogs count as top tier",
+      tiers: [{ name: "Test-blog tier", domains: /historyblog\.example\.com/ }],
+    });
+    const customRanked = rankCandidatesForAssignment([jstorLit, blogHist], litSpec);
+    assert(customRanked[0].hit.url.includes("historyblog"),
+      "authority: profiles are configurable — a registered profile reorders the ranking");
+    registerAuthorityProfile(originalLit); // restore, tests stay order-independent
+
+    // --- Existing generic ranker untouched (its own tests still hold) ---
+    assert(rankCandidates([
+      mkHit("https://www.noaa.gov/coral", "Coral report", "Government coral bleaching report with figures 40 percent."),
+    ]).length === 1, "authority: the generic rankCandidates still works exactly as before");
+
+    // --- The stored decision shape (what the citation audit will read) ---
+    const d: AuthorityDecision = histRanked[0].decision;
+    assert(typeof d.category === "string" && typeof d.score === "number" && Array.isArray(d.reasons) && d.reasons.length > 0 &&
+      typeof d.classification_rationale === "string" && typeof d.relevance === "number" &&
+      typeof d.evidence_quality === "number" && typeof d.date_fit === "number",
+      "authority: every decision is a complete, explainable record");
+
+    // --- Usable-hit filtering matches the old policy ---
+    assert(rankCandidatesForAssignment([mkHit("ftp://files.example.com/x", "ftp file", "some ftp resource", "2024-01-01")], histSpec).length === 0,
+      "authority: non-http hits are filtered out (same policy as the generic ranker)");
+  }
+
+  section("16d. Citation audit explains WHY each source was accepted (stored authority decisions)");
+  {
+    const tracedRow: ClaimEvidenceRecord = {
+      claim_id: "C1", assignment_id: null,
+      claim_text: "Reefs declined 40 percent in 2020.",
+      source_id: "s1", source_url: "https://www.loc.gov/revolution-letters", source_title: "Letters from the Revolution",
+      exact_supporting_passage: "Reefs declined 40 percent in 2020.",
+      evidence_start: 0, evidence_end: 34, verification_status: "verified",
+      confidence: 0.9, authority_score: 8, verified_at: "2026-10-05T00:00:00.000Z", reasons: [],
+    };
+    const ok = buildIntegrityReport([tracedRow], {
+      url_resolves: { s1: true }, title_match: { s1: true }, authority_ok: { s1: true },
+      authority_required: "any", now: "2026-10-05T00:00:00.000Z",
+      authority_reasons: { s1: "accepted as tier 1 of the history authority profile; primary source archive" },
+    });
+    assert(ok.authority_explanations.length === 1 && ok.authority_explanations[0].reason.includes("history authority profile"),
+      "authority: the integrity report carries the stored acceptance explanation");
+    assert(ok.authority_explanations[0].source_id === "s1", "authority: acceptance explanations are per-source");
   }
 })();
 

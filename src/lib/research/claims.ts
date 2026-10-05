@@ -77,6 +77,9 @@ export interface IntegrityReportInput {
   authority_ok: Record<string, boolean>;
   authority_required: string | null;
   now: string;
+  /** Stored authority decisions (research_sources.authority_decision): the
+   * citation audit uses them to explain WHY each source was accepted. */
+  authority_reasons?: Record<string, string>;
 }
 
 export interface IntegrityFailure {
@@ -101,6 +104,8 @@ export interface IntegrityReport {
   authority_required: string | null;
   research_complete: boolean;
   failures: IntegrityFailure[];
+  /** Why each source was accepted under the assignment's authority rules. */
+  authority_explanations: { source_id: string; source_title: string; reason: string }[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -482,6 +487,7 @@ export function buildIntegrityReport(
   const claims_total = statuses.size;
   let supported = 0, partial = 0, unsupported = 0, unverified = 0;
   const failures: IntegrityFailure[] = [];
+  const accepted_explanations: { source_id: string; source_title: string; reason: string }[] = [];
   statuses.forEach((status, claimId) => {
     if (status === "verified") supported++;
     else if (status === "partially_supported") {
@@ -533,6 +539,15 @@ export function buildIntegrityReport(
         action: "Replace with a source that satisfies the assignment's source-type requirement.",
       });
     }
+    // Recorded acceptance explanation (assignment-aware authority round):
+    // the stored decision says why this source was allowed into the essay.
+    if (input.authority_ok[id] === true && input.authority_reasons?.[id]) {
+      accepted_explanations.push({
+        source_id: id,
+        source_title: row?.source_title ?? id,
+        reason: input.authority_reasons[id],
+      });
+    }
   }
 
   const research_complete =
@@ -548,6 +563,7 @@ export function buildIntegrityReport(
     urls_total, urls_resolve, titles_total, titles_match,
     authority_total, authority_satisfied, authority_required: input.authority_required,
     research_complete, failures,
+    authority_explanations: accepted_explanations,
   };
 }
 

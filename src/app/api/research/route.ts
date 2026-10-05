@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/supabase/guard";
 import { getSearchProvider, searchProviderConfigured, SearchNotConfiguredError } from "@/lib/research/provider";
 import { fetchAndVerify, titlesCorrespond } from "@/lib/research/verify";
 import { generateQueries, dedupeSources, rankCandidates } from "@/lib/research/research";
+import { rankCandidatesForAssignment } from "@/lib/research/authority";
 import { parseISODateLoose } from "@/lib/research/citation";
 
 export const runtime = "nodejs";
@@ -133,7 +134,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const candidates = rankCandidates(dedupeSources(allHits)).slice(0, MAX_CANDIDATES);
+  // Assignment-aware ranking (2026-10-05): classify the task, apply its
+  // authority profile, teacher requirements override generic preferences.
+  // rankCandidates() itself is untouched and remains the generic fallback.
+  const ranked = rankCandidatesForAssignment(dedupeSources(allHits), spec);
+  const candidates = ranked.slice(0, MAX_CANDIDATES);
   if (candidates.length === 0) {
     const reason = searchFailures.length
       ? `All searches failed: ${searchFailures.join("; ")}.`
@@ -146,7 +151,7 @@ export async function POST(request: NextRequest) {
 
   // 3. Verify each candidate — actually fetch it.
   const stored: Record<string, unknown>[] = [];
-  for (const hit of candidates) {
+  for (const { hit, decision } of candidates) {
     const v = await fetchAndVerify(hit.url);
     const titleMatch = titlesCorrespond(hit.title, v.title || hit.title);
     let status = v.status;
@@ -183,6 +188,8 @@ export async function POST(request: NextRequest) {
         content_chars: v.textChars,
         integrity_hash: v.hash,
         approval: "pending",
+        authority_category: decision.category,
+        authority_decision: decision,
       })
       .select("id")
       .single();
@@ -215,6 +222,15 @@ export async function POST(request: NextRequest) {
       author: v.author,
       publication_date: parseISODateLoose(v.publicationDate),
       notes,
+      authority: {
+        category: decision.category,
+        tier: decision.tier,
+        tier_name: decision.tier_name,
+        teacher_required: decision.teacher_required,
+        primary_source: decision.primary_source,
+        peer_reviewed: decision.peer_reviewed,
+        reasons: decision.reasons,
+      },
     });
   }
 

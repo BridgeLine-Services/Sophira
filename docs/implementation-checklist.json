@@ -5,7 +5,7 @@
     "auditor": "repository implementation audit against requirements (Prompt 1)",
     "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
     "verification": {
-      "offline_tests": "350/350 passed (326 prior + 24 stale-pattern/readiness assertions added 2026-10-05, second round)",
+      "offline_tests": "393/393 passed (350 prior + 43 assignment-aware authority assertions added 2026-10-05, third round)",
       "typecheck": "tsc --noEmit strict: clean",
       "build": "next build: 38/38 routes compiled",
       "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 \u2014 production is in the documented DEGRADED mode (no Supabase/AI env configured)",
@@ -964,6 +964,45 @@
       "blockers": [
         "Live verification needs AI + search credentials (external)"
       ]
+    },
+    {
+      "id": "assignment-aware-authority",
+      "title": "Assignment-aware source authority: task classification, configurable authority profiles, teacher-override ranking, stored acceptance decisions",
+      "status": "IMPLEMENTED",
+      "notes": "Added 2026-10-05 as an EXTENSION of research.ts's rankCandidates (which remains untouched and is the generic fallback). classifyAssignment picks history/science/current-events/literature/social-science/general; AUTHORITY_PROFILES hold the configurable tier hierarchies (registerAuthorityProfile replaces a category at runtime); rankCandidatesForAssignment sorts teacher-gate \u2192 tier \u2192 within-tier score (relevance, evidence quality, date fit). Teacher requirements override generic preferences absolutely. .gov/.edu are never blindly prioritized \u2014 institutional domains only count where the profile's hierarchy values them. The per-source decision (tier, flags, reasons) is stored via migration 0014 and surfaced by the citation audit as authority_explanations ('why each source was accepted').",
+      "files": [
+        "src/lib/research/authority.ts",
+        "src/app/api/research/route.ts",
+        "src/app/api/research/audit/route.ts",
+        "src/app/api/ai/solve/route.ts",
+        "src/components/app/ResearchPanel.tsx",
+        "supabase/migrations/0014_source_authority.sql"
+      ],
+      "functions": [
+        "classifyAssignment",
+        "parseTeacherSourceType",
+        "registerAuthorityProfile",
+        "assessSourceAuthority",
+        "rankCandidatesForAssignment"
+      ],
+      "tables": [
+        "research_sources (authority_category + authority_decision, migration 0014)",
+        "research_projects",
+        "research_claims"
+      ],
+      "apis": [
+        "/api/research (ranking now assignment-aware)",
+        "/api/research/audit (authority_explanations)",
+        "/api/ai/solve"
+      ],
+      "tests_existing": [
+        "43 assertions in tests/run.ts sections 16c (ranking changes by assignment type) + 16d (audit acceptance explanations)"
+      ],
+      "tests_missing": [
+        "Live end-to-end with a configured search provider (external credentials)"
+      ],
+      "env": [],
+      "blockers": []
     }
   ],
   "priorities": {

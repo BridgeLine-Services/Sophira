@@ -53,8 +53,10 @@ interface AuditData {
     authority_satisfied: number;
     research_complete: boolean;
     failures: { claim_id: string; claim_text: string; reason: string; action: string }[];
+    authority_explanations?: { source_id: string; source_title: string; reason: string }[];
   } | null;
   integrity_text?: string | null;
+  authority_decisions?: Record<string, unknown>;
 }
 
 const VERIF_TONE: Record<string, "success" | "warn" | "danger" | "neutral"> = {
@@ -367,6 +369,18 @@ export function ResearchPanel({
                         </p>
                       ))}
                     </div>
+                  )}
+                  {(audit.integrity.authority_explanations ?? []).length > 0 && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer font-medium">Why each source was accepted</summary>
+                      <ul className="mt-1.5 space-y-1">
+                        {(audit.integrity.authority_explanations ?? []).map((e, i) => (
+                          <li key={i} className="text-ink-soft">
+                            <span className="font-medium text-ink">{e.source_title}</span> — {e.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
                   )}
                 </div>
               )}

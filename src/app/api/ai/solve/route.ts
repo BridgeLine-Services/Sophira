@@ -220,6 +220,7 @@ export async function POST(request: NextRequest) {
   }[] = [];
   let researchCitationStyle = "generic";
   let researchSourceType: string | null = null;
+  let researchAuthorityDecisions: Record<string, { teacher_required?: boolean }> = {};
   let factualClaimsRaw: unknown = null;
   if (researchProjectId) {
     const { data: rp } = await supabase
@@ -232,16 +233,20 @@ export async function POST(request: NextRequest) {
     researchSourceType = spec.sourceType || null;
     const { data: rs } = await supabase
       .from("research_sources")
-      .select("id, title, listed_title, author, publisher, publication_date, final_url, original_url, domain, retrieval_date, doi, verification_status, content_extract")
+      .select("id, title, listed_title, author, publisher, publication_date, final_url, original_url, domain, retrieval_date, doi, verification_status, authority_decision, content_extract")
       .eq("project_id", researchProjectId)
       .eq("approval", "approved")
       .in("verification_status", ["verified", "partially_verified"]);
+    researchAuthorityDecisions = Object.fromEntries(
+      (rs ?? []).map((r) => [r.id, (r.authority_decision ?? {}) as { teacher_required?: boolean }])
+    );
     researchSources = (rs ?? []).map((r) => ({
       id: r.id, title: r.title, author: r.author, publisher: r.publisher,
       publication_date: r.publication_date, url: (r.final_url || r.original_url) as string,
       accessed: r.retrieval_date, doi: r.doi, extract: String(r.content_extract ?? ""),
       domain: r.domain ?? "", listed_title: r.listed_title ?? "",
       verification_status: r.verification_status as string,
+      authority_decision: (r.authority_decision ?? null) as { teacher_required?: boolean } | null,
     }));
     if (researchSources.length === 0) {
       return NextResponse.json(
@@ -522,7 +527,11 @@ export async function POST(request: NextRequest) {
     for (const r of researchSources) {
       url_resolves[r.id] = r.verification_status === "verified" || r.verification_status === "partially_verified";
       title_match[r.id] = titlesCorrespond(r.listed_title, r.title);
-      authority_ok[r.id] = authorityVerdict({ domain: r.domain, doi: r.doi }, researchSourceType).ok;
+      // Teacher-required sources satisfy the authority check via their
+      // STORED decision; otherwise the deterministic verdict applies.
+      authority_ok[r.id] =
+        authorityVerdict({ domain: r.domain, doi: r.doi }, researchSourceType).ok ||
+        researchAuthorityDecisions[r.id]?.teacher_required === true;
     }
     integrityReport = buildIntegrityReport(claimRows, {
       url_resolves, title_match, authority_ok,

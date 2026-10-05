@@ -429,3 +429,52 @@ rot with time), NOT a weakening of the feature. Final run 0 failed.
 readiness reflects stored records only — it does not re-run the rubric
 audit or the research audit itself, it reports their latest persisted
 results.
+
+## 31. Assignment-aware source authority (2026-10-05) — 393/393 offline
+
+Prompt: EXTEND the existing research-ranking system (explicitly not
+replace it) with assignment-aware source authority rules.
+
+**What was added — `src/lib/research/authority.ts` (new, additive):**
+
+| Piece | Detail |
+|---|---|
+| `classifyAssignment` | Deterministic classification of the research task into history / science / current events / literature / social science / general, from topic, question, course and teacher words (teacher words weigh double). No signal → general: the teacher/rubric requirements govern; without them the UNCHANGED generic ranker applies |
+| `AUTHORITY_PROFILES` | Configurable, data-defined tier hierarchies exactly as specified — HISTORY (primary sources → scholarly → university archives → museums → government archives), SCIENCE (journals → NIH/PubMed → university → textbooks → scientific organizations), CURRENT EVENTS (original reporting → government releases → primary documents → established news), LITERATURE (primary text → scholarly criticism → university → journals → literary organizations), SOCIAL SCIENCE (peer-reviewed → government statistics → university research → research organizations → secondary) |
+| `registerAuthorityProfile` | Profiles are configurable: a registered profile replaces a category's hierarchy at runtime |
+| `rankCandidatesForAssignment` | The assignment-aware ranker: teacher gate first, then the profile's tier, then score (relevance, evidence quality, date fit) within a tier. `rankCandidates()` itself is UNTOUCHED and remains the generic fallback |
+| `assessSourceAuthority` | Per-source decision record: category, rationale, tier, tier name, primary/peer-reviewed/institutional flags, teacher-required flag, date fit, relevance, evidence quality, human-readable reasons — the decision is STORED with the source (migration 0014) so the citation audit explains why each source was accepted |
+
+**Requirements honored:** teacher requirements override generic
+preferences as a hard ordering gate; .gov/.edu are never blindly
+prioritized (institutional domains count only where the profile's
+hierarchy values them, e.g. a random .gov page ranks last for a
+literature essay); publication date matters under a recency requirement;
+primary vs secondary and peer-review status come from the profile tier
+and deterministic domain/DOI signals; grade level flows in via the
+research spec.
+
+**Citation audit integration:** `/api/research/audit` reads each stored
+decision, builds a per-source acceptance explanation, passes it into the
+Research Integrity report (`authority_explanations`, new field) and
+returns it; the UI shows "Why each source was accepted" per source.
+`/api/ai/solve` honors a stored `teacher_required` decision in its
+authority check.
+
+**Tests: 43 new assertions (sections 16c + 16d), suite total 393/393
+PASSED.** The central proof: the SAME source set ranks archive-first
+for history, journal-first for science, primary-text-first for
+literature. Teacher-override, no-blind-gov/edu, tier fidelity (PubMed
+tier 2 ≠ journals tier 1), date, relevance, evidence quality, profile
+configurability and the decision record shape are all asserted.
+**During development 6 tests failed.** Two were my own test bugs
+(a backwards tier assertion; a report test built with no claim rows).
+Two uncovered REAL bugs in the new code, both fixed: date_fit was
+narrated in the reasons but never added to the score, and relevance
+could flip adjacent profile tiers (the profile hierarchy now decides
+order; relevance ranks within a tier). Nothing was fabricated; the
+final run is 0 failed. `tsc` clean; `next build` passes.
+
+**Existing research verification untouched:** redirect/dead-link
+detection, canonical URL, metadata, hashing, ranking fallback, provider
+and verify suites all pass unchanged.
