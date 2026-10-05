@@ -1217,3 +1217,65 @@ no placeholder production URLs (the only example.com reference is the
 REMOVED_FALLBACK enforcement constant), no fabricated research links
 (citations derive from verified records only), no unsupported factual
 claims (unverifiable claims marked UNVERIFIED by design).
+
+## 45. Owner-controlled access system (2026-10-05) — 989/989 offline
+
+TASK — secure owner-controlled access: permanent owner role, grant/revoke/
+reinstate/permanent removal, immediate revocation of every access path,
+server-side enforcement everywhere, no client-side-only boundaries, and
+owner documentation.
+
+**Discovered architecture (reused, not rebuilt):** Supabase Auth with
+`profiles.role` (owner/user — no admin role required; the architecture
+never needed one), `profiles.status` (active/revoked, migration 0005),
+fail-closed owner bootstrap via operator-set `app_config.owner_email`
+(migration 0008 — no hardcoded password, no stranger can claim a fresh
+install), middleware revoked-user redirect, and the server-side guard
+(`requireUser` → authenticated → ACTIVE access; `requireOwner` → owner
+role) already on most API routes.
+
+**Security gap found and fixed:** 4 routes checked authentication but NOT
+revoked status — a revoked user could still call AI/extraction:
+`/api/account/delete`, `/api/ai/analyze-writing`,
+`/api/ai/extract-teacher-doc`, `/api/extract`. All four now go through
+`requireUser` (the full authenticated → active → resource chain).
+
+**Migration 0019 (additive, no existing policy weakened):**
+- `profiles.access_revoked_at` — when access was revoked (NULL = active).
+- `network_stats()` extended to return each member's email identifier and
+  revocation timestamp; computation of every existing column preserved
+  verbatim; still owner-only (fail-closed role check) and still
+  aggregate-only (no academic content).
+- `revoke_all_sessions(uuid)` — service-role-only SQL function that
+  deletes all the target user's refresh tokens: revoking access now
+  kills every previously issued session server-side (installed apps, open
+  browsers, old tokens cannot refresh; middleware + guards reject them
+  immediately regardless).
+
+**Owner actions (server-enforced via requireOwner):** revoke (status +
+timestamp + session kill), restore (status + timestamp cleared),
+permanent removal (auth user deletion cascades all data),
+invite-permission toggle; the owner cannot revoke/remove their own or any
+owner account. Access Management UI (`/owner`) now shows name, email,
+role, status, date granted, date revoked, with revoke/restore/remove/
+grant (invitation) buttons and an explicit "only the owner" notice — the
+UI is a window, never the boundary.
+
+**Enforcement chain machine-checked (new suite §27, 58 assertions):**
+every API route enforces the guard or is on the documented public
+allowlist (health + single-use-token invitation accept, which must be
+pre-auth); the guard implements authenticated → revoked-reject(403) →
+role; middleware redirects revoked users; revoke records both status and
+audit timestamp AND kills refresh tokens; restore clears both; removal
+deletes the auth user; /owner is server-side owner-only; the UI shows all
+required fields; fail-closed owner bootstrap preserved; ZERO plaintext
+credentials in src; docs/OWNER_ACCESS.md covers creation, login, role
+storage, identification, credential recovery, revocation, reinstatement.
+
+**Remaining security limitations (honest):** a still-valid short-lived
+Supabase access token (~1h) technically authenticates at the auth layer
+for its remaining life, but every Sophira server path rejects revoked
+users via the live-database status check, so it grants nothing; the
+operator/deployer (Supabase project access) remains the trust root for
+owner-account recovery — by design. Suite **989/989**, tsc clean,
+`next build` passes, all security self-tests pass.

@@ -49,8 +49,10 @@ export interface InvitationRequest {
 export interface NetworkMemberStats {
   user_id: string;
   display_name: string;
+  email: string | null;
   role: "owner" | "user";
   status: "active" | "revoked";
+  access_revoked_at: string | null;
   onboarded: boolean;
   can_request_invites: boolean;
   created_at: string;

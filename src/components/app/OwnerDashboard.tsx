@@ -329,6 +329,11 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
         <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
           <Users className="h-5 w-5 text-accent" /> Members
         </h2>
+        <p className="mb-2 text-xs text-ink-soft">
+          Only the owner can grant, revoke, or reinstate access. Revoking blocks the member
+          immediately — even if they have the app installed or a session already open — and signs
+          out their active sessions.
+        </p>
         {members.length === 0 ? (
           <EmptyState icon={<Users className="h-6 w-6" />} title="No members yet" description="Invite people you trust — Sophira is a private network." />
         ) : (
@@ -345,7 +350,11 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                         <Badge>{m.status}</Badge>
                       </p>
                       <p className="mt-0.5 text-xs text-ink-soft">
-                        joined {fmtDate(m.created_at)} · last active {timeAgo(m.last_active_at)} ·{" "}
+                        {m.email || "no email"} · access granted {fmtDate(m.created_at)}
+                        {m.status === "revoked" && m.access_revoked_at
+                          ? ` · access revoked ${fmtDate(m.access_revoked_at)}`
+                          : ""}{" "}
+                        · last active {timeAgo(m.last_active_at)} ·{" "}
                         {m.assignment_count} assignment{m.assignment_count === 1 ? "" : "s"} · {m.response_count} AI response{m.response_count === 1 ? "" : "s"}
                       </p>
                       {m.subject_usage.length > 0 && (

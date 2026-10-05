@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/guard";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -11,8 +12,11 @@ export const runtime = "nodejs";
  */
 export async function POST() {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  // Full authorization chain: authenticated -> ACTIVE access -> own resource.
+  // A revoked user must not be able to call account deletion directly.
+  const guard = await requireUser(supabase);
+  if (!guard.ok) return guard.response;
+  const user = guard.data.user;
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.deleteUser(user.id);

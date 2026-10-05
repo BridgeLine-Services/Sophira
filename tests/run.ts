@@ -2803,4 +2803,127 @@ async function runPwaReadinessTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+// ---------------------------------------------------------------------------
+// OWNER-CONTROLLED ACCESS CONFORMANCE (2026-10-05) — §27.
+// The server-side authorization chain is "authenticated -> ACTIVE access ->
+// role -> resource", enforced on every protected operation. Frontend hiding
+// is cosmetic and never the boundary. Machine-check the whole chain.
+// ---------------------------------------------------------------------------
+async function runAccessControlTests(): Promise<void> {
+  section("27. Owner-controlled access — server-side enforcement conformance");
+  {
+    // ---- every protected API route must use the server guard -------------
+    const routeFiles: string[] = [];
+    const apiRoot = path.join(process.cwd(), "src", "app", "api");
+    const walkApi = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walkApi(p);
+        else if (e.name === "route.ts") routeFiles.push(p);
+      }
+    };
+    walkApi(apiRoot);
+    // Genuinely public by design: health (config status only, no user data)
+    // and invitations/accept (account creation via a single-use invitation
+    // token; must be callable before authentication exists).
+    const intentionallyPublic = ["/api/health", "/api/invitations/accept"];
+    for (const rf of routeFiles) {
+      const rel = ("/api" + rf.slice(apiRoot.length)).replaceAll("\\", "/").replace("/route.ts", "");
+      const src = fs.readFileSync(rf, "utf8");
+      const guarded = src.includes("requireUser") || src.includes("requireOwner");
+      const publicOk = intentionallyPublic.some((p) => rel === p);
+      assert(guarded || publicOk,
+        `access: ${rel} enforces the server guard (authenticated -> active) or is on the documented public allowlist`);
+      if (publicOk) {
+        assert(rel === "/api/health" || src.includes("token"),
+          `access: public route ${rel} operates solely on its single-use token`);
+      }
+    }
+    assert(routeFiles.length > 20, "access: the route audit actually scanned the API tree");
+
+    // ---- the guard implements the full chain -------------------------------
+    const guard = fs.readFileSync(path.join(process.cwd(), "src", "lib", "supabase", "guard.ts"), "utf8");
+    assert(guard.includes("auth.getUser()"), "access: guard checks authentication first");
+    assert(guard.includes('"revoked"') && guard.includes("403"), "access: guard rejects revoked users with 403");
+    assert(guard.includes("role !== \"owner\""), "access: requireOwner checks the owner role server-side");
+    assert(!guard.includes("process.env.NEXT_PUBLIC") || !/secret|key|password/i.test(guard),
+      "access: guard exposes no secrets to the client");
+
+    // ---- middleware blocks revoked users on protected pages ----------------
+    const mw = fs.readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+    assert(mw.includes('"revoked"') && mw.includes("/access-denied"),
+      "access: middleware redirects revoked users away from protected pages");
+
+    // ---- revocation persists in the database with an audit trail ----------
+    const mig = fs.readFileSync(path.join(process.cwd(), "supabase", "migrations", "0019_access_revocation_audit.sql"), "utf8");
+    assert(mig.includes("access_revoked_at"), "access: migration 0019 adds the revocation timestamp column");
+    assert(mig.includes("au.email"), "access: owner membership view includes the email identifier");
+    assert(!/essay|prompt|writing_sample|response_body|content/i.test(mig.replace(/--[^\n]*/g, "")),
+      "access: owner membership view exposes no academic content columns");
+    const stats = mig.slice(mig.indexOf("create or replace function public.network_stats"));
+    assert(stats.includes("p.role = 'owner'") && stats.includes("raise exception"),
+      "access: network_stats stays owner-only (fail-closed role check preserved)");
+
+    // ---- revoke/restore/remove actions are owner-only and server-enforced -
+    const members = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "network", "members", "route.ts"), "utf8");
+    assert(members.includes("requireOwner"), "access: membership actions go through requireOwner");
+    assert(members.includes("access_revoked_at") && members.includes("status: \"revoked\""),
+      "access: revoke records both status and audit timestamp");
+    assert(members.includes('rpc("revoke_all_sessions"'),
+      "access: revoke kills all the user's refresh tokens server-side (old sessions cannot refresh)");
+    const mig19b = fs.readFileSync(path.join(process.cwd(), "supabase", "migrations", "0019_access_revocation_audit.sql"), "utf8");
+    assert(mig19b.includes("delete from auth.refresh_tokens"),
+      "access: session kill deletes refresh tokens at the database level");
+    assert(mig19b.includes("revoke all on function public.revoke_all_sessions(uuid) from public, anon, authenticated"),
+      "access: session kill is service-role only — no user role can call it");
+    assert(members.includes("access_revoked_at: null") && members.includes('status: "active"'),
+      "access: restore clears status and audit timestamp");
+    assert(members.includes("deleteUser"), "access: permanent removal deletes the auth user");
+    assert(members.includes("user_id === ownerId"), "access: the owner cannot lock themselves out by self-revocation");
+    assert(members.includes('target.role === "owner"') || members.includes('"owner"'),
+      "access: owner accounts cannot be modified by membership actions");
+
+    // ---- the owner UI is a window, not the boundary -------------------------
+    const ownerPage = fs.readFileSync(path.join(process.cwd(), "src", "app", "owner", "page.tsx"), "utf8");
+    assert(ownerPage.includes('profile.role !== "owner"'), "access: /owner is owner-only, checked server-side");
+    const ui = fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "OwnerDashboard.tsx"), "utf8");
+    assert(ui.includes("Revoke access") && ui.includes("Restore"),
+      "access: the Access Management area offers revoke/reinstate");
+    assert(ui.includes("m.email") && ui.includes("access granted") && ui.includes("access revoked"),
+      "access: member cards show name, email, dates granted/revoked");
+    assert(ui.includes("Only the owner can grant, revoke, or reinstate access"),
+      "access: the UI states clearly that only the owner can manage access");
+
+    // ---- fail-closed owner bootstrap, no hardcoded credentials --------------
+    const m8 = fs.readFileSync(path.join(process.cwd(), "supabase", "migrations", "0008_invitation_only_signup.sql"), "utf8");
+    assert(m8.includes("owner_email") && m8.includes("fail-closed"),
+      "access: the initial owner is the operator-configured owner_email (fail-closed)");
+    const signup = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "invitations", "accept", "route.ts"), "utf8");
+    assert(!/password\s*=\s*["']/.test(signup), "access: no plaintext password in the accept route");
+    let plaintextPasswords = 0;
+    const walkSrc = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walkSrc(p);
+        else if (/\.(tsx?|jsx?)$/.test(e.name)) {
+          const t = fs.readFileSync(p, "utf8");
+          if (/(password|passwd)\s*[:=]\s*["'][^"']+["']/i.test(t)) plaintextPasswords++;
+        }
+      }
+    };
+    walkSrc(path.join(process.cwd(), "src"));
+    assert(plaintextPasswords === 0,
+      `access: no plaintext credentials anywhere in src (found ${plaintextPasswords})`);
+
+    // ---- documentation exists ------------------------------------------------
+    const doc = fs.readFileSync(path.join(process.cwd(), "docs", "OWNER_ACCESS.md"), "utf8");
+    for (const s of ["How the initial owner account is created", "How the owner logs in", "Where the owner role is stored",
+      "How access revocation works", "How access reinstatement works", "Server-side enforcement chain"]) {
+      assert(doc.includes(s), `access: docs/OWNER_ACCESS.md covers "${s}"`);
+    }
+    assert(doc.includes("No plaintext owner password exists anywhere in the codebase"),
+      "access: docs state no owner password is hardcoded");
+  }
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

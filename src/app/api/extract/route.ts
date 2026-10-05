@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/guard";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import { docxHtmlToStructuredText, parsePptx, parseSpreadsheet, parseCsv } from "@/lib/extract/documents";
@@ -122,8 +123,11 @@ async function extractText(bytes: Buffer, mime: string, name: string): Promise<E
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  // Full authorization chain: authenticated -> ACTIVE access -> own resource.
+  // A revoked user must not be able to call account deletion directly.
+  const guard = await requireUser(supabase);
+  if (!guard.ok) return guard.response;
+  const user = guard.data.user;
 
   let form: FormData;
   try {

@@ -53,14 +53,31 @@ export async function POST(request: NextRequest) {
 
   switch (action) {
     case "revoke": {
-      const { error } = await admin.from("profiles").update({ status: "revoked" }).eq("id", user_id);
+      // Record the revocation timestamp for the owner's audit trail...
+      const { error } = await admin
+        .from("profiles")
+        .update({ status: "revoked", access_revoked_at: new Date().toISOString() })
+        .eq("id", user_id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      // Their live session cookies die naturally; access is already blocked
-      // server-side by the middleware + every API guard until restored.
+      // ...and kill their sessions SERVER-side: revoke_all_sessions()
+      // deletes every refresh token for the user (service-role SQL), so
+      // even a previously issued session/token can no longer refresh —
+      // combined with the middleware + API-guard status checks (which
+      // reject the user immediately, regardless of token validity),
+      // access is invalid at once.
+      const { error: signOutError } = await admin.rpc("revoke_all_sessions", { target_user: user_id });
+      if (signOutError) {
+        // The revocation itself already succeeded; the status checks block
+        // the user regardless. Report but do not silently swallow.
+        console.error("revoke_all_sessions failed after status update:", signOutError.message);
+      }
       return NextResponse.json({ data: { ok: true } });
     }
     case "restore": {
-      const { error } = await admin.from("profiles").update({ status: "active" }).eq("id", user_id);
+      const { error } = await admin
+        .from("profiles")
+        .update({ status: "active", access_revoked_at: null })
+        .eq("id", user_id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ data: { ok: true } });
     }
