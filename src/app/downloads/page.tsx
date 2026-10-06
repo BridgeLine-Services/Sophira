@@ -131,7 +131,12 @@ export default function DownloadsPage() {
           <CardTitle className="flex items-center gap-2">
             Native apps
             {version && date && <Badge tone="accent">v{version} · {date}</Badge>}
+            <Badge tone="warn">TEST BUILD</Badge>
           </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Test Build: these artifacts come from the test/private channel and may not be production-signed.
+            Unsigned artifacts are labeled honestly and their install requirements are stated.
+          </p>
         </CardHeader>
         <CardContent>
           {state === "loading" && (
@@ -164,7 +169,28 @@ export default function DownloadsPage() {
             <div className="space-y-5">
               {PLATFORMS.map((pl) => {
                 const mine = appAssets.filter((a) => pl.match.test(a.name));
-                if (mine.length === 0) return null;
+                if (mine.length === 0 && pl.key !== "ios") return null;
+                if (mine.length === 0) {
+                  // iOS honesty: no .ipa in this release — never claim an
+                  // unsigned archive installs like a normal app.
+                  return (
+                    <div key={pl.key} className="rounded-lg bg-muted/40 p-3 text-sm">
+                      <p className="font-medium">iPhone / iPad — no installable .ipa in this release</p>
+                      <p className="mt-1 text-muted-foreground">
+                        Apple devices cannot install an unsigned app, and iOS has no &quot;install unknown apps&quot;
+                        switch — that is Apple&apos;s rule, not a missing download. The supported paths are:
+                      </p>
+                      <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                        <li>PWA now: open Sophira in Safari, Share → Add to Home Screen (no Apple signing needed).</li>
+                        <li>Development/ad-hoc: configure the Apple signing secrets in the repository, then the
+                          release pipeline exports a real signed .ipa installable on registered devices via Xcode
+                          or Apple Configurator.</li>
+                        <li>TestFlight: upload the signed build to App Store Connect and invite testers — Apple
+                          then handles distribution and device trust.</li>
+                      </ul>
+                    </div>
+                  );
+                }
                 return (
                   <div key={pl.key}>
                     <p className="mb-2 text-sm font-semibold">{pl.label}</p>
@@ -178,7 +204,15 @@ export default function DownloadsPage() {
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-medium">
                                   {a.name}
-                                  {unsigned && (
+                                  {/\.apk$/i.test(a.name) && (
+                                    <Badge tone={unsigned ? "warn" : "accent"} className="ml-2">
+                                      {unsigned ? "UNSIGNED APK" : "SIGNED APK"}
+                                    </Badge>
+                                  )}
+                                  {/\.ipa$/i.test(a.name) && (
+                                    <Badge tone="accent" className="ml-2">SIGNED IPA</Badge>
+                                  )}
+                                  {!/\.(apk|ipa)$/i.test(a.name) && unsigned && (
                                     <Badge tone="warn" className="ml-2">unsigned</Badge>
                                   )}
                                 </p>
@@ -210,6 +244,15 @@ export default function DownloadsPage() {
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground">{pl.note}</p>
+                            {unsigned && /\.apk$/i.test(a.name) && (
+                              <p className="text-xs text-amber-700">
+                                Installation requirements: this APK has no release signature. Install it with{" "}
+                                <code>adb install Sophira-release-unsigned.apk</code> from Android platform-tools, or
+                                sign it first with your own key (<code>apksigner</code>) and then enable
+                                &quot;install unknown apps&quot; for your chosen source. Android will refuse to install
+                                an unsigned APK by tapping it.
+                              </p>
+                            )}
                           </li>
                         );
                       })}

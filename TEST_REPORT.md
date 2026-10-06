@@ -2008,3 +2008,57 @@ account deletion cascades auth.users → all data (requireUser rejects the
 missing profile); stale tokens are rejected by the per-request profile
 check; owner endpoints require the owner role after auth + active-access.
 
+## §62 PRIVATE TESTING CHANNEL (2026-10-06): /downloads + /install hardened, TESTING_TONIGHT.md, release pipeline live
+
+**Goal:** test tonight without any app-store listing, via PWA → Android
+APK → desktop installers, with /install and /downloads fully functional.
+
+**Honest artifact policy implemented on /downloads:** the page lists ONLY
+assets the current GitHub release actually contains (fetched live from the
+public API — the repo is public, so the fetch works unauthenticated). No
+release / no artifact → the page says so; NO download button exists for an
+artifact that does not exist. Added: **TEST BUILD** label (native artifacts
+may not be production-signed), **SIGNED APK / UNSIGNED APK** badges named
+per the user's exact labels, honest installation requirements for an
+unsigned APK (adb install or apksigner — Android refuses a tapped
+unsigned APK), per-artifact SHA-256 (from the release checksum file, with
+a graceful link to the checksum file itself), version + date per
+artifact, and an iOS honesty block: no .ipa in a release → the page
+NEVER implies an unsigned build installs normally; it states the PWA-now
+/ development-ad-hoc / TestFlight paths.
+
+**Local gate (this machine):** npm ci clean (302 packages); npm test
+1892/1892; npm run build PASS; npx tsc --noEmit -p tsconfig.json clean.
+
+**Native builds, honestly:** this sandbox has NO Java/Android SDK and NO
+Rust/Tauri toolchain — android:build cannot run here (attempted: fails
+on the missing toolchain; documented, not faked) and desktop:build
+correctly FAILS CLOSED because SOPHIRA_APP_URL is not defined for a
+release build (native-url.mjs refuses — by design, no silent placeholder
+fallback). The supported path ran instead: the **Release workflow was
+dispatched via the GitHub API (HTTP 204) and executed on Actions runners
+with the full toolchains** — it builds the Android APK (unsigned and
+named Sophira-release-unsigned.apk when the ANDROID_* signing secrets
+are absent), an honest unsigned iOS .xcarchive (never called an .ipa),
+desktop installers where the runner supports them, and SHA-256 checksum
+files for every published artifact. Run id 37489113950.
+
+**LIVE PWA validation performed (real browser + HTTP, this session):**
+https://sophira.vercel.app is live — /downloads renders the honest
+"no native release published yet" state (verified in-browser);
+/manifest.webmanifest → HTTP 200, application/manifest+json, name
+"Sophira — Your private academic AI assistant", display: standalone,
+3 icons; /sw.js → HTTP 200 (application/javascript); /install →
+HTTP 200; /login → HTTP 200; / → HTTP 307 redirect as designed.
+
+**NOT performed (stated, not faked):** creating an owner/test-user
+account, invitation flow, typing calibration, local-model download,
+offline mode, math/research/essay/rubric runs, revocation and
+reinstatement — all of these require live user accounts and are written
+as the 14 exact steps in **TESTING_TONIGHT.md** for execution tonight.
+APK identity/signature validation also awaits the workflow's artifacts;
+it has NOT been claimed. When the release publishes, /downloads will
+display the real artifacts automatically (the page requires no redeploy
+for asset discovery — only the TEST BUILD/SIGNED/UNSIGNED/iOS-honesty
+UI needs the Vercel deploy from this push).
+
