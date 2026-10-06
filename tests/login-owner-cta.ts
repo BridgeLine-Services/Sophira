@@ -22,7 +22,7 @@ export function runLoginOwnerCtaTests(assert: (c: boolean, n: string) => void, s
   // Visibility is decided by the SERVER status, never a browser-only flag
   assert(login.includes("/api/setup-status") && login.includes("ownerCreation"),
     "login: the CTA visibility comes from the server-side ownerCreation status (same source as /create-owner)");
-  assert(login.includes(".catch(() => setOwnerCreationOpen(false))"),
+  assert(login.includes("setOwnerCreationOpen(false)"),
     "login: if the status cannot be checked the CTA stays HIDDEN (fail closed)");
   assert(route.includes("ownerCreation"), "login: /api/setup-status still exposes ownerCreation (single source of truth)");
   assert(createOwner.includes("An owner account already exists, so a second one cannot be created"),
@@ -31,6 +31,17 @@ export function runLoginOwnerCtaTests(assert: (c: boolean, n: string) => void, s
   // No secrets or authorization internals to the browser
   assert(!/SUPABASE_SERVICE_ROLE_KEY|GEMINI_API_KEY|OPENAI_API_KEY/.test(login),
     "login: the page never references secret env names");
+
+  // Database-unavailable is distinguished from owner-exists: a clear
+  // plain-language diagnostic appears ONLY when the server cannot check.
+  assert(login.includes("Sophira is not connected to its database yet"),
+    "login: when the database is unreachable the page says so in plain English");
+  assert(login.includes("An administrator needs to finish the server"),
+    "login: the notice explains an administrator must finish configuration - not the user's account");
+  assert(login.includes('d?.ownerCreation?.possible === null && d?.probe?.database !== "checked"'),
+    "login: the notice is driven by the SERVER status (possible===null), never shown when an owner exists");
+  assert(login.includes("setOwnerCreationOpen(false)") && login.includes("setDatabaseUnreachable(false)"),
+    "login: on any fetch failure the page hides the CTA AND the notice (never a false state)");
   assert(!/owner_bootstrap|app_config|owner_email/.test(login),
     "login: the page never references the owner claim table or bootstrap config");
 

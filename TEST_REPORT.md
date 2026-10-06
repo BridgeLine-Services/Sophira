@@ -2459,3 +2459,43 @@ claim-table references in the page; migration 0025 single-owner,
 atomic, invitation-only, client-blind contract re-verified; docs must
 not contain the manual owner_email SQL and must document /create-owner.
 
+## §71 PRODUCTION SUPABASE CONFIGURATION AUDIT (2026-10-06): live diagnosis + login connection diagnostic
+
+**Audit result (traced end to end):** the live deployment of a4273cb
+IS current (verified: /setup shows the new owner section, /api/setup-status
+returns ownerCreation) and the code reads exactly the variable names the
+Vercel project holds (NEXT_PUBLIC_SUPABASE_URL,
+NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY —
+confirmed by exhaustive grep; no wrong-name reads, no localhost
+hard-coding: auth callback redirects are relative, password-reset uses
+window.location.origin, invitation links use NEXT_PUBLIC_SITE_URL with
+request-origin fallback). The server-side status honestly reported the
+variables MISSING from the running deployment environment: the Vercel
+environment variables were added after the last build, so the current
+deployment was built without them. The fix is a redeploy so the build
+picks up the configured values - not a code change; the application was
+already correct, and no message was faked to pretend otherwise.
+
+**Code change (login diagnostic, state C never confused with A/B):**
+when the server reports it cannot reach the database
+(ownerCreation.possible === null, probe.database !== "checked"), the
+sign-in screen now shows a plain-language notice: "Sophira is not
+connected to its database yet. An administrator needs to finish the
+server configuration - nothing is wrong with your account." with a link
+to /setup. It NEVER appears when an owner exists, never names technical
+variables, never exposes secrets, and on any fetch failure both the
+Create Owner CTA and the notice stay hidden (no false states).
+
+**AI independence re-verified:** OpenAI variables (OPENAI_API_KEY,
+OPENAI_BASE_URL, SOPHIRA_MODEL) remain optional everywhere; the
+owner-creation path deliberately ignores AI configuration; local AI
+untouched; no paid requirement. Migration order for a fresh install:
+0001 through 0025 (25 files, chain-ordered); 0025 re-verified for
+zero-owners-start, atomic single winner, permanent close, invitation
+gating, RLS intact.
+
+**Tests (2037/2037 PASS; build PASS; secret scan CLEAN):** new
+assertions - plain-language unreachable notice shown only on
+possible===null; never when an owner exists; no secret names;
+fetch-failure hides both CTA and notice (fail closed).
+

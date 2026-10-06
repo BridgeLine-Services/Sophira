@@ -20,13 +20,23 @@ function LoginForm() {
   // when the status cannot be checked the CTA simply stays hidden (fail
   // closed - /create-owner itself still gates honestly).
   const [ownerCreationOpen, setOwnerCreationOpen] = useState(false);
+  // Plain-language database-connection notice (C is never confused with A/B):
+  // shown only when the SERVER says the database cannot be reached - never
+  // when an owner exists, and never with technical variable names or secrets.
+  const [databaseUnreachable, setDatabaseUnreachable] = useState(false);
   useEffect(() => {
     fetch("/api/setup-status", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { ownerCreation?: { possible: boolean | null } } | null) => {
+      .then((d: { ownerCreation?: { possible: boolean | null }; probe?: { database?: string } } | null) => {
         setOwnerCreationOpen(d?.ownerCreation?.possible === true);
+        // null = cannot check (missing config / unreachable) — distinct from
+        // "an owner exists", which sets possible=false and shows no notice.
+        setDatabaseUnreachable(d?.ownerCreation?.possible === null && d?.probe?.database !== "checked");
       })
-      .catch(() => setOwnerCreationOpen(false));
+      .catch(() => {
+        setOwnerCreationOpen(false);
+        setDatabaseUnreachable(false);
+      });
   }, []);
 
   async function onSubmit(e: FormEvent) {
@@ -96,6 +106,16 @@ function LoginForm() {
           </Button>
         </div>
       </form>
+
+      {databaseUnreachable && (
+        <div className="mt-5 rounded-lg border border-warn/30 bg-warn/5 p-4 text-center text-sm">
+          <p className="text-ink-soft">
+            Sophira is not connected to its database yet. An administrator needs to finish the server
+            configuration — nothing is wrong with your account.{" "}
+            <a href="/setup" className="text-accent hover:underline">See the setup status</a>
+          </p>
+        </div>
+      )}
 
       {ownerCreationOpen && (
         <div className="mt-5 rounded-lg border border-success/30 bg-success/5 p-4 text-center">
