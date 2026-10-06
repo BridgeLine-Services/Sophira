@@ -1371,3 +1371,41 @@ routes registered). CI green on the pushed commit (51048ab).
   real database - migrations detected, owner_email configured, owner
   account created/active - will only be observable once the owner
   completes the configuration steps it lists.
+
+## 48. Private-beta hardening round 2026-10-06: APK rebuilt on current code; gate 21 PASS / 0 FAIL / 17 BLOCKED / 0 NOT RUN (owner-only blockers)
+
+Context: this round audited the repository state after 24 commits of
+owner-access, memory, and release-gate work by other sessions (audited in
+place; nothing rebuilt or duplicated). The fresh sandbox had no JDK/Android
+SDK, so the full Android toolchain was reinstalled from scratch
+(Temurin JDK 21, Android SDK cmdline-tools, platform 36, build-tools 34).
+
+**Android APK (blocker 8 of the private-beta request) — BUILT AND VERIFIED:**
+- `npx cap sync android` with `SOPHIRA_APP_URL=https://sophira.vercel.app` →
+  `./gradlew assembleDebug`: **BUILD SUCCESSFUL, 147 tasks** (first attempt
+  failed honestly on JDK 17: Capacitor camera plugin requires a Java 21
+  toolchain; JDK 21 installed and rebuilt — matches §21's requirements).
+- Artifact: `android/app/build/outputs/apk/debug/app-debug.apk` (8.1 MB),
+  package `com.bridgeline.sophira` v1.0.0, minSdk 24, compile/target 36,
+  `apksigner verify` → **SIGNATURE OK** (debug-signed; release signing needs
+  the owner's keystore secrets by design).
+- `assets/capacitor.config.json` inside the APK verified to load
+  **https://sophira.vercel.app** with cleartext and mixed content disabled.
+- NOT device-tested: no physical Android device exists in this sandbox —
+  install/launch on a real phone remains an owner-side step
+  (docs/PWA_TESTING_GUIDE.md / docs/DEVICE_ACCEPTANCE.md).
+
+**Offline suite in the fresh sandbox:** 1101 passed / 0 failed.
+**Release gate (full mode, --report):** 38 checks — **21 PASS, 0 FAIL,
+17 BLOCKED, 0 NOT RUN.** "APK built if supported" moved NOT RUN → PASS.
+Every remaining blocker is owner-side: production env vars (Supabase, AI,
+search, SOPHIRA_APP_URL), live security matrices (SUPABASE_TEST_* creds),
+physical devices, and legal owner-facts. The live production deployment was
+re-verified healthy and honest: /, /setup, /install, /api/health,
+/api/setup-status, /manifest.webmanifest all 200/307, with setup-status
+correctly reporting the unconfigured state and exact operator guidance.
+
+**Private-beta verdict:** the code is beta-ready; the DEPLOYMENT is not.
+No FAIL exists anywhere in the gate — turning the 17 BLOCKED items green
+requires only owner configuration (env vars + credentials + one device
+session), no further engineering.
