@@ -96,6 +96,7 @@ import { runMathPipelineTests } from "./math-pipeline";
 import { runEssayPipelineTests } from "./essay-pipeline";
 import { runHostileAuditTests } from "./hostile-audit";
 import { runResetPasswordTests } from "./reset-password";
+import { runOwnerBootstrapTests } from "./owner-bootstrap";
 import { runReadinessCompletionTests } from "./readiness-completion";
 import { runProdEnvPolicyTests } from "./prod-env-policy";
 import { runProviderTests, runSecretScanTests } from "./providers";
@@ -2679,10 +2680,15 @@ async function runInvitationRegressionTests(): Promise<void> {
       "[1] the invitation claim is atomic (for update skip locked) — no race can create an account");
     assert((fn0008.match(/v_claimed_invitation :=/g) ?? []).length === 0,
       "[1] the claim variable is set ONLY by the atomic UPDATE ... RETURNING — no bypass path can pre-set it");
-    assert(fn0008.includes("Sophira is not yet initialized"),
-      "[1] bootstrap is fail-closed: no configured owner_email means no first account");
-    assert(fn0008.includes("lower(v_owner_email) = lower(new.email)"),
-      "[1] the unsafe first-signup-becomes-owner rule is gone: owner role is granted ONLY to the operator-configured email");
+    assert(migrations.includes("SOPHIRA migration 0025"),
+      "[1] the first-owner bootstrap migration exists (0025)");
+    const fnLive = migrations.slice(migrations.lastIndexOf("create or replace function public.handle_new_user"));
+    assert(fnLive.includes("on conflict (id) do nothing"),
+      "[1] the live handle_new_user claims the single owner slot ATOMICALLY (insert ... on conflict do nothing)");
+    assert(fnLive.includes("if found then") && fnLive.includes("if not exists (select 1 from public.profiles where role = 'owner')"),
+      "[1] the owner claim only opens while no owner exists, and the claim decides - a lost race can never become owner");
+    assert(fnLive.includes("lower(v_owner_email) = lower(new.email)"),
+      "[1] a CONFIGURED owner_email still restricts the claim to that exact email (operator intent preserved)");
     assert(fn0008.includes("revoke all on public.app_config from anon, authenticated"),
       "[1] app_config (owner bootstrap) is unreadable/unwritable by any client API");
     assert(migrations.includes("alter table public.app_config enable row level security"),
@@ -3129,8 +3135,8 @@ async function runAccessControlTests(): Promise<void> {
 
     // ---- fail-closed owner bootstrap, no hardcoded credentials --------------
     const m8 = fs.readFileSync(path.join(process.cwd(), "supabase", "migrations", "0008_invitation_only_signup.sql"), "utf8");
-    assert(m8.includes("owner_email") && m8.includes("fail-closed"),
-      "access: the initial owner is the operator-configured owner_email (fail-closed)");
+    assert(m8.includes("owner_email"),
+      "access: the configured owner_email path is preserved (now optional — 0025 adds the automatic first-owner claim)");
     const signup = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "invitations", "accept", "route.ts"), "utf8");
     assert(!/password\s*=\s*["']/.test(signup), "access: no plaintext password in the accept route");
     let plaintextPasswords = 0;
@@ -3470,13 +3476,19 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(c.ready === false, "setup: missing migrations => not ready");
   assert(c.guidance.some((g) => g.includes("0001-0020")), "setup: missing-migrations guidance names the migration chain");
 
-  // ---- scenario D: owner_email not configured --------------------------------
+  // ---- scenario D: owner_email NOT configured, no owner yet (NEW: automatic) ----
   const d = evaluateOwnerSetup(mk({
     supabaseConfigured: true, serviceRoleConfigured: true, database: "checked",
     migrationsPresent: true, ownerEmailConfigured: false, ownerAccount: "none",
   }));
-  assert(d.ready === false, "setup: no owner_email => not ready (fail-closed preserved)");
-  assert(d.guidance.some((g) => g.includes("insert into public.app_config")), "setup: guidance gives the exact owner_email SQL");
+  assert(d.ownerCreation.possible === true && d.ownerCreation.url === "/create-owner",
+    "setup: with NO owner_email configured and no owner, owner creation is POSSIBLE from the app (0025 automatic bootstrap)");
+  assert(d.ready === false, "setup: no owner yet => deployment not ready until the owner registers");
+  assert(d.guidance.some((g) => g.includes("/create-owner")), "setup: guidance points at /create-owner, not database SQL");
+  assert(!d.guidance.some((g) => g.includes("insert into public.app_config")),
+    "setup: the owner is NEVER told to run manual database SQL to create their account");
+  assert(d.guidance.some((g) => g.includes("no predefined or default owner password")),
+    "setup: guidance still denies any predefined/default password");
 
   // ---- scenario E: owner_email set, no owner account yet ---------------------
   const e = evaluateOwnerSetup(mk({
@@ -3484,8 +3496,8 @@ async function runOwnerSetupTests(): Promise<void> {
     migrationsPresent: true, ownerEmailConfigured: true, ownerAccount: "none",
   }));
   assert(e.ready === false, "setup: owner email configured but no account => not ready");
-  assert(e.guidance.some((g) => g.includes("exact email") && g.includes("/signup")), "setup: guidance says to sign up with the exact email");
-  assert(e.guidance.some((g) => g.includes("no predefined or default owner password")), "setup: guidance explicitly denies any predefined/default password");
+  assert(e.ownerCreation.possible === true, "setup: owner creation possible regardless of how the email restriction is set");
+  assert(e.guidance.some((g) => g.includes("/create-owner")), "setup: guidance points at the in-app owner registration");
   const ownerStep = e.steps.find((s) => s.label.includes("Owner account initialized"));
   assert(ownerStep !== undefined && ownerStep.detail.includes("no predefined or default password"), "setup: uninitialized owner step explains the owner chooses their own password");
 
@@ -3504,8 +3516,19 @@ async function runOwnerSetupTests(): Promise<void> {
   }));
   assert(g2.ready === null, "setup: unreachable database reports cannot-determine, never a false ok or a false not-ready");
 
+  // ---- scenario H: AI configuration NEVER gates owner creation -----------------
+  const h = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: true, database: "checked",
+    migrationsPresent: true, ownerEmailConfigured: false, ownerAccount: "none",
+    aiConfigured: false,
+  }));
+  assert(h.ownerCreation.possible === true,
+    "setup: owner creation is possible with NO AI provider configured - no Gemini/OpenAI key is ever required for the owner account");
+  assert(h.ownerCreation.possible === d.ownerCreation.possible,
+    "setup: AI configuration does not influence owner creation at all");
+
   // ---- secret-leak regression across every scenario --------------------------
-  for (const st of [a, b, c, d, e, f, g2]) {
+  for (const st of [a, b, c, d, e, f, g2, h]) {
     const blob = JSON.stringify(st);
     assert(!/sk-[A-Za-z0-9]{10}/.test(blob), "setup: status never embeds API-key-shaped material");
     assert(!blob.includes("eyJhbGciOi"), "setup: status never embeds JWT-shaped material");
@@ -3529,15 +3552,22 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(!/\.value\b/.test(routeCode), "setup: the route code never returns raw row values");
 
   const pageSrc = readFileSync(path.join(process.cwd(), "src", "app", "setup", "page.tsx"), "utf8");
-  assert(pageSrc.includes('href="/reset-password"'), "setup: the page links the existing password-reset flow");
-  assert(pageSrc.includes('href="/signup"'), "setup: the page links the normal signup flow");
-  assert(pageSrc.includes("no predefined, default, or generated owner password"), "setup: the page states there is no predefined/default owner password");
+  assert(pageSrc.includes('href="/login"'), "setup: the page links the sign-in flow for an existing owner");
+  assert(pageSrc.includes('href="/create-owner"'), "setup: the page links the in-app owner registration (no database editing)");
+  assert(pageSrc.includes("no predefined or default") || pageSrc.includes("password you choose") || pageSrc.includes("choose your own password"), "setup: the owner account section states the owner chooses their own password");
   assert(!/password\s*[:=]\s*["'][^"']{4,}/.test(pageSrc), "setup: the page contains no password literals");
-  assert(pageSrc.includes("fail-closed"), "setup: the page explains the fail-closed bootstrap");
+  assert(pageSrc.includes("Technical diagnostics") && readFileSync(path.join(process.cwd(), "src", "app", "setup", "SetupDiagnostics.tsx"), "utf8").includes("useState"),
+    "setup: the page SEPARATES owner creation from technical diagnostics (diagnostics optional, never a blocker)");
+
+  const setupDiagSrc = readFileSync(path.join(process.cwd(), "src", "app", "setup", "SetupDiagnostics.tsx"), "utf8");
+  assert(!/SUPABASE_SERVICE_ROLE_KEY|GEMINI_API_KEY|OPENAI_API_KEY/.test(setupDiagSrc),
+    "setup: the client components never import the server-side probe (secret names stay out of the browser bundle)");
+  assert(pageSrc.startsWith("import") && !pageSrc.includes('"use client"'),
+    "setup: /setup runs the database probe on the SERVER (secret env names never reach the client)");
 
   const mwSrc = readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section))
-    .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
+    .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

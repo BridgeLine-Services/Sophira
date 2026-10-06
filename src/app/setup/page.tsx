@@ -1,117 +1,74 @@
 import Link from "next/link";
-import { evaluateOwnerSetup, probeOwnerSetup, type OwnerSetupStep } from "@/lib/owner-setup";
-import { Sparkles } from "lucide-react";
-
-export const dynamic = "force-dynamic";
+import { evaluateOwnerSetup, probeOwnerSetup, type OwnerSetupStatus } from "@/lib/owner-setup";
+import SetupDiagnostics from "./SetupDiagnostics";
 
 /**
- * Operator setup-status page (public, like /login and /install).
+ * Setup experience (2026-10-06 first-owner bootstrap) — SERVER component.
  *
- * WHO THIS IS FOR: the person deploying Sophira (with database access).
- * It answers - in one place, honestly, before any account exists:
- *   is the Supabase connection configured? are the migrations applied?
- *   is app_config.owner_email configured? does the owner account exist and
- *   is it active? is the AI provider configured?
+ *   A. "Create my owner account" — plain language, no technical
+ *      configuration required. Owner creation NEVER depends on AI
+ *      configuration or any API key.
  *
- * WHAT IT NEVER DOES: display or imply secrets - no keys, no tokens, no
- * emails, no passwords - and it never implies Sophira has a predefined or
- * default owner password (the owner always chooses their own through the
- * normal signup flow). Machine-checked by the offline suite.
+ *   B. "Technical diagnostics" — the operator/developer checklist in a
+ *      separate optional client component.
+ *
+ * The database probe (which reads SERVER-ONLY environment variables)
+ * runs here on the server — secret names never reach the client bundle.
+ * This page must never display secret VALUES and never imply a default
+ * owner password (the owner always chooses their own).
  */
 export default async function SetupPage() {
-  const probe = await probeOwnerSetup();
-  const status = evaluateOwnerSetup(probe);
+  const status: OwnerSetupStatus = evaluateOwnerSetup(await probeOwnerSetup());
+  const creation = status.ownerCreation;
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 py-10">
-      <header className="mb-8 text-center">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1 text-sm font-medium text-accent">
-          <Sparkles className="h-4 w-4" aria-hidden /> Sophira
-        </div>
-        <h1 className="text-2xl font-semibold">Owner setup status</h1>
-        <p className="mt-2 text-ink-soft">
-          A diagnostic for the person deploying Sophira. It reports configuration
-          status only - never keys, tokens, emails, or passwords.
-        </p>
-      </header>
+    <main className="mx-auto max-w-2xl px-6 py-16">
+      <h1 className="text-2xl font-semibold">Getting started with Sophira</h1>
 
-      <section
-        aria-live="polite"
-        className={`mb-6 rounded-card border p-4 ${
-          status.ready === true
-            ? "border-success/40 bg-success/5"
-            : status.ready === false
-              ? "border-warn/40 bg-warn/5"
-              : "border-ink/10 bg-ink/5"
-        }`}
-      >
-        <p className="font-medium">
-          {status.ready === true ? "✓ " : status.ready === false ? "• " : "… "}
-          {status.headline}
-        </p>
-      </section>
-
-      <section className="mb-6 space-y-3" aria-label="Setup checklist">
-        {status.steps.map((step: OwnerSetupStep) => (
-          <div
-            key={step.label}
-            className={`rounded-card border p-4 ${
-              step.done === true ? "border-success/30" : step.done === false ? "border-warn/30" : "border-ink/10"
-            }`}
-          >
-            <p className="flex items-start gap-2 font-medium">
-              <span aria-hidden>
-                {step.done === true ? "✅" : step.done === false ? "⬜" : "❔"}
-              </span>
-              <span>{step.label}</span>
+      {/* ---------- A. Owner account (plain language) ---------- */}
+      <section className="mt-8 rounded-xl border bg-card p-6">
+        <h2 className="font-medium">Your owner account</h2>
+        {creation?.possible === true && (
+          <>
+            <p className="mt-2 text-sm text-ink-soft">
+              Sophira has no owner yet. The first account you create becomes the owner — no technical setup needed,
+              just your email and a password you choose. Owner creation then closes permanently, and new people join by invitation only.
             </p>
-            <p className="mt-1 pl-7 text-sm leading-relaxed text-ink-soft">{step.detail}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className="mb-6 rounded-card border border-ink/10 p-4">
-        <h2 className="font-medium">What to do next</h2>
-        {status.guidance.length > 0 ? (
-          <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-ink-soft">
-            {status.guidance.map((g) => (
-              <li key={g}>{g}</li>
-            ))}
-          </ol>
-        ) : (
-          <p className="mt-2 text-sm text-ink-soft">Nothing - setup is complete.</p>
-        )}
-      </section>
-
-      <section className="mb-6 rounded-card border border-ink/10 p-4">
-        <h2 className="font-medium">How the owner account works</h2>
-        <ul className="mt-2 space-y-2 text-sm leading-relaxed text-ink-soft">
-          <li>
-            The initial owner is the exact email configured in{" "}
-            <code className="rounded bg-ink/5 px-1">app_config.owner_email</code> in
-            the database. Until it is configured, no account can be created at all
-            (fail-closed by design - an arbitrary first user can never become the
-            owner).
-          </li>
-          <li>
-            The owner account is created through the{" "}
-            <Link href="/signup" className="text-accent hover:underline">normal signup flow</Link>{" "}
-            with that exact email, and the owner chooses their own password there.
-            Sophira has no predefined, default, or generated owner password.
-          </li>
-          <li>
-            Forgot the owner password? Use the existing password-reset flow:{" "}
-            <Link href="/reset-password" className="text-accent hover:underline">
-              reset your password by email
+            <Link href="/create-owner" className="mt-4 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+              Create Owner Account
             </Link>
-            .
-          </li>
-        </ul>
+          </>
+        )}
+        {creation?.possible === false && (
+          <p className="mt-2 text-sm text-ink-soft">
+            {creation.reason} <Link href="/login" className="text-accent hover:underline">Go to sign in</Link>
+          </p>
+        )}
+        {creation?.possible === null && (
+          <p className="mt-2 text-sm text-ink-soft">
+            {creation.reason} You can still try{" "}
+            <Link href="/create-owner" className="text-accent hover:underline">creating the owner account</Link> —
+            Sophira will tell you honestly if it is not possible yet.
+          </p>
+        )}
+        {status.probe.ownerAccount === "active" && (
+          <p className="mt-3 text-sm text-success">Your account is ready.</p>
+        )}
+
+        {/* ---------- AI status, plain language ---------- */}
+        <div className="mt-5 border-t pt-4 text-sm text-ink-soft">
+          <span className="font-medium text-ink">AI status:</span>{" "}
+          {status.probe.aiConfigured
+            ? "Free remote AI is connected as an optional enhancement."
+            : "No remote AI account is connected — that is optional. Local AI is built in, needs no API key, and no paid AI is ever used unless you explicitly turn it on."}
+        </div>
       </section>
 
-      <footer className="mt-auto pt-4 text-center text-sm text-ink-soft">
-        <Link href="/login" className="text-accent hover:underline">Back to sign in</Link>
-      </footer>
-    </div>
+      {/* ---------- B. Technical diagnostics (optional, separate) ---------- */}
+      <section className="mt-8">
+        <h2 className="text-sm font-medium text-ink-soft">Technical diagnostics (for developers/maintenance) — optional, never blocks owner creation</h2>
+        <SetupDiagnostics status={status} />
+      </section>
+    </main>
   );
 }

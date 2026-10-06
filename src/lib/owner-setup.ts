@@ -50,6 +50,14 @@ export interface OwnerSetupStatus {
   ready: boolean | null; // null = cannot determine (missing config)
   headline: string;
   guidance: string[]; // exact operator actions, in order
+  /** 2026-10-06 first-owner bootstrap: can the owner create their account
+   *  from the app right now, with no manual database configuration? This is
+   *  INDEPENDENT of AI configuration and of app_config.owner_email. */
+  ownerCreation: {
+    possible: boolean | null; // null = cannot determine yet
+    reason: string; // plain language, never secret material
+    url: string; // where to go ("/create-owner") or "" when not possible
+  };
 }
 
 const configured = (v: string | undefined): boolean =>
@@ -127,7 +135,7 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       return probe;
     }
 
-    // ---- migration 0020: student_memories (newest migration) ----
+    // ---- migration 0020: student_memories ----
     const { error: memErr } = await admin
       .from("student_memories")
       .select("id")
@@ -138,6 +146,16 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     }
     if (memErr) {
       probe.migrationsPresent = null;
+      return probe;
+    }
+
+    // ---- migration 0025: owner_bootstrap (first-owner claim table) ----
+    const { error: bootErr } = await admin
+      .from("owner_bootstrap")
+      .select("id")
+      .limit(1);
+    if (bootErr && isMissingRelation(bootErr)) {
+      probe.migrationsPresent = false;
       return probe;
     }
 
@@ -203,14 +221,17 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
             : "Some migrations are missing - run the migration chain in the Supabase SQL editor (see docs/RELEASE_PROCESS.md).",
     },
     {
-      done: probe.ownerEmailConfigured,
-      label: "Owner bootstrap email configured (app_config.owner_email)",
+      // Informational since migration 0025: the automatic first-owner
+      // bootstrap needs NO configured email. A configured email simply
+      // restricts the claim to that exact address (operator intent).
+      done: probe.ownerEmailConfigured === null ? null : true,
+      label: "Owner email restriction (optional)",
       detail:
         probe.ownerEmailConfigured === null
           ? cannotCheck
           : probe.ownerEmailConfigured
-            ? "The fail-closed bootstrap email is set in the database. Its value is never displayed here."
-            : "Not configured. Run in the Supabase SQL editor: insert into public.app_config (key, value) values ('owner_email', to_jsonb('your@email.com')); - BEFORE the first signup.",
+            ? "Optional restriction: only the configured email can create the owner account. Its value is never displayed here."
+            : "Not configured - not needed. The first person to complete owner registration becomes the owner automatically, and owner creation then closes permanently.",
     },
     {
       done: probe.ownerAccount !== "unknown" && probe.ownerAccount !== "none" ? probe.ownerAccount === "active" : probe.ownerAccount === "none" ? false : null,
@@ -221,7 +242,7 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
           : probe.ownerAccount === "revoked"
             ? "An owner account exists but is marked revoked - restore it from the database (profiles.status) before continuing."
             : probe.ownerAccount === "none"
-              ? "No owner account yet. After owner_email is configured, sign up with that exact email at /signup and choose your own password. There is no predefined or default password."
+              ? "No owner account yet. Open /create-owner and register with your email and a password you choose. There is no predefined or default password."
               : cannotCheck,
     },
     {
@@ -234,11 +255,25 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
   ];
 
   const checkable = probe.database === "checked";
+  // Deployment readiness = migrations applied + an active owner. Since
+  // migration 0025 the owner_email restriction is OPTIONAL (informational
+  // only) — it never blocks owner creation.
   const ready = checkable
     ? probe.migrationsPresent === true &&
-      probe.ownerEmailConfigured === true &&
       (probe.ownerAccount === "active")
     : null;
+
+  // ---- First-owner bootstrap availability (plain language) --------------
+  // AI configuration is deliberately NOT consulted: owner creation must
+  // never require any AI key or paid account.
+  const ownerCreation =
+    probe.ownerAccount === "active"
+      ? { possible: false, reason: "An owner account already exists. Owner creation is permanently closed.", url: "" }
+      : probe.ownerAccount === "revoked"
+        ? { possible: false, reason: "The owner account exists but is revoked - restore it to continue.", url: "" }
+        : probe.database === "checked" && probe.migrationsPresent === true && probe.ownerAccount === "none"
+          ? { possible: true, reason: "No owner yet - the first registration creates the owner, then owner creation closes permanently.", url: "/create-owner" }
+          : { possible: null, reason: "Cannot check yet - the database connection is not available to the server.", url: "" };
 
   const guidance: string[] = [];
   if (!probe.supabaseConfigured) {
@@ -251,11 +286,8 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
     if (probe.migrationsPresent === false) {
       guidance.push("Apply the Supabase migrations 0001-0020 (Supabase SQL editor) - see docs/RELEASE_PROCESS.md.");
     }
-    if (probe.ownerEmailConfigured === false) {
-      guidance.push("Run: insert into public.app_config (key, value) values ('owner_email', to_jsonb('your@email.com')); - this is required before the first signup and is fail-closed by design.");
-    }
-    if (probe.ownerAccount === "none" && probe.ownerEmailConfigured === true) {
-      guidance.push("Open /signup with that exact email and create the owner account, choosing your own password during the normal signup flow. Sophira has no predefined or default owner password.");
+    if (probe.ownerAccount === "none") {
+      guidance.push("Open /create-owner and register with your email and a password you choose. The first registration becomes the owner; owner creation then closes permanently. Sophira has no predefined or default owner password.");
     }
   }
   if (probe.ownerAccount === "active") {
@@ -272,5 +304,5 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
         ? "Sophira is initialized: the owner account exists and is active."
         : "Sophira is not fully initialized - follow the steps below in order.";
 
-  return { probe, steps, ready, headline, guidance };
+  return { probe, steps, ready, headline, guidance, ownerCreation };
 }

@@ -2376,3 +2376,53 @@ environment configuration, live recovery-email test, Gemini live test,
 physical-device verification for native packaging — the release gate
 remains honestly BLOCKED until these are done by the owner.
 
+## §69 IN-APP FIRST-OWNER BOOTSTRAP (2026-10-06): owner creation with no manual configuration
+
+**Goal honored:** the owner creates their account from the app itself —
+open Sophira → "Create Owner Account" → email + own password → owner. No
+app_config.owner_email insert, no service-key editing, no AI keys, no
+deployment secrets. Migration 0025 keeps every security property.
+
+**Mechanism (migration 0025_first_owner_bootstrap.sql):** a single-row
+table public.owner_bootstrap (PRIMARY KEY with CHECK id = 1) plus the
+signup trigger attempting INSERT ... ON CONFLICT DO NOTHING. Exactly one
+registration in the database's lifetime can claim; concurrent first
+registrations are decided ATOMICALLY by the database (the loser falls
+through to the unchanged invitation-only path and is rejected). Once
+claimed, bootstrap is permanently closed. The claim is revoked from
+anon/authenticated and has RLS with no client policies — no browser can
+read or modify it; ownership is decided server-side by the trigger
+(security definer), never by client data. A CONFIGURED owner_email still
+restricts the claim to that exact email (operator intent preserved); an
+UNSET value enables the automatic first-registration bootstrap. Existing
+0008-flow deployments are seeded (their window closes; no second owner).
+Raising an exception aborts the whole signup transaction, so a rejected
+claim leaves no row behind.
+
+**UI:** /setup now leads with "Your owner account" (plain language,
+CTA to the new /create-owner page, honest refusal when an owner already
+exists, plain-language AI status: local AI needs no key, paid AI is off
+unless explicitly enabled). Technical diagnostics moved to a separate
+optional collapsible section (server component; the database probe with
+server-only env names never reaches the client bundle — the secret scan
+initially CAUGHT the client-bundle leak in my first rewrite and the
+server-component split fixed it). /create-owner: normal signup flow, own
+password, lost-race honesty, straight to /owner on success. Owner
+dashboard, invitations, revoke/restore all unchanged and already
+in-app; the owner never edits database records.
+
+**No paid AI anywhere in the path:** owner creation deliberately ignores
+AI configuration (asserted); ALLOW_PAID_AI stays false and
+MONTHLY_AI_BUDGET_USD stays 0 by default; free-first provider priority
+(local → Gemini free tier → explicitly-enabled paid) untouched.
+
+**Tests (2013/2013 PASS; build PASS; secret scan CLEAN; gate self-test
+PASS):** new tests/owner-bootstrap.ts (single-row enforcement, atomic
+claim, race-safety, invitation path preserved, client-blind claim,
+operator-intent preservation, seed, honest UI, server-side probe,
+plain-language separation) plus rewritten owner-setup scenarios (no
+manual SQL guidance, /create-owner guidance, AI independence, secret-leak
+regression) and updated invitation-regression assertions for the live
+trigger. RLS, invitation tests, offline, learning, research, readiness:
+all untouched and passing.
+

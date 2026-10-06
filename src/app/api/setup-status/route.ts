@@ -30,5 +30,6 @@ export async function GET() {
       ownerAccount: status.probe.ownerAccount,
     },
     guidance: status.guidance,
+    ownerCreation: status.ownerCreation,
   });
 }
