@@ -1456,3 +1456,44 @@ include a real Brave/Tavily query, and the full `/api/research` route needs
 Supabase + a provider key. Offline tests already machine-check provider
 honesty (refuses to run without a real key, never fabricates results), and
 the verification stages downstream of search are now LIVE-verified.
+
+## 50. Mobile device-testing readiness round (2026-10-06): release APK built+verified; desktop browser verified; device flows remain NOT TESTED (honest)
+
+Pre-build verification of the production deployment (all recorded honestly):
+- Production URL: https://sophira.vercel.app — live; `/` 307 → /login; `/login`,
+  `/install`, `/api/health`, `/api/setup-status` all HTTP 200.
+- Application loads: verified in a REAL desktop Chromium browser (Browserbase):
+  title renders, sign-in form, invitation signup link, /install page with
+  correct per-device instructions.
+- Environment configuration: NOT configured on the deployment (honest
+  degraded mode by design) — /api/health reports supabase:false,
+  supabase_service_role:false, ai:false, search:false.
+- Authentication / Supabase / AI / research connectivity: cannot be
+  live-verified until the owner sets the production env vars; the app fails
+  closed and says so rather than pretending. These rows stay FAILED/BLOCKED,
+  not passed.
+
+**Release APK (the requested artifact) — BUILT AND VERIFIED:**
+- `SOPHIRA_APP_URL=https://sophira.vercel.app SOPHIRA_NATIVE_RELEASE=1
+  npx cap sync android` + `./gradlew assembleRelease` → **BUILD SUCCESSFUL,
+  198 tasks**.
+- Artifact: `android/app/build/outputs/apk/release/app-release-unsigned.apk`
+  (6.6 MB), package `com.bridgeline.sophira` v1.0.0, minSdk 24,
+  **targetSdk 35**, label "Sophira", `assets/capacitor.config.json` verified
+  to load https://sophira.vercel.app with cleartext+mixed content disabled.
+- Signature: **UNSIGNED — `apksigner verify`: DOES NOT VERIFY** (honest
+  fallback; no keystore secrets exist in this environment, and none were
+  invented). Not installable until CI signs it with the owner keystore.
+- The debug APK from the same code (`app-debug.apk`, 8.1 MB, debug-signed,
+  same production URL, signature OK) IS installable for device testing now.
+
+**Android 17-step device flow / iPhone PWA flow: NOT TESTED.** No physical
+Android device or iPhone exists in the agent sandbox — recorded as NOT
+TESTED in docs/DEVICE_ACCEPTANCE.md, never passed. Server-side PWA artifacts
+for the iPhone column verified: manifest (standalone display, 192/512 icons,
+start_url /dashboard) and service worker both serve HTTP 200. iOS native
+(IPA) remains separate and NOT TESTED (requires Apple Developer cert).
+
+**Desktop: VERIFIED** in a real Chromium desktop browser — app loads,
+login renders, install page correct (recorded as a browser verification,
+not a native-OS test).
