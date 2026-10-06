@@ -239,3 +239,27 @@ implemented this round. No other category was touched.
 - `TEST_REPORT.md` — §28 documents this round.
 - `docs/IMPLEMENTATION_AUDIT.md` + `docs/implementation-checklist.json` —
   this audit (human- and machine-readable).
+
+---
+
+## Audit addendum: AI provider architecture (2026-10-06)
+
+**Status: implemented, tested (offline), live-verified for the build path.**
+
+- Free-first provider dispatch (`src/lib/ai/provider.ts`): Gemini free tier
+  (default `gemini-2.5-flash`) → paid OpenAI ONLY on explicit owner opt-in.
+  Zero-billing defaults fail closed — a paid key is reported and ignored.
+- Key hygiene: provider keys are server-side only; `scripts/secret-scan.mjs`
+  (release-gate check #39) scans the built client bundle, service worker,
+  and native asset bundles for all four secret names and fails on any hit.
+  The real production build scanned CLEAN.
+- Owner diagnostics: `/owner` provider card + `GET /api/provider-status`
+  (usage counts from `provider_usage`, migration 0021; "Cost unknown" is
+  shown where cost cannot be verified rather than a fabricated figure).
+- Local models: Qwen2.5-1.5B (laptop tier) added after hub verification;
+  Gemma candidates are license-gated on the HF hub (401) and are NOT
+  registered; the desktop tier has no entry rather than a fake one.
+- Not live-verified: a real Gemini call (no key in this environment) and
+  the owner-side blockers (env vars, migrations, device tests, legal
+  placeholders) — unchanged and honestly BLOCKED in the release gate.
+
