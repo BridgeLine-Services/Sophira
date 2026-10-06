@@ -232,6 +232,10 @@ Sophira never silently depends on a paid API:
 - **Provider failure** — falls back to the next allowed candidate; if none, the honest error points to Offline mode. Nothing is ever faked.
 - **Owner diagnostics** — the `/owner` page shows active provider, model, cost class, and zero-billing state; `GET /api/provider-status` (owner session) adds usage counts. Costs display **"Cost unknown"** where they cannot be verified — never a fabricated "$0".
 - **Usage log** — migration `0021_provider_usage.sql` (service-role only; no client access).
+- **Capability registry** — `/owner` shows every provider's capabilities (provider, model, online_required, free_tier, paid_capable, billing_required, multimodal, max_context, research_tools, local) BEFORE activation; `src/lib/ai/capabilities.ts` is the single source.
+- **"No Unexpected Charges" security setting** — displayed on `/owner`. The state lives in the SERVER environment (`ALLOW_PAID_AI`, `MONTHLY_AI_BUDGET_USD`) so the frontend can never weaken it; rejection happens server-side before any network call.
+- **Model-level fail-closed** — with paid AI off, only models on the verified free-tier list (`VERIFIED_FREE_TIER_GEMINI_MODELS`) may run; an unknown `GEMINI_MODEL` is rejected. This is the "free forever" guard: if Google moves a model off the free tier, removing it from the list blocks it.
+- **Startup diagnostic** — `GET /api/provider-diagnostics` (owner session) returns ONLY: `configured_provider`, `configured_model`, `local_model_availability`, `free_tier_mode`, `paid_ai_allowed`. Never API keys.
 
 ### 3. Run
 

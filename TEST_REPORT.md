@@ -1627,3 +1627,49 @@ offline suite; the gate itself runs `npm test`, `build`, `tsc`, and the
 secret scan). Suite **1238/1238**, build PASS, typecheck PASS, real client
 bundle secret scan CLEAN.
 
+## §55 Capability registry, paid-model fail-closed, startup diagnostics (2026-10-06)
+
+**Changed:** the zero-billing policy now gates MODELS, not just providers, and
+the owner UI shows everything before activation. Suite 1325/1325.
+
+**Implemented and executed:**
+
+- `src/lib/ai/capabilities.ts` — provider capability registry with all ten
+  required fields per row (provider, model, online_required, free_tier,
+  paid_capable, billing_required, multimodal, max_context, research_tools,
+  local); "No Unexpected Charges" setting state; `startupDiagnostics()`
+  returning ONLY the five allowed fields.
+- Model-level fail-closed (server-side, in `resolveProviders`): with paid AI
+  off, a `GEMINI_MODEL` not on `VERIFIED_FREE_TIER_GEMINI_MODELS` is
+  REJECTED before any network call. Unknown models fail closed; explicit
+  `ALLOW_PAID_AI=true` permits owner-chosen models. This guards against
+  assuming a "free" API stays free: removing a model from the verified list
+  blocks it immediately.
+- Honest 404 handling: if Google removes the configured model, the error
+  tells the owner to update `GEMINI_MODEL` — never a fake answer.
+- `GET /api/provider-diagnostics` — startup diagnostic endpoint
+  (owner-guarded): exactly the five fields, no keys, tested.
+- `/owner` — "No Unexpected Charges" security setting card (state from
+  server env, display-only in the browser) + capability registry table
+  shown BEFORE activation.
+- New tests (all executed, suite 1325/1325):
+  - paid provider rejected (provider level) — §"provider" selection matrix
+  - paid MODEL rejected — unverified `gemini-2.5-pro` style model rejected
+    under zero-billing; permitted only with explicit paid opt-in
+  - missing Gemini key handled gracefully — honest error, zero network
+    calls, points to the free path and LOCAL/offline fallback
+  - offline (`AI_PROVIDER=local`) NEVER contacts remote AI — instrumented
+    fetch, zero calls even with keys configured
+  - local fallback — degraded server response points to Offline mode
+  - API secrets never reach client code — source scan: no client-side
+    file references any secret name; production bundle scan CLEAN
+  - no secret in localStorage/IndexedDB — every source file with actual
+    storage API calls (localStorage./sessionStorage./indexedDB./openDB()/
+    navigator.storage.) contains no secret name
+  - no secret returned from API endpoints — startup diagnostics and
+    provider-status payloads tested with planted key values
+  - startup diagnostics return exactly the five allowed fields
+
+**Not live-verified (honest):** a real Gemini call (no `GEMINI_API_KEY` in
+this environment) and the owner-side blockers — unchanged in the gate.
+

@@ -24,6 +24,8 @@
  * never silent.
  */
 
+import { VERIFIED_FREE_TIER_GEMINI_MODELS } from "./capabilities";
+
 export type ProviderId = "local" | "gemini" | "openai";
 export type ProviderCostClass = "local" | "free-tier" | "paid";
 
@@ -81,10 +83,22 @@ export function resolveProviders(env: AiEnv): ProviderPlan {
 
   const geminiEligible = () => {
     if (!env.GEMINI_API_KEY) {
-      reasons.gemini = "not configured (GEMINI_API_KEY is unset) — free tier unavailable";
+      reasons.gemini = "not configured (GEMINI_API_KEY is unset) — handled gracefully: falling back per policy (local/offline)";
       return false;
     }
-    reasons.gemini = `free tier configured (model ${env.GEMINI_MODEL})`;
+    // MODEL-level billing policy (fail closed): when paid use is not
+    // explicitly allowed, only models VERIFIED on the free tier may run.
+    // Unknown/unverified models are rejected server-side here, before any
+    // network call. This also guards "free forever" drift: if Google moves
+    // a model off the free tier, removing it from the verified list blocks
+    // it under the zero-billing policy.
+    if (!paidAllowed(env) && !VERIFIED_FREE_TIER_GEMINI_MODELS.includes(env.GEMINI_MODEL)) {
+      reasons.gemini = `REJECTED: model "${env.GEMINI_MODEL}" is not on the verified free-tier list and ALLOW_PAID_AI=false — set GEMINI_MODEL to a verified free-tier model (${VERIFIED_FREE_TIER_GEMINI_MODELS.join(", ")}) or explicitly allow paid use`;
+      return false;
+    }
+    reasons.gemini = VERIFIED_FREE_TIER_GEMINI_MODELS.includes(env.GEMINI_MODEL)
+      ? `free tier configured (model ${env.GEMINI_MODEL}, verified free-tier as of 2026-10-06)`
+      : `configured (model ${env.GEMINI_MODEL}) with paid use EXPLICITLY allowed`;
     return true;
   };
   const openaiEligible = () => {
@@ -232,7 +246,12 @@ export async function geminiChat(
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       if (res.status === 429) {
-        throw new Error(`Gemini free-tier quota was exceeded (rate limited)${body ? "" : ""}.`);
+        throw new Error("Gemini free-tier quota was exceeded (rate limited).");
+      }
+      if (res.status === 404) {
+        throw new Error(
+          `The configured Gemini model "${env.GEMINI_MODEL}" is no longer available. Update GEMINI_MODEL to a model on Google's current free tier, or use Offline mode.`
+        );
       }
       // Never echo the body (could reflect request data) or the key.
       throw new Error(`The Gemini API returned an error (HTTP ${res.status}).`);

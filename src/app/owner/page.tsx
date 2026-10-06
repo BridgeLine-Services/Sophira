@@ -8,6 +8,7 @@ import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/ty
 import Link from "next/link";
 import { Briefcase, Gauge } from "lucide-react";
 import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
+import { capabilityRegistry, noUnexpectedCharges } from "@/lib/ai/capabilities";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,8 @@ export default async function OwnerPage() {
         </span>
         <Badge>owner</Badge>
       </div>
+      <NoUnexpectedChargesCard />
+      <CapabilityRegistryCard />
       <ProviderDiagnosticsCard />
       <OwnerDashboard
         initialMembers={members as NetworkMemberStats[]}
@@ -127,6 +130,87 @@ function ProviderDiagnosticsCard() {
       <p className="mt-2 text-xs text-muted-foreground">
         Request counts and failure rates: <code>GET /api/provider-status</code> (owner session required; migration 0021).
       </p>
+    </div>
+  );
+}
+
+/**
+ * "No Unexpected Charges" SECURITY SETTING (owner view). The state itself is
+ * enforced SERVER-SIDE from the environment (ALLOW_PAID_AI /
+ * MONTHLY_AI_BUDGET_USD) — deliberately NOT a frontend control, so the
+ * browser can never weaken it. This card displays the live state.
+ */
+function NoUnexpectedChargesCard() {
+  const env = readAiEnv();
+  const state = noUnexpectedCharges(paidAllowed(env));
+  return (
+    <div className={`mb-6 rounded-lg border p-4 ${state.enabled ? "border-emerald-600/40 bg-emerald-500/5" : "border-destructive/40 bg-destructive/5"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-semibold">Security setting: No Unexpected Charges</div>
+        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${state.enabled ? "bg-emerald-600/15 text-emerald-700 dark:text-emerald-400" : "bg-destructive/15 text-destructive"}`}>
+          {state.enabled ? "ON" : "OFF"}
+        </span>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">{state.detail}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Controlled by the server environment (ALLOW_PAID_AI, MONTHLY_AI_BUDGET_USD), not by the browser — the frontend can
+        never enable a paid provider on its own. Rejection happens server-side before any network call.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Provider CAPABILITY REGISTRY — displayed BEFORE a provider is activated.
+ * Everything the owner needs to decide: cost class, online requirement,
+ * multimodal support, context, research tools. No secrets.
+ */
+function CapabilityRegistryCard() {
+  const env = readAiEnv();
+  const rows = capabilityRegistry(env);
+  return (
+    <div className="mb-6 rounded-lg border bg-card p-4">
+      <div className="mb-2 text-sm font-semibold">Provider capability registry (shown before activation)</div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-xs">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="py-1.5 pr-3">provider</th>
+              <th className="py-1.5 pr-3">model</th>
+              <th className="py-1.5 pr-3">online</th>
+              <th className="py-1.5 pr-3">free tier</th>
+              <th className="py-1.5 pr-3">paid capable</th>
+              <th className="py-1.5 pr-3">billing required</th>
+              <th className="py-1.5 pr-3">multimodal</th>
+              <th className="py-1.5 pr-3">max context</th>
+              <th className="py-1.5 pr-3">research tools</th>
+              <th className="py-1.5">local</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={`${r.provider}-${r.model}`} className="border-b last:border-b-0 align-top">
+                <td className="py-1.5 pr-3 font-medium">{r.provider}</td>
+                <td className="py-1.5 pr-3">{r.model}</td>
+                <td className="py-1.5 pr-3">{r.online_required ? "yes" : "no"}</td>
+                <td className="py-1.5 pr-3">{r.free_tier ? "yes" : "no"}</td>
+                <td className="py-1.5 pr-3">{r.paid_capable ? "yes" : "no"}</td>
+                <td className="py-1.5 pr-3">{r.billing_required ? "yes" : "no"}</td>
+                <td className="py-1.5 pr-3">{r.multimodal ? "yes" : "no"}</td>
+                <td className="py-1.5 pr-3">{r.max_context === null ? "device dependent" : r.max_context.toLocaleString()}</td>
+                <td className="py-1.5 pr-3">{r.research_tools ? "yes" : "no"}</td>
+                <td className="py-1.5">{r.local ? "yes" : "no"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+        {rows[0]?.notes.slice(0, 1).map((n, i) => (
+          <li key={`ln-${i}`}>{n}</li>
+        ))}
+        <li>Free-tier facts are current, not promises: the provider controls tiering and can change it at any time — under the No Unexpected Charges setting, only models on the verified free-tier list run when paid AI is not allowed.</li>
+      </ul>
     </div>
   );
 }
