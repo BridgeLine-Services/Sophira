@@ -122,9 +122,20 @@ export function ResultBody({ content }: { content: string }) {
       continue;
     }
 
-    // paragraph
+    // paragraph — the guard requires whitespace after list/heading markers so
+    // a line like "**Bold**" or "-5" is treated as paragraph text, not a list.
+    // Legal-infrastructure round: this guard previously matched a bare "-"/*
+    // prefix, so such a line fell through every branch WITHOUT advancing i —
+    // an infinite loop that OOM-killed the renderer. The progress guarantee
+    // below makes non-advancement structurally impossible.
     const buf: string[] = [];
-    while (i < lines.length && lines[i].trim() && !/^\s*([-*]|\d+[.)]|#{1,3}\s|```)/.test(lines[i])) {
+    while (i < lines.length && lines[i].trim() && !/^\s*(?:[-*]\s|\d+[.)]\s|#{1,3}\s|```)/.test(lines[i])) {
+      buf.push(lines[i]);
+      i++;
+    }
+    if (buf.length === 0) {
+      // pathological line no branch consumed: take it as paragraph text and
+      // ALWAYS advance — the loop above must never spin without progress.
       buf.push(lines[i]);
       i++;
     }

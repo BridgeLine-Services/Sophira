@@ -8,7 +8,9 @@
     "skipLibCheck": true,
     "outDir": "../tests-dist",
     "rootDir": "..",
-    "noEmitOnError": true
+    "noEmitOnError": true,
+    "jsx": "react-jsx",
+    "paths": { "@/*": ["../src/*"] }
   },
   "include": ["./**/*.ts", "../src/lib/ai/context.ts", "../src/lib/ai/subjects.ts", "../src/lib/ai/mathverify.ts", "../src/lib/ai/compliance.ts",
     "../src/lib/ai/subjects.ts", "../src/lib/ai/context.ts",

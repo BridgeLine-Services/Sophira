@@ -1519,3 +1519,33 @@ failures. Verdict: **PRIVATE BETA READY: NO** — blockers are exactly the
 owner-side items listed in the gate (production env vars, migrations + owner
 email on Supabase, SUPABASE_TEST_* credentials for the live matrices, legal
 owner-facts, one device session). No engineering work remains to unblock.
+
+## 52. Legal-infrastructure round (2026-10-06): in-app legal pages added — /terms /privacy /license render the REAL documents; ResultBody infinite-loop bug found+fixed; 1120/1120
+
+STEP 1–2 audit: every placeholder in LICENSE / TERMS_OF_SERVICE.md /
+PRIVACY_POLICY.md was inventoried (14 distinct owner-fact placeholders) and
+all 14 are catalogued in docs/legal/LEGAL_CONFIGURATION.md sections A–E —
+the centralized owner-input system; no values were invented anywhere.
+STEP 3: the app previously had NO in-app legal surface (documents existed
+only in docs/). Added public routes **/terms**, **/privacy**, **/license**
+that read the actual repository files at request time (single source of
+truth, force-included for serverless via outputFileTracingIncludes; honest
+unavailable-notice when a file is missing rather than fake text), render
+them through the existing dependency-free renderer, and show a
+`TEMPLATE — PLACEHOLDER NOTICE` banner while placeholders remain. Linked
+from the login page; middleware PUBLIC list updated. LICENSE's proprietary
+terms (no copying/redistribution/sublicensing, all rights reserved,
+confidential source) are unchanged and now user-visible in-app.
+**Bug found + fixed:** ResultBody infinite-looped (OOM) on lines starting
+with `**bold**` or `-` without a space — the paragraph guard matched a bare
+marker so `i` never advanced. Guard now requires whitespace after markers
+and the parser guarantees progress. This affected ALL AI output rendering,
+not just legal pages. Regression test included.
+STEP 4: technical controls re-verified by the suite (auth/invite-only
+signup, RLS conformance, revocation, access control, audit) — legal text
+alone is never claimed to prevent access; the machine controls are.
+STEP 5: scripts/legal-status.mjs + release gate item 15 still BLOCK
+production-readiness while placeholders remain (asserted by tests §17c).
+Tests: **1120 passed, 0 failed** (new §17c executes the real page components
+via react-dom/server). Production build clean; live local serve verified
+all three pages public + honest banners + login 200.

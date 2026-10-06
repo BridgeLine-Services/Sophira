@@ -296,6 +296,14 @@ prohibited without express written authorization. See
 [docs/legal/PRIVACY_POLICY.md](docs/legal/PRIVACY_POLICY.md) (templates with
 placeholders — see docs/legal/LEGAL_REVIEW_NOTICE.md).
 
+The app itself serves these documents at **/terms**, **/privacy**, and
+**/license** (public routes, viewable signed-out, linked from the login
+page). The pages render the REAL repository documents — never a duplicated
+copy — with an honest `TEMPLATE — PLACEHOLDER NOTICE` banner while owner-fact
+placeholders remain, per docs/legal/LEGAL_CONFIGURATION.md. The release gate
+(`node scripts/release-gate.mjs`) BLOCKS production-readiness while legal
+placeholders remain unresolved.
+
 ## Feature status (honest, 2026-09-27)
 
 | Feature | Status |

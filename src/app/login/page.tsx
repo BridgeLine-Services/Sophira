@@ -92,7 +92,7 @@ function LoginForm() {
           <Link href="/signup" className="text-accent hover:underline">Create your account</Link>
         </p>
         <p>
-          <Link href="/install" className="text-ink-soft hover:underline">Install the app</Link>
+          <span className="flex items-center gap-3"><Link href="/install" className="text-ink-soft hover:underline">Install the app</Link><Link href="/terms" className="text-ink-soft hover:underline">Terms</Link><Link href="/privacy" className="text-ink-soft hover:underline">Privacy</Link></span>
         </p>
       </div>
     </div>

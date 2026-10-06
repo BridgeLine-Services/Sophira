@@ -66,6 +66,12 @@ import { passageById, pickPassage, TYPING_PASSAGES } from "../src/lib/typing-pas
 import { buildChecklist, auditDraft, mergeSemanticResults, failedCriteriaForRevision, countWords } from "../src/lib/rubric";
 import { searchProviderConfigured, getSearchProvider, SearchNotConfiguredError } from "../src/lib/research/provider";
 import { fetchAndVerify, titlesCorrespond } from "../src/lib/research/verify";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import TermsPage from "../src/app/terms/page";
+import PrivacyPage from "../src/app/privacy/page";
+import LicensePage from "../src/app/license/page";
+import { loadLegalDoc, legalPlaceholdersRemain } from "../src/lib/legal";
 import { formatCitation, buildBibliography, extractCitationMarkers, quoteInContent, claimSupportsDeterministic, parseISODateLoose } from "../src/lib/research/citation";
 import { generateQueries, normalizeUrl, dedupeSources, rankCandidates } from "../src/lib/research/research";
 import {
@@ -1210,6 +1216,65 @@ export async function runResearchLiveTests(): Promise<void> {
 
   console.log("  LIVE research verification complete: 4 real sources fetched, 1 dead link detected, " +
     "1 redirect followed, 1 refused page honestly categorized, claims + citation checked against genuinely retrieved content.");
+}
+
+
+// ---------------------------------------------------------------------------
+// In-app legal pages (legal-infrastructure round): the app renders the REAL
+// repository documents at /terms, /privacy, /license — single source of truth,
+// honest TEMPLATE banner while owner-fact placeholders remain, and no
+// fabricated legal identity anywhere. Executed by rendering the actual
+// server components to markup.
+// ---------------------------------------------------------------------------
+async function runLegalPageTests(): Promise<void> {
+  section("17c. In-app legal pages render the real documents with honest placeholder banners");
+  {
+    const { spawnSync } = await import("node:child_process");
+    const tosMarkup = renderToStaticMarkup(createElement(TermsPage));
+    const privacyMarkup = renderToStaticMarkup(createElement(PrivacyPage));
+    const licenseMarkup = renderToStaticMarkup(createElement(LicensePage));
+
+    assert(tosMarkup.includes("Terms of Service") && tosMarkup.includes("invitation"), "legal pages: /terms renders the REAL repository document (actual header + real content present)");
+    assert(privacyMarkup.includes("Privacy Policy") && privacyMarkup.includes("retention"), "legal pages: /privacy renders the REAL repository document (actual header + real content present)");
+    assert(licenseMarkup.includes("PROPRIETARY SOFTWARE LICENSE"), "legal pages: /license renders the REAL LICENSE (proprietary terms visible to users)");
+
+    // single source of truth: rendered content IS the repo file, never a copy
+    const tosFile = readFileSync(path.join(process.cwd(), "docs", "legal", "TERMS_OF_SERVICE.md"), "utf8");
+    assert(loadLegalDoc("TERMS_OF_SERVICE") === tosFile, "legal pages: loader returns the exact repository file (no duplicated/paraphrased copy)");
+    assert(loadLegalDoc("LICENSE") === readFileSync(path.join(process.cwd(), "LICENSE"), "utf8"), "legal pages: LICENSE loaded verbatim");
+    assert(loadLegalDoc("PRIVACY_POLICY") === readFileSync(path.join(process.cwd(), "docs", "legal", "PRIVACY_POLICY.md"), "utf8"), "legal pages: PRIVACY_POLICY loaded verbatim");
+
+    // honest TEMPLATE banner while placeholders remain
+    assert(legalPlaceholdersRemain(tosFile), "legal pages: placeholders detected in the real document");
+    assert(tosMarkup.includes("TEMPLATE") && tosMarkup.includes("PLACEHOLDER NOTICE"), "legal pages: /terms shows the honest TEMPLATE banner (not presented as final/legal advice)");
+    assert(privacyMarkup.includes("PLACEHOLDER NOTICE"), "legal pages: /privacy shows the honest TEMPLATE banner");
+    assert(licenseMarkup.includes("PLACEHOLDER NOTICE"), "legal pages: /license shows the honest placeholder note");
+
+    // placeholders are VISIBLE, never silently filled with guesses
+    assert(tosMarkup.includes("[LEGAL ENTITY NAME]") && tosMarkup.includes("[JURISDICTION]"), "legal pages: owner-fact placeholders are displayed as-is, never auto-filled");
+    assert(privacyMarkup.includes("[CONTACT EMAIL]") && licenseMarkup.includes("[COPYRIGHT HOLDER LEGAL NAME]"), "legal pages: privacy contact + license holder remain explicit placeholders");
+
+    // no fabricated identity
+    for (const m of [tosMarkup, privacyMarkup, licenseMarkup]) {
+      assert(!/BridgeLine Services, LLC|John Doe|123 Main Street|legal@bridgeline/i.test(m), "legal pages: NO invented entity name, address, or contact anywhere");
+    }
+
+    // public access + navigation
+    const mw = readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+    assert(mw.includes('"/terms"') && mw.includes('"/privacy"') && mw.includes('"/license"'), "legal pages: /terms /privacy /license are PUBLIC (viewable signed-out)");
+    const loginSrc = readFileSync(path.join(process.cwd(), "src", "app", "login", "page.tsx"), "utf8");
+    assert(loginSrc.includes('href="/terms"') && loginSrc.includes('href="/privacy"'), "legal pages: login page links Terms and Privacy");
+
+    // regression: ResultBody previously infinite-looped (OOM) on lines like
+    // "**Bold start**" — every line must now render with guaranteed progress.
+    const { ResultBody } = await import("../src/components/app/ResultBody");
+    const pathological = renderToStaticMarkup(createElement(ResultBody, { content: "**Bold start**\n- item one\n-5 dashes here\n1. ordered\n**EFFECTIVE DATE: [EFFECTIVE DATE]** • **OPERATOR: [LEGAL ENTITY NAME]**\n\ntail" }));
+    assert(pathological.includes("Bold start") && pathological.includes("-5 dashes here"), "legal pages: ResultBody renders bold-heading/odd-marker lines without hanging (infinite-loop regression fixed)");
+
+    // the machine checks still refuse production-readiness while placeholders remain
+    const status = JSON.parse(spawnSync("node", ["scripts/legal-status.mjs", "--json"], { cwd: process.cwd(), encoding: "utf8" }).stdout);
+    assert(status.complete === false && (status.remaining ?? 0) > 0, "legal pages: legal-status machine check still reports placeholders remaining (release gate stays BLOCKED — honest)");
+  }
 }
 
 function finish() {
@@ -3385,4 +3450,4 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(finish).catch((e) => { console.error(e); process.exit(1); });
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
