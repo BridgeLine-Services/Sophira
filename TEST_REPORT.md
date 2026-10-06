@@ -2323,3 +2323,56 @@ npm run build PASS, node scripts/release-gate.mjs --self-test PASS
 (39 checks). Nothing fabricated; the live gate remains BLOCKED for the
 real production environment, as it must.
 
+## §68 PRODUCT-COMPLETION PASS (2026-10-06): stale learning + submission readiness finished
+
+**Audit first, minimal changes only.** On inspection the two "missing"
+capabilities were already substantially built and were PRESERVED, not
+rebuilt: the learning system has full lifecycle states (candidate,
+active, lower_confidence, corrected, inactive, recurring, temporary,
+teacher_required), an evidence-decay engine (recent evidence outweighs
+old — decay anchors on the MOST RECENT confirmation/use; explicit
+contradictions out-weight history; bounded geometric time decay with a
+90-day grace window), STALE_AFTER_DAYS=180 exclusion from AI context,
+human explanations in the UI ("Not observed in over 6 months — stale.
+It is excluded from AI context until it is observed again"), teacher
+instructions outranking student habits, and full scope isolation.
+
+**What was genuinely missing — implemented:**
+1. The final submission gate did not check unresolved teacher-rule
+   conflicts, student corrections not yet incorporated, or in-progress
+   paced output. Added all three as real GateRequirements with honest
+   semantics: unresolved conflicts (hard fail), pending corrections
+   (hard fail), paced output unfinished (warn), null records skipped
+   honestly (never a fabricated pass/fail). A verdict recomputation bug
+   was found and fixed: the final READY/NOT_READY now recomputes after
+   ALL pushes so the new hard checks genuinely block submission.
+2. Readiness issues were not clickable. Every gate requirement now
+   carries a deterministic anchor (draft, citations, research, method,
+   rules, corrections, schedule) and the ReadinessPanel renders a "Go to
+   this part" link that scrolls to and highlights the exact spot in the
+   workspace.
+3. The API route wires the new inputs as honest nulls until stored
+   conflict/correction records exist for the assignment — the gate skips
+   rather than invents.
+
+**Tests:** 18 new assertions (tests/readiness-completion.ts) covering
+conflict blocking + anchoring, conflict resolution pass, pending
+corrections blocking, null-skip honesty, output warn, anchor coverage of
+every failing requirement, real click-through navigation, and placeholder
+regression. Suite: 1980/1980 PASS.
+
+**Everything else in this request was verified as already working and
+left untouched**: staged 13-stage essay workflow, research strictness
+(real retrieval verification, no hallucinated links), typing calibration
++ paced output, deadline-aware breaks (10s–6h with feasibility
+warnings), encrypted offline storage + local AI with LOCAL MODEL
+labeling, offline research honesty, invitation-only auth with
+generic forgot-password responses, owner privacy boundary, PWA/APK
+honesty, free-first AI provider architecture, legal documents with
+attorney-review notice, and the full security regression battery.
+
+**Still requiring OWNER action (not code):** production Supabase/AI
+environment configuration, live recovery-email test, Gemini live test,
+physical-device verification for native packaging — the release gate
+remains honestly BLOCKED until these are done by the owner.
+

@@ -32,6 +32,18 @@ interface FinalGate {
  * show "Ready to Submit" unless the machine result says submission_ready.
  * Every ✓/✗ line carries its evidence; warnings never hide blockers.
  */
+const goToIssue = (anchor?: string) => {
+  if (!anchor) return;
+  const el = document.getElementById(anchor);
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-accent");
+    window.setTimeout(() => el.classList.remove("ring-2", "ring-accent"), 1800);
+  } else {
+    window.location.hash = "#" + anchor;
+  }
+};
+
 export function ReadinessPanel({ assignmentId }: { assignmentId: string }) {
   const [data, setData] = useState<FinalGate | null>(null);
   const [busy, setBusy] = useState(false);
@@ -105,6 +117,9 @@ export function ReadinessPanel({ assignmentId }: { assignmentId: string }) {
                         <span className="block text-xs text-danger">Fix: {r.correction}</span>
                       )}
                     </span>
+                  {(r as { anchor?: string }).anchor && r.status !== "pass" && (
+                      <button type="button" onClick={() => goToIssue((r as { anchor?: string }).anchor)} className="text-accent hover:underline">Go to this part</button>
+                    )}
                   </li>
                 ))}
               </ul>

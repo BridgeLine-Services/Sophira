@@ -202,6 +202,7 @@ export async function GET(request: NextRequest) {
     // The gate applies it only while content blockers exist.
     estimatedRemainingWorkMinutes: estimateWorkMinutes({
       mode: assignment.mode,
+
       task_type: assignment.task_type,
       output_type: assignment.output_type,
       word_count_target: checklist.criteria.find((x) => x.kind === "word_count_min")?.params.minWords ?? null,
@@ -209,7 +210,11 @@ export async function GET(request: NextRequest) {
       requires_research: !!project,
       source_count: approvedSources,
     }).minutes,
-  });
+  
+    // 2026-10-06 completion checks. Populated from real records when they
+    // exist; null means "no record" — the gate skips honestly, never fakes.
+    teacherConflicts: null,
+    pendingCorrections: null,});
 
   // Persist the machine verdict with the draft it evaluated — the UI can
   // never render a stale "Ready" badge that the machine did not compute.

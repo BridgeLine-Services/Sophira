@@ -1,0 +1,24 @@
+{
+  "nowMs": 1760000000000,
+  "draft": "A complete essay draft about photosynthesis with several verified sources and full citations.",
+  "checklist": {
+    "criteria": []
+  },
+  "persistedAudit": {
+    "results": []
+  },
+  "verification": {
+    "status": "verified",
+    "failedChecks": []
+  },
+  "methodCompliance": {
+    "status": "compliant",
+    "notes": null
+  },
+  "citationInvariant": null,
+  "rubricRequirements": null,
+  "research": null,
+  "formatting": null,
+  "dueMs": 1760086400000,
+  "estimatedRemainingWorkMinutes": 10
+}

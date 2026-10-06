@@ -47,6 +47,10 @@ export interface GateRequirement {
   hard: boolean;
   evidence: string;
   correction: string;
+  /** Deterministic in-app target for click-through: the element id in the
+   * assignment workspace the user is taken to for this issue (e.g.
+   * "citations", "rubric", "research", "draft", "schedule", "method"). */
+  anchor?: string;
 }
 
 export interface FinalGateResult {
@@ -112,6 +116,15 @@ export interface FinalGateInput {
   verification: { status: string | null; failedChecks: string[] } | null;
   methodCompliance: { status: string | null; notes: string | null } | null;
   research: FinalGateResearch | null;
+  /** Unresolved teacher-rule conflicts (from the existing conflict engine),
+   * or null when no conflict record exists for this assignment. */
+  teacherConflicts?: { unresolved: number; detail?: string } | null;
+  /** Student corrections on this assignment that have NOT yet been
+   * incorporated into the draft (count), or null when unknown. */
+  pendingCorrections?: number | null;
+  /** Paced-output state: true when section output is still being paced out
+   * (typing simulation in progress). Null when pacing is not in use. */
+  outputInProgress?: boolean | null;
   /** 2026-10-06 hardening: per-citation 12-step invariant summary
    *  (NO VERIFIED CITATION WITHOUT VERIFIED SOURCE). null = not run; the
    *  gate then fails closed for research-backed work. */
@@ -151,7 +164,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
   const draft = input.draft ?? "";
   const hasDraft = draft.trim().length > 0;
   push({
-    id: "draft",
+    id: "draft", anchor: "draft",
     label: "Draft present",
     status: hasDraft ? "pass" : "fail",
     hard: true,
@@ -214,7 +227,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
   /* -- 3. Unresolved placeholders ---------------------------------- */
   const placeholders = input.draft ? findUnresolvedPlaceholders(input.draft) : [];
   push({
-    id: "placeholders",
+    id: "placeholders", anchor: "draft",
     label: "No unresolved placeholders",
     status: placeholders.length === 0 ? "pass" : "fail",
     hard: true,
@@ -228,7 +241,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
   /* -- 4. Independent verification (machine checks / self checks) --- */
   if (!input.verification || !input.verification.status) {
     push({
-      id: "verification",
+      id: "verification", anchor: "draft",
       label: "Independent verification",
       status: "warn",
       hard: false,
@@ -237,7 +250,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     });
   } else if ((input.verification.failedChecks ?? []).length > 0) {
     push({
-      id: "verification",
+      id: "verification", anchor: "draft",
       label: "Independent verification",
       status: "fail",
       hard: true,
@@ -246,7 +259,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     });
   } else if (input.verification.status === "verified") {
     push({
-      id: "verification",
+      id: "verification", anchor: "draft",
       label: "Independent verification",
       status: "pass",
       hard: true,
@@ -255,7 +268,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     });
   } else {
     push({
-      id: "verification",
+      id: "verification", anchor: "draft",
       label: "Independent verification",
       status: "warn",
       hard: false,
@@ -270,7 +283,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     // No method requirements — not applicable, never blocking.
   } else if (mc.status === "compliant") {
     push({
-      id: "method_compliance",
+      id: "method_compliance", anchor: "method",
       label: "Teacher's required method",
       status: "pass", hard: true,
       evidence: "The work follows the teacher's required methods.",
@@ -278,7 +291,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     });
   } else {
     push({
-      id: "method_compliance",
+      id: "method_compliance", anchor: "method",
       label: "Teacher's required method",
       status: "fail", hard: true,
       evidence: `The work does ${mc.status === "partial" ? "only partially" : "not"} follow the teacher's required methods.${mc.notes ? " " + mc.notes : ""}`,
@@ -300,7 +313,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     if (res.minSources !== null && res.minSources > 0) {
       const enough = res.approvedSources >= res.minSources;
       push({
-        id: "required_sources",
+        id: "required_sources", anchor: "research",
         label: `${res.minSources} required source${res.minSources === 1 ? "" : "s"}`,
         status: enough ? "pass" : "fail",
         hard: true,
@@ -314,7 +327,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     const ci = input.citationInvariant;
     if (!ci) {
       push({
-        id: "citation_invariant",
+        id: "citation_invariant", anchor: "citations",
         label: "Citation invariant (no verified citation without verified source)",
         status: "fail", hard: true,
         evidence: "The 12-step citation invariant has not been run — citations cannot be accepted on trust.",
@@ -323,7 +336,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     } else {
       const bad = ci.unverified + ci.unavailable + ci.stale;
       push({
-        id: "citation_invariant",
+        id: "citation_invariant", anchor: "citations",
         label: "Citation invariant (no verified citation without verified source)",
         status: bad === 0 ? "pass" : "fail",
         hard: true,
@@ -338,7 +351,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     const integ = res.integrity;
     if (!integ) {
       push({
-        id: "research_integrity",
+        id: "research_integrity", anchor: "research",
         label: "Research integrity",
         status: "fail", hard: true,
         evidence: "The research integrity report has not been produced for this work — acceptance cannot be verified.",
@@ -354,7 +367,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
       const unsupported = integ.failures.map((f) => `${f.claim_text} — ${f.reason}`);
       const authorityOk = integ.authority_total === 0 || integ.authority_satisfied === integ.authority_total;
       push({
-        id: "research_integrity",
+        id: "research_integrity", anchor: "research",
         label: "All factual claims supported (research integrity)",
         status: complete ? "pass" : "fail",
         hard: true,
@@ -364,7 +377,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
         correction: complete ? "" : "Revise or remove the unsupported claims, or replace their sources.",
       });
       push({
-        id: "source_authority",
+        id: "source_authority", anchor: "research",
         label: "Source authority requirements",
         status: authorityOk ? "pass" : "fail",
         hard: true,
@@ -399,7 +412,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     (bibOk === null || bibOk) && (styleOk === null || styleOk) &&
     (!citeCount || citeCount.status === "satisfied");
   push({
-    id: "citation_integrity",
+    id: "citation_integrity", anchor: "citations",
     label: "Citations & bibliography",
     status: citationOk ? "pass" : "fail",
     hard: true,
@@ -425,7 +438,7 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
   if (input.dueMs !== null) {
     if (input.dueMs <= input.nowMs) {
       push({
-        id: "deadline",
+        id: "deadline", anchor: "schedule",
         label: "Deadline feasibility",
         status: "warn",
         hard: false,
@@ -452,14 +465,51 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
     }
   }
 
+  /* -- 2026-10-06 completion: teacher-rule conflicts, pending student
+     corrections, and paced-output state (readiness spec items 12, 16, 17). */
+  const teacherConflicts = input.teacherConflicts ?? null;
+  if (teacherConflicts) {
+    if (teacherConflicts.unresolved > 0) {
+      push({
+        id: "teacher_conflicts", anchor: "rules", label: "Teacher-rule conflicts resolved", status: "fail", hard: true,
+        evidence: `${teacherConflicts.unresolved} unresolved teacher-rule conflict(s)${teacherConflicts.detail ? ": " + teacherConflicts.detail : ""}.`,
+        correction: "Resolve the conflicting teacher requirements before submitting — the more specific current instruction wins.",
+      });
+    } else {
+      push({ id: "teacher_conflicts", anchor: "rules", label: "Teacher-rule conflicts resolved", status: "pass", hard: false, evidence: "No unresolved teacher-rule conflicts.", correction: "" });
+    }
+  }
+  if ((input.pendingCorrections ?? 0) > 0) {
+    push({
+      id: "pending_corrections", anchor: "corrections", label: "Student corrections incorporated", status: "fail", hard: true,
+      evidence: `${input.pendingCorrections} correction(s) from your feedback have NOT been incorporated into the draft yet.`,
+      correction: "Apply the pending corrections, then re-run this check.",
+    });
+  }
+  if (input.outputInProgress === true) {
+    push({
+      id: "output_state", anchor: "draft", label: "Output completed", status: "warn", hard: false,
+      evidence: "Section output is still being paced out — the draft is not final yet.",
+      correction: "Wait for the paced output to finish (or pause and finish it) before submitting.",
+    });
+  }
+
   const warnings = requirements.filter((r) => r.status === "warn");
 
+  // Recompute AFTER all pushes — the conflict/correction checks above push
+  // hard fails that MUST block submission (the earlier pass computed the
+  // deadline evidence only; it must not decide the final verdict).
+  const failedAll = requirements.filter((r) => r.status === "fail");
+  const blockersAll = failedAll
+    .filter((r) => r.hard)
+    .map((r) => `${r.label}: ${r.evidence}${r.correction ? ` (${r.correction})` : ""}`);
+
   return {
-    submission_ready: blockers.length === 0,
-    status: blockers.length === 0 ? "READY" : "NOT_READY",
+    submission_ready: blockersAll.length === 0,
+    status: blockersAll.length === 0 ? "READY" : "NOT_READY",
     requirements,
     passed: requirements.filter((r) => r.status === "pass"),
-    failed: failedReq,
+    failed: failedAll,
     warnings,
     rubric_status: {
       passed,
