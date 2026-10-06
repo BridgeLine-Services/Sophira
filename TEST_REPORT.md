@@ -2525,3 +2525,33 @@ missing-schema state is asserted to be distinct and honest; the
 one-file setup is asserted to contain the first-owner bootstrap
 migration and to preserve the exact migration order.
 
+## §73 VERCEL SINGLE-SERVICE DEPLOYMENT (2026-10-06): Next.js root pinned, Tauri never a web service
+
+**Problem:** importing the repository into Vercel auto-detected two
+applications (Next.js at root + Rust in src-tauri) and proposed a
+multi-service vercel.json with a Rust service and a catch-all rewrite.
+
+**Fix:** a MINIMAL root vercel.json pins the deployment as a single
+Next.js application - framework "nextjs", nothing else. No services, no
+Rust runtime, no rewrites: the desktop Tauri application is not a web
+service and is never deployed. The existing build script (next build,
+npm) is used as-is. src-tauri is untouched and remains independently
+buildable (GitHub Actions / local Tauri toolchain).
+
+**Docs:** new docs/VERCEL_DEPLOYMENT.md explains the import flow - if
+the wizard still shows a multi-application prompt, select the Next.js
+application with Root Directory = repository root; never accept the
+Rust service proposal. README links it.
+
+**Tests (2051/2051 PASS; build PASS; secret scan CLEAN):** new
+tests/vercel-config.ts (11 assertions): framework pinned to nextjs; no
+services/rewrites/Rust references in the deployment config; the Next.js
+build configuration has no Tauri dependency; no web source file imports
+src-tauri (verified by walking all of src/); the desktop project files
+and identifier are unchanged; the build command is the existing
+next build with no Rust compilation. Environment audit re-confirmed:
+exact names NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY /
+SUPABASE_SERVICE_ROLE_KEY (service key server-only), migrations
+0001-0025 present with the one-file supabase/bootstrap-all.sql setup,
+owner bootstrap 0025 unchanged, OpenAI fully optional, local AI intact.
+
