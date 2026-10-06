@@ -2555,3 +2555,38 @@ SUPABASE_SERVICE_ROLE_KEY (service key server-only), migrations
 0001-0025 present with the one-file supabase/bootstrap-all.sql setup,
 owner bootstrap 0025 unchanged, OpenAI fully optional, local AI intact.
 
+## §74 NO-CHOICE VERCEL IMPORT (2026-10-06): .vercelignore keeps src-tauri out of Vercel entirely
+
+**Why Vercel offered two targets:** the dashboard's import scan found
+Cargo.toml in src-tauri/ (a top-level Rust project) and proposed it as a
+deployable "Rust" application alongside the Next.js app at the root.
+Detection is repository-shape-driven; it was NOT caused by any nested
+package.json, vercel.json, or workspace config (exhaustively verified:
+none exist in the tracked tree).
+
+**Reinforcement on top of the framework pin (§73):**
+- .vercelignore excludes src-tauri/, android/, ios/ from Vercel
+  deployment files entirely — the desktop project is invisible to
+  Vercel, not merely unpinned. The Next.js build never reads these
+  directories (verified: no web source imports src-tauri; the build
+  needs no Rust toolchain).
+- docs/VERCEL_DEPLOYMENT.md now states verbatim: "Vercel deploys the
+  repository root as a single Next.js application. src-tauri/ is the
+  Tauri desktop application and is not deployed to Vercel." with exact
+  dashboard settings (Root Directory = repository root, Framework
+  Preset = Next.js, never select src-tauri, never create a Rust
+  service or second application).
+
+**Honest limitation:** whether the import wizard still shows a choice
+is a dashboard-side behavior that cannot be verified from the
+repository; the repo now expresses the single Next.js target in every
+available mechanism (framework pin + .vercelignore + no nested configs
++ docs). If a prompt ever appears, the doc says exactly what to select.
+
+**Tests (2056/2056 PASS; build PASS; secret scan CLEAN):** the 11-point
+deployment-shape contract now also asserts: no nested vercel.json or
+package.json anywhere in the tracked tree; no monorepo tooling files;
+.vercelignore excludes src-tauri; Capacitor mobile shell remains;
+desktop files unchanged. Supabase env names, owner bootstrap 0025, and
+optional OpenAI re-verified unchanged.
+

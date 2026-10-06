@@ -1,0 +1,6 @@
+# src-tauri is the Tauri DESKTOP application (Rust) - never a Vercel target.
+# The Next.js web build has no dependency on it (verified by the test suite).
+src-tauri
+# Native mobile shells (Capacitor) - built by GitHub Actions, not by Vercel.
+android
+ios

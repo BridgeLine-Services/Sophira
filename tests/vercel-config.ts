@@ -45,6 +45,20 @@ export function runVercelConfigTests(assert: (c: boolean, n: string) => void, se
   walk("src");
   assert(importers.length === 0, "vercel: no web source file imports src-tauri (web and desktop fully separated)");
 
+  // No nested deployment configuration anywhere in the tracked tree
+  const { execSync } = require("child_process");
+  const tracked = execSync("git ls-files", { encoding: "utf8" }).split("\n").filter(Boolean);
+  const nestedVercel = tracked.filter((f: string) => f.endsWith("vercel.json") && f !== "vercel.json");
+  assert(nestedVercel.length === 0, "vercel: no nested vercel.json exists anywhere (only the root config)");
+  const nestedPkg = tracked.filter((f: string) => f.endsWith("package.json") && f !== "package.json");
+  assert(nestedPkg.length === 0, "vercel: no nested package.json exists anywhere (no monorepo apps; src-tauri uses Cargo.toml, not npm)");
+  assert(!tracked.includes("pnpm-workspace.yaml") && !tracked.includes("lerna.json") && !tracked.includes("turbo.json"),
+    "vercel: no workspace/monorepo tooling configuration exists");
+  const vci = readFileSync(".vercelignore", "utf8");
+  assert(vci.includes("src-tauri"), "vercel: .vercelignore keeps the desktop project out of Vercel deployment files entirely");
+  assert(existsSync("android/capacitor.config.ts") || existsSync("capacitor.config.ts"),
+    "native: the Capacitor mobile shell configuration remains in the repository");
+
   // package manager stays npm; build command is the existing one
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
   assert(pkg.scripts.build === "next build", "vercel: the deployment uses the existing production build script (next build)");

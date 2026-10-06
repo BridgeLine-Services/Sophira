@@ -19,6 +19,19 @@ proposes a multi-service configuration ("app" + "src-tauri" with a Rust
 runtime), do NOT accept it — it is auto-detection of the desktop folder,
 not a runtime requirement of the web app.
 
+## Statement
+
+Vercel deploys the repository root as a single Next.js application. `src-tauri/` is the Tauri desktop application and is not deployed to Vercel.
+
+## Vercel dashboard settings
+
+- Repository: `BridgeLine-Services/Sophira`
+- Root Directory: **the repository root** (leave as `/` — the folder containing `package.json`)
+- Framework Preset: **Next.js**
+- Do **not** select `src-tauri`
+- Do **not** create a Rust service
+- Do **not** create a second Vercel application
+
 ## Importing the repository
 
 1. Import `BridgeLine-Services/Sophira` into Vercel.
