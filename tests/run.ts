@@ -3475,7 +3475,8 @@ async function runOwnerSetupTests(): Promise<void> {
     migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "unknown",
   }));
   assert(c.ready === false, "setup: missing migrations => not ready");
-  assert(c.guidance.some((g) => g.includes("0001-0020")), "setup: missing-migrations guidance names the migration chain");
+  assert(c.guidance.some((g) => g.includes("0001-0025")) || c.guidance.some((g) => g.includes("bootstrap-all.sql")),
+    "setup: missing-migrations guidance names the one-file database setup (migrations 0001-0025)");
 
   // ---- scenario D: owner_email NOT configured, no owner yet (NEW: automatic) ----
   const d = evaluateOwnerSetup(mk({

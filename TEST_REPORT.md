@@ -2499,3 +2499,29 @@ assertions - plain-language unreachable notice shown only on
 possible===null; never when an owner exists; no secret names;
 fetch-failure hides both CTA and notice (fail closed).
 
+## §72 ONE-FILE DATABASE SETUP + HONEST MISSING-SCHEMA STATE (2026-10-06)
+
+**Live finding (honest):** after the redeploy the production deployment
+correctly loads its Supabase variables (supabaseConfigured=true,
+serviceRoleConfigured=true, database=checked) — the earlier "not
+configured" state was the pre-env-var build, now resolved. The remaining
+gap is real and specific: the connected Supabase project has NO Sophira
+tables yet (migrationsPresent=false). Applying the schema is a one-time
+owner action that cannot be done from the repo side without database
+credentials, so it is documented plainly and made as simple as possible.
+
+**Changes:**
+- supabase/bootstrap-all.sql: ONE combined file applying every
+  migration 0001-0025 in exact order. Setup is now a single paste in the
+  Supabase SQL editor instead of 25 separate runs.
+- owner-setup wording: "database connected but not initialized" is now
+  its own honest state, distinct from "unreachable" and from "owner
+  exists" — the guidance names the one-file setup, and the migration
+  chain label reads 0001-0025.
+- README setup instructions point at the single file.
+
+**Tests (2040/2040 PASS; build PASS; secret scan CLEAN):** the
+missing-schema state is asserted to be distinct and honest; the
+one-file setup is asserted to contain the first-owner bootstrap
+migration and to preserve the exact migration order.
+

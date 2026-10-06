@@ -212,12 +212,12 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
     },
     {
       done: probe.migrationsPresent,
-      label: "Database migrations applied (0001-0020)",
+      label: "Database migrations applied (0001-0025)",
       detail:
         probe.migrationsPresent === null
           ? cannotCheck
           : probe.migrationsPresent
-            ? "All required tables and columns are present, through migration 0020."
+            ? "All required tables and columns are present, through migration 0025."
             : "Some migrations are missing - run the migration chain in the Supabase SQL editor (see docs/RELEASE_PROCESS.md).",
     },
     {
@@ -271,6 +271,8 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
       ? { possible: false, reason: "An owner account already exists. Owner creation is permanently closed.", url: "" }
       : probe.ownerAccount === "revoked"
         ? { possible: false, reason: "The owner account exists but is revoked - restore it to continue.", url: "" }
+        : probe.database === "checked" && probe.migrationsPresent === false
+        ? { possible: null, reason: "The database is connected but not initialized yet - the Sophira tables are missing. An administrator needs to run the database setup once (see /setup).", url: "" }
         : probe.database === "checked" && probe.migrationsPresent === true && probe.ownerAccount === "none"
           ? { possible: true, reason: "No owner yet - the first registration creates the owner, then owner creation closes permanently.", url: "/create-owner" }
           : { possible: null, reason: "Cannot check yet - the database connection is not available to the server.", url: "" };
@@ -284,7 +286,7 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
   }
   if (probe.database === "checked") {
     if (probe.migrationsPresent === false) {
-      guidance.push("Apply the Supabase migrations 0001-0020 (Supabase SQL editor) - see docs/RELEASE_PROCESS.md.");
+      guidance.push("Apply the Sophira database setup once: in the Supabase SQL editor, run the single combined file supabase/bootstrap-all.sql (migrations 0001-0025, in order) - see docs/RELEASE_PROCESS.md.");
     }
     if (probe.ownerAccount === "none") {
       guidance.push("Open /create-owner and register with your email and a password you choose. The first registration becomes the owner; owner creation then closes permanently. Sophira has no predefined or default owner password.");

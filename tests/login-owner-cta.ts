@@ -34,6 +34,14 @@ export function runLoginOwnerCtaTests(assert: (c: boolean, n: string) => void, s
 
   // Database-unavailable is distinguished from owner-exists: a clear
   // plain-language diagnostic appears ONLY when the server cannot check.
+  const setupLib = readFileSync("src/lib/owner-setup.ts", "utf8");
+  assert(setupLib.includes("connected but not initialized yet"),
+    "login: state 'database reachable but tables missing' is reported honestly and distinctly (C is never confused with A or B)");
+  const boot = readFileSync("supabase/bootstrap-all.sql", "utf8");
+  assert(boot.includes("-- ===================== 0025_first_owner_bootstrap.sql"),
+    "setup: the one-file database setup includes the first-owner bootstrap migration");
+  assert(boot.indexOf("0024_profile_status_constraint.sql") < boot.indexOf("0025_first_owner_bootstrap.sql"),
+    "setup: the one-file setup preserves the exact migration order");
   assert(login.includes("Sophira is not connected to its database yet"),
     "login: when the database is unreachable the page says so in plain English");
   assert(login.includes("An administrator needs to finish the server"),

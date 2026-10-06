@@ -160,8 +160,9 @@ Key design decisions:
 ### 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run **all migrations in order**:
-   `supabase/migrations/0001_init.sql` through `0020_student_memory.sql`
+2. In the SQL editor, run the **one combined setup file**:
+   `supabase/bootstrap-all.sql` (applies every migration, `0001` through
+   `0025_first_owner_bootstrap`, in order — a single paste)
    (0001 schema + RLS + private `private-docs` bucket; 0002 owner-only
    invitations; 0003 profile versioning; 0004 sources + audit trail;
    0005 owner membership, invitation requests, learning patterns, aggregate
