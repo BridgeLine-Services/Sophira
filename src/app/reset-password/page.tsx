@@ -42,10 +42,30 @@ export default function ResetPasswordPage() {
     // unexpired, unused link; anything else fails safely below.
     const code = params.get("code");
     if (code) {
+      // Recovery-code exchange — handled exactly once per code. Supabase
+      // enforces single use server-side; we handle BOTH result shapes
+      // (v2 returns { error } rather than throwing) and we confirm with
+      // getSession() before declaring success OR failure, so the implicit
+      // URL detection having already consumed this code is not mistaken
+      // for an invalid link. No session -> the password-change UI is
+      // never shown; the code is never logged or echoed.
+      const invalid = "This password-reset link is invalid, expired, or was already used. For your security it cannot be reused — request a new reset link below.";
       supabase.auth
         .exchangeCodeForSession(code)
-        .then(() => setMode("set"))
-        .catch(() => setLinkError("This password-reset link is invalid, expired, or was already used. For your security it cannot be reused — request a new reset link below."));
+        .then(async ({ error }) => {
+          if (error) {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) setMode("set"); // already exchanged during client init — not an invalid link
+            else setLinkError(invalid);
+            return;
+          }
+          setMode("set");
+        })
+        .catch(async () => {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) setMode("set");
+          else setLinkError(invalid);
+        });
       return;
     }
     supabase.auth.getSession().then(({ data }) => {

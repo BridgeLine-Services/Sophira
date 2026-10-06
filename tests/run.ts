@@ -1191,6 +1191,31 @@ section("16. Proprietary license and legal documents (spec §11–§14)");
 
 
 // ---------------------------------------------------------------------------
+// LIVE Gemini verification (LIVE_GEMINI=1 + GEMINI_API_KEY in the server
+// environment): exercises the REAL serverAiChat / geminiChat code path
+// against the REAL Google endpoint. Skipped by default; costs free-tier
+// quota only. No key is ever printed, logged, or placed in a URL.
+// ---------------------------------------------------------------------------
+export async function runGeminiLiveTests(): Promise<void> {
+  section("LIVE. Gemini free-tier through the real application code path (LIVE_GEMINI=1)");
+  const key = process.env.GEMINI_API_KEY;
+  const liveAssert = (cond: boolean, label: string) => { if (!cond) throw new Error("LIVE gemini: " + label); };
+
+  if (!key || process.env.LIVE_GEMINI !== "1") {
+    console.log("  (skipped: set LIVE_GEMINI=1 and provide GEMINI_API_KEY in the server environment — never commit the key)");
+    return;
+  }
+  const { serverAiChat, resolveProviders, readAiEnv } = await import("../src/lib/ai/provider");
+  const aiEnv = readAiEnv();
+  const plan = resolveProviders(aiEnv);
+  liveAssert(plan.candidates[0] === "gemini", "real env resolves to Gemini as the preferred free-tier provider");
+  liveAssert(process.env.ALLOW_PAID_AI !== "true", "paid AI is not silently enabled by the live test");
+  const r = await serverAiChat([{ role: "user", content: "Reply with exactly: SOPHIRA-LIVE-OK" }], {}, aiEnv);
+  liveAssert(r.provider === "gemini" && r.model === (process.env.GEMINI_MODEL || "gemini-2.5-flash"), "the REAL request ran on Gemini free tier and reports the model used");
+  liveAssert(typeof r.text === "string" && r.text.length > 0, "the response is converted into Sophira's internal { text, provider, model } format");
+}
+
+// ---------------------------------------------------------------------------
 // LIVE research verification (RESEARCH_LIVE=1): exercises the REAL
 // fetchAndVerify / claim / citation pipeline against the REAL web. Skipped by
 // default so the offline suite stays deterministic; when enabled it performs
@@ -1318,6 +1343,17 @@ async function runLegalPageTests(): Promise<void> {
 function finish() {
   console.log(`\n${"=".repeat(50)}`);
   console.log(`RESULTS: ${passed} passed, ${failed} failed, ${passed + failed} total`);
+  // Offline-suite evidence file for the release gate's OFFLINE-ONLY AI path
+  // (scripts/release-gate.mjs). The gate PASSes an offline-only designation
+  // ONLY on this real evidence — never on assumption.
+  try {
+    const fs = require("fs");
+    fs.mkdirSync("tests-dist", { recursive: true });
+    fs.writeFileSync(
+      "tests-dist/offline-suite-report.json",
+      JSON.stringify({ green: failed === 0, passed, failed, total: passed + failed, generated_at: new Date().toISOString() }, null, 2)
+    );
+  } catch { /* the gate fails closed without the report */ }
   if (failed > 0) {
     console.log("FAILED:", failures.join(" | "));
     process.exit(1);
@@ -3501,5 +3537,5 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section))
     .then(() => runResetPasswordTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

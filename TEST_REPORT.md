@@ -2232,3 +2232,56 @@ credentials). They remain on the TESTING_TONIGHT.md "Forgot Password
 Acceptance Test" checklist. Release gate stays BLOCKED until live
 prerequisites are real.
 
+## §66 RECOVERY-CONFUSION AUDIT + PROVIDER-AWARE GATE + LIVE TESTS SCAFFOLDED (2026-10-06)
+
+**Recovery-session confusion audit (§2 of the request):** the flow was
+already correct end-to-end (no second implementation created). One REAL
+subtlety was found and fixed in the /reset-password code branch: when a
+recovery code reaches the page directly, supabase-js client-init URL
+detection may already have consumed it, and exchangeCodeForSession
+returns errors as RESULTS (v2) rather than throwing. The branch now
+handles both result shapes and CONFIRMS with getSession() before
+declaring success or failure — a code already consumed by client init is
+never mistaken for an invalid link, and the password-change UI is never
+shown without a real session. Verified NOT present: double exchange in
+the normal flow (the callback success redirect drops the code), reuse
+(the page's re-exchange of a consumed code fails safely into the
+invalid-link message), malformed/expired code acceptance (server-side
+exchange rejects them), URL leaks (redirects carry only generic error
+params), unauthenticated password changes (updateUser needs the session),
+privilege escalation (nothing writes profiles), and recovery links
+becoming permanent login links (the recovery session is signed out
+immediately after the password change).
+
+**Release-gate AI logic (already free-first) completed with the local
+path:** GEMINI free tier PASSes without any OpenAI key (existing);
+OpenAI-only + paid disabled stays BLOCKED with the zero-billing
+explanation (existing); no provider stays BLOCKED (existing). NEW: an
+EXPLICIT offline-only designation (SOPHIRA_OFFLINE_ONLY=true) PASSes the
+AI-provider check ONLY when the offline suite has actually produced green
+evidence (tests now write tests-dist/offline-suite-report.json from the
+real run — the gate fails closed without it). Gate self-test: 39 checks,
+PASS. Zero-billing firewall untouched.
+
+**Live tests scaffolded, honestly BLOCKED/NOT RUN (§4/§5):** LIVE Gemini
+section (LIVE_GEMINI=1) exercises the REAL serverAiChat/geminiChat path
+(free-tier model policy, x-goog-api-key header — never in a URL, honest
+429 quota handling, no silent paid switch). scripts/live-ai-app-test.mjs
+exercises the DEPLOYED app route: unauthenticated refusal, dedicated
+test-account sign-in, real authenticated AI request, honest failures, no
+secrets in responses, optional cross-user probe — exits BLOCKED (2)
+without credentials, never a fabricated PASS. TESTING_TONIGHT.md gains
+steps Q (revoked user stays revoked through recovery) and R (owner
+recovery does not bypass owner checks). docs/LIVE_TESTS.md records the
+credential-gated live matrix and the honest current statuses.
+
+**Verification:** npm test 1952/1952 PASS, npx tsc --noEmit -p tsconfig.json
+clean, npm run build PASS, secret scan CLEAN, release-gate self-test PASS
+(39 checks), offline-suite evidence file generated (green: true).
+
+**Honest statuses:** password-reset OFFLINE PASS; password-reset LIVE
+NOT RUN (no test credentials); Gemini LIVE NOT RUN (no key); AI app
+route LIVE NOT RUN (no deployed backend credentials); release gate
+BLOCKED (production env + live prerequisites still missing). Sophira is
+NOT production-ready until the required live tests pass.
+

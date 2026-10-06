@@ -168,6 +168,16 @@ O. Request a reset, then request another and open the FIRST link after the
    applies the same invitation/active-access checks.
 P. Confirm the reset did NOT change the user's invitation status, role,
    profile, teacher data, academic data, or permissions (compare before/after).
+Q. REVOKED-user check: have the owner revoke the test user, then run the
+   full recovery flow — the recovery email may arrive and the password may
+   change, but the user must remain REVOKED and still be denied access.
+R. OWNER check: run the recovery flow with the owner account — recovery
+   must NOT bypass owner authorization checks or change any role/status.
+
+(Dedicated test credentials only: a throwaway invited test account and a
+test project. Never production accounts; never commit credentials. See
+docs/LIVE_TESTS.md for the credential-gated live tests and their honest
+BLOCKED semantics.)
 
 Note: password recovery is an ONLINE authentication operation — with
 connectivity off, the page says so honestly and never pretends an email

@@ -40,7 +40,8 @@ export function runResetPasswordTests(assert: (c: boolean, n: string) => void, s
     "reset: a failed exchange for a recovery link redirects BACK to /reset-password with safe generic error params (expired/malformed/used/tampered links fail safely in the recovery context)");
   assert(!callback.includes("console."),
     "reset: the callback never logs codes, tokens, or authorization headers");
-  assert(!/code\}/.test(callback.split("searchParams")[0]) === false || true, "noop");
+  assert(page.includes("const { data } = await supabase.auth.getSession();"),
+    "reset: the code branch CONFIRMS with getSession() before declaring success or failure — a code already consumed by client init is never mistaken for an invalid link, and the password UI is never shown without a session");
   assert(page.includes("exchangeCodeForSession(code)"),
     "reset: the page also performs the explicit client-side exchange when a code arrives directly (no reliance on implicit session creation)");
   assert(page.includes("If that email has a Sophira account, a reset link is on its way"),

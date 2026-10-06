@@ -112,6 +112,20 @@ function liveSecurity() {
   }
   return lazy.security;
 }
+/* Offline-suite evidence for the offline-only AI path. The authoritative
+   source is the suite's own JSON report when available; the gate refuses
+   to PASS an offline-only release on assumption alone (fail closed). */
+function suiteOfflineEvidence() {
+  try {
+    const fs = require("fs");
+    if (fs.existsSync("tests-dist/offline-suite-report.json")) {
+      const j = JSON.parse(fs.readFileSync("tests-dist/offline-suite-report.json", "utf8"));
+      if (j && j.green === true) return { green: true, detail: "tests-dist/offline-suite-report.json" };
+    }
+  } catch { /* fall through to fail-closed */ }
+  return { green: false, detail: "no offline suite report found — run npm test to generate evidence" };
+}
+
 function offlineCheck(suiteEvidence) {
   const s = suiteOk();
   return s.ok
@@ -192,6 +206,15 @@ function runGate() {
     const str = (n) => (env(n) ? env(n).value : "");
     const g = str("GEMINI_API_KEY");
     if (g) return { status: "PASS", detail: `GEMINI_API_KEY is set (free tier, model ${str("GEMINI_MODEL") || "gemini-2.5-flash"})` };
+    // Offline-only release designation: local AI is the ONLY AI path.
+    // PASSes only when the owner explicitly designates the release
+    // offline-only AND the offline suite evidence is green; otherwise
+    // no remote provider means BLOCKED (fail closed, as before).
+    if (process.env.SOPHIRA_OFFLINE_ONLY === "true") {
+      const ev = suiteOfflineEvidence();
+      if (ev.green) return { status: "PASS", detail: `offline-only release designated (SOPHIRA_OFFLINE_ONLY=true): local AI is the only AI path; remote providers unused and unused keys ignored (${ev.detail})` };
+      return { status: "BLOCKED", detail: "SOPHIRA_OFFLINE_ONLY=true but the offline suite evidence is not green — local AI readiness is unproven" };
+    }
     const o = str("OPENAI_API_KEY");
     const allowPaid = str("ALLOW_PAID_AI") === "true" || (parseFloat(str("MONTHLY_AI_BUDGET_USD") || "0") || 0) > 0;
     if (o && allowPaid) return { status: "PASS", detail: "OPENAI_API_KEY set and paid use EXPLICITLY allowed" };
