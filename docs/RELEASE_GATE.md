@@ -34,7 +34,7 @@ release workflow runs the gate after its own test/build steps (with
 deployment scripts and manual pre-flight checks.
 
 Environment the gate reads: `SOPHIRA_APP_URL`, `SUPABASE_URL`,
-`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`,
+`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY` (free tier — the preferred AI path; `OPENAI_API_KEY` is required ONLY when paid AI is explicitly enabled),
 `SEARCH_API_KEY` (+ `SEARCH_PROVIDER` / `SEARCH_BASE_URL`),
 `SUPABASE_TEST_URL` / `SUPABASE_TEST_ANON_KEY` /
 `SUPABASE_TEST_SERVICE_ROLE_KEY` (live security matrices), `RUN_LIVE_TESTS`

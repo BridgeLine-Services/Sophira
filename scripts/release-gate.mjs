@@ -325,11 +325,38 @@ function runGate() {
 
   // 33 production env vars
   check("prod-env", "Production environment variables verified", () => {
-    const required = ["SOPHIRA_APP_URL", "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "SEARCH_API_KEY"];
+    // Required regardless of AI provider. OPENAI_API_KEY is NOT here —
+    // the AI requirement is provider-aware (free-first) and evaluated
+    // below, exactly like the ai-provider check. Zero-billing firewall
+    // is preserved: a paid key never satisfies a zero-billing config.
+    const required = ["SOPHIRA_APP_URL", "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SEARCH_API_KEY"];
     const missing = required.filter((n) => !(process.env[n] && process.env[n].trim()));
-    return missing.length === 0
-      ? { status: "PASS", detail: "all required production env vars are present in this environment" }
-      : { status: "BLOCKED", detail: `missing production environment variables: ${missing.join(", ")}` };
+    if (missing.length > 0) {
+      return { status: "BLOCKED", detail: `missing production environment variables: ${missing.join(", ")}` };
+    }
+    // --- provider-aware AI requirement (free-first policy) ---
+    const set = (n) => Boolean(process.env[n] && process.env[n].trim());
+    const gemini = set("GEMINI_API_KEY");
+    const openai = set("OPENAI_API_KEY");
+    const paidEnabled = process.env.ALLOW_PAID_AI === "true" || (parseFloat(process.env.MONTHLY_AI_BUDGET_USD || "0") || 0) > 0;
+    if (process.env.SOPHIRA_OFFLINE_ONLY === "true") {
+      // Offline-only release: the existing offline evidence logic decides
+      // whether the local AI path is sufficient (fail closed without it).
+      const ev = suiteOfflineEvidence();
+      return ev.green
+        ? { status: "PASS", detail: `offline-only release: core env present; local AI path satisfied by green offline evidence (${ev.detail})` }
+        : { status: "BLOCKED", detail: `offline-only release designated but offline evidence is missing/failed (${ev.detail})` };
+    }
+    if (gemini) {
+      return { status: "PASS", detail: "Gemini free-tier AI configured; OpenAI is not required because paid AI is disabled." };
+    }
+    if (openai && paidEnabled) {
+      return { status: "PASS", detail: "paid AI explicitly enabled and OPENAI_API_KEY is present" };
+    }
+    if (openai && !paidEnabled) {
+      return { status: "BLOCKED", detail: "OPENAI_API_KEY is present but paid AI is disabled (ALLOW_PAID_AI=false, MONTHLY_AI_BUDGET_USD=0) — configure GEMINI_API_KEY (free tier), designate offline-only, or explicitly allow paid AI" };
+    }
+    return { status: "BLOCKED", detail: "No AI provider configured." };
   });
 
   // 34 secrets

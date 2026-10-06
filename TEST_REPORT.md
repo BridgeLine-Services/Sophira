@@ -2285,3 +2285,41 @@ route LIVE NOT RUN (no deployed backend credentials); release gate
 BLOCKED (production env + live prerequisites still missing). Sophira is
 NOT production-ready until the required live tests pass.
 
+## §67 PROD-ENV GATE CORRECTION (2026-10-06): production env check made provider-aware
+
+**The only change:** the release gate's "prod-env" check unconditionally
+required OPENAI_API_KEY; that was inconsistent with the free-first
+architecture the "ai-provider" check already implements. It now requires
+SOPHIRA_APP_URL, SUPABASE_URL, SUPABASE_ANON_KEY,
+SUPABASE_SERVICE_ROLE_KEY, SEARCH_API_KEY regardless of provider, and
+evaluates the AI requirement exactly like the ai-provider check:
+GEMINI_API_KEY (free tier) -> PASS ("Gemini free-tier AI configured;
+OpenAI is not required because paid AI is disabled."); offline-only
+designation (SOPHIRA_OFFLINE_ONLY=true) -> the EXISTING offline-evidence
+logic decides (green evidence PASS, missing/failed BLOCKED — fail
+closed); OPENAI_API_KEY only with ALLOW_PAID_AI=true or
+MONTHLY_AI_BUDGET_USD>0; OPENAI + paid disabled -> BLOCKED explaining
+the zero-billing policy; neither provider -> BLOCKED ("No AI provider
+configured."). No other system was touched; no rebuild of auth, AI, RLS,
+or offline functionality; the zero-billing firewall is preserved.
+
+**Regression tests (tests/prod-env-policy.ts, 10 new assertions):** the
+seven mandated cases are pinned — (1) Gemini + no OpenAI + paid disabled
+-> PASS with the exact honest message; (2) Gemini + OpenAI absent +
+budget 0 -> PASS; (3) OpenAI + paid disabled + Gemini absent -> BLOCKED
+(zero-billing firewall holds); (4) OpenAI + paid enabled -> PASS (both
+via ALLOW_PAID_AI=true and via budget > 0); (5) neither -> BLOCKED;
+(6/7) offline-only -> PASS iff the offline evidence file is green,
+BLOCKED otherwise (same suiteOfflineEvidence logic as the gate). The
+always-required list is asserted to be exactly the five core variables.
+Env state is saved/restored around the simulated configurations.
+
+**Docs:** docs/RELEASE_GATE.md no longer lists OPENAI_API_KEY as
+universally required — GEMINI_API_KEY is documented as the preferred AI
+path, with OpenAI required ONLY when paid AI is explicitly enabled.
+
+**Verification:** npm test 1962/1962 PASS, npx tsc --noEmit clean,
+npm run build PASS, node scripts/release-gate.mjs --self-test PASS
+(39 checks). Nothing fabricated; the live gate remains BLOCKED for the
+real production environment, as it must.
+
