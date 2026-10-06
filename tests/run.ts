@@ -91,6 +91,7 @@ import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "
 import { readFileSync } from "fs";
 import { runOfflineTests } from "./offline";
 import { runNotebookTests } from "./notebook";
+import { runAdversarialCitationTests } from "./adversarial-citations";
 import { runProviderTests, runSecretScanTests } from "./providers";
 
 let passed = 0;
@@ -573,6 +574,7 @@ section("8d. Stale-pattern detection (pattern lifecycle round)");
       verification: { status: "verified", failedChecks: [] },
       methodCompliance: { status: "compliant", notes: null },
       research: null,
+      citationInvariant: { verified: 3, unverified: 0, unavailable: 0, stale: 0, total: 3, blockers: [] },
       dueMs: DUE,
       estimatedRemainingWorkMinutes: 30,
       ...over,
@@ -690,6 +692,19 @@ section("8d. Stale-pattern detection (pattern lifecycle round)");
     assert(noReport.submission_ready === false,
       "gate: linked research without an integrity report blocks — acceptance is never guessed");
     const notLinked = evaluateFinalGate(baseInput({ research: { linked: false, minSources: null, approvedSources: 0, integrity: null } }));
+
+    // -- 2026-10-06: the 12-step citation invariant is a HARD gate --
+    const invMissing = evaluateFinalGate(baseInput({ research: researchInput({}), citationInvariant: null }));
+    assert(invMissing.submission_ready === false && invMissing.requirements.some((r) => r.id === "citation_invariant" && r.status === "fail"),
+      "gate: a missing citation-invariant run fails closed (citations are never accepted on trust)");
+    const invBad = evaluateFinalGate(baseInput({ research: researchInput({}), citationInvariant: { verified: 2, unverified: 1, unavailable: 0, stale: 0, total: 3, blockers: ["FAILED at step 6: HTTP response succeeded — the request failed (dead, blocked, or error status)"] } }));
+    assert(invBad.submission_ready === false && invBad.requirements.some((r) => r.id === "citation_invariant" && r.status === "fail" && invBad.requirements.find((r) => r.id === "citation_invariant")!.hard === true),
+      "gate: ONE unverified citation blocks submission (no verified citation without verified source)");
+    const invStale = evaluateFinalGate(baseInput({ research: researchInput({}), citationInvariant: { verified: 0, unverified: 0, unavailable: 1, stale: 1, total: 2, blockers: [] } }));
+    assert(invStale.submission_ready === false, "gate: UNAVAILABLE and STALE citations block submission too");
+    const invOk = evaluateFinalGate(baseInput({ research: researchInput({}), citationInvariant: { verified: 2, unverified: 0, unavailable: 0, stale: 0, total: 2, blockers: [] } }));
+    assert(invOk.requirements.some((r) => r.id === "citation_invariant" && r.status === "pass"),
+      "gate: a clean invariant run passes the hard gate");
     assert(notLinked.research_integrity.status === "not_applicable" && notLinked.submission_ready === true,
       "gate: no research linked → research checks not applicable, never blocking");
 
@@ -3466,4 +3481,4 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runAdversarialCitationTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

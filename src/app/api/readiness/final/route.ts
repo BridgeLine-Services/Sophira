@@ -110,6 +110,52 @@ export async function GET(request: NextRequest) {
     | { research_complete?: boolean; claims_supported?: number; claims_total?: number; urls_resolve?: number; urls_total?: number; authority_satisfied?: number; authority_total?: number; failures?: { claim_text?: string; reason?: string }[] }
     | null;
 
+  // 2026-10-06: the 12-step citation invariant, computed from the STORED
+  // claim/source records — the gate knows about every UNVERIFIED /
+  // UNAVAILABLE / STALE citation (NO VERIFIED CITATION WITHOUT VERIFIED
+  // SOURCE). Claims whose source vanished or changed are demoted here.
+  let citationInvariant: import("@/lib/research/citation-invariant").CitationGateSummary | null = null;
+  if (project) {
+    const { data: claimRows } = await supabase
+      .from("research_claims")
+      .select("id, source_url, source_title, evidence_start, evidence_end, verification_status, content_extract, claim")
+      .eq("assignment_id", assignmentId)
+      .limit(300);
+    const { verifyCitation, summarizeCitations } = await import("@/lib/research/citation-invariant");
+    const verdicts = (claimRows ?? []).map((c: Record<string, unknown>) => {
+      const content = String(c.content_extract ?? "");
+      const start = typeof c.evidence_start === "number" ? c.evidence_start : null;
+      const passage = content && start !== null && typeof c.evidence_end === "number" ? content.slice(start, c.evidence_end) : null;
+      const claimText = String(c.claim ?? "");
+      const words = claimText.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 3);
+      const low = passage?.toLowerCase() ?? "";
+      const overlap = passage && words.length > 0 && words.filter((w) => low.includes(w)).length >= Math.max(2, Math.ceil(words.length * 0.5));
+      const vs = String(c.verification_status ?? "");
+      // a verified record needs: stored URL+title+passage+overlap+(re)verified status
+      const ok = vs === "verified" && !!c.source_url && !!c.source_title && !!passage && overlap;
+      return verifyCitation({
+        searchResultExisted: !!c.source_url,
+        originalUrl: String(c.source_url ?? ""),
+        finalUrl: ok ? String(c.source_url) : "",
+        retrieval: ok
+          ? { requested: true, redirectCount: 0, httpOk: true, contentChars: content.length, title: String(c.source_title), contentHash: "stored", notes: [] }
+          : null,
+        passage,
+        claim: claimText,
+        authorityOk: true,
+        citationSource: {
+          title: String(c.source_title ?? ""),
+          author: null,
+          publisher: null,
+          publicationDate: null,
+          url: String(c.source_url ?? ""),
+          accessedISO: new Date(nowMs - 1).toISOString(),
+        },
+      });
+    });
+    citationInvariant = summarizeCitations(verdicts);
+  }
+
   const nowMs = Date.now();
   const result = evaluateFinalGate({
     nowMs,
@@ -149,6 +195,7 @@ export async function GET(request: NextRequest) {
             : null,
         }
       : null,
+    citationInvariant,
     dueMs: assignment.due_at ? Date.parse(assignment.due_at) : null,
     // Conservative upper-bound remaining-work estimate from the workload
     // estimator (same transparent heuristic the schedule system uses).

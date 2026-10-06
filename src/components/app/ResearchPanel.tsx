@@ -2,8 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Spinner, useToast } from "@/components/ui";
 import {
-  Search, ExternalLink, CheckCircle2, XCircle, ShieldAlert, BookOpenCheck, ChevronDown, ChevronRight,
-} from "lucide-react";
+  Search, ExternalLink, CheckCircle2, XCircle, ShieldAlert, BookOpenCheck, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 
 interface SourceRow {
   id: string;
@@ -129,7 +128,7 @@ export function ResearchPanel({
         if (json.data.warning) toast("info", json.data.warning);
         await load(json.data.project_id);
         toast(json.data.status === "failed" ? "error" : "success",
-          json.data.status === "failed" ? "Research failed — see the details." : "Research complete — review and approve your sources.");
+          json.data.status === "failed" ? "Research failed — see the details." : "Research finished — review and approve your sources, then verify all sources again before submitting.");
       } else {
         toast("error", json.error || "Research could not run.");
       }
@@ -137,6 +136,31 @@ export function ResearchPanel({
       toast("error", "Could not reach the server.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  const [reverify, setReverify] = useState<{ results: Record<string, { status: string; explanation: string } | null>; summary: { verified: number; unverified: number; unavailable: number; stale: number; total: number }; completion: string } | null>(null);
+  const [reverifyBusy, setReverifyBusy] = useState(false);
+
+  async function verifyAllAgain() {
+    if (!projectId) { toast("error", "Run research first."); return; }
+    setReverifyBusy(true);
+    try {
+      const res = await fetch("/api/research/verify-again", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setReverify(json);
+        toast(json.summary.verified === json.summary.total ? "success" : "error", json.completion);
+        await load(projectId);
+      } else {
+        toast("error", json.error ?? "Re-verification failed.");
+      }
+    } finally {
+      setReverifyBusy(false);
     }
   }
 
@@ -276,7 +300,31 @@ export function ResearchPanel({
                 <Badge tone="neutral">{data.sources.length} candidate sources</Badge>
                 <Badge tone="success">{approved.length} approved &amp; verified</Badge>
                 <Badge tone="danger">{data.sources.filter((s) => s.verification_status === "failed" || s.verification_status === "inaccessible").length} dead/blocked</Badge>
+                <Button size="sm" variant="secondary" onClick={verifyAllAgain} disabled={reverifyBusy}>
+                  <RotateCcw className="mr-1 h-3.5 w-3.5" /> Verify all sources again
+                </Button>
               </div>
+              {reverify && (
+                <div className="rounded-lg border border-ink/10 bg-muted/40 p-3 text-sm">
+                  <p className="font-medium">Citation re-verification (12-step invariant)</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <Badge tone="success">{reverify.summary.verified} VERIFIED</Badge>
+                    <Badge tone="warn">{reverify.summary.unverified} UNVERIFIED</Badge>
+                    <Badge tone="danger">{reverify.summary.unavailable} UNAVAILABLE</Badge>
+                    <Badge tone="accent">{reverify.summary.stale} STALE</Badge>
+                  </div>
+                  <p className={`mt-1 text-xs ${reverify.completion.startsWith("RESEARCH INCOMPLETE") ? "text-danger font-medium" : "text-ink-soft"}`}>{reverify.completion}</p>
+                  <details className="mt-1 text-xs text-ink-soft">
+                    <summary className="cursor-pointer">Per-source explanations</summary>
+                    <ul className="mt-1 space-y-1">
+                      {Object.entries(reverify.results).map(([url, r]) => (
+                        <li key={url}><span className="font-medium">{r?.status ?? "UNVERIFIED"}</span> — {url}: {r?.explanation ?? "not re-checked"}</li>
+                      ))}
+                    </ul>
+                  </details>
+                  <p className="mt-1 text-xs text-ink-soft">Failed sources are never replaced by guesses. The final submission gate is informed automatically — re-run it after this.</p>
+                </div>
+              )}
               {data.project.status === "failed" && (
                 <p className="rounded-lg bg-danger/10 p-3 text-sm text-ink">
                   <ShieldAlert className="mr-1.5 inline h-4 w-4 text-danger" />
@@ -308,6 +356,12 @@ export function ResearchPanel({
                       HTTP {s.http_status ?? "—"} · {s.redirect_count} redirect(s) · {s.content_chars.toLocaleString()} chars retrieved
                     </p>
                     {s.verification_notes && <p className="mt-1 text-xs text-ink-soft">{s.verification_notes}</p>}
+                    {reverify?.results[s.final_url || s.original_url] && (
+                      <p className="mt-1 text-xs">
+                        <span className="font-medium">{reverify.results[s.final_url || s.original_url]!.status}</span>
+                        <span className="text-ink-soft"> — {reverify.results[s.final_url || s.original_url]!.explanation}</span>
+                      </p>
+                    )}
                     {s.approval === "pending" && (
                       <div className="mt-2 flex gap-2">
                         <Button size="sm" onClick={() => decide(s.id, "approve")} disabled={s.verification_status === "failed" || s.verification_status === "inaccessible"}>

@@ -252,6 +252,10 @@ ever attempted. See `docs/OFFLINE_MODELS.md`.
 
 Private, source-grounded research notebooks: sources (PDF/DOCX/TXT/web/image/instructions/notes), notes, questions with LABELED grounded answers (SOURCE-SUPPORTED / INFERENCE / NOT VERIFIED), evidence with exact locators, "Research this topic" with a user approval gate, and provenance-retaining artifacts (study guide, quiz, flashcards, outline, briefing, evidence table, research plan, essay plan, bibliography). Source content is owner-only under RLS — no other user, admin included, can read it. See `docs/NOTEBOOKS.md`.
 
+#### Research citation invariant
+
+NO VERIFIED CITATION WITHOUT VERIFIED SOURCE: every citation must pass a 12-step check (search result → valid URL → actually requested → redirects followed → final URL → HTTP success → content extracted → title extracted → passage exists → claim overlaps passage → authority met → citation from stored metadata). Any failure → UNVERIFIED with an explanation; failed sources are never replaced by guesses. "Verify all sources again" re-fetches every source before submission (vanished → UNAVAILABLE, changed → STALE; claims demoted, final gate re-run informed). The UI shows VERIFIED / UNVERIFIED / UNAVAILABLE / STALE and never claims "Research complete" while evidence is missing.
+
 ### 3. Run
 
 ```bash

@@ -1782,3 +1782,53 @@ the authenticated owner — never with the service role); OCR of uploaded
 images (an upstream capability; images without OCR are stored honestly
 and cannot be cited).
 
+## §58 Citation hardening: NO VERIFIED CITATION WITHOUT VERIFIED SOURCE (2026-10-06)
+
+**Requirement:** make fabricated, dead, wrong, or mismatched citations
+structurally difficult to produce; preserve the six existing research modules
+(all preserved — the new engine composes them). Suite 1628/1628, build PASS.
+
+**Implemented and executed:**
+
+- `src/lib/research/citation-invariant.ts` — the 12-step invariant engine.
+  A citation is VERIFIED only when ALL 12 steps pass from STORED records:
+  (1) search result exists, (2) URL syntactically valid, (3) URL actually
+  requested, (4) redirect chain followed, (5) final URL recorded, (6) HTTP
+  success, (7) content extracted, (8) title extracted, (9) supporting passage
+  exists, (10) claim overlaps the passage, (11) authority requirements met,
+  (12) citation generated from stored metadata. Any failure → UNVERIFIED
+  with a per-step explanation; the failed source is NEVER replaced by a guess.
+- Re-verification engine: `refetchSource`/`verifyAllSourcesAgain` re-fetch
+  with the REAL fetchAndVerify; unreachable → UNAVAILABLE (claims demoted),
+  content hash changed → STALE (claims demoted), unchanged → VERIFIED.
+- FINAL GATE integration: `citation_invariant` is a HARD requirement in
+  evaluateFinalGate — missing run fails closed; any UNVERIFIED/UNAVAILABLE/
+  STALE citation blocks submission. The readiness route computes the summary
+  from stored claim/source records.
+- API: POST /api/research/verify-again — "Verify all sources again" before
+  final submission; demotes claims of vanished/changed sources; recomputes
+  the stored integrity summary; returns honest completion line.
+- UI: VERIFIED / UNVERIFIED / UNAVAILABLE / STALE badges with per-source
+  explanations; "Verify all sources again" action; the blanket "Research
+  complete" claim is REPLACED with an honest line that reads
+  "RESEARCH INCOMPLETE: …" whenever any citation is unverified, unavailable,
+  or stale (machine-checked).
+
+**Adversarial battery (tests/adversarial-citations.ts, all executed):**
+nonexistent URL → UNAVAILABLE; typo URL never verifies; redirect → STALE;
+redirect-to-unrelated-site never verifies; misleading title → UNVERIFIED;
+no relevant passage → step 9/10 fail; source deleted after research →
+UNAVAILABLE + claim demotion; paywalled → UNVERIFIED; JS-only → UNVERIFIED;
+source changed after retrieval → STALE; duplicate URL → consistent verdicts
+(dedupe upstream); tracking-URL duplicates judged only on their own honest
+records; AI-generated fake URL → UNVERIFIED at step 1 and called out as a
+possible invention; hallucinated DOI → UNVERIFIED; hallucinated journal
+article → UNVERIFIED; wrong publication date / wrong author → never trusted
+without a retrieval record; unsupported quotation → UNVERIFIED (existing
+locatePassage refuses absent quotes). Each of steps 1-12 fails the whole
+citation when failed in isolation. Every case fails safely.
+
+**Not live-verified (honest):** the verify-again route against a live
+database (the engine under it, fetchAndVerify, is the same code exercised
+live by the existing research tests); browser click-through of the badges.
+

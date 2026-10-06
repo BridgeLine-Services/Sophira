@@ -25,6 +25,7 @@
  * dishonest the other way).
  */
 
+import { type CitationGateSummary } from "../research/citation-invariant";
 import {
   auditDraft,
   type RubricAuditResult,
@@ -111,6 +112,10 @@ export interface FinalGateInput {
   verification: { status: string | null; failedChecks: string[] } | null;
   methodCompliance: { status: string | null; notes: string | null } | null;
   research: FinalGateResearch | null;
+  /** 2026-10-06 hardening: per-citation 12-step invariant summary
+   *  (NO VERIFIED CITATION WITHOUT VERIFIED SOURCE). null = not run; the
+   *  gate then fails closed for research-backed work. */
+  citationInvariant: CitationGateSummary | null;
   dueMs: number | null;
   /** Remaining estimated work minutes, if the schedule system knows it. */
   estimatedRemainingWorkMinutes: number | null;
@@ -301,6 +306,31 @@ export function evaluateFinalGate(input: FinalGateInput): FinalGateResult {
         hard: true,
         evidence: `${res.approvedSources} approved & verified source${res.approvedSources === 1 ? "" : "s"} (required: at least ${res.minSources}).`,
         correction: enough ? "" : "Approve/verify more sources or research additional ones.",
+      });
+    }
+
+    // 2026-10-06: the 12-step citation invariant is a HARD gate —
+    // any UNVERIFIED / UNAVAILABLE / STALE citation blocks submission.
+    const ci = input.citationInvariant;
+    if (!ci) {
+      push({
+        id: "citation_invariant",
+        label: "Citation invariant (no verified citation without verified source)",
+        status: "fail", hard: true,
+        evidence: "The 12-step citation invariant has not been run — citations cannot be accepted on trust.",
+        correction: "Run the citation audit (Verify all sources again) before submitting.",
+      });
+    } else {
+      const bad = ci.unverified + ci.unavailable + ci.stale;
+      push({
+        id: "citation_invariant",
+        label: "Citation invariant (no verified citation without verified source)",
+        status: bad === 0 ? "pass" : "fail",
+        hard: true,
+        evidence: bad === 0
+          ? `All ${ci.total} citations passed all 12 checks against retrieved, verified, stored sources.`
+          : `${bad} of ${ci.total} citations are UNVERIFIED/UNAVAILABLE/STALE${ci.blockers.length ? ": " + ci.blockers.slice(0, 5).join("; ") : ""}. Failed sources are never replaced by guesses.`,
+        correction: bad === 0 ? "" : "Fix or remove the citations that failed; re-run Verify all sources again, then re-run the final gate.",
       });
     }
 
