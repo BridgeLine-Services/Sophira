@@ -249,14 +249,20 @@ optional and not required to use Sophira.
 
 ## Testing
 
-- `npm test` — 285 unit/integration assertions: isolation, conditionality,
+- `npm test` — 1193 unit/integration assertions: isolation, conditionality,
   conflicts, injection defense, subject + math-topic routing, all six verifier
   kinds, method-compliance honesty guards, offline round-trip parsing of a
   real XLSX and PPTX, the learning-pattern lifecycle (confirm → corrected →
   recurring, temporary caps), scope leakage (subject/course/teacher/global),
   honest applied-context metadata, and the §12 preserved-writing-habit
-  guard (explicit opt-in, writing tasks only, requirements always win).
-  Runs fully offline.
+  guard (explicit opt-in, writing tasks only, requirements always win),
+  and the complete offline subsystem (encrypted local store, durable sync
+  queue, deterministic conflict resolution, revocation sealing, and the
+  full 17-step offline lifecycle — two-device races included). Runs fully
+  offline.
+- `RUN_LIVE_MODEL=1 npm test` — additionally downloads a real SmolLM2 135M
+  model (~120 MB) and verifies genuine on-device inference through
+  transformers.js/WASM.
 - **Native targets** (web app stays canonical): `android/` + `ios/` (Capacitor,
   real Gradle/Xcode projects) and `src-tauri/` (Tauri desktop app for
   Windows/macOS/Linux). See `docs/NATIVE_BUILDS.md` for builds, signing and
@@ -282,9 +288,29 @@ what is honestly still blocked on a live backend.
 - Extraction failures say exactly what couldn't be read and why.
 - The verification panel never claims a check that wasn't performed.
 - Profile changes require explicit approval; every proposal can be rejected.
+- Offline answers are always stamped with their origin (LOCAL MODEL vs
+  REMOTE MODEL); online-only features are listed, never faked as offline.
 
 
 ---
+
+## Offline mode (implemented)
+
+`src/lib/offline/` is a full offline subsystem: an AES-256-GCM encrypted
+local store (per-record IV + AAD binding, KEK-wrapped DEK), a durable
+encrypted sync queue, deterministic conflict resolution (explicit
+conflict records — both sides preserved; never silent overwrites), sync
+orchestration with optimistic concurrency, account-revocation sealing
+(a revoked account's queued work is never uploaded), and consent-gated
+local AI models (SmolLM2-135M ~120 MB, Qwen2.5-0.5B ~400 MB) running
+real on-device inference via transformers.js.
+
+Works offline: reading/editing your synced academic data, writing
+assistance, rewriting, generation, deterministic math solving, machine
+verification, teacher-rule application, academic memory recall.
+Online-only (never faked): live web research, new-document extraction,
+fresh-source cross-checking. Architecture, interfaces, and honest
+limitations: `docs/OFFLINE_ARCHITECTURE.md`.
 
 ## Proprietary Software — All Rights Reserved
 

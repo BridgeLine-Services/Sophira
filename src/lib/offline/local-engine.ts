@@ -30,7 +30,16 @@ export interface LocalInferenceResult {
 }
 
 interface PipelineApi {
-  __call(args: unknown, options?: unknown): Promise<unknown>;
+  /** transformers.js pipelines ARE callable functions (typeof pipe === "function") */
+  (args: unknown, options?: unknown): Promise<unknown>;
+
+}
+
+function invokePipeline(pipe: PipelineApi, args: unknown, options: unknown): Promise<unknown> {
+  if (typeof pipe === "function") return pipe(args, options);
+  const alt = (pipe as unknown as { _call?: (a: unknown, o: unknown) => Promise<unknown> })._call;
+  if (typeof alt === "function") return alt.call(pipe, args, options);
+  throw new Error("pipeline object is not callable (unexpected transformers.js API shape)");
 }
 
 interface TransformersApi {
@@ -40,8 +49,8 @@ interface TransformersApi {
 
 /** Lazily load transformers.js only when a local model is actually used. */
 async function getTransformers(): Promise<TransformersApi> {
-  const mod = (await import("@huggingface/transformers")) as unknown as TransformersApi;
-  return mod;
+  const { loadTransformers } = await import("./load-transformers");
+  return loadTransformers();
 }
 
 export class LocalInferenceEngine {
@@ -68,7 +77,7 @@ export class LocalInferenceEngine {
     if (!spec) throw new Error(`local-engine: unknown model ${modelId}`);
     const pipe = await this.loadPipeline(spec);
     const started = Date.now();
-    const out = (await pipe.__call([
+    const out = (await invokePipeline(pipe, [
       { role: "system", content: "You are Sophira's offline writing and study assistant. Be concise and helpful." },
       { role: "user", content: prompt },
     ],

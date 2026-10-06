@@ -1,6 +1,8 @@
 # Sophira — Test Report
 
-Date: 2026-09-26 (membership & learning upgrade) · Next 14.2.35, strict TypeScript · `npm test` + `npm run build`
+Date: 2026-10-06 (offline subsystem) · Next 14.2.35, strict TypeScript · `npm test` + `npm run build`
+
+Current state: **1193/1193 PASSED** (`npm test`); latest details in §53.
 
 ## 1. Automated tests — ✅ 144 / 144 PASSED (`npm test`, fully offline)
 
@@ -1549,3 +1551,27 @@ production-readiness while placeholders remain (asserted by tests §17c).
 Tests: **1120 passed, 0 failed** (new §17c executes the real page components
 via react-dom/server). Production build clean; live local serve verified
 all three pages public + honest banners + login 200.
+
+## 53. Offline subsystem (2026-10-06): full offline lifecycle — 1193/1193 PASSED including a REAL on-device model run
+
+`npm test` (offline, deterministic): **1193 passed / 0 failed**, including 33 new offline assertions across 6 sections. `RUN_LIVE_MODEL=1 npm test` additionally downloads the real SmolLM2-135M-Instruct ONNX model (~120 MB from the HF CDN) and executes genuine on-device inference through transformers.js/WASM: **passed** (output stamped LOCAL). Full architecture + honest limitations: `docs/OFFLINE_ARCHITECTURE.md`.
+
+| Area | Checks | Result |
+|---|---|---|
+| Encrypted store: AES-GCM roundtrip, wrong-key fails closed, tombstones, versioning | 10 | ✅ |
+| At rest: ciphertext contains no plaintext; different install secret cannot unlock | 2 | ✅ |
+| Durable queue: unique ids, total order, queue-time metadata | 4 | ✅ |
+| Conflict matrix: apply/drop/conflict decisions; conflict records preserve BOTH sides verbatim | 7 | ✅ |
+| Model manager: consent-gated downloads (unconfirmed refused), integrity vs CDN manifest, failure rollback (never fake ready) | 7 | ✅ |
+| **17-step lifecycle** (online → sync → disconnect → open/edit → offline AI → correction → learning update → create → reconnect → sync → verify server) | 12 | ✅ |
+| Two-device simultaneous edits → explicit conflicts; keep-local/keep-remote resolution; cross-device propagation | 12 | ✅ |
+| Failed sync: transient server error keeps the op queued; safe idempotent retry | 4 | ✅ |
+| Logout offline: unsynced work destroyed, NEVER uploaded | 3 | ✅ |
+| Revocation: queue sealed dead, nothing uploaded, local data purged | 4 | ✅ |
+| Memory recall offline: hit + honest miss | 2 | ✅ |
+| Live real-model pipeline (RUN_LIVE_MODEL=1): real SmolLM2 inference on-device | 1 | ✅ |
+
+Honest notes:
+- The offline AI models are small; answers are shallower than online. Every offline response is provenance-stamped (LOCAL MODEL · repo) in the UI, and online-only features (live research, new document extraction, source cross-checking) are listed explicitly, never faked.
+- Model integrity is verified against the HF CDN manifest (sizes + LFS sha256 oids) plus a functional inference check; a full local hash of every blob is a documented non-goal.
+- The install-secret localStorage tradeoff (protects at rest, not against compromised same-origin scripts) is documented in `docs/OFFLINE_ARCHITECTURE.md` §security.

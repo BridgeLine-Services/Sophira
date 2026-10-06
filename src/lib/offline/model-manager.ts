@@ -151,8 +151,9 @@ export class ModelManager {
     report({ modelId, progress: 0, stage: "checking manifest" });
 
     try {
+      const { loadTransformers } = await import("./load-transformers");
       const t = (this.env.transformers ??
-        (await import("@huggingface/transformers"))) as {
+        (await loadTransformers())) as {
         pipeline: (task: string, model: string, options?: unknown) => Promise<unknown>;
         env: { allowLocalModels?: boolean };
       };

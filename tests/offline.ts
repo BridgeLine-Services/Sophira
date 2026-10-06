@@ -59,7 +59,7 @@ class FakeRemote implements RemoteAdapter {
 
   async fetchChanged(table: OfflineTable, since: string | null): Promise<RemoteRow[]> {
     const out: RemoteRow[] = [];
-    for (const [id, r] of this.t(table)) {
+    for (const [id, r] of Array.from(this.t(table))) {
       if (!since || r.updated_at > since) out.push({ id, row: { ...r.row }, updated_at: r.updated_at });
     }
     return out;

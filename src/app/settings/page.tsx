@@ -122,9 +122,14 @@ export default function SettingsPage() {
   async function deleteAccount() {
     setDeleting(true);
     try {
+      // Offline policy (spec §12): account deletion also destroys ALL local
+      // offline data — encrypted mirror, queue, keys. Pending offline work is
+      // discarded by design; the account (and its server data) is going away.
+      const { purgeOfflineOnLogout } = await import("@/lib/offline/client");
       const res = await fetch("/api/account/delete", { method: "POST" });
       const json = await res.json();
       if (res.ok) {
+        try { await purgeOfflineOnLogout(); } catch { /* local store already gone */ }
         await supabase.auth.signOut();
         toast("success", "Account deleted. Take care.");
         router.push("/login");
