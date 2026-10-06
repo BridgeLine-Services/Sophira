@@ -2640,3 +2640,34 @@ honesty (never falsely ready), offline-guard never attempts remote,
 tiered registry intact, docs/scripts contracts, no remote-provider or
 secret references in the local flow.**
 
+## §76 DEPLOYMENT AUDIT FOR THE OWNER + ENVIRONMENT VARIABLE GUIDE (2026-10-06)
+
+**Audit conclusion (verified from the repository, not assumed):** Sophira
+is ONE Next.js web application at the repository root. There is NO
+second service anywhere: no axios, no BACKEND_URL/API_BASE_URL/SERVICE_URL,
+no Dockerfiles, no docker-compose, no service discovery, no Vercel
+service bindings needed. The browser talks to Supabase and to Sophira's
+own Next.js API routes (same application); server code calls only
+Supabase/AI providers over HTTPS. src-tauri is the Tauri desktop wrapper
+(tauri:: commands in Rust), never a network backend - it must NOT be
+deployed as a Vercel service, and Vercel's auto-generated multi-service
+proposal remains rejected. The only localhost references in web source
+are the native release guard that REJECTS localhost in production builds
+and the dev-only service-worker registration - both correct by design.
+
+**Added: docs/ENVIRONMENT_VARIABLES.md** - a plain-English categorized
+guide for the nontechnical owner: PUBLIC/SAFE (NEXT_PUBLIC_SUPABASE_URL,
+NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SITE_URL), SERVER-ONLY
+(SUPABASE_SERVICE_ROLE_KEY - master key, never in the browser),
+THIRD-PARTY optional (Gemini free tier preferred; paid OpenAI disabled by
+default; Brave/Tavily for research; none required to deploy), and
+DEV/TEST-ONLY (SOPHIRA_LOCAL_FIRST, SOPHIRA_TEST_*). For each: where to
+get it, whether it is secret, where to paste it in Vercel. No secret
+VALUES anywhere. Missing variables produce the honest /setup status.
+
+**Tests (2089/2089 PASS; build PASS; secret scan CLEAN):** the
+service-to-service audit is now a permanent contract - no axios, no
+backend/service URL variables, no bindings, no Dockerfiles, no reachable
+hard-coded localhost in web source, and EVERY environment variable read
+by the code (middleware included) must be documented in the guide.
+

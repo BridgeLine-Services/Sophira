@@ -4,6 +4,8 @@
  * never deployed as a Vercel web service.
  */
 import { readFileSync, existsSync } from "fs";
+import { execSync as _exec } from "child_process";
+const execSync2 = (cmd: string): string[] => _exec(cmd, { encoding: "utf8" }).split("\n").filter(Boolean);
 
 export function runVercelConfigTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
   section("Vercel: single Next.js service, Tauri desktop app untouched");
@@ -58,6 +60,39 @@ export function runVercelConfigTests(assert: (c: boolean, n: string) => void, se
   assert(vci.includes("src-tauri"), "vercel: .vercelignore keeps the desktop project out of Vercel deployment files entirely");
   assert(existsSync("android/capacitor.config.ts") || existsSync("capacitor.config.ts"),
     "native: the Capacitor mobile shell configuration remains in the repository");
+
+  // SERVICE-TO-SERVICE AUDIT (2026-10-06): Sophira is ONE web application.
+  // No backend service exists; the browser never calls a second server and
+  // no server-side code calls another service - so NO Vercel service
+  // bindings are needed (bindings would only be used from server-side code
+  // of the calling service, and there is no caller).
+  const srcFiles: string[] = execSync2("git ls-files 'src/**/*.ts' 'src/**/*.tsx'");
+  const allSrc = srcFiles.map((f: string) => [f, readFileSync(f, "utf8")] as const);
+  assert(!allSrc.some(([, c]) => c.includes("axios")), "audit: no axios client anywhere (no second backend to call)");
+  assert(!allSrc.some(([, c]) => c.includes("BACKEND_URL") || c.includes("API_BASE_URL") || c.includes("SERVICE_URL")),
+    "audit: no BACKEND_URL/API_BASE_URL/SERVICE_URL - no service-to-service dependency exists");
+  assert(!("bindings" in vc), "audit: no Vercel service bindings (nothing to bind - one application only)");
+  const localhostHits = allSrc.filter(([, c]) => /(^|[^.A-Za-z])localhost(:|\/|$|\b)/.test(c))
+    .filter(([f, c]) => !(f.includes("native-url") && c.includes("a release build cannot point at localhost"))
+      && !(f.includes("ServiceWorkerRegister") && c.includes("window.location.hostname")));
+  assert(localhostHits.length === 0,
+    "audit: no reachable hard-coded localhost URLs in web source (the only matches are the release guard that REJECTS localhost and the dev-only service-worker registration)");
+  assert(!execSync2("git ls-files").some((f: string) => f.startsWith("Dockerfile") || f.startsWith("docker-compose")),
+    "audit: no Dockerfiles or docker-compose (no container service discovery)");
+
+  // The environment variable catalog covers every variable the code reads
+  const envDoc = readFileSync("docs/ENVIRONMENT_VARIABLES.md", "utf8");
+  const srcEnvNames = new Set<string>();
+  for (const f of srcFiles) srcEnvNames.add(f);
+  const allEnv = new Set<string>();
+  const addEnv = (code: string): void => { for (const m of Array.from(code.matchAll(/process\.env\.([A-Z_0-9]+)/g))) allEnv.add(m[1]); };
+  for (const [f, c] of allSrc) addEnv(c);
+  addEnv(readFileSync("src/middleware.ts", "utf8"));
+  const undocumented = Array.from(allEnv).filter((n) => n !== "NODE_ENV" && !envDoc.includes(n));
+  assert(undocumented.length === 0, "audit: every environment variable the code reads is documented in docs/ENVIRONMENT_VARIABLES.md (missing: " + undocumented.join(", ") + ")");
+  assert(envDoc.includes("NEXT_PUBLIC_") && envDoc.includes("SUPABASE_SERVICE_ROLE_KEY") && envDoc.includes("Server-only"),
+    "audit: the variable guide separates PUBLIC, SERVER-ONLY, and THIRD-PARTY variables");
+  assert(!envDoc.includes("sk-") && !/[a-f0-9]{32,}/i.test(envDoc), "audit: the variable guide contains no secret VALUES");
 
   // package manager stays npm; build command is the existing one
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
