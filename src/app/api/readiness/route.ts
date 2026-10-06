@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     .from("assignments")
     .select("id, teacher_id, instructions_text")
     .eq("id", assignmentId)
+    .eq("user_id", guard.data.user.id)
     .single();
   if (!assignment) return NextResponse.json({ error: "Assignment not found." }, { status: 404 });
 

@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
     .from("responses")
     .select("id, assignment_id, content")
     .eq("id", responseId)
+    .eq("user_id", guard.data.user.id)
     .single();
   if (!response || !response.content) {
     return NextResponse.json({ error: "Response not found." }, { status: 404 });
@@ -81,17 +82,30 @@ export async function POST(request: NextRequest) {
     .from("assignments")
     .select("id, teacher_id, instructions_text, task_type, output_type, title")
     .eq("id", assignmentId)
+    .eq("user_id", guard.data.user.id)
     .single();
   if (!assignment) return NextResponse.json({ error: "Assignment not found." }, { status: 404 });
 
   // Teacher rubric + official-instruction documents (existing system).
   let teacherDocs: TeacherDoc[] = [];
   if (assignment.teacher_id) {
-    const { data: teacher } = await supabase
+    // Hostile audit fix 2026-10-06: rubrics/official_instructions live on
+    // teacher_profiles (0001), NOT on teachers — the old query silently
+    // returned nothing. Explicit user ownership on both rows.
+    const { data: teacherRow } = await supabase
       .from("teachers")
-      .select("rubrics, official_instructions")
+      .select("id")
       .eq("id", assignment.teacher_id)
+      .eq("user_id", guard.data.user.id)
       .single();
+    const { data: teacher } = teacherRow
+      ? await supabase
+          .from("teacher_profiles")
+          .select("rubrics, official_instructions")
+          .eq("teacher_id", assignment.teacher_id)
+          .eq("user_id", guard.data.user.id)
+          .single()
+      : { data: null };
     if (teacher) {
       teacherDocs = [
         ...((teacher.rubrics as TeacherDoc[]) ?? []),

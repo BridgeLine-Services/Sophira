@@ -16,6 +16,17 @@ export interface GuardResult {
   profile: Profile;
 }
 
+/**
+ * ACTIVE-ACCESS allow-list (hostile audit 2026-10-06). A profile status
+ * is trusted ONLY if it is on this list — revoked users and ANY status
+ * added later (typos included) fail CLOSED. Deny-list checks ("status
+ * === revoked") would let an unknown status through; this cannot.
+ * 'pending' is the status every invited signup is created with (the
+ * invitation claim in the DB trigger IS the approval step); 'active' is
+ * a restored member; 'accepted' is legacy.
+ */
+const ACTIVE_STATUSES: ReadonlySet<string> = new Set(["pending", "accepted", "active"]);
+
 export async function requireUser(
   supabase: SupabaseClient
 ): Promise<{ ok: true; data: GuardResult } | { ok: false; response: NextResponse }> {
@@ -35,11 +46,14 @@ export async function requireUser(
       ),
     };
   }
-  if ((profile as Profile).status === "revoked") {
+  if (!ACTIVE_STATUSES.has((profile as Profile).status)) {
+    // revoked, or a status the guard does not know → fail closed
     return {
       ok: false,
       response: NextResponse.json(
-        { error: "Your access to this network has been revoked by the owner." },
+        (profile as Profile).status === "revoked"
+          ? { error: "Your access to this network has been revoked by the owner." }
+          : { error: "Your account status does not allow access. Contact the owner." },
         { status: 403 }
       ),
     };

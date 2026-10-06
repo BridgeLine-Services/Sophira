@@ -24,7 +24,7 @@ export interface Invitation {
   id: string;
   email: string;
   token: string;
-  status: "pending" | "accepted" | "revoked";
+  status: "pending" | "accepted" | "active" | "revoked";
   invited_by: string;
   created_at: string;
   accepted_at: string | null;

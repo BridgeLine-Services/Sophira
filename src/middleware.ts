@@ -63,10 +63,13 @@ export async function middleware(request: NextRequest) {
       .select("status")
       .eq("id", user.id)
       .single();
-    if (profile && profile.status === "revoked") {
+    // ACTIVE-ACCESS allow-list (hostile audit 2026-10-06): only these
+    // statuses pass. A "revoked" user — or any status the code does not
+    // explicitly trust — fails CLOSED.
+    if (profile && !(profile.status === "pending" || profile.status === "accepted" || profile.status === "active")) {
       const url = request.nextUrl.clone();
       url.pathname = "/access-denied";
-      url.search = "";
+      url.search = profile.status === "revoked" ? "?reason=revoked" : "";
       return NextResponse.redirect(url);
     }
   }

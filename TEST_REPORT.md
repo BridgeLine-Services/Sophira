@@ -1942,3 +1942,69 @@ configured provider (tests exercise the pure engines + route structure;
 routes refuse honestly when AI is unconfigured), and browser
 click-through of the reveal.
 
+## §61 HOSTILE SECURITY AUDIT (2026-10-06): fail-closed guards, ownership fixes, injection defense, attack-surface removal
+
+**Attacker model tested:** another user, a revoked user, an invited-but-
+not-approved user, an unauthenticated visitor, a malicious browser
+client, request/user/assignment ID tampering, RLS-bypass attempts,
+bundle/localStorage/service-worker inspection, stale tokens, and prompt
+injection through uploaded docs, teacher docs, research sources, and
+web pages. Authorization order verified per protected route:
+authentication → active-access → role → resource ownership → operation.
+Suite 1892/1892, strict tsc clean, production build PASS, bundle +
+public + service-worker secret scan clean.
+
+**Real vulnerabilities found and FIXED (each with a regression test):**
+
+1. **The active-access check was a deny-list** (guard + middleware rejected
+   only `status === "revoked"`): any typo'd or future status would fail
+   OPEN. Now an explicit allow-list {pending, accepted, active} in both
+   the API guard and the middleware — revoked and every unknown status
+   fail CLOSED.
+2. **The owner's "restore member" action was silently broken**: it wrote
+   `status = 'active'`, which the profiles check constraint
+   (pending/accepted/revoked) rejects at the DB — un-revoking a member has
+   been failing invisibly. Migration 0024 fixes the constraint.
+3. **The essay plan queried a nonexistent `teacher_source_docs` table**
+   (teacher requirements silently vanished from every essay plan) — and
+   the same class of bug in rubric-audit (selecting rubrics columns that
+   live on teacher_profiles, not teachers). Both now read the real
+   tables (teachers + teacher_profiles).
+4. **ID-tampering defense-in-depth**: id-parameterized reads on
+   readiness, rubric-audit, solve, and the essay plan relied on RLS
+   alone; every one now asserts `.eq("user_id", ...)` ownership
+   explicitly. (The LIVE RLS matrix — tests/security/rls-regression.mjs —
+   already proved cross-user reads return nothing for all 10 data
+   categories; this closes the order-of-authorization gap at the route.)
+5. **Prompt injection through teacher documents and research sources**:
+   essay routes now wrap every external document with the untrusted-
+   content wrapper + injection detector (uploaded files, research web
+   pages, and solve already had it — §21/§32); injection attempts are
+   excluded and disclosed honestly, never obeyed.
+6. **Next.js Image Optimizer attack surface removed** (critical DoS
+   advisory for self-hosted builds): the app uses no next/image and no
+   remote hosts, so the endpoint is disabled outright
+   (`images.unoptimized: true`).
+
+**Dependency audit:** transitive build-time chain (braces, micromatch,
+fast-glob, chokidar via tailwind) pinned to their latest patched lines
+via package.json overrides; tailwindcss upgraded to 3.4.19 (postcss
+resolves to 8.5.29, above all advisory ranges). Residual npm-audit flags
+are build-toolchain only (braces has NO fixed release: advisory range
+<=3.0.3 with fix=None) — none reachable at runtime; the test battery
+asserts runtime code never imports them. The Next.js critical advisory
+is configuration-mitigated (optimizer disabled); the full fix is a
+semver-major upgrade to Next 15.5.10+/16, deliberately not risked in
+this audit round. mammoth (moderate, transitive sprintf-js DoS) is
+queued for review. **Honest statement: these two residuals are
+documented, not silently closed.**
+
+**Verified already-correct (no change needed):** invitation-only signup
+enforced by a DB trigger (no invitation → no account, atomically claimed,
+single-use, expiry-checked, 192-bit unguessable tokens, owner-only
+issuing/approval); revocation blocks access instantly regardless of
+token validity (status allow-list) AND kills refresh tokens server-side;
+account deletion cascades auth.users → all data (requireUser rejects the
+missing profile); stale tokens are rejected by the per-request profile
+check; owner endpoints require the owner role after auth + active-access.
+
