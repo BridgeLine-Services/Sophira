@@ -1497,3 +1497,25 @@ start_url /dashboard) and service worker both serve HTTP 200. iOS native
 **Desktop: VERIFIED** in a real Chromium desktop browser — app loads,
 login renders, install page correct (recorded as a browser verification,
 not a native-OS test).
+
+## 51. Private-beta acceptance run (2026-10-06): Phases 2–13 BLOCKED at the auth layer — verdict NO, all blockers owner-side
+
+Executed the 13-phase private-beta acceptance (production probes, real-browser
+load check, live connectivity probes, full offline suite, release gate --report).
+PHASE 1: deployment exists (PASS, HTTP 307→/login, /api/health 200), application
+loads (PASS, real Chromium desktop browser renders the login form, invitation
+link, /install). Supabase/AI/search connectivity: **BLOCKED** — the deployment
+reports supabase:false, ai:false, search:false; no credentials exist in this
+environment. That single gap gates PHASES 2–12 (every flow behind sign-in) and
+the live parts of PHASE 13: no owner account can be created, so typing,
+academic setup, math, writing, corrections, pacing, scheduling, Student B
+isolation, revocation, and invitation security are BLOCKED, not passed.
+Supporting (NOT counted as PASS): the deterministic engines behind those
+phases are machine-tested in the 1101/1101 offline suite (typing calibration,
+paced output, deadline scheduling, math verification, learning/correction/
+override priority, invitation conformance, RLS SQL conformance), and the
+release gate reports 21 PASS / 0 FAIL / 17 BLOCKED with zero code-side
+failures. Verdict: **PRIVATE BETA READY: NO** — blockers are exactly the
+owner-side items listed in the gate (production env vars, migrations + owner
+email on Supabase, SUPABASE_TEST_* credentials for the live matrices, legal
+owner-facts, one device session). No engineering work remains to unblock.
