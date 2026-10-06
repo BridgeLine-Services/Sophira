@@ -35,6 +35,19 @@ export default function ResetPasswordPage() {
       setLinkError("This password-reset link is invalid, expired, or was already used. For your security it cannot be reused — request a new reset link below.");
       return;
     }
+    // If a recovery code arrives here directly (hash/token flow variants),
+    // exchange it explicitly with THIS browser client rather than assuming
+    // getSession() created the session. The PKCE verifier is in the shared
+    // cookie store, so the exchange succeeds only for a genuine,
+    // unexpired, unused link; anything else fails safely below.
+    const code = params.get("code");
+    if (code) {
+      supabase.auth
+        .exchangeCodeForSession(code)
+        .then(() => setMode("set"))
+        .catch(() => setLinkError("This password-reset link is invalid, expired, or was already used. For your security it cannot be reused — request a new reset link below."));
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       // A valid recovery link establishes a Supabase recovery session;
       // only then does the page switch into password-change mode. This is
@@ -62,8 +75,11 @@ export default function ResetPasswordPage() {
       setError("Password recovery requires an internet connection — it is an online authentication operation. Nothing was sent while you are offline; try again once you are connected.");
       return;
     }
+    // The recovery link lands on /auth/callback (the PKCE code exchange
+    // happens server-side with the cookie-stored verifier) and then
+    // redirects back here with a valid recovery session.
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: window.location.origin + "/reset-password",
+      redirectTo: window.location.origin + "/auth/callback?next=/reset-password",
     });
     setBusy(false);
     if (error) {
@@ -105,6 +121,8 @@ export default function ResetPasswordPage() {
     }
     await supabase.auth.signOut();
     setMode("done");
+    // Send the user back to /login to authenticate with the NEW password.
+    router.replace("/login");
   }
 
   return (

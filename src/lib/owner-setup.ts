@@ -31,7 +31,7 @@ export type DatabaseProbe =
 export interface OwnerSetupProbe {
   supabaseConfigured: boolean; // NEXT_PUBLIC_SUPABASE_URL + anon key present
   serviceRoleConfigured: boolean; // SUPABASE_SERVICE_ROLE_KEY present (server only)
-  aiConfigured: boolean; // OPENAI_API_KEY present
+  aiConfigured: boolean; // a usable remote provider: GEMINI_API_KEY (free tier), or a paid key with paid use explicitly allowed
   database: DatabaseProbe;
   migrationsPresent: boolean | null; // null = could not check
   ownerEmailConfigured: boolean | null; // null = could not check (never the value)
@@ -76,7 +76,14 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       configured(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
       configured(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     serviceRoleConfigured: serviceRoleConfigured(),
-    aiConfigured: configured(process.env.OPENAI_API_KEY),
+    // Free-first policy: the Gemini free tier counts as configured; a paid
+    // OpenAI key counts ONLY when ALLOW_PAID_AI=true or budget > 0
+    // (zero-billing defaults leave it inert — never silently spend money).
+    aiConfigured:
+      configured(process.env.GEMINI_API_KEY) ||
+      (configured(process.env.OPENAI_API_KEY) &&
+        (process.env.ALLOW_PAID_AI === "true" ||
+          (parseFloat(process.env.MONTHLY_AI_BUDGET_USD || "0") || 0) > 0)),
     database: "unconfigured",
     migrationsPresent: null,
     ownerEmailConfigured: null,
@@ -221,8 +228,8 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
       done: probe.aiConfigured,
       label: "AI provider configured",
       detail: probe.aiConfigured
-        ? "The AI key is present on the server. Academic AI features will run."
-        : "OPENAI_API_KEY is not set - the app works, and AI features report honestly that they are not configured until it is added.",
+        ? "A remote AI provider is configured (free tier, or paid use explicitly allowed). Academic AI features will run."
+        : "No AI provider key is set - the app works, and AI features report honestly that they are not configured. The preferred no-billing path is Gemini free tier (GEMINI_API_KEY) or Offline/local AI; the optional paid OpenAI fallback is disabled by default (ALLOW_PAID_AI=false, MONTHLY_AI_BUDGET_USD=0).",
     },
   ];
 
@@ -255,7 +262,7 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
     guidance.push("Owner account initialized. Sign in at /login; use 'Forgot your password?' (/reset-password) if you ever need to recover it.");
   }
   if (!probe.aiConfigured) {
-    guidance.push("Optional but required for AI features: set OPENAI_API_KEY (and SOPHIRA_MODEL, e.g. gpt-4o-mini).");
+    guidance.push("Optional but required for remote AI features: preferred no-billing path is Gemini free tier (set GEMINI_API_KEY, model gemini-2.5-flash) or Offline/local AI (no key needed). The paid OpenAI fallback (OPENAI_API_KEY + SOPHIRA_MODEL) is optional and DISABLED by default - enable only by setting ALLOW_PAID_AI=true or MONTHLY_AI_BUDGET_USD>0.");
   }
 
   const headline =

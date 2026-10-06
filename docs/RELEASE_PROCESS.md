@@ -11,7 +11,7 @@ NEVER the service-role key):
 - `NEXT_PUBLIC_SUPABASE_URL` — the Supabase project HTTPS URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` — server-only (needed by admin routes)
-- `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`, `SOPHIRA_MODEL`) — AI features
+- `GEMINI_API_KEY` (free tier — preferred remote AI), or `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`, `SOPHIRA_MODEL`) as the optional paid fallback, used ONLY when `ALLOW_PAID_AI=true` or `MONTHLY_AI_BUDGET_USD>0`
 - `SEARCH_PROVIDER` / `SEARCH_API_KEY` (optional) — verified web research
 - `NEXT_PUBLIC_SITE_URL` — the public URL, used in invitation links
 

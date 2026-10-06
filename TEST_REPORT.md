@@ -2163,3 +2163,72 @@ recovery link was exercised in this environment (no Supabase project
 credentials). The automated verdict is PASS; the live verdict remains
 open until the TESTING_TONIGHT checklist is run with a real inbox.
 
+## §65 RECOVERY E2E + FREE-FIRST CONFIG DRIFT FIX (2026-10-06)
+
+**Password recovery made genuinely end-to-end (architecture preserved —
+Supabase Auth only, no second system):** the recovery email link now
+lands on **/auth/callback** (the standards-correct step for this SSR
+cookie architecture — the PKCE verifier lives in the shared cookie
+store, so the server-side exchangeCodeForSession is the real exchange,
+not an assumption that getSession() creates the session) and redirects
+back to /reset-password with a valid recovery session. If a recovery
+code arrives at the page directly (hash/token variants), the page now
+performs the EXPLICIT client-side exchangeCodeForSession rather than
+relying on implicit session creation. Only a valid recovery session
+reveals the "Choose a new password" UI; updateUser({password}) runs
+only after recovery authentication; after the change the recovery
+session is signed out and the user is sent to /login to authenticate
+with the new password. Expired / malformed / already-used / tampered
+links fail safely IN THE RECOVERY CONTEXT: the callback redirects
+failures back to /reset-password with generic error params (no /login
+bounce, no silent dead end, no account-existence leak) and the page
+shows the invalid/expired message plus a fresh-link action. Nothing is
+logged: no passwords, recovery codes, access/refresh tokens, or
+authorization headers (callback has no logging; page logs nothing).
+
+**Anti-enumeration and authorization preserved:** generic messaging for
+the request (unchanged); the recovery session is a normal session that
+still passes the middleware's active-access allow-list — recovery
+cannot activate a pending invitation, restore a revoked account, grant
+membership/owner/approval, or touch any profile field, RLS, or academic
+data. The reset page and callback write nothing to the database.
+
+**Free-first config drift fixed (OpenAI fallback preserved, disabled by
+default):** `.env.example` now ships the true default configuration —
+`AI_PROVIDER=auto`, `ALLOW_PAID_AI=false`, `MONTHLY_AI_BUDGET_USD=0`,
+`GEMINI_API_KEY` (free tier, preferred remote), OpenAI labeled an
+OPTIONAL paid fallback that is INERT under the defaults. Stale
+OpenAI-only owner instructions corrected: src/lib/owner-setup.ts now
+counts Gemini free tier as configured, a paid key counts ONLY when paid
+use is explicitly allowed, and the owner guidance states the preferred
+no-billing path (Gemini free tier or Offline/local AI) with paid OpenAI
+clearly optional and disabled by default. docs/IMPLEMENTATION_AUDIT.md
+and docs/RELEASE_PROCESS.md no longer say OpenAI is required. The
+release gate was already provider-aware (free-tier Gemini PASSes; paid
+key without explicit allowance BLOCKs) and its fail-closed behavior is
+preserved — 36 BLOCKED lines remain because the production env and live
+prerequisites are not configured in this environment.
+
+**Routing matrix pinned by tests (tests/providers.ts, 6 new):** no
+keys -> no provider; Gemini + verified free model -> selected; Gemini +
+unverified model + paid disabled -> REJECTED before any network call;
+OpenAI + paid disabled -> IGNORED; OpenAI + paid explicitly allowed ->
+selectable; auto prefers Gemini over OpenAI. Offline/local AI
+untouched: immutable model revisions, integrity checks, download
+confirmation, real local inference probe, provenance labeling, and
+offline network blocking all remain (existing suites verify them).
+Runtime note stays accurate: local inference needs a one-time runtime/
+model download while online; a completely fresh browser cannot infer
+with zero initialization.
+
+**Verification:** npm test 1952/1952 (6 matrix + 8 recovery assertions
+new), npm run build PASS, npx tsc --noEmit -p tsconfig.json clean,
+secret scan CLEAN.
+
+**LIVE-TEST REQUIRED (not claimed):** live Supabase recovery email,
+real recovery-link exchange, old-password-fails/new-password-succeeds,
+and the Gemini free-tier live call were NOT exercised here (no
+credentials). They remain on the TESTING_TONIGHT.md "Forgot Password
+Acceptance Test" checklist. Release gate stays BLOCKED until live
+prerequisites are real.
+

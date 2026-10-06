@@ -36,7 +36,7 @@ that would break a fresh production bring-up.
 teacher → assignment hierarchy), `src/lib/ai/subjects.ts` (9 subject + 15
 math-topic workflows), `/api/ai/solve`. Tables: profiles, courses, teachers,
 assignments, learning_patterns. Tests: hierarchy, routing, order-of-authority.
-Live model flow needs `OPENAI_API_KEY` (external).
+Live remote AI: free-first — `GEMINI_API_KEY` (Gemini free tier) is the preferred remote path; `OPENAI_API_KEY` is an optional paid fallback, inert unless `ALLOW_PAID_AI=true` or `MONTHLY_AI_BUDGET_USD>0`. Offline/local AI needs no key.
 
 ### 2. Writing style/profile learning — IMPLEMENTED
 `/api/ai/analyze-writing` (samples → PENDING proposal), conditional profile

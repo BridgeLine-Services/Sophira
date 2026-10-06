@@ -209,7 +209,35 @@ export async function runProviderTests(assert: Assert, section: Section): Promis
     assert(fetchCalls === 0, "no network call is made when no provider is configured");
   }
 
-  section("provider: offline (AI_PROVIDER=local) NEVER contacts remote AI");
+  section("provider: routing matrix — free-first policy pinned case by case");
+  {
+    // 1. no keys -> no remote provider (auto)
+    let plan = resolveProviders(ENV({ AI_PROVIDER: "auto" }));
+    assert(plan.candidates.length === 0, "matrix: no keys -> no remote provider (honest unavailable, never fabricated)");
+
+    // 2. Gemini key + VERIFIED free model -> Gemini selected
+    plan = resolveProviders(ENV({ AI_PROVIDER: "auto", GEMINI_API_KEY: "gk" }));
+    assert(plan.candidates[0] === "gemini", "matrix: Gemini key + verified free model -> Gemini selected");
+
+    // 3. Gemini key + UNVERIFIED model + paid disabled -> Gemini rejected (fail closed)
+    plan = resolveProviders(ENV({ AI_PROVIDER: "auto", GEMINI_API_KEY: "gk", GEMINI_MODEL: "gemini-9-unverified" }));
+    assert(!plan.candidates.includes("gemini"), "matrix: Gemini key + unverified model + paid disabled -> Gemini REJECTED before any network call");
+    assert((plan.reasons.gemini || "").includes("REJECTED"), "matrix: the rejection reason is stated honestly");
+
+    // 4. OpenAI key + paid disabled -> OpenAI rejected (never silently spend money)
+    plan = resolveProviders(ENV({ AI_PROVIDER: "auto", OPENAI_API_KEY: "sk" }));
+    assert(!plan.candidates.includes("openai"), "matrix: OpenAI key + paid disabled -> OpenAI IGNORED (zero-billing fail-closed)");
+    assert((plan.reasons.openai || "").includes("IGNORED"), "matrix: the OpenAI ignore reason names the zero-billing policy");
+
+    // 5. OpenAI key + paid EXPLICITLY enabled -> OpenAI may be selected
+    plan = resolveProviders(ENV({ AI_PROVIDER: "auto", OPENAI_API_KEY: "sk", ALLOW_PAID_AI: "true" }));
+    assert(plan.candidates.includes("openai"), "matrix: OpenAI key + paid explicitly enabled -> OpenAI selectable");
+
+    // 6. auto mode prefers Gemini over OpenAI (both configured, paid allowed)
+    plan = resolveProviders(ENV({ AI_PROVIDER: "auto", GEMINI_API_KEY: "gk", OPENAI_API_KEY: "sk", ALLOW_PAID_AI: "true" }));
+    assert(plan.candidates[0] === "gemini" && plan.candidates.includes("openai"), "matrix: auto mode prefers Gemini (free) over OpenAI (paid)");
+  }
+section("provider: offline (AI_PROVIDER=local) NEVER contacts remote AI");
   {
     let fetchCalls = 0;
     const fetchFn = (() => {

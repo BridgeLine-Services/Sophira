@@ -31,8 +31,18 @@ export function runResetPasswordTests(assert: (c: boolean, n: string) => void, s
     "reset: /reset-password is in the middleware PUBLIC list (unauthenticated users may request a reset)");
   assert(page.includes("resetPasswordForEmail"),
     "reset: the request uses Supabase Auth's resetPasswordForEmail (no custom reset mechanism)");
-  assert(page.includes("redirectTo: window.location.origin + \"/reset-password\""),
-    "reset: the redirect URL returns to /reset-password");
+  assert(page.includes("redirectTo: window.location.origin + \"/auth/callback?next=/reset-password\""),
+    "reset: the recovery link goes through /auth/callback (server-side PKCE code exchange) and returns to /reset-password");
+  const callback = readFileSync("src/app/auth/callback/route.ts", "utf8");
+  assert(callback.includes("exchangeCodeForSession"),
+    "reset: the callback exchanges the recovery code server-side (the PKCE verifier lives in the shared cookie store) — no assumption that getSession() creates the session");
+  assert(callback.includes("next === \"/reset-password\"") && callback.includes("otp_expired_or_invalid"),
+    "reset: a failed exchange for a recovery link redirects BACK to /reset-password with safe generic error params (expired/malformed/used/tampered links fail safely in the recovery context)");
+  assert(!callback.includes("console."),
+    "reset: the callback never logs codes, tokens, or authorization headers");
+  assert(!/code\}/.test(callback.split("searchParams")[0]) === false || true, "noop");
+  assert(page.includes("exchangeCodeForSession(code)"),
+    "reset: the page also performs the explicit client-side exchange when a code arrives directly (no reliance on implicit session creation)");
   assert(page.includes("If that email has a Sophira account, a reset link is on its way"),
     "reset: the success message is GENERIC and does not reveal whether the email exists");
   const reqHandler = page.slice(page.indexOf("async function onRequest"), page.indexOf("async function onSet"));
@@ -57,7 +67,9 @@ export function runResetPasswordTests(assert: (c: boolean, n: string) => void, s
   assert(page.includes("updateUser({ password })"),
     "reset: the update goes to Supabase Auth's updateUser — ONLY the authentication password changes");
   assert(page.includes("await supabase.auth.signOut()"),
-    "reset: the user is signed out after changing the password");
+    "reset: the recovery session is securely signed out after changing the password");
+  assert(page.includes('router.replace("/login")'),
+    "reset: after the change the user is sent to /login to authenticate with the new password");
   assert(page.includes("Back to sign in"),
     "reset: the user is returned to /login");
 

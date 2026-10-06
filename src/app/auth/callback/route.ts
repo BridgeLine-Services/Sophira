@@ -11,11 +11,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  // The PKCE code verifier lives in the shared cookie store, so the
+  // server-side exchange is the standards-correct step for this SSR
+  // architecture (email confirmation AND password recovery alike).
+  // Security: the code is exchanged exactly once, is NEVER logged, and is
+  // never echoed into a redirect URL. An expired, malformed, already-used,
+  // or tampered code fails here — safely and generically (the error
+  // message reveals nothing about which account the link belonged to).
   const supabase = createClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    const url = new URL("/login", request.url);
-    url.searchParams.set("error", "auth");
+    const recovery = next === "/reset-password";
+    const url = new URL(recovery ? "/reset-password" : "/login", request.url);
+    if (recovery) {
+      // Keep the user in the recovery context: /reset-password shows the
+      // safe "invalid, expired, or already used" message and a fresh-link
+      // action (it never silently dead-ends, and never claims success).
+      url.searchParams.set("error", "recovery_link");
+      url.searchParams.set("error_code", "otp_expired_or_invalid");
+    } else {
+      url.searchParams.set("error", "auth");
+    }
     return NextResponse.redirect(url);
   }
 
