@@ -7,12 +7,13 @@ import { CloudOff } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { BookOpen, Brain, GraduationCap, Home, Library, LogOut, PenLine, Settings, ClipboardCheck, ShieldCheck, AlertTriangle } from "lucide-react";
+import { BookOpen, Brain, GraduationCap, Home, Library, LogOut, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const NAV = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/courses", label: "Courses", icon: BookOpen },
   { href: "/teachers", label: "Teachers", icon: GraduationCap },
+  { href: "/notebooks", label: "Notebooks", icon: NotebookPen },
   { href: "/writing", label: "Writing", icon: PenLine },
   { href: "/library", label: "Library", icon: Library },
   { href: "/proposals", label: "Changes", icon: ClipboardCheck },

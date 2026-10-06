@@ -1732,3 +1732,53 @@ execution, and native MediaPipe integration (documented as the next
 engineering round). The registry itself was verified against the live HF hub
 on 2026-10-06.
 
+## §57 Notebook workspace: source-grounded academic notebook (2026-10-06)
+
+**Requirement:** a first-class source-grounded Notebook workspace, building
+on (never replacing) the existing research engine, tables, citation,
+claim/evidence, and source-authority systems. Suite 1544/1544, build PASS,
+client-bundle secret scan CLEAN.
+
+**Implemented and executed (all assertions ran in `npm test`):**
+
+- Migration 0022: 6 tables (notebooks, notebook_sources, notebook_notes,
+  notebook_questions, notebook_evidence, notebook_artifacts). STRICT
+  owner-only RLS — every policy is user_id = auth.uid(), and there is NO
+  admin read policy: every other user, admin included, is blocked from
+  source content (machine-checked; the migration documents it).
+- Every supported source type (PDF, DOCX, TXT, web URL, image, teacher
+  instructions, assignment instructions, user notes, research source)
+  stores the required fields incl. sha256 content hash, page metadata
+  (PDF) and section/paragraph metadata (DOCX).
+- Grounded chat: answers grounded ONLY in included sources (pinned first)
+  unless the user EXPLICITLY enables web research per question. Every
+  statement is labeled SOURCE-SUPPORTED (verbatim passage located, offsets
+  + locator recorded), INFERENCE (anchor cited), or NOT VERIFIED. A
+  claimed quote that cannot be located is DOWNGRADED and disclosed —
+  never faked. Excluded sources are never cited. Tests prove the web
+  opt-in gate both ways.
+- Inline citations open the exact location: page for PDFs, URL + retrieved
+  timestamp for web, section/¶ for DOCX (tested all three).
+- Source controls: include / exclude / pin / verify / remove, plus
+  "Why this source?" showing authority, relevance, date, source type,
+  why selected, and the assignment requirement satisfied.
+- "Research this topic": all 10 steps on the EXISTING engine (generateQueries,
+  dedupeSources, rankCandidatesForAssignment, fetchAndVerify). Dead URLs
+  rejected; snippets never stored as content; a candidate can become a
+  source ONLY through the user approval gate AND the conversion gate
+  (refuses unretrieved/snippet-only candidates). With all URLs dead,
+  zero candidates — nothing invented.
+- Artifacts: all 9 types generated deterministically with retained
+  provenance; empty notebooks produce an honest unsourced skeleton, not
+  fabricated content; bibliography reuses the deterministic formatter.
+- UI: /notebooks list + 7-tab workspace (Sources, Notes, Questions,
+  Evidence, Research, Study Materials, Artifacts) with labels, clickable
+  citations, controls, candidate approval; nav entry added.
+
+**Not live-verified (honest):** browser click-through of the workspace and
+real multi-user RLS enforcement against a live Postgres (the SQL is
+machine-audited for the policy set, and the API routes read strictly as
+the authenticated owner — never with the service role); OCR of uploaded
+images (an upstream capability; images without OCR are stored honestly
+and cannot be cited).
+

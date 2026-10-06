@@ -248,6 +248,10 @@ explicit confirmation, and a model is only "ready" after a real local
 inference probe. While offline, no remote AI/search/verification call is
 ever attempted. See `docs/OFFLINE_MODELS.md`.
 
+#### Notebooks
+
+Private, source-grounded research notebooks: sources (PDF/DOCX/TXT/web/image/instructions/notes), notes, questions with LABELED grounded answers (SOURCE-SUPPORTED / INFERENCE / NOT VERIFIED), evidence with exact locators, "Research this topic" with a user approval gate, and provenance-retaining artifacts (study guide, quiz, flashcards, outline, briefing, evidence table, research plan, essay plan, bibliography). Source content is owner-only under RLS — no other user, admin included, can read it. See `docs/NOTEBOOKS.md`.
+
 ### 3. Run
 
 ```bash
