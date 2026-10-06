@@ -6,7 +6,8 @@ import { OwnerDashboard } from "@/components/app/OwnerDashboard";
 import { Badge, Button } from "@/components/ui";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import Link from "next/link";
-import { Briefcase } from "lucide-react";
+import { Briefcase, Gauge } from "lucide-react";
+import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,7 @@ export default async function OwnerPage() {
         </span>
         <Badge>owner</Badge>
       </div>
+      <ProviderDiagnosticsCard />
       <OwnerDashboard
         initialMembers={members as NetworkMemberStats[]}
         initialInvitations={(invitations || []) as Invitation[]}
@@ -68,5 +70,63 @@ export default async function OwnerPage() {
         siteUrl={siteUrl}
       />
     </AppShell>
+  );
+}
+
+/**
+ * Owner-only AI provider diagnostics (server-rendered; no API round-trip).
+ * Shows the ACTIVE provider, model, cost class, and zero-billing state —
+ * honest "Cost unknown" where cost cannot be verified. Contains NO secret
+ * values: configuration booleans and reasons only.
+ */
+function ProviderDiagnosticsCard() {
+  const env = readAiEnv();
+  const diag = providerDiagnostics(env);
+  const rows: [string, string][] = [
+    ["Mode", diag.configuredMode],
+    ["Active provider", diag.activeProvider ?? "none (Offline mode only)"],
+    ["Model", diag.activeModel ?? "n/a"],
+    ["Cost class", diag.classification ?? "n/a"],
+    ["Paid AI allowed", paidAllowed(env) ? "yes (explicit owner configuration)" : "no — zero-billing policy"],
+    ["Monthly budget", `$${env.MONTHLY_AI_BUDGET_USD}`],
+    [
+      "Estimated cost",
+      diag.activeProvider === "gemini"
+        ? "Cost unknown — free tier applies while quota lasts; billing state is not verifiable from the server"
+        : diag.activeProvider === "openai"
+          ? "Cost unknown — paid provider enabled by explicit configuration"
+          : "Nothing — on-device model",
+    ],
+  ];
+  return (
+    <div className="mb-6 rounded-lg border bg-card p-4">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        <Gauge className="h-4 w-4 text-accent" />
+        AI provider diagnostics
+      </div>
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map(([k, v]) => (
+            <tr key={k} className="border-b last:border-b-0">
+              <td className="py-1.5 pr-4 text-muted-foreground align-top">{k}</td>
+              <td className="py-1.5">{v}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+        {Object.entries(diag.reasons).map(([p, r]) => (
+          <li key={p}>
+            <span className="font-medium">{p}:</span> {r}
+          </li>
+        ))}
+        {diag.notes.map((n, i) => (
+          <li key={`note-${i}`}>{n}</li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Request counts and failure rates: <code>GET /api/provider-status</code> (owner session required; migration 0021).
+      </p>
+    </div>
   );
 }

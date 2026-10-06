@@ -90,6 +90,7 @@ import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
 import { readFileSync } from "fs";
 import { runOfflineTests } from "./offline";
+import { runProviderTests, runSecretScanTests } from "./providers";
 
 let passed = 0;
 let failed = 0;
@@ -2789,7 +2790,7 @@ async function runAcceptanceDocTests(): Promise<void> {
 // docs/RELEASE_GATE.md + scripts/release-gate.mjs are the single
 // authoritative gate. Machine-check: the doc lists all 38 checks, states
 // the GO/BLOCKED-only semantics and that NOT RUN is never PASS, the script
-// registers exactly 38 checks, its self-test passes, and the release
+// registers exactly 39 checks, its self-test passes, and the release
 // workflow runs the gate.
 // ---------------------------------------------------------------------------
 async function runReleaseGateTests(): Promise<void> {
@@ -2816,15 +2817,15 @@ async function runReleaseGateTests(): Promise<void> {
       "Native URL configured", "Capacitor versions aligned",
       "Legal placeholders removed or explicitly blocked pending owner input",
       "Production environment variables verified", "No secrets committed", "npm test passes",
-      "npm build passes", "Type checking passes", "Security tests pass",
+      "npm build passes", "Type checking passes", "Security tests pass", "Client bundle secret scan passes",
     ];
-    assert(requiredChecks.length === 38, "gate doc check list has exactly 38 entries");
+    assert(requiredChecks.length === 39, "gate doc check list has exactly 39 entries");
     for (const name of requiredChecks) {
       assert(doc.includes(name), `gate doc: lists required check "${name}"`);
     }
     const gate = fs.readFileSync(path.join(process.cwd(), "scripts", "release-gate.mjs"), "utf8");
     const checkCount = (gate.match(/^  check\(/gm) ?? []).length;
-    assert(checkCount === 38, `gate script: registers exactly 38 checks (found ${checkCount})`);
+    assert(checkCount === 39, `gate script: registers exactly 39 checks (found ${checkCount})`);
     assert(gate.includes("RELEASE STATUS: GO") && gate.includes("RELEASE STATUS: BLOCKED"),
       "gate script: emits exactly one final state GO or BLOCKED");
     assert(gate.includes("BLOCKERS:") && /process.exit\(go \? 0 : 1\)/.test(gate),
@@ -2837,7 +2838,7 @@ async function runReleaseGateTests(): Promise<void> {
     const { spawnSync: sp } = await import("node:child_process");
     const selfTest = sp("node", ["scripts/release-gate.mjs", "--self-test"], { encoding: "utf8" });
     assert(selfTest.status === 0,
-      "gate script: --self-test passes (doc semantics + 38-check registry verified)");
+      "gate script: --self-test passes (doc semantics + 39-check registry verified)");
   }
 }
 
@@ -3464,4 +3465,4 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

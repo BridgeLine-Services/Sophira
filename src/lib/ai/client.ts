@@ -3,94 +3,72 @@ import type { Course, Profile, TeacherProfile, WritingProfile } from "../types";
 import { composeAcademicContext, conflictNotices, type ContextConflict } from "./context";
 import { routeSubject } from "./subjects";
 
-export interface ChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
+export type { ChatMessage, ChatOpts } from "./provider";
+import type { ChatMessage, UseRecord } from "./provider";
 
 export class AiNotConfiguredError extends Error {
-  constructor() {
-    super(
-      "The AI service is not configured yet. An administrator needs to set the OPENAI_API_KEY environment variable."
-    );
+  constructor(message?: string) {
+    super(message);
     this.name = "AiNotConfiguredError";
   }
 }
 
+/**
+ * True when at least one REMOTE provider is eligible right now (Gemini free
+ * tier, or paid OpenAI explicitly allowed). When false, API routes fail
+ * closed with an honest message that points at Offline mode.
+ */
 export function aiConfigured(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY);
+  const { resolveProviders, readAiEnv } = require("./provider") as typeof import("./provider");
+  return resolveProviders(readAiEnv()).candidates.length > 0;
 }
 
 export function aiModel(): string {
-  return process.env.SOPHIRA_MODEL || "gpt-4o-mini";
+  return process.env.GEMINI_API_KEY
+    ? process.env.GEMINI_MODEL || "gemini-2.5-flash"
+    : process.env.SOPHIRA_MODEL || "gpt-4o-mini";
 }
 
 /**
- * Calls an OpenAI-compatible chat completions endpoint.
- * SERVER USE ONLY — the API key never reaches the client.
- * opts.images: base64 data URLs attached to the last user message (vision).
+ * Server-side AI chat through the provider architecture (free-first,
+ * zero-billing). SERVER USE ONLY — provider keys never reach the client.
+ * Usage is recorded (best-effort) in the provider_usage table for the
+ * owner diagnostics screen; the log write never blocks the response.
  */
 export async function aiChat(
   messages: ChatMessage[],
   opts: { temperature?: number; maxTokens?: number; jsonMode?: boolean; images?: string[] } = {}
 ): Promise<string> {
-  if (!aiConfigured()) throw new AiNotConfiguredError();
-
-  const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 120_000);
-
-  const finalMessages: { role: "system" | "user" | "assistant"; content: unknown }[] = [...messages];
-  if (opts.images && opts.images.length > 0 && finalMessages.length > 0) {
-    const last = finalMessages[finalMessages.length - 1];
-    if (last.role === "user") {
-      last.content = [
-        { type: "text", text: String(last.content) },
-        ...opts.images.map((dataUrl) => ({ type: "image_url", image_url: { url: dataUrl } })),
-      ];
-    }
-  }
-
+  const { serverAiChat, readAiEnv, AiProviderUnavailableError } = await import("./provider");
+  let record: ((r: UseRecord) => void) | undefined;
   try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: aiModel(),
-        messages: finalMessages,
-        temperature: opts.temperature ?? 0.4,
-        max_tokens: opts.maxTokens ?? 4096,
-        ...(opts.jsonMode ? { response_format: { type: "json_object" } } : {}),
-      }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(
-        `The AI service returned an error (HTTP ${res.status}). ${body.slice(0, 300)}`
-      );
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    record = (r: UseRecord) => {
+      try {
+        void admin.from("provider_usage").insert({
+          provider: r.provider,
+          model: r.model,
+          classification: r.classification,
+          ok: r.ok,
+          tokens_in: r.tokensIn ?? null,
+          tokens_out: r.tokensOut ?? null,
+        });
+      } catch {
+        /* best-effort diagnostics only */
+      }
+    };
+  } catch {
+    /* usage logging is optional — never block AI */
+  }
+  try {
+    const r = await serverAiChat(messages, opts, readAiEnv(), { onUse: record });
+    return r.text;
+  } catch (e) {
+    if (e instanceof AiProviderUnavailableError) {
+      throw new AiNotConfiguredError(e.message);
     }
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== "string" || !content.trim()) {
-      throw new Error("The AI service returned an empty response. Please try again.");
-    }
-    return content;
-  } catch (err) {
-    if (err instanceof AiNotConfiguredError) throw err;
-    if (err instanceof Error && err.name === "AbortError") {
-      throw new Error("The AI request took too long and was cancelled. Your work was not lost — please try again.");
-    }
-    if (err instanceof TypeError) {
-      throw new Error("Could not reach the AI service. Please check your connection and try again.");
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
+    throw e;
   }
 }
 

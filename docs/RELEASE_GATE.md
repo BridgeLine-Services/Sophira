@@ -54,7 +54,7 @@ Environment the gate reads: `SOPHIRA_APP_URL`, `SUPABASE_URL`,
 
 Any check that is not PASS (FAIL, BLOCKED, or NOT RUN) blocks the release.
 
-## The 38 checks
+## The 39 checks
 
 Each check prints its evidence. "Offline suite" evidence means the executed
 `npm test` section(s) listed — behavior verified by real assertions, not by
@@ -64,7 +64,7 @@ code inspection.
 |---|---|---|
 | 1 | Production URL works | `SOPHIRA_APP_URL` resolved + `scripts/verify-deployment.mjs` live check (health endpoint, configuration readiness) |
 | 2 | Database migrations applied | production DB probe of the newest migration's table (0018 `typing_profiles`) via the REST API with service-role credentials |
-| 3 | AI provider configured | `OPENAI_API_KEY` present (server-side only) |
+| 3 | AI provider configured | free-first architecture: `GEMINI_API_KEY` (Gemini free tier, server-side only) — or `OPENAI_API_KEY` counting ONLY when paid use is explicitly allowed (`ALLOW_PAID_AI=true` / `MONTHLY_AI_BUDGET_USD>0`); zero-billing defaults reject a paid key |
 | 4 | Search provider configured | `SEARCH_API_KEY` (+ custom `SEARCH_BASE_URL`) present |
 | 5 | Search provider live test passes | real search request when `RUN_LIVE_TESTS=1`; otherwise NOT RUN |
 | 6 | Invitation-only signup tested | live invitation matrix (`tests/security/invitation-regression.mjs`) when `SUPABASE_TEST_*` is configured |
@@ -100,6 +100,7 @@ code inspection.
 | 36 | npm build passes | `next build` executed |
 | 37 | Type checking passes | `tsc --noEmit` executed |
 | 38 | Security tests pass | both security suites' self-tests + offline conformance + the live matrices when configured |
+| 39 | Client bundle secret scan passes | `scripts/secret-scan.mjs` scans built client artifacts (`.next/static`, service worker, Capacitor/Tauri asset bundles) for `OPENAI_API_KEY` / `GEMINI_API_KEY` / `SEARCH_API_KEY` / `SUPABASE_SERVICE_ROLE_KEY` and fails if any appears |
 
 ## Blocker policy
 

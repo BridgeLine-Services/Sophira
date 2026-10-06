@@ -1575,3 +1575,55 @@ Honest notes:
 - The offline AI models are small; answers are shallower than online. Every offline response is provenance-stamped (LOCAL MODEL · repo) in the UI, and online-only features (live research, new document extraction, source cross-checking) are listed explicitly, never faked.
 - Model integrity is verified against the HF CDN manifest (sizes + LFS sha256 oids) plus a functional inference check; a full local hash of every blob is a documented non-goal.
 - The install-secret localStorage tradeoff (protects at rest, not against compromised same-origin scripts) is documented in `docs/OFFLINE_ARCHITECTURE.md` §security.
+
+## §54 Provider architecture: free-first / zero-billing / secret scan (2026-10-06)
+
+**Changed:** the server AI path was OpenAI-only; it is now a free-first,
+fail-closed provider architecture. No AI route can silently spend money.
+
+**Implemented and executed (all assertions below ran in `npm test`, suite 1238/1238):**
+
+- `src/lib/ai/provider.ts` — provider selection (`AI_PROVIDER=auto|gemini|openai|local`,
+  default `auto`), zero-billing policy (`ALLOW_PAID_AI=false`,
+  `MONTHLY_AI_BUDGET_USD=0` by default → a paid key is reported and IGNORED),
+  Gemini free-tier client (key in the `x-goog-api-key` header, never in a URL;
+  default model `gemini-2.5-flash`, currently on the free tier), ordered
+  fallback on failure, honest `AiProviderUnavailableError`.
+- `src/lib/ai/client.ts` — `aiChat` delegates to the provider architecture and
+  records best-effort usage rows in `provider_usage` (migration 0021; no
+  client access to the table).
+- Tests §"provider": 41 assertions — selection matrix, fail-closed
+  (zero-billing config performs ZERO network calls, verified with an
+  instrumented fetch), request/response conversion (system merge, image
+  inlineData, JSON mode, token usage), fallback order (Gemini 429 → paid only
+  when explicitly allowed), diagnostics never serialize secret values.
+- `scripts/secret-scan.mjs` — client-bundle secret scan
+  (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `SEARCH_API_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`) over `.next/static`, `public/`, Capacitor and
+  Tauri asset bundles; self-test + positive/negative controls executed in
+  the suite. The REAL production build was scanned: CLEAN (3 dirs, 4 names).
+  Wired as release-gate check #39.
+- `src/app/owner/page.tsx` — owner-only provider diagnostics card (active
+  provider, model, cost class, budget, reasons; "Cost unknown" honesty).
+- `GET /api/provider-status` — owner-guarded endpoint adding usage counts;
+  no secret values in any response.
+- Local model registry — `onnx-community/Qwen2.5-1.5B-Instruct` added
+  (verified on the HF hub 2026-10-06: q8 ONNX present, not license-gated)
+  as the laptop tier with a device recommendation UI. Gemma-family models
+  were investigated and are NOT registered: their HF repos are license-gated
+  (HTTP 401 without per-user license acceptance). No ungated 3B+ ONNX
+  instruct model could be verified, so the desktop tier has no entry rather
+  than a fabricated one.
+- Release gate — check #3 ("AI provider configured") now requires the
+  free-first configuration honestly; new check #39 (secret scan). Gate
+  registry updated to 39 checks (doc + script + suite cross-verified).
+
+**Not tested live (blocked, honest):** a real Gemini call (no `GEMINI_API_KEY`
+in this environment) and a real paid call. These surface as gate check #3
+BLOCKED until the owner configures a key — never faked as PASS.
+
+**Gate after this round:** re-run pending commit (this section records the
+offline suite; the gate itself runs `npm test`, `build`, `tsc`, and the
+secret scan). Suite **1238/1238**, build PASS, typecheck PASS, real client
+bundle secret scan CLEAN.
+

@@ -16,7 +16,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog,
 import { SyncStatus } from "@/components/app/SyncStatus";
 import { ProvenanceBadge } from "@/components/app/ProvenanceBadge";
 import { offlineStack, purgeOfflineOnLogout } from "@/lib/offline/client";
-import { LOCAL_MODELS, findModel } from "@/lib/offline/model-registry";
+import { LOCAL_MODELS, findModel, recommendModelForDevice } from "@/lib/offline/model-registry";
 import { ONLINE_ONLY_TASKS } from "@/lib/offline/offline-tasks";
 import type { ConflictRecord } from "@/lib/offline/conflicts";
 import type { AiProvenance } from "@/lib/offline/local-engine";
@@ -156,6 +156,7 @@ export default function OfflinePage() {
             <CardTitle className="flex items-center gap-2"><Cpu className="h-4 w-4" /> Local AI model</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <DeviceRecommendation />
             {LOCAL_MODELS.map((m) => {
               const st = modelStates[m.id];
               const state = st?.state ?? "unknown";
@@ -268,5 +269,38 @@ export default function OfflinePage() {
         onCancel={() => setConfirmModel(null)}
       />
     </AppShell>
+  );
+}
+
+/**
+ * Client-side device detection → honest model recommendation. NEVER
+ * auto-downloads: it only names the recommended tier and why. RAM detection
+ * in browsers is coarse (deviceMemory caps at ~8 GB), so the reason states
+ * the reported figure, and the user still consents to any download.
+ */
+function DeviceRecommendation() {
+  const [rec, setRec] = useState<{ modelId: string; reason: string } | null>(null);
+  const [detected, setDetected] = useState("");
+  useEffect(() => {
+    try {
+      const nav = navigator as Navigator & { deviceMemory?: number };
+      const ramGB = Math.round(nav.deviceMemory ?? 2);
+      const webgpu = typeof navigator !== "undefined" && "gpu" in navigator;
+      setDetected(`detected: ~${ramGB} GB RAM${webgpu ? ", WebGPU available" : ", WASM only"}`);
+      setRec(recommendModelForDevice({ ramGB, webgpu }));
+    } catch {
+      setRec(null);
+    }
+  }, []);
+  if (!rec) return null;
+  const m = findModel(rec.modelId);
+  if (!m) return null;
+  return (
+    <div className="rounded-md border bg-muted/50 p-3 text-sm">
+      <p className="font-medium">Recommended for this device: {m.label}</p>
+      <p className="mt-1 text-muted-foreground">
+        {rec.reason} {detected ? `(${detected})` : ""} Nothing downloads without your explicit consent below.
+      </p>
+    </div>
   );
 }

@@ -13,7 +13,7 @@
  * Exit codes (enforcement mode): 0 = RELEASE STATUS: GO, 1 = BLOCKED/FAIL,
  * 2 = usage error. Every check is PASS | FAIL | BLOCKED | NOT RUN.
  * NOT RUN and BLOCKED are never treated as PASS: the release is GO only
- * when ALL 38 checks PASS.
+ * when ALL 39 checks PASS.
  */
 
 import { spawnSync } from "node:child_process";
@@ -46,7 +46,7 @@ function hasSupabaseTest() {
 }
 
 // ---------------------------------------------------------------------------
-// check registry — the 38 required checks, in the documented order
+// check registry — the 39 required checks, in the documented order
 // ---------------------------------------------------------------------------
 const results = []; // { id, name, status, detail }
 
@@ -189,8 +189,14 @@ function runGate() {
 
   // 3./4. providers configured
   check("ai-provider", "AI provider configured", () => {
-    const k = env("OPENAI_API_KEY");
-    return k ? { status: "PASS", detail: "OPENAI_API_KEY is set" } : { status: "BLOCKED", detail: "OPENAI_API_KEY is not configured" };
+    const str = (n) => (env(n) ? env(n).value : "");
+    const g = str("GEMINI_API_KEY");
+    if (g) return { status: "PASS", detail: `GEMINI_API_KEY is set (free tier, model ${str("GEMINI_MODEL") || "gemini-2.5-flash"})` };
+    const o = str("OPENAI_API_KEY");
+    const allowPaid = str("ALLOW_PAID_AI") === "true" || (parseFloat(str("MONTHLY_AI_BUDGET_USD") || "0") || 0) > 0;
+    if (o && allowPaid) return { status: "PASS", detail: "OPENAI_API_KEY set and paid use EXPLICITLY allowed" };
+    if (o && !allowPaid) return { status: "BLOCKED", detail: "OPENAI_API_KEY is set but IGNORED by the zero-billing policy (ALLOW_PAID_AI=false, MONTHLY_AI_BUDGET_USD=0) — set GEMINI_API_KEY for the free path or explicitly allow paid use" };
+    return { status: "BLOCKED", detail: "no AI provider configured — GEMINI_API_KEY (free tier) is the free path; OPENAI_API_KEY only counts when paid use is explicitly allowed" };
   });
   check("search-provider", "Search provider configured", () => {
     const k = env("SEARCH_API_KEY");
@@ -315,6 +321,14 @@ function runGate() {
     const s = buildOk();
     return s.ok ? { status: "PASS", detail: s.detail } : { status: "FAIL", detail: s.detail };
   });
+  check("secret-scan", "Client bundle secret scan passes", () => {
+    const s = buildOk(); // ensure a build exists before scanning it
+    if (!s.ok) return { status: "FAIL", detail: "no build to scan — npm build failed" };
+    const r = run(["node", "scripts/secret-scan.mjs"]);
+    return r.code === 0
+      ? { status: "PASS", detail: "client chunks / SW / native assets contain no secret names (OPENAI_API_KEY, GEMINI_API_KEY, SEARCH_API_KEY, SUPABASE_SERVICE_ROLE_KEY)" }
+      : { status: "FAIL", detail: "secret name(s) leaked into client artifacts: " + r.stdout + r.stderr };
+  });
   check("typecheck", "Type checking passes", () => {
     const s = typecheckOk();
     return s.ok ? { status: "PASS", detail: s.detail } : { status: "FAIL", detail: s.detail };
@@ -414,12 +428,12 @@ function selfTest() {
     ["doc declares GO/BLOCKED final state", doc.includes("RELEASE STATUS: GO") && doc.includes("RELEASE STATUS: BLOCKED")],
     ["doc states NOT RUN is never PASS", /NOT RUN.*never.*PASS|never.*treated as PASS/i.test(doc)],
     ["doc lists all four statuses", ["PASS", "FAIL", "BLOCKED", "NOT RUN"].every((s) => doc.includes(`**${s}**`) || doc.includes(s))],
-    ["gate implements exactly the 38 checks", true],
+    ["gate implements exactly the 39 checks", true],
   ];
   // count the checks the gate would run (registry count via a dry parse)
   const src = fs.readFileSync(new URL(import.meta.url), "utf8");
   const checkCount = (src.match(/^  check\(/gm) || []).length;
-  checks.push(["gate registers 38 checks", checkCount === 38]);
+  checks.push(["gate registers 39 checks", checkCount === 39]);
   let failed = 0;
   for (const [name, ok] of checks) {
     console.log(`${ok ? "✓" : "✗"} ${name}`);

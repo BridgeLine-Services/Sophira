@@ -212,10 +212,26 @@ Copy `.env.example` to `.env.local` and fill in:
 | `NEXT_PUBLIC_SUPABASE_URL` | your Supabase URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | **server only** — never shipped to the client |
-| `OPENAI_API_KEY` | leave empty to see the honest "not configured" state |
-| `OPENAI_BASE_URL` | any OpenAI-compatible endpoint |
-| `SOPHIRA_MODEL` | e.g. `gpt-4o-mini` (vision-capable models enable photo reading) |
+| `GEMINI_API_KEY` | **free tier (recommended)** — Google Gemini API key, server-side only; never shipped to the client |
+| `GEMINI_MODEL` | default `gemini-2.5-flash` (currently in the Gemini free tier); change only if Google's current free tier still offers it |
+| `AI_PROVIDER` | `auto` (default: Gemini free tier first, then paid only if explicitly allowed) \| `gemini` \| `openai` \| `local` |
+| `ALLOW_PAID_AI` | default `false` — zero-billing: a paid key alone is IGNORED (fail closed) |
+| `MONTHLY_AI_BUDGET_USD` | default `0` — `0` means only free providers may operate; a value > 0 is an explicit decision to allow paid use |
+| `OPENAI_API_KEY` | paid fallback — only used when `ALLOW_PAID_AI=true` or `MONTHLY_AI_BUDGET_USD>0`; leave empty for the free path |
+| `OPENAI_BASE_URL` | any OpenAI-compatible endpoint (paid path only) |
+| `SOPHIRA_MODEL` | paid-path model, e.g. `gpt-4o-mini` (vision-capable models enable photo reading) |
 | `NEXT_PUBLIC_SITE_URL` | deployed URL, used in invite links |
+
+#### AI providers: free-first, zero-billing, fail-closed
+
+Sophira never silently depends on a paid API:
+
+- **OFFLINE** — the local model runs on-device (Offline page; the 135M/0.5B/1.5B tiers download with explicit consent, and every local answer is stamped `LOCAL MODEL`).
+- **ONLINE, Gemini free tier** — set `GEMINI_API_KEY`. Default model `gemini-2.5-flash`. The key lives only in server environment variables (the client-bundle secret scan in the release gate proves it).
+- **ONLINE, paid** — only when the owner EXPLICITLY sets `ALLOW_PAID_AI=true` or `MONTHLY_AI_BUDGET_USD>0`. With the defaults (`false`/`0`) an `OPENAI_API_KEY` is reported and IGNORED.
+- **Provider failure** — falls back to the next allowed candidate; if none, the honest error points to Offline mode. Nothing is ever faked.
+- **Owner diagnostics** — the `/owner` page shows active provider, model, cost class, and zero-billing state; `GET /api/provider-status` (owner session) adds usage counts. Costs display **"Cost unknown"** where they cannot be verified — never a fabricated "$0".
+- **Usage log** — migration `0021_provider_usage.sql` (service-role only; no client access).
 
 ### 3. Run
 
