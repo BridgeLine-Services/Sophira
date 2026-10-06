@@ -1358,6 +1358,16 @@ authorization, fail-closed `app_config.owner_email` bootstrap, server-side
   actual 0001-0020 chain) and /setup documented.
 
 **Verified:** `npm test` **1101/1101**; `npm run build` passes (both new
-routes registered). **Not live-tested** (no production credentials): the
-/authenticated/ behavior of the diagnostic against a real database is
-BLOCKED pending the owner's Supabase configuration, same as §46.
+routes registered). CI green on the pushed commit (51048ab).
+
+**Live-verified after push (sophira.vercel.app auto-deploy):**
+- `GET /api/setup-status` → honest degraded state: `ready: null`,
+  all booleans false, `database: "unconfigured"`, `ownerAccount:
+  "unknown"`, plus the exact operator guidance (Supabase env vars,
+  service-role key, AI key) - no fake ok, no secret material.
+- `/setup` renders (HTTP 200) pre-auth.
+- **Still BLOCKED** (needs the owner's real Supabase + AI config, same as
+  §46): the authenticated-path behavior of the diagnostic against a
+  real database - migrations detected, owner_email configured, owner
+  account created/active - will only be observable once the owner
+  completes the configuration steps it lists.
