@@ -1886,3 +1886,59 @@ provider (tests inject a deterministic OCR engine; the route requires AI
 configuration and refuses honestly otherwise), and browser click-through
 of the camera capture.
 
+## §60 Essay workflow hardening: staged pipeline, paced presentation, deadline honesty (2026-10-06)
+
+**Requirement:** never generate an entire essay as one opaque response when
+paced writing is requested; fixed 13-stage workflow; compact assignment
+plan + sources/evidence before drafting; outline approval; the existing
+typing calibration; output modes Instant/Calibrated/Slow/Custom; local
+timer with pause/resume and progress restore; deadline scheduling with
+breaks as a scheduling preference (10s..6h), no intentional time-wasting,
+impossible deadlines told immediately. Suite 1807/1807, build PASS.
+
+**Implemented and executed:**
+
+- `src/lib/essay/pipeline.ts` — the 13 stages as an ordered, tested
+  machine: ASSIGNMENT ANALYSIS → RUBRIC → TEACHER REQUIREMENTS →
+  RESEARCH → EVIDENCE MAP → THESIS → OUTLINE → SECTION DRAFTS →
+  CITATION AUDIT → RUBRIC AUDIT → STYLE AUDIT → FINAL VERIFICATION →
+  PACED PRESENTATION. `canDraft` refuses drafting structurally until the
+  outline is approved; `nextSectionToDraft` enforces ONE section per
+  call; assembly exists only in presentation.
+- `src/lib/essay/pacing.ts` — output modes on the EXISTING calibration:
+  Calibrated = the user's selected WPM (manual preferred pace → adaptive
+  recommendation when auto-adjust → baseline; NO calibration → NO
+  invented speed, instant fallback with a disclosed reason); Slow =
+  half; Custom = user WPM; Instant = no pacing. Reveal state
+  serialize/restore for close/reopen (ACTIVE time only — paused time
+  never counts; completed sections never re-reveal).
+- The reveal is a LOCAL timer on the client over already-generated,
+  already-audited text — no network request per character, no database
+  row per character (the draft route writes the session exactly once per
+  section; verified by test). Pause/resume works; closing and reopening
+  restores progress (localStorage keyed per session+section, restored
+  via the pure engine — tested).
+- `src/lib/essay/schedule.ts` + scheduler upgrade — the EXISTING
+  deadline scheduler decides when sections are generated/displayed.
+  Breaks are a scheduling preference: honored when the deadline allows,
+  REDUCED to fit when tight (never the reverse), hard-clamped to
+  [10s, 6h]. No intentional time-wasting: generation is back-to-back,
+  the only waits are the bounded breaks + the local reveal. Impossible
+  deadlines are reported IMMEDIATELY with numbers, and the verdict
+  states a delayed schedule NEVER guarantees completion.
+- API: POST /api/essay/plan (analysis → … → outline; compact plan;
+  impossible-deadline verdict persisted honestly), POST/PATCH
+  /api/essay/draft-section (outline gate; one section + per-section
+  citation/rubric/style audits; final verification once at the end).
+  Migration 0023: essay_sessions (per-user RLS; outline_approved NOT
+  NULL default false; break preference constrained to [10s, 6h];
+  output_mode persisted).
+- UI `/essay`: compact plan card, outline approval/edit, one-section-
+  at-a-time drafting, per-section paced reveal with mode/WPM/pause/
+  resume/progress bar, restore banner, honest local-timer note.
+
+**Not live-verified (honest):** AI plan/draft generation against a
+configured provider (tests exercise the pure engines + route structure;
+routes refuse honestly when AI is unconfigured), and browser
+click-through of the reveal.
+

@@ -11,6 +11,10 @@ export interface ScheduleInput {
   deadlineMs: number;
   estimatedWorkMinutes: number;
   urgency?: Urgency;
+  /** the user's requested break between work sessions (a scheduling
+   *  preference): honored when the deadline allows, shrunk when tight,
+   *  never allowed to push completion past the deadline. */
+  preferredBreakSeconds?: number | null;
 }
 export interface ScheduledSession { startMs: number; workSeconds: number; breakSeconds: number }
 export interface SchedulePlan {
@@ -43,12 +47,26 @@ export function planSchedule(input: ScheduleInput): SchedulePlan {
   const workInterval = pressure >= 8 ? LONG_WORK_INTERVAL_SECONDS : WORK_INTERVAL_SECONDS;
   const breakFraction = (URGENCY_FACTOR[urgency] * 0.3 * Math.min(pressure, 16)) / 16;
   const sessions: ScheduledSession[] = [];
+  let breakReducedFromPreference = false;
+  let preferredBreak: number | null = null;
+  if (input.preferredBreakSeconds != null) {
+    preferredBreak = clampBreak(input.preferredBreakSeconds);
+    // the largest per-session break that still completes by the deadline
+    const nSessions = Math.max(1, Math.ceil(totalWorkSeconds / workInterval));
+    const slackSeconds = timeRemainingMs / 1000 - totalWorkSeconds;
+    const maxBreakPer = slackSeconds > 0 ? slackSeconds / Math.max(1, nSessions - 1) : 0;
+    if (preferredBreak > maxBreakPer) { preferredBreak = clampBreak(maxBreakPer); breakReducedFromPreference = true; }
+  }
   let remaining = totalWorkSeconds;
   let cursor = input.nowMs;
   while (remaining > 0) {
     const work = Math.min(workInterval, remaining);
     const isLast = remaining - work <= 0;
-    const breakSeconds = isLast ? 0 : clampBreak(work * breakFraction);
+    const breakSeconds = isLast
+      ? 0
+      : preferredBreak != null
+        ? preferredBreak
+        : clampBreak(work * breakFraction);
     sessions.push({ startMs: cursor, workSeconds: work, breakSeconds });
     cursor += (work + breakSeconds) * 1000;
     remaining -= work;
@@ -63,7 +81,11 @@ export function planSchedule(input: ScheduleInput): SchedulePlan {
     `Deadline ${new Date(input.deadlineMs).toISOString()}; ${(timeRemainingMs / 3600000).toFixed(1)} hours remain ` +
     `for ~${input.estimatedWorkMinutes} minutes of work (time pressure ${pressure.toFixed(1)}x, urgency "${urgency}"). ` +
     `Next interval: ${Math.round(first.workSeconds / 60)} minutes of work, then a ${first.breakSeconds}-second break. ` +
-    `Breaks scale with urgency and available time and are hard-bounded to ${MIN_BREAK_SECONDS}-${MAX_BREAK_SECONDS} seconds. ` +
+    (input.preferredBreakSeconds != null
+      ? breakReducedFromPreference
+        ? `Your preferred break was REDUCED to ${preferredBreak}s so the plan still completes before the deadline; breaks are hard-bounded to ${MIN_BREAK_SECONDS}-${MAX_BREAK_SECONDS} seconds. `
+        : `Your preferred ${preferredBreak}s break between sections is honored; breaks are hard-bounded to ${MIN_BREAK_SECONDS}-${MAX_BREAK_SECONDS} seconds. `
+      : `Breaks scale with urgency and available time and are hard-bounded to ${MIN_BREAK_SECONDS}-${MAX_BREAK_SECONDS} seconds. `) +
     (feasible ? "Estimated completion is before the deadline." : "WARNING: estimated completion is AFTER the deadline.");
   return { feasible, warning, sessions, estimatedCompletionMs, timeRemainingMs, explanation };
 }

@@ -89,6 +89,11 @@ export class PacingController {
     return pacingComplete(this.plan, this.activeMs, this.mode);
   }
 
+  /** Accumulated ACTIVE reveal time so far (for save/restore of progress). */
+  elapsedActiveMs(): number {
+    return this.activeMs;
+  }
+
   /** Total planned active time for the paced reveal (instant → 0). */
   get totalMs(): number {
     return this.mode === "instant" ? 0 : this.plan.totalMs;

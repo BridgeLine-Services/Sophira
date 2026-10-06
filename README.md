@@ -260,6 +260,10 @@ NO VERIFIED CITATION WITHOUT VERIFIED SOURCE: every citation must pass a 12-step
 
 Photograph an equation: deterministic preprocessing (crop/rotate/deskew, Otsu + projection-profile), vision OCR that transcribes but never solves, the recognized expression is ALWAYS shown for confirmation (step 7 never skipped), then deterministic solving (mathjs: linear, quadratic, systems, derivatives, integrals, matrices, statistics, geometry, word problems), an AI explanation that never re-computes, and INDEPENDENT deterministic verification. Failures are marked NEEDS REVIEW — never hidden, never guessed. See `docs/MATH_SCAN.md`.
 
+#### Essay workflow (staged, paced, deadline-aware)
+
+Never an opaque single-response essay: ASSIGNMENT ANALYSIS → RUBRIC → TEACHER REQUIREMENTS → RESEARCH → EVIDENCE MAP → THESIS → OUTLINE (you approve or edit it) → SECTION DRAFTS (one at a time, with citation/rubric/style audits) → FINAL VERIFICATION → PACED PRESENTATION. Output modes Instant / Calibrated (your typing calibration — manual preferred pace, else adaptive, else baseline; no calibration → instant, never an invented speed) / Slow / Custom. The reveal is a local timer: no per-character network or database writes, pause/resume works, and closing the page restores progress. Deadlines: the scheduler decides when sections are generated/displayed; your breaks are a scheduling preference (10 s – 6 h), shrunk when tight; impossible deadlines are told to you immediately — a delayed schedule is never presented as a guarantee.
+
 ### 3. Run
 
 ```bash
