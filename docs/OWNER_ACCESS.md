@@ -43,6 +43,33 @@ bootstrap is **fail-closed**:
 owner sets their password themselves through the normal signup form,
 stored only by the configured authentication provider (Supabase Auth).
 
+## Owner setup status diagnostic (/setup)
+
+Operators get a one-page, pre-auth diagnostic at **/setup** (and a
+scriptable **GET /api/setup-status**) that answers, honestly and before
+any account exists:
+
+- Is the Supabase connection configured?
+- Are the database migrations applied (through 0020)?
+- Is `app_config.owner_email` configured? (existence only - the email
+  value is NEVER displayed)
+- Does an owner account exist, and is it active?
+- Is the AI provider configured?
+
+If no owner is initialized, the page explains the exact steps: configure
+`app_config.owner_email`, then sign up at `/signup` with that exact
+email, choosing your own password in the normal signup flow (there is
+no predefined/default owner password). If an owner already exists, it
+states the owner account is initialized without exposing any
+credential, and links the existing password-reset flow
+(`/reset-password`) for recovery.
+
+The diagnostic is public BY DESIGN (the operator must be able to check
+bootstrap readiness before any account exists) and reports categorical
+booleans only - never keys, tokens, emails, or passwords. It changes no
+access control: the bootstrap stays fail-closed, users still cannot
+promote themselves, modify their own role, or restore revoked access.
+
 ## How the owner logs in
 
 Exactly like any member: `/login` with email + password through Supabase

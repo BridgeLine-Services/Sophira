@@ -2829,10 +2829,12 @@ async function runAccessControlTests(): Promise<void> {
       }
     };
     walkApi(apiRoot);
-    // Genuinely public by design: health (config status only, no user data)
-    // and invitations/accept (account creation via a single-use invitation
-    // token; must be callable before authentication exists).
-    const intentionallyPublic = ["/api/health", "/api/invitations/accept"];
+    // Genuinely public by design: health (config status only, no user data),
+    // invitations/accept (account creation via a single-use invitation
+    // token; must be callable before authentication exists), and
+    // setup-status (pre-auth OPERATOR bootstrap diagnostic — categorical
+    // booleans only, machine-checked for zero secret material below).
+    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status"];
     for (const rf of routeFiles) {
       const rel = ("/api" + rf.slice(apiRoot.length)).replaceAll("\\", "/").replace("/route.ts", "");
       const src = fs.readFileSync(rf, "utf8");
@@ -2841,8 +2843,12 @@ async function runAccessControlTests(): Promise<void> {
       assert(guarded || publicOk,
         `access: ${rel} enforces the server guard (authenticated -> active) or is on the documented public allowlist`);
       if (publicOk) {
-        assert(rel === "/api/health" || src.includes("token"),
-          `access: public route ${rel} operates solely on its single-use token`);
+        assert(
+          rel === "/api/health" ||
+          rel === "/api/setup-status" ||
+          src.includes("token"),
+          `access: public route ${rel} is health/setup-status (config booleans only) or operates solely on its single-use token`
+        );
       }
     }
     assert(routeFiles.length > 20, "access: the route audit actually scanned the API tree");
@@ -3196,4 +3202,120 @@ async function runMemoryTests(): Promise<void> {
   }
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+// ---------------------------------------------------------------------------
+// Owner setup / status diagnostic (operator round 2026-10-06): /setup page +
+// /api/setup-status answer "is owner bootstrap ready?" BEFORE any account
+// exists, categorical booleans only. The fail-closed security model itself
+// (owner_email bootstrap, no self-promotion, no default password) is NOT
+// changed — this section machine-checks that the diagnostic can never leak
+// secrets, never imply a predefined owner password, and reports honestly.
+// ---------------------------------------------------------------------------
+async function runOwnerSetupTests(): Promise<void> {
+  const { evaluateOwnerSetup } = await import("../src/lib/owner-setup");
+  type OwnerAccountStatus = "unknown" | "none" | "active" | "revoked";
+  interface Probe {
+    supabaseConfigured: boolean; serviceRoleConfigured: boolean; aiConfigured: boolean;
+    database: "unconfigured" | "unreachable" | "checked";
+    migrationsPresent: boolean | null; ownerEmailConfigured: boolean | null; ownerAccount: OwnerAccountStatus;
+  }
+  const mk = (o: Partial<Probe>): Probe => ({
+    supabaseConfigured: false, serviceRoleConfigured: false, aiConfigured: false,
+    database: "unconfigured", migrationsPresent: null, ownerEmailConfigured: null, ownerAccount: "unknown",
+    ...o,
+  });
+
+  // ---- scenario A: nothing configured -------------------------------------
+  const a = evaluateOwnerSetup(mk({}));
+  assert(a.ready === null, "setup: unconfigured deployment reports cannot-determine, never a fake ok");
+  assert(a.steps[0].done === false && a.steps[1].done === false, "setup: unconfigured deployment marks connection steps not-done");
+  assert(a.guidance.some((g) => g.includes("NEXT_PUBLIC_SUPABASE_URL")), "setup: unconfigured guidance names the missing env vars");
+  assert(a.guidance.some((g) => g.includes("SUPABASE_SERVICE_ROLE_KEY")), "setup: unconfigured guidance names the service-role var");
+
+  // ---- scenario B: fully ready ---------------------------------------------
+  const b = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: true,
+    database: "checked", migrationsPresent: true, ownerEmailConfigured: true, ownerAccount: "active",
+  }));
+  assert(b.ready === true, "setup: fully configured + active owner reports ready");
+  assert(b.headline.includes("initialized"), "setup: ready headline states the owner account is initialized");
+  assert(b.steps.every((s) => s.done === true), "setup: ready status marks every step done");
+  assert(b.guidance.some((g) => g.includes("/reset-password")), "setup: ready guidance points at the existing password-reset flow");
+
+  // ---- scenario C: migrations missing --------------------------------------
+  const c = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: true, database: "checked",
+    migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "unknown",
+  }));
+  assert(c.ready === false, "setup: missing migrations => not ready");
+  assert(c.guidance.some((g) => g.includes("0001-0020")), "setup: missing-migrations guidance names the migration chain");
+
+  // ---- scenario D: owner_email not configured --------------------------------
+  const d = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: true, database: "checked",
+    migrationsPresent: true, ownerEmailConfigured: false, ownerAccount: "none",
+  }));
+  assert(d.ready === false, "setup: no owner_email => not ready (fail-closed preserved)");
+  assert(d.guidance.some((g) => g.includes("insert into public.app_config")), "setup: guidance gives the exact owner_email SQL");
+
+  // ---- scenario E: owner_email set, no owner account yet ---------------------
+  const e = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: true, database: "checked",
+    migrationsPresent: true, ownerEmailConfigured: true, ownerAccount: "none",
+  }));
+  assert(e.ready === false, "setup: owner email configured but no account => not ready");
+  assert(e.guidance.some((g) => g.includes("exact email") && g.includes("/signup")), "setup: guidance says to sign up with the exact email");
+  assert(e.guidance.some((g) => g.includes("no predefined or default owner password")), "setup: guidance explicitly denies any predefined/default password");
+  const ownerStep = e.steps.find((s) => s.label.includes("Owner account initialized"));
+  assert(ownerStep !== undefined && ownerStep.detail.includes("no predefined or default password"), "setup: uninitialized owner step explains the owner chooses their own password");
+
+  // ---- scenario F: owner exists but revoked ---------------------------------
+  const f = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: true, database: "checked",
+    migrationsPresent: true, ownerEmailConfigured: true, ownerAccount: "revoked",
+  }));
+  assert(f.ready === false, "setup: revoked owner => not ready");
+  assert(f.steps.some((s) => s.detail.includes("revoked") && s.detail.includes("restore")), "setup: revoked owner step explains restoration");
+
+  // ---- scenario G: database unreachable but env configured -------------------
+  const g2 = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: true, database: "unreachable",
+    migrationsPresent: null, ownerEmailConfigured: null, ownerAccount: "unknown",
+  }));
+  assert(g2.ready === null, "setup: unreachable database reports cannot-determine, never a false ok or a false not-ready");
+
+  // ---- secret-leak regression across every scenario --------------------------
+  for (const st of [a, b, c, d, e, f, g2]) {
+    const blob = JSON.stringify(st);
+    assert(!/sk-[A-Za-z0-9]{10}/.test(blob), "setup: status never embeds API-key-shaped material");
+    assert(!blob.includes("eyJhbGciOi"), "setup: status never embeds JWT-shaped material");
+  }
+  // owner_email VALUE never surfaces: the probe contract (existence-only) is
+  // machine-checked on the source below.
+
+  // ---- source-level security contract ----------------------------------------
+  const libSrc = readFileSync(path.join(process.cwd(), "src", "lib", "owner-setup.ts"), "utf8");
+  assert(libSrc.includes("select(\"key\")"), "setup: app_config probe selects only the key column — never the owner_email value");
+  assert(!libSrc.match(/from\("app_config"\)\s*\.select\("\*"/), "setup: app_config probe never selects *");
+  assert(libSrc.includes(".eq(\"key\", \"owner_email\")"), "setup: owner_email probe is keyed (existence-only)");
+  assert(!/SUPABASE_SERVICE_ROLE_KEY[^)]*\breturn/.test(libSrc), "setup: the service-role key is only tested for presence, never returned");
+
+  const routeSrc = readFileSync(path.join(process.cwd(), "src", "app", "api", "setup-status", "route.ts"), "utf8");
+  assert(!routeSrc.includes("process.env"), "setup: the route returns no raw env values (whitelisted fields only)");
+  assert(routeSrc.includes("ownerAccount") && routeSrc.includes("ownerEmailConfigured"), "setup: the route surfaces the categorical probe fields");
+  assert(!routeSrc.includes(".select("), "setup: the route does no database reads of its own (delegates to the audited lib)");
+  const routeCode = routeSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert(!/owner[_-]email/i.test(routeCode), "setup: the route code (outside comments) never touches the owner_email value (boolean ownerEmailConfigured is categorical and allowed)");
+  assert(!/\.value\b/.test(routeCode), "setup: the route code never returns raw row values");
+
+  const pageSrc = readFileSync(path.join(process.cwd(), "src", "app", "setup", "page.tsx"), "utf8");
+  assert(pageSrc.includes('href="/reset-password"'), "setup: the page links the existing password-reset flow");
+  assert(pageSrc.includes('href="/signup"'), "setup: the page links the normal signup flow");
+  assert(pageSrc.includes("no predefined, default, or generated owner password"), "setup: the page states there is no predefined/default owner password");
+  assert(!/password\s*[:=]\s*["'][^"']{4,}/.test(pageSrc), "setup: the page contains no password literals");
+  assert(pageSrc.includes("fail-closed"), "setup: the page explains the fail-closed bootstrap");
+
+  const mwSrc = readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+  assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
+}
+
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });

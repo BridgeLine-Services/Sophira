@@ -1322,3 +1322,42 @@ Project → Settings → Environment Variables):**
 docs/RELEASE_PROCESS.md):** run migrations 0001–0020, then
 `insert into public.app_config (key, value) values ('owner_email', to_jsonb('<owner email>')) ...`
 BEFORE the first owner signup. No owner password is created by the app.
+
+## 47. Owner setup status diagnostic (2026-10-06) — 1101/1101 offline, build green
+
+**Round intent:** improve the OWNER SETUP EXPERIENCE without touching the
+security model (Supabase Auth credentials, `profiles.role='owner'`
+authorization, fail-closed `app_config.owner_email` bootstrap, server-side
+`requireOwner` — all unchanged).
+
+**What was added:**
+- `src/lib/owner-setup.ts` — a server-side probe + pure evaluator, the
+  single source of truth for the diagnostic. Probes (service-role,
+  server-only): app_config/owner_email **existence** (never the value),
+  migration chain markers (0008 app_config, 0019 `profiles.access_revoked_at`,
+  0020 `student_memories`), and categorical owner-account status
+  (none / active / revoked — never email or id).
+- `GET /api/setup-status` — public BY DESIGN (the operator must be able to
+  check bootstrap readiness BEFORE any account exists, including the
+  owner). Returns booleans/enums + ordered operator guidance only.
+- `/setup` page (added to the middleware PUBLIC list) — operator checklist:
+  Supabase connection, migrations, owner_email configured, owner account
+  initialized/active, AI provider; exact next steps when uninitialized
+  (configure owner_email SQL → sign up with that exact email → choose your
+  own password in the normal signup flow); a link to the existing
+  password-reset flow (/reset-password) for recovery; explicit statement
+  that Sophira has NO predefined/default/generated owner password.
+- Suite §27 allowlist updated for the new public route; new test section
+  machine-checks the diagnostic (50 new assertions: evaluator scenarios
+  A-G, secret-leak regression on every scenario, source-level contract —
+  existence-only app_config probe, no raw env returns, no password
+  literals, middleware PUBLIC, reset-password link, default-password
+  denial).
+- docs/OWNER_ACCESS.md: new "Owner setup status diagnostic (/setup)"
+  section. README: Setup step 2 corrected (stale "through 0012" → the
+  actual 0001-0020 chain) and /setup documented.
+
+**Verified:** `npm test` **1101/1101**; `npm run build` passes (both new
+routes registered). **Not live-tested** (no production credentials): the
+/authenticated/ behavior of the diagnostic against a real database is
+BLOCKED pending the owner's Supabase configuration, same as §46.

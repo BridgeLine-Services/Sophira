@@ -161,13 +161,24 @@ Key design decisions:
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. In the SQL editor, run **all migrations in order**:
-   `supabase/migrations/0001_init.sql` through `0012_research_tables.sql`
+   `supabase/migrations/0001_init.sql` through `0020_student_memory.sql`
    (0001 schema + RLS + private `private-docs` bucket; 0002 owner-only
    invitations; 0003 profile versioning; 0004 sources + audit trail;
    0005 owner membership, invitation requests, learning patterns, aggregate
    owner analytics; 0006 invitation expiry; 0007 intentional habits;
    0008 invitation-only signup; 0009 typing calibration; 0010 deadline
-   scheduling; 0011 rubric audits; 0012 research tables).
+   scheduling; 0011 rubric audits; 0012 research tables; 0013 claim
+   evidence; 0014 source authority; 0015 submission gate; 0016 pattern
+   evidence; 0017 schedule executions; 0018 adaptive typing profile;
+   0019 access revocation audit; 0020 student memory).
+
+   After configuring the deployment you can check readiness at any time
+   on the **/setup** page (public operator diagnostic) or via
+   **GET /api/setup-status** — they report, in categorical terms only:
+   whether the Supabase connection is configured, the migrations are
+   applied, `app_config.owner_email` is set, the owner account exists and
+   is active, and the AI provider is configured. They never display keys,
+   tokens, emails, or passwords.
 3. **Configure the owner email (required — signup is fail-closed without
    it).** Migration 0008 removed the old "first user to sign up becomes
    owner" rule (any stranger could claim ownership of a fresh install).

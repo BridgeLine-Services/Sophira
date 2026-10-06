@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = ["/login", "/signup", "/reset-password", "/auth/callback", "/install", "/downloads"];
+// /setup: pre-auth OPERATOR diagnostic (owner bootstrap status). It needs
+// to be reachable before any account exists — including the owner.
+const PUBLIC = ["/login", "/signup", "/reset-password", "/auth/callback", "/install", "/downloads", "/setup"];
 
 // Degraded-mode guard (found by the local production-serve smoke test, §24
 // and the 2026-09-27 production 500s): without Supabase env config, PUBLIC
