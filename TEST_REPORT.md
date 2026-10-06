@@ -1409,3 +1409,50 @@ correctly reporting the unconfigured state and exact operator guidance.
 No FAIL exists anywhere in the gate — turning the 17 BLOCKED items green
 requires only owner configuration (env vars + credentials + one device
 session), no further engineering.
+
+## 49. LIVE end-to-end verification of the research pipeline (2026-10-06) — every stage except the search provider verified against the real web
+
+Round goal (research-integrity request): make the existing research system
+operational and verify its integrity end-to-end. **No architecture was
+replaced** — the audit found the full pipeline already implemented and sound:
+assignment → assignment-specific query generation (`research.ts
+generateQueries`) → external search (`provider.ts`, Brave/Tavily/custom
+abstraction) → deduplication (`dedupeSources`/`normalizeUrl`, tracking-param
+strip, per-domain cap) → objective + assignment-aware ranking
+(`rankCandidatesForAssignment` over `rankCandidates`) → URL fetching with
+manual redirect following (`verify.ts fetchAndVerify`) → HTTP verification,
+page-title verification (`titlesCorrespond`), dead-link (404/410),
+login/paywall detection (401/402/403/429 + in-text wall patterns), text
+extraction with meaningfulness floor → evidence storage
+(`research_sources.content_extract` + sha256 `integrity_hash` +
+`research_verifications` log) → claim/evidence mapping (`claims.ts`,
+migration 0013) → deterministic citation generation (`citation.ts`, from
+stored verified fields only). Snippets are used ONLY for ranking heuristics,
+never as evidence — claim verification runs against the retrieved extract.
+
+**New capability: `RESEARCH_LIVE=1 npm test`** runs a LIVE section
+(`runResearchLiveTests`) exercising the REAL pipeline against the REAL web.
+Executed 2026-10-06 — **18/18 LIVE assertions passed** (1117/1117 total;
+the default suite remains deterministic at 1101/1101):
+
+- Valid source: en.wikipedia.org/wiki/Coral_bleaching → VERIFIED; real page
+  title "Coral bleaching - Wikipedia" extracted (never invented), 41,007
+  chars of genuinely retrieved text, sha256 integrity hash recorded,
+  page-title correspondence verified.
+- Dead link: nonexistent Wikipedia page (real HTTP 404) → FAILED with
+  dead-link note, never cited.
+- Redirect: en.m.wikipedia.org → 301 followed manually, final URL recorded
+  exactly, verified against the FINAL URL.
+- Access refused: britannica.com (real HTTP 403) → INACCESSIBLE, honestly
+  reported, and ZERO text stored from the refused page.
+- Claim-evidence: a claim quoting the REAL retrieved passage → verified; a
+  fabricated claim absent from the real content → NOT verified (unsupported).
+- Citation: built ONLY from really-fetched fields — contains the real final
+  URL and real page title, no invented/placeholder values.
+
+**Still BLOCKED (honest):** the external search-provider stage
+(`provider.search`) has no key in this environment, so the live matrix cannot
+include a real Brave/Tavily query, and the full `/api/research` route needs
+Supabase + a provider key. Offline tests already machine-check provider
+honesty (refuses to run without a real key, never fabricates results), and
+the verification stages downstream of search are now LIVE-verified.

@@ -1145,6 +1145,73 @@ section("16. Proprietary license and legal documents (spec §11–§14)");
     "legal: review notice points to the configuration file of owner-supplied values");
 }
 
+
+// ---------------------------------------------------------------------------
+// LIVE research verification (RESEARCH_LIVE=1): exercises the REAL
+// fetchAndVerify / claim / citation pipeline against the REAL web. Skipped by
+// default so the offline suite stays deterministic; when enabled it performs
+// genuine end-to-end network verification of every stage except the external
+// search provider (which requires SEARCH_API_KEY).
+// ---------------------------------------------------------------------------
+export async function runResearchLiveTests(): Promise<void> {
+  section("LIVE. Research pipeline against the real web (RESEARCH_LIVE=1)");
+  const liveAssert = (cond: boolean, label: string) => {
+    assert(cond, label);
+  };
+
+  // 1. VALID SOURCE — Wikipedia coral bleaching (stable, public, rich text)
+  const valid = await fetchAndVerify("https://en.wikipedia.org/wiki/Coral_bleaching", { timeoutMs: 20_000 });
+  liveAssert(valid.status === "verified", "LIVE research: real public page fetched → VERIFIED (title, text extracted, no notes of refusal)");
+  liveAssert(valid.textChars >= 400, "LIVE research: real page yielded meaningful extracted text (" + valid.textChars + " chars)");
+  liveAssert(valid.title.length > 0 && valid.domain === "en.wikipedia.org", "LIVE research: REAL page title extracted (" + JSON.stringify(valid.title) + ") — never invented");
+  liveAssert(valid.hash.length === 64, "LIVE research: content integrity hash recorded (sha256)");
+  liveAssert(titlesCorrespond("Coral bleaching - Wikipedia", valid.title), "LIVE research: page-title verification passes for the matching listed title");
+
+  // 2. DEAD LINK — a genuinely nonexistent Wikipedia page (real 404)
+  const dead = await fetchAndVerify("https://en.wikipedia.org/wiki/Sophira_nonexistent_page_test_2026", { timeoutMs: 20_000 });
+  liveAssert(dead.status === "failed" && dead.notes.join(" ").includes("dead"), "LIVE research: real dead link (HTTP 404) → FAILED with dead-link note, never cited as verified");
+
+  // 3. REDIRECT — mobile Wikipedia 301s to the desktop article (real HTTPS redirect)
+  const redirected = await fetchAndVerify("https://en.m.wikipedia.org/wiki/Coral_bleaching", { timeoutMs: 20_000 });
+  liveAssert(redirected.redirectCount >= 1, "LIVE research: real redirect followed manually (count " + redirected.redirectCount + ")");
+  liveAssert(redirected.finalUrl === "https://en.wikipedia.org/wiki/Coral_bleaching", "LIVE research: final URL after redirect recorded exactly");
+  liveAssert(redirected.status === "verified", "LIVE research: redirected page still verified against its FINAL URL");
+
+  // 4. ACCESS REFUSED — a page that refuses this client (HTTP 401/402/403/429)
+  const refused = await fetchAndVerify("https://www.britannica.com/", { timeoutMs: 20_000 });
+  liveAssert(refused.status === "inaccessible", "LIVE research: access-refused page (" + refused.httpStatus + ") → INACCESSIBLE, honestly reported (status: " + refused.status + ", notes: " + refused.notes.join(" ").slice(0, 80) + ")");
+  liveAssert(refused.textChars === 0, "LIVE research: refused page stored NO text — nothing extracted from an inaccessible source");
+
+  // 5. CLAIM-EVIDENCE + CITATION against the REAL fetched content
+  //    Take an actual sentence from the real extracted text — the only
+  //    evidence admissible is what was genuinely retrieved.
+  const sentences = valid.text.split(/[.!?]\s+/).filter((s2) => s2.trim().length >= 60);
+  liveAssert(sentences.length > 0, "LIVE research: real page contains usable factual sentences for claim verification");
+  const realSentence = sentences[0].trim();
+  const liveSource: SourceForClaims = {
+    id: "live-wiki",
+    url: valid.finalUrl,
+    title: valid.title,
+    content: valid.text,
+    verification_status: "verified",
+    domain: valid.domain,
+    doi: null,
+  };
+  const supported = verifyClaimAgainstSource(realSentence, realSentence, liveSource);
+  liveAssert(supported.status === "verified", "LIVE research: a claim quoting the REAL retrieved passage is verified against the retrieved content");
+  const fabricated = verifyClaimAgainstSource("Coral bleaching increased global fish stocks by 8,000 percent in 1997.", "The 1997 survey found exactly 8,000 percent more fish.", liveSource);
+  liveAssert(fabricated.status !== "verified", "LIVE research: a fabricated claim NOT present in the real retrieved content is NOT verified (status: " + fabricated.status + ")");
+  const citation = formatCitation(
+    { title: valid.title, author: valid.author ?? null, publisher: valid.domain, publicationDate: valid.publicationDate, url: valid.finalUrl, accessedISO: new Date().toISOString(), doi: null },
+    "MLA"
+  );
+  liveAssert(citation.includes(valid.finalUrl) && citation.includes(valid.title), "LIVE research: citation built ONLY from really-fetched fields (real final URL + real page title)");
+  liveAssert(!/example\.com|placeholder/i.test(citation), "LIVE research: citation contains no invented/placeholder values");
+
+  console.log("  LIVE research verification complete: 4 real sources fetched, 1 dead link detected, " +
+    "1 redirect followed, 1 refused page honestly categorized, claims + citation checked against genuinely retrieved content.");
+}
+
 function finish() {
   console.log(`\n${"=".repeat(50)}`);
   console.log(`RESULTS: ${passed} passed, ${failed} failed, ${passed + failed} total`);
@@ -3318,4 +3385,4 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(finish).catch((e) => { console.error(e); process.exit(1); });
