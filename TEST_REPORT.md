@@ -1716,9 +1716,19 @@ revision pins. Suite 1396/1396.
   signals + honest unknowns), tier labels, limitations shown per model,
   LOCAL vs REMOTE quality disclosure, offline-mode toggle.
 
-**Not live-verified (honest):** actual on-device downloads/inference of the
-new 360M/1.7B/4B entries (the RUN_LIVE_MODEL live pipeline check remains
-opt-in for a real machine run), and native MediaPipe integration (documented
-as the next engineering round). The registry itself was verified against the
-live HF hub on 2026-10-06.
+**Live verification addendum (same day, real machine):** the suite was run
+with `RUN_LIVE_MODEL=1` — the REAL transformers.js pipeline downloaded and
+loaded SmolLM2-135M through its immutable SHA pin and produced real
+on-device output stamped LOCAL (1397/1397). A one-off probe then did the
+same for SmolLM2-360M-Instruct-ONNX via the q4 dtype path — real download
+(~395 MB), real inference, LOCAL provenance, ~1.0 s latency. This proves the
+registry's runtime path end-to-end for both int8 and q4 quantization
+(q4 is what the tier-2/tier-3 models use).
+
+**Still not live-verified (honest):** actual on-device runs of the heavier
+entries (Qwen3 1.7B ~2.2 GB, Qwen3 4B ~4 GB — too heavy for this test
+machine; the same verified path applies), browser-side (WebGPU/WASM)
+execution, and native MediaPipe integration (documented as the next
+engineering round). The registry itself was verified against the live HF hub
+on 2026-10-06.
 
