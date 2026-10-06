@@ -38,6 +38,16 @@ export async function loadTransformers(): Promise<TransformersApi> {
     const req = eval("require") as (id: string) => unknown;
     return req("@huggingface/transformers") as TransformersApi;
   }
-  const mod = (await import(/* webpackIgnore: true */ CDN_URL)) as unknown as TransformersApi;
-  return mod;
+  try {
+    const mod = (await import(/* webpackIgnore: true */ CDN_URL)) as unknown as TransformersApi;
+    return mod;
+  } catch (e) {
+    // A fresh browser session that has never been online cannot fetch the
+    // library. Fail with an honest, actionable message — never a fake result.
+    throw new Error(
+      `offline AI needs a one-time online initialization to fetch the inference ` +
+      `library (~a few MB, from ${CDN_URL}); after that it runs on-device. ` +
+      `Original error: ${(e as Error).message}`
+    );
+  }
 }
