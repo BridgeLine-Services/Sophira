@@ -16,24 +16,70 @@ export default function ResetPasswordPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Recovery links may arrive with Supabase error params when the link
+    // is expired, invalid, malformed, tampered, or already used
+    // (e.g. ?error=access_denied&error_code=otp_expired). Fail safely and
+    // VISIBLY: no session is established, and the user is told to request
+    // a fresh link. Nothing is exposed about the account.
+    const params = new URLSearchParams(
+      window.location.search.includes("error") || window.location.search.includes("code")
+        ? window.location.search
+        : window.location.hash.startsWith("#error") || window.location.hash.startsWith("#code") || window.location.hash.includes("error=")
+          ? window.location.hash.slice(1)
+          : ""
+    );
+    if (params.get("error") || params.get("error_code")) {
+      setLinkError("This password-reset link is invalid, expired, or was already used. For your security it cannot be reused — request a new reset link below.");
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
-      // A recovery link creates a session; then we let the user set a new password.
+      // A valid recovery link establishes a Supabase recovery session;
+      // only then does the page switch into password-change mode. This is
+      // a NORMAL Supabase session: it does NOT bypass Sophira's
+      // invitation/active-access authorization — the middleware still
+      // checks profile status on every request, RLS still applies, and
+      // no profile, role, or status field is ever written here.
       if (data.session) setMode("set");
     });
   }, [supabase]);
 
+  // Honest, privacy-preserving request handling. Password recovery is an
+  // ONLINE authentication operation (Supabase Auth sends the email). We
+  // never reveal whether an email belongs to a Sophira account: success
+  // and "no such account" produce the SAME generic message. Only two
+  // classes of error are shown honestly, and neither reveals account
+  // existence: offline/fetch failures (we did NOT send an email) and
+  // provider rate limits (applied to all addresses alike).
   async function onRequest(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setBusy(false);
+      setError("Password recovery requires an internet connection — it is an online authentication operation. Nothing was sent while you are offline; try again once you are connected.");
+      return;
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: window.location.origin + "/reset-password",
     });
     setBusy(false);
     if (error) {
-      setError(error.message);
+      const msg = (error.message || "").toLowerCase();
+      if (/fetch|network|offline|failed to fetch|load failed/.test(msg)) {
+        setError("Password recovery requires connectivity — the reset service could not be reached, so no email was sent. This is an online operation; try again once you are connected.");
+        return;
+      }
+      if (/rate|once every|seconds|too many/.test(msg)) {
+        setError("The reset provider is limiting requests for security. Please wait a moment and try again.");
+        return;
+      }
+      // Any other error (including "user not found"-style responses that
+      // could reveal account existence) gets the SAME generic response
+      // as success. Nothing about this message depends on the account.
+      setSent(true);
       return;
     }
     setSent(true);
@@ -93,6 +139,19 @@ export default function ResetPasswordPage() {
             </Button>
           </div>
         </form>
+      )}
+
+      {mode === "request" && linkError && (
+        <div className="rounded-card border border-danger/20 bg-danger/5 p-5 text-center shadow-sm" role="alert">
+          <p className="text-sm text-danger">{linkError}</p>
+          <button
+            type="button"
+            className="mt-3 text-sm text-accent hover:underline"
+            onClick={() => { setLinkError(null); setSent(false); }}
+          >
+            Request a new reset link
+          </button>
+        </div>
       )}
 
       {mode === "request" && sent && (

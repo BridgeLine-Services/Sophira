@@ -2111,3 +2111,55 @@ scripts/legal-status.mjs exit 1 with all 28 owner facts listed (BLOCKED
 by design); release gate: legal-placeholders BLOCKED pending owner
 input — agent must not invent them.
 
+## §64 FORGOT-PASSWORD / RESET-PASSWORD HARDENING (2026-10-06): existing Supabase Auth flow made production-ready
+
+**Architecture preserved — NOT replaced.** Sophira already used Supabase
+Auth end-to-end: /login carries the visible "Forgot your password?" link,
+/reset-password is in the middleware PUBLIC list, the request calls
+resetPasswordForEmail with redirectTo /reset-password, the recovery link
+establishes a Supabase session that switches the page into password-change
+mode, updateUser({password}) changes ONLY the authentication password,
+and the user is signed out afterward. No second reset system, no custom
+crypto, no second password hash, no architectural replacement was needed.
+
+**Four real gaps found and fixed (minimal changes only):**
+1. **Privacy oracle:** the request path displayed raw Supabase error
+   messages — a provider response that differed for unknown addresses
+   would reveal account existence. Now success and every
+   non-rate/non-network error produce the SAME generic message.
+2. **Offline honesty:** password recovery is an ONLINE authentication
+   operation; offline (navigator.onLine or fetch failure) now shows the
+   honest "requires connectivity, nothing was sent" message instead of a
+   fake success. No offline/local reset mechanism exists, by design.
+3. **Silent dead end on invalid links:** expired / invalid / malformed /
+   tampered / already-used recovery links previously left the user stuck
+   on the request form with no explanation. Supabase error params are
+   now detected and answered with a visible, safe failure plus a
+   fresh-link action.
+4. **Authorization model unchanged and verified:** the recovery session
+   is a normal Supabase session — the middleware's active-access
+   allow-list still applies to it, RLS still applies, and the page never
+   touches profiles (it cannot activate a pending invitation, restore a
+   revoked/deleted account, or change a role). A successful reset changes
+   the Supabase Auth password and nothing else.
+
+**Privacy/security verifications (permanent, tests/reset-password.ts,
+22 new assertions, suite 1938/1938):** visible forgot-password link;
+public route; generic non-revealing message with no raw error display;
+recovery session required for set-mode; middleware allow-list intact;
+page never touches profiles; min-length + mismatch validation errors;
+updateUser-only password change; sign-out after change; return to /login;
+safe visible failure for invalid/expired/used links; no logging of emails,
+tokens, or passwords; no client-storage persistence; no custom crypto;
+honest offline behavior with no fake success.
+
+**Live checklist added:** TESTING_TONIGHT.md "Forgot Password Acceptance
+Test" — the exact steps A–P (real reset email, real recovery link, old
+password failing, new password succeeding, nonexistent-email generic
+response, expired-link safe failure, and no status/role/data changes).
+
+**LIVE NOT YET VERIFIED (honestly):** no actual recovery email or
+recovery link was exercised in this environment (no Supabase project
+credentials). The automated verdict is PASS; the live verdict remains
+open until the TESTING_TONIGHT checklist is run with a real inbox.
+

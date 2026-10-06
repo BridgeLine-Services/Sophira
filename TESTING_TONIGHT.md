@@ -141,6 +141,38 @@ download button for an artifact that actually exists, with its SHA-256.
 - Network-off fallback: with the local model downloaded and connectivity
   OFF, an ask must get a real local-model response — not a fake success.
 
+## Forgot Password Acceptance Test
+
+Real-user steps (perform with a real email inbox; do not skip):
+
+A. Create a valid invited test account.
+B. Confirm the account can sign in.
+C. Sign out.
+D. On /login, select "Forgot your password?".
+E. Request a reset using the account email.
+F. Open the real reset email.
+G. Follow the recovery link (it returns to /reset-password in set mode).
+H. Set a new password (try a mismatch first — expect a clear error; try 7
+   characters — expect the minimum-length error).
+I. Confirm the password was changed (the app signs you out).
+J. Return to /login.
+K. Confirm the OLD password now fails.
+L. Confirm the NEW password succeeds.
+M. Sign out.
+N. Repeat D–E with a NONEXISTENT email and confirm the page shows the SAME
+   generic message — it must not reveal whether the account exists.
+O. Request a reset, then request another and open the FIRST link after the
+   second (or wait for expiry) — confirm the page fails safely with the
+   invalid/expired message and offers a fresh link. Recovery does not
+   grant access: while the recovery session is open, /dashboard still
+   applies the same invitation/active-access checks.
+P. Confirm the reset did NOT change the user's invitation status, role,
+   profile, teacher data, academic data, or permissions (compare before/after).
+
+Note: password recovery is an ONLINE authentication operation — with
+connectivity off, the page says so honestly and never pretends an email
+was sent. There is no offline password reset, by design.
+
 ## Build artifacts (for maintainers)
 
 ```bash
