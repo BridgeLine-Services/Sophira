@@ -89,6 +89,7 @@ import type { SearchHit } from "../src/lib/research/provider";
 import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
 import { readFileSync } from "fs";
+import { runOfflineTests } from "./offline";
 
 let passed = 0;
 let failed = 0;
@@ -2913,21 +2914,34 @@ async function runPwaReadinessTests(): Promise<void> {
     assert(install.includes("beforeinstallprompt"),
       "pwa: /install offers one-tap install where the browser supports it");
 
-    // ---- no false offline-AI claims ---------------------------------------
-    const offlineClaims: string[] = [];
+    // ---- offline claims are real, scoped, and provenance-stamped -------------
+    // The offline subsystem (src/lib/offline/) IS implemented and tested, so
+    // claiming offline AI is no longer forbidden per se. The honesty bar is:
+    // (a) NO unqualified full-parity claims anywhere;
+    // (b) the offline UI always shows response provenance (LOCAL vs REMOTE);
+    // (c) the offline UI explicitly lists what is online-only.
+    const parityClaims: string[] = [];
     const walk = (dir: string) => {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, e.name);
-        if (e.isDirectory()) walk(p);
-        else if (/\.(tsx?|jsx?)$/.test(e.name) && !/node_modules/.test(p)) {
+        if (e.isDirectory()) { if (!/node_modules|\.next/.test(e.name)) walk(p); }
+        else if (/\.(tsx?|jsx?)$/.test(e.name)) {
           const t = fs.readFileSync(p, "utf8");
-          if (/works offline|offline mode|offline AI|use Sophira offline/i.test(t)) offlineClaims.push(p);
+          if (/all features work offline|everything works offline|full offline parity|offline parity with the online/i.test(t)) {
+            parityClaims.push(p);
+          }
         }
       }
     };
     walk(path.join(process.cwd(), "src"));
-    assert(offlineClaims.length === 0,
-      `pwa: no offline-AI/feature claims in the UI (offline offers shell only) — found ${offlineClaims.length}`);
+    assert(parityClaims.length === 0,
+      `offline: no unqualified full-parity claims (offline is a real but scoped subset) — found ${parityClaims.length}`);
+    const offlinePage = fs.readFileSync(path.join(process.cwd(), "src", "app", "offline", "page.tsx"), "utf8");
+    assert(offlinePage.includes("ProvenanceBadge"), "offline: the offline assistant stamps every response with its origin");
+    assert(offlinePage.includes("ONLINE_ONLY_TASKS"), "offline: the UI explicitly lists online-only features (nothing faked as available)");
+    const swStill = fs.readFileSync(path.join(process.cwd(), "public", "sw.js"), "utf8");
+    assert(swStill.includes("Never cache HTML/API responses"),
+      "offline: the service worker STILL never caches user/AI content (offline data comes from the encrypted store, not the SW cache)");
 
     // ---- guide exists and gives the exact owner steps ----------------------
     const guide = fs.readFileSync(path.join(process.cwd(), "docs", "PWA_TESTING_GUIDE.md"), "utf8");
@@ -3450,4 +3464,4 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(finish).catch((e) => { console.error(e); process.exit(1); });
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

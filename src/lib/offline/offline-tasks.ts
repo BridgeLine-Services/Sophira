@@ -24,9 +24,9 @@
 import type { LocalInferenceEngine } from "./local-engine";
 import type { OfflineStore } from "./store";
 import type { OfflineRecord } from "./store";
-import type { LearningPattern } from "@/lib/learning/patterns";
-import { selectApplicablePatterns } from "@/lib/learning/patterns";
-import { runMachineChecks } from "@/lib/ai/mathverify";
+import type { LearningPattern } from "../learning/patterns";
+import { selectApplicablePatterns } from "../learning/patterns";
+import { runMachineChecks } from "../ai/mathverify";
 
 export type OfflineTaskKind =
   | "write-assist"

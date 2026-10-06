@@ -48,7 +48,8 @@ interface HfTreeEntry {
 
 export interface ModelManagerEnv {
   /** transformers.js module — injected so tests can pass a mock. */
-  transformers: unknown;
+  /** transformers.js module — injected so tests can pass a mock; falls back to a lazy import. */
+  transformers?: unknown;
   /** fetch — injected for testability. */
   fetchFn?: typeof fetch;
 }
@@ -150,7 +151,8 @@ export class ModelManager {
     report({ modelId, progress: 0, stage: "checking manifest" });
 
     try {
-      const t = this.env.transformers as {
+      const t = (this.env.transformers ??
+        (await import("@huggingface/transformers"))) as {
         pipeline: (task: string, model: string, options?: unknown) => Promise<unknown>;
         env: { allowLocalModels?: boolean };
       };

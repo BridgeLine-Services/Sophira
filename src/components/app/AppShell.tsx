@@ -1,6 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { SyncStatus } from "@/components/app/SyncStatus";
+import { purgeOfflineOnLogout } from "@/lib/offline/client";
+import { CloudOff } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -15,6 +18,7 @@ const NAV = [
   { href: "/proposals", label: "Changes", icon: ClipboardCheck },
   { href: "/corrections", label: "Learning", icon: AlertTriangle },
   { href: "/memories", label: "Memory", icon: Brain },
+  { href: "/offline", label: "Offline", icon: CloudOff },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -45,6 +49,19 @@ export function AppShell({ title, backHref, actions, children }: {
 
   async function signOut() {
     setSigningOut(true);
+    // Offline logout policy (STEP 12): sign-out deletes ALL local offline
+    // data — including any unsynced changes. Warn first when work would be lost.
+    try {
+      const pending = await purgeOfflineOnLogout();
+      if (pending > 0 && !window.confirm(
+        `You have ${pending} offline change(s) that have NOT synchronized. Signing out now deletes them permanently. Sign out anyway?`
+      )) {
+        setSigningOut(false);
+        return;
+      }
+    } catch {
+      // offline store unavailable — proceed with server sign-out
+    }
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
@@ -69,6 +86,7 @@ export function AppShell({ title, backHref, actions, children }: {
             </Link>
           )}
           <h1 className="flex-1 truncate text-[17px] font-semibold text-ink">{title}</h1>
+          <span className="mr-1 hidden sm:inline-flex"><SyncStatus /></span>
           {actions}
           <button
             onClick={signOut}

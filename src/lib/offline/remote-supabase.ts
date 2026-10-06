@@ -29,12 +29,24 @@ const SUPABASE_TABLE: Record<OfflineTable, string> = {
   conflicts: "app_config", // never actually mirrored; placeholder mapping
 };
 
+type SupabaseClient = import("@supabase/supabase-js").SupabaseClient;
+
 export class SupabaseRemoteAdapter implements RemoteAdapter {
-  constructor(private readonly supabase: import("@supabase/supabase-js").SupabaseClient) {}
+  private client: SupabaseClient | null = null;
+
+  constructor(
+    /** lazy factory — the browser client is async-created and may fail when degraded */
+    private readonly clientFactory: () => Promise<SupabaseClient> | SupabaseClient
+  ) {}
+
+  private async sb(): Promise<SupabaseClient> {
+    if (!this.client) this.client = await this.clientFactory();
+    return this.client;
+  }
 
   async getRow(table: OfflineTable, id: string): Promise<RemoteRow | null> {
     const sb = SUPABASE_TABLE[table];
-    const { data, error } = await this.supabase.from(sb).select("*").eq("id", id).maybeSingle();
+    const { data, error } = await (await this.sb()).from(sb).select("*").eq("id", id).maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return null;
     const d = data as Record<string, unknown>;
@@ -43,7 +55,7 @@ export class SupabaseRemoteAdapter implements RemoteAdapter {
 
   async fetchChanged(table: OfflineTable, since: string | null): Promise<RemoteRow[]> {
     const sb = SUPABASE_TABLE[table];
-    let q = this.supabase.from(sb).select("*");
+    let q = (await this.sb()).from(sb).select("*");
     if (since) q = q.gt("updated_at", since);
     const { data, error } = await q.order("updated_at", { ascending: true });
     if (error) throw new Error(error.message);
@@ -58,14 +70,14 @@ export class SupabaseRemoteAdapter implements RemoteAdapter {
     const sb = SUPABASE_TABLE[op.table];
     if (op.kind === "create") {
       const payload = { ...(record?.row as Record<string, unknown>), id: op.id };
-      const { error } = await this.supabase.from(sb).insert(payload);
+      const { error } = await (await this.sb()).from(sb).insert(payload);
       if (error) return classifyError(error);
       return { ok: true, updated_at: new Date().toISOString() };
     }
     if (op.kind === "update") {
       const payload = { ...(record?.row as Record<string, unknown>), id: op.id };
       // optimistic concurrency: only when the row still matches our base
-      let q = this.supabase.from(sb).update(payload).eq("id", op.id);
+      let q = (await this.sb()).from(sb).update(payload).eq("id", op.id);
       if (op.base_server_updated_at) q = q.eq("updated_at", op.base_server_updated_at);
       const { data, error } = await q.select();
       if (error) return classifyError(error);
@@ -77,7 +89,7 @@ export class SupabaseRemoteAdapter implements RemoteAdapter {
       return { ok: true, updated_at: ((d.updated_at ?? d.created_at) as string) ?? new Date().toISOString() };
     }
     // delete
-    const { data, error } = await this.supabase.from(sb).delete().eq("id", op.id).select();
+    const { data, error } = await (await this.sb()).from(sb).delete().eq("id", op.id).select();
     if (error) return classifyError(error);
     if (!data || data.length === 0) {
       // row gone or changed — let sync-side conflict logic decide via getRow
@@ -87,10 +99,12 @@ export class SupabaseRemoteAdapter implements RemoteAdapter {
   }
 
   async isAuthorized(): Promise<boolean> {
-    const { data } = await this.supabase.auth.getSession();
+    const sb = await this.sb().catch(() => null);
+    if (!sb) return false;
+    const { data } = await sb.auth.getSession();
     if (!data.session) return false;
     // probe with a cheap RLS-guarded call — revoked users fail here
-    const { error } = await this.supabase.from("profiles").select("id").limit(1);
+    const { error } = await sb.from("profiles").select("id").limit(1);
     return !error;
   }
 }
