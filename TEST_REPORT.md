@@ -2062,3 +2062,52 @@ display the real artifacts automatically (the page requires no redeploy
 for asset discovery — only the TEST BUILD/SIGNED/UNSIGNED/iOS-honesty
 UI needs the Vercel deploy from this push).
 
+## §63 LEGAL AUDIT (2026-10-06): proprietary license + ToS audited against the private-testing spec
+
+**Audited:** LICENSE, Terms of Service, Privacy Policy, the /terms,
+/privacy, /license canonical serving, and the release gate's legal
+blocking. **Placeholders preserved — none invented:** the owner's legal
+name, business name, address, jurisdiction, attorney, email, effective
+date, and liability amount all remain bracketed placeholders
+(scripts/legal-status.mjs: 28 owner facts remain, exit 1 — the release
+gate stays BLOCKED until the owner supplies them; legal readiness is NOT
+marked complete, and attorney review is still required per
+docs/legal/LEGAL_REVIEW_NOTICE.md).
+
+**LICENSE hardening (was already proprietary; now explicit on every
+mandated prohibition):** NOT open-source software (unchanged); all
+rights reserved except those EXPRESSLY granted; §3 now prohibits, to the
+maximum extent permitted by applicable law: unauthorized copying,
+redistribution, sublicensing, unauthorized HOSTING, unauthorized
+commercial use, unauthorized modification, creation of unauthorized
+DISTRIBUTED VERSIONS (modified or unmodified), removal of copyright
+notices, circumvention of AUTHENTICATION, circumvention of ROW-LEVEL
+SECURITY, and circumvention of license-enforcement mechanisms. §6 now
+states unauthorized use may constitute copyright infringement, breach of
+this license, breach of contract, and/or other violations of applicable
+law; all rights and remedies reserved. Added the savings clause:
+"Nothing in this license limits rights that cannot lawfully be limited."
+
+**Terms of Service:** §14 extended to license-enforcement circumvention;
+the Enforcement paragraph now matches the LICENSE's prohibition list
+exactly (unauthorized hosting included — no contradiction between the
+documents) and carries the same savings clause. No exaggerated threats:
+the test battery now asserts NO jail/prison/automatic-penalty claims in
+either document (there were none; now it is permanent).
+
+**Privacy Policy:** now describes the ACTUAL data architecture, including
+the on-device local model (local/offline processing stays on the user's
+device — never sent to a third-party AI provider for those requests),
+PWA local caching (app code, not other users' data), Supabase RLS
+isolation, and owner-visible aggregate analytics only.
+
+**Serving verified:** /terms, /privacy, /license render from the
+canonical repository documents via src/lib/legal.ts (loadLegalDoc) at
+request time — single source of truth, traced into standalone builds by
+next.config outputFileTracingIncludes.
+
+**Verification:** npm test 1916/1916 (24 new legal-audit assertions);
+scripts/legal-status.mjs exit 1 with all 28 owner facts listed (BLOCKED
+by design); release gate: legal-placeholders BLOCKED pending owner
+input — agent must not invent them.
+

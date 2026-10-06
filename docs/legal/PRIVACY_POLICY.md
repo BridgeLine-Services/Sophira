@@ -33,6 +33,13 @@ subject to legal/backup retention. You may request access, correction, or
 deletion at [CONTACT EMAIL]; where applicable law grants data-protection
 rights, we will honor them.
 
+## Local/offline processing (actual architecture)
+When you enable the optional local model, generation happens ON YOUR DEVICE
+and the content you submit for that request is not sent to a third-party AI
+provider. Offline mode uses that on-device model and previously cached data.
+The installed web app (PWA) also caches application files locally on your
+device; that cache contains app code, not other users' data.
+
 ## Access controls and RLS
 Row-level security isolates every user's private content. The owner can see
 **aggregate** analytics only and cannot read your essays, assignments,

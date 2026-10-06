@@ -56,7 +56,7 @@ No outcome is promised. The service may contain errors and may be unavailable at
 Unlawful, abusive, or institution-violating use, including academic dishonesty, is prohibited.
 
 ## 14. Attempts to bypass authentication or RLS
-Circumventing authentication, row-level security, or access controls is prohibited and may result in termination.
+Circumventing authentication, row-level security, other access controls, or any technical license-enforcement mechanism is prohibited and may result in termination.
 
 ## 15. Attempts to access another user's data
 Attempting to access, infer, or expose another user's data (including by manipulating identifiers in requests) is prohibited.
@@ -71,9 +71,11 @@ Redistributing the software or any part of it is prohibited except as expressly 
 The software is proprietary and all rights are reserved by [LEGAL ENTITY NAME] under the LICENSE file in the repository.
 
 **Enforcement.** Unauthorized copying, redistribution, modification,
-sublicensing, or commercial exploitation of the software may constitute
-copyright infringement and/or a breach of these Terms and the License. The
-Operator reserves all rights and remedies available under applicable law.
+sublicensing, unauthorized hosting, or commercial exploitation of the
+software may constitute copyright infringement, a breach of the License,
+a breach of these Terms and/or of contract, and/or other violations of
+applicable law. The Operator reserves all rights and remedies available
+under applicable law. Nothing in these Terms limits rights that cannot lawfully be limited.
 
 ## 19. Third-party services and AI providers
 The service relies on third-party providers (hosting, database, AI models, and search/retrieval providers where used). Your content is processed by those providers as described in the Privacy Policy.

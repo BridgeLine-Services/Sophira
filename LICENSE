@@ -17,14 +17,24 @@ authorized in writing by the copyright holder. Any authorized use must comply
 with the Terms of Service accompanying the Software.
 
 3. RESTRICTIONS
-Unless expressly authorized in writing by the copyright holder, you may NOT:
-  a) copy, reproduce, republish, or redistribute the Software or any part of it;
-  b) sublicense, sell, rent, lease, or commercially exploit the Software;
-  c) create derivative works, modifications, or modified redistributions;
-  d) remove, obscure, or alter any copyright, proprietary, or legal notice
+Unless expressly authorized in writing by the copyright holder, you may NOT,
+to the maximum extent permitted by applicable law:
+  a) copy or reproduce the Software or any part of it;
+  b) redistribute, republish, or distribute the Software or any part of it,
+     in source, object, or any other form;
+  c) sublicense, sell, rent, lease, or commercially exploit the Software,
+     or use the Software for any commercial purpose;
+  d) create derivative works or modifications of the Software, or create,
+     distribute, or make available any distributed version of the Software,
+     modified or unmodified;
+  e) remove, obscure, or alter any copyright, proprietary, or legal notice
      contained in the Software;
-  e) use the Software on behalf of any party not expressly authorized;
-  f) assist any unauthorized party in doing any of the above.
+  f) host, deploy, operate, or offer the Software as a service to any party
+     not expressly authorized in writing by the copyright holder;
+  g) circumvent, bypass, disable, or interfere with any authentication,
+     access control, row-level security, or other technical protection or
+     license-enforcement mechanism of the Software;
+  h) assist any unauthorized party in doing any of the above.
 
 4. REPOSITORY ACCESS
 Access to a source-code repository hosting the Software (for example on
@@ -39,8 +49,11 @@ under applicable copyright, contract, trade-secret, or other law.
 
 6. INFRINGEMENT
 Unauthorized use, copying, or distribution of the Software may constitute
-copyright infringement and/or a breach of contract. The copyright holder
-reserves all remedies available under applicable law.
+copyright infringement, a breach of this license, a breach of contract,
+and/or other violations of applicable law. The copyright holder reserves
+all rights and remedies available under applicable law.
+
+Nothing in this license limits rights that cannot lawfully be limited.
 
 7. GOVERNING LAW
 This license is governed by the laws of [JURISDICTION], without regard to

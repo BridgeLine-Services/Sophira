@@ -1163,6 +1163,22 @@ section("16. Proprietary license and legal documents (spec §11–§14)");
     "legal: no document claims to be legally guaranteed or attorney approved");
   assert(tos.includes("may constitute") && tos.includes("reserves all rights and remedies"),
     "legal: ToS uses cautious enforcement language (may constitute infringement/breach; rights and remedies reserved)");
+  // ---- hostile legal audit (2026-10-06): every mandated prohibition ----
+  assert(license.includes("NOT open-source software"), "legal: LICENSE states plainly that the Software is NOT open-source software");
+  assert(/All rights (are )?reserved/.test(license) && license.includes("expressly"), "legal: LICENSE reserves ALL rights except those EXPRESSLY granted");
+  for (const prohibition of ["copy", "redistribut", "sublicens", "host", "commercial", "modif", "distributed version", "remove", "circumvent", "row-level security", "authentication"]) {
+    assert(license.toLowerCase().includes(prohibition.toLowerCase()), `legal: LICENSE prohibits ${prohibition}...`);
+  }
+  for (const consequence of ["copyright infringement", "breach of this license", "breach of contract", "violations of applicable law"]) {
+    assert(license.includes(consequence), `legal: LICENSE states unauthorized use MAY CONSTITUTE ${consequence}`);
+  }
+  assert(license.includes("Nothing in this license limits rights that cannot lawfully be limited"), "legal: LICENSE carries the lawful-rights savings clause");
+  assert(!/jail|prison|criminal prosecution|automatically be fined|you will be sued/i.test(license + tos), "legal: no exaggerated threats (no jail/prison/automatic-penalty claims)");
+  assert(!/will (constitute|be) (a )?(crime|felony)/i.test(license + tos), "legal: no automatic legal penalties are claimed");
+  assert(tos.includes("Nothing in these Terms limits rights that cannot lawfully be limited"), "legal: ToS carries the same savings clause as the LICENSE");
+  assert(tos.includes("breach of the License") && tos.includes("unauthorized hosting"), "legal: ToS enforcement matches the LICENSE's prohibition list (no contradiction)");
+  assert(privacy.includes("ON YOUR DEVICE") && privacy.includes("local model"), "legal: Privacy Policy describes the ACTUAL architecture (on-device local model)");
+  assert(privacy.includes("aggregate"), "legal: Privacy Policy states the owner sees aggregate analytics only");
   const notice = readFileSync("docs/legal/LEGAL_REVIEW_NOTICE.md", "utf8");
   assert(notice.includes("Neither the AI nor Base44 is the owner's lawyer"),
     "legal: review notice states plainly that neither the AI nor Base44 is the owner's lawyer");
