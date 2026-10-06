@@ -1832,3 +1832,57 @@ citation when failed in isolation. Every case fails safely.
 database (the engine under it, fetchAndVerify, is the same code exercised
 live by the existing research tests); browser click-through of the badges.
 
+## §59 Scan Problem: image-to-solution math pipeline (2026-10-06)
+
+**Requirement:** upgrade the mathematics workflow into an image-to-solution
+pipeline with a 13-step flow, step 7 (showing the recognized expression)
+never skipped, separate tracking of recognized input / solution /
+explanation / verification, deterministic solving across 12+ domains, and
+the LLM never the mathematical authority. Suite 1714/1714, build PASS.
+
+**Implemented and executed:**
+
+- Preprocessing (pure, unit-tested, no DOM): grayscale, Otsu ink mask,
+  crop-to-ink bounding box, rotation, projection-profile deskew
+  (±9° search), expression detection with honest refusals for blank or
+  over-dense images.
+- OCR: the vision model transcribes ONLY (prompt forbids solving or
+  correcting); normalization (x²→x^2, √→sqrt(), ÷→/, ×→*, vulgar
+  fractions, integral markers, systems split) is deterministic and
+  unit-tested; comma decimals never corrupt matrix lists.
+- Step 7 is structurally unskippable: every pipeline result carries the
+  recognized expression, and the UI renders it before anything else; the
+  confirmation gate blocks solving until the user confirms/corrects
+  (low confidence is explicitly flagged and disclosed).
+- Deterministic solver (mathjs + hand formulas): fractions, exponents,
+  square roots, linear equations (2x+5=17 → 2x=12 → x=6 shown as steps),
+  quadratics incl. negative discriminants, systems (LU solve), derivatives,
+  elementary integrals (∫3x²dx=x³+C, ∫1/x=log|x|), non-elementary cases
+  REFUSED honestly, matrices (det/inv/product), statistics, geometry,
+  word problems (sum/difference template; anything unmapped is refused —
+  never guessed).
+- Independent verification: numeric substitution of roots (different
+  mechanism than the solver's algebra), numeric differentiation for
+  derivatives, sample-point equivalence for symbolic answers, system
+  substitution, plus the existing machine-check engine. The LLM never
+  verifies and never solves.
+- NEEDS REVIEW: unsupported or unverifiable results are marked NEEDS
+  REVIEW and displayed with the reason — never hidden, never replaced by
+  a guess (machine-checked for the unmapped word problem, the
+  non-elementary integral, and the degenerate equation).
+- Teacher-specific method step: applies the stored method-compliance
+  profile and reports missing constraints honestly.
+- UI `/math`: Scan Problem (camera capture), crop/rotate/deskew preview,
+  recognized-input card, confirm/correct box, solution steps, AI
+  explanation with honest authority note, verification card with per-check
+  details. API `POST /api/math/solve`.
+
+**The user-flow example is a test:** photo "2x + 5 = 17" → recognized
+"2x + 5 = 17" → user confirms → steps "2x = 12", "x = 6" → independently
+verified OK.
+
+**Not live-verified (honest):** the vision-OCR call against a configured
+provider (tests inject a deterministic OCR engine; the route requires AI
+configuration and refuses honestly otherwise), and browser click-through
+of the camera capture.
+

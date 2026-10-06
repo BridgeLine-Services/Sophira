@@ -256,6 +256,10 @@ Private, source-grounded research notebooks: sources (PDF/DOCX/TXT/web/image/ins
 
 NO VERIFIED CITATION WITHOUT VERIFIED SOURCE: every citation must pass a 12-step check (search result → valid URL → actually requested → redirects followed → final URL → HTTP success → content extracted → title extracted → passage exists → claim overlaps passage → authority met → citation from stored metadata). Any failure → UNVERIFIED with an explanation; failed sources are never replaced by guesses. "Verify all sources again" re-fetches every source before submission (vanished → UNAVAILABLE, changed → STALE; claims demoted, final gate re-run informed). The UI shows VERIFIED / UNVERIFIED / UNAVAILABLE / STALE and never claims "Research complete" while evidence is missing.
 
+#### Scan Math (image → solution)
+
+Photograph an equation: deterministic preprocessing (crop/rotate/deskew, Otsu + projection-profile), vision OCR that transcribes but never solves, the recognized expression is ALWAYS shown for confirmation (step 7 never skipped), then deterministic solving (mathjs: linear, quadratic, systems, derivatives, integrals, matrices, statistics, geometry, word problems), an AI explanation that never re-computes, and INDEPENDENT deterministic verification. Failures are marked NEEDS REVIEW — never hidden, never guessed. See `docs/MATH_SCAN.md`.
+
 ### 3. Run
 
 ```bash
