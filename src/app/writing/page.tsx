@@ -11,6 +11,7 @@ import { fmtDate } from "@/lib/format";
 import { PenLine, RefreshCw } from "lucide-react";
 import { ProfileVersionHistory } from "@/components/app/ProfileVersionHistory";
 import type { WritingProfile, WritingSample } from "@/lib/types";
+import { guardedAiFetch } from "@/lib/ai/offline-guard";
 
 const REPR_BADGE = {
   preferred: { tone: "success" as const, label: "Preferred" },
@@ -45,7 +46,7 @@ export default function WritingPage() {
   async function analyze() {
     setAnalyzing(true);
     try {
-      const res = await fetch("/api/ai/analyze-writing", {
+      const res = await guardedAiFetch("/api/ai/analyze-writing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),

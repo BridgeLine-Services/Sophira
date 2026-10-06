@@ -16,7 +16,10 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog,
 import { SyncStatus } from "@/components/app/SyncStatus";
 import { ProvenanceBadge } from "@/components/app/ProvenanceBadge";
 import { offlineStack, purgeOfflineOnLogout } from "@/lib/offline/client";
-import { LOCAL_MODELS, findModel, recommendModelForDevice } from "@/lib/offline/model-registry";
+import { LOCAL_MODELS, findModel } from "@/lib/offline/model-registry";
+import { detectDeviceCapabilities } from "@/lib/offline/device-capabilities";
+import { setOfflineModeChoice, getOfflineModeChoice } from "@/lib/ai/offline-guard";
+import type { DeviceAnalysis } from "@/lib/offline/device-capabilities";
 import { ONLINE_ONLY_TASKS } from "@/lib/offline/offline-tasks";
 import type { ConflictRecord } from "@/lib/offline/conflicts";
 import type { AiProvenance } from "@/lib/offline/local-engine";
@@ -157,6 +160,7 @@ export default function OfflinePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <DeviceRecommendation />
+            <QualityHonesty />
             {LOCAL_MODELS.map((m) => {
               const st = modelStates[m.id];
               const state = st?.state ?? "unknown";
@@ -165,7 +169,9 @@ export default function OfflinePage() {
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <p className="font-medium">{m.label}</p>
-                      <p className="text-xs text-ink/60">{m.params} · {m.capabilities.join(", ")}</p>
+                      <p className="text-xs text-ink/40">{m.tierLabel}</p>
+                      <p className="text-xs text-ink/60">{m.params} · {m.quantization} · {m.license} · {m.capabilities.join(", ")}</p>
+                      <p className="text-xs text-amber-700/80">Limitations: {m.limitations}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge tone={state === "ready" ? "success" : state === "downloading" ? "accent" : "neutral"}>
@@ -202,6 +208,7 @@ export default function OfflinePage() {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><CloudOff className="h-4 w-4" /> Offline assistant</CardTitle></CardHeader>
           <CardContent className="space-y-3">
+            <OfflineModeToggle />
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <Label>Model</Label>
@@ -273,34 +280,97 @@ export default function OfflinePage() {
 }
 
 /**
- * Client-side device detection → honest model recommendation. NEVER
- * auto-downloads: it only names the recommended tier and why. RAM detection
- * in browsers is coarse (deviceMemory caps at ~8 GB), so the reason states
- * the reported figure, and the user still consents to any download.
+ * Device capability detection → honest tier recommendation. NEVER
+ * auto-downloads; the picker below is the user override, always available.
  */
 function DeviceRecommendation() {
-  const [rec, setRec] = useState<{ modelId: string; reason: string } | null>(null);
-  const [detected, setDetected] = useState("");
+  const [analysis, setAnalysis] = useState<DeviceAnalysis | null>(null);
   useEffect(() => {
-    try {
-      const nav = navigator as Navigator & { deviceMemory?: number };
-      const ramGB = Math.round(nav.deviceMemory ?? 2);
-      const webgpu = typeof navigator !== "undefined" && "gpu" in navigator;
-      setDetected(`detected: ~${ramGB} GB RAM${webgpu ? ", WebGPU available" : ", WASM only"}`);
-      setRec(recommendModelForDevice({ ramGB, webgpu }));
-    } catch {
-      setRec(null);
-    }
+    detectDeviceCapabilities().then(setAnalysis).catch(() => setAnalysis(null));
   }, []);
-  if (!rec) return null;
-  const m = findModel(rec.modelId);
-  if (!m) return null;
+  if (!analysis) return null;
+  const c = analysis.capabilities;
+  const m = findModel(analysis.recommendation.modelId);
+  const tone =
+    analysis.recommendation.resourceClass === "HIGH RESOURCE"
+      ? "border-emerald-600/40 bg-emerald-500/5"
+      : analysis.recommendation.resourceClass === "MEDIUM RESOURCE"
+        ? "border-sky-600/30 bg-sky-500/5"
+        : "border-amber-600/30 bg-amber-500/5";
   return (
-    <div className="rounded-md border bg-muted/50 p-3 text-sm">
-      <p className="font-medium">Recommended for this device: {m.label}</p>
-      <p className="mt-1 text-muted-foreground">
-        {rec.reason} {detected ? `(${detected})` : ""} Nothing downloads without your explicit consent below.
+    <div className={`rounded-md border p-3 text-sm ${tone}`}>
+      <div className="flex items-center justify-between">
+        <p className="font-medium">{analysis.recommendation.resourceClass}</p>
+        <span className="text-xs text-muted-foreground">{analysis.recommendation.policy}</span>
+      </div>
+      <p className="mt-1 font-medium">Recommended for this device: {m?.label}</p>
+      <p className="mt-1 text-muted-foreground">{analysis.recommendation.reason}</p>
+      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-3">
+        <span>WebGPU: {c.webgpu ? "available" : "not available (WASM)"}</span>
+        <span>RAM estimate: ~{analysis.ramEstimateGB} GB</span>
+        <span>CPU cores: {c.cpuCores ?? "unknown"}</span>
+        <span>Platform: {c.platform}</span>
+        <span>CPU arch: {c.cpuArchitecture ?? "unknown"}</span>
+        <span>
+          Storage: {c.storageQuotaGB !== null ? `~${c.storageQuotaGB} GB quota` : "unknown"}
+        </span>
+      </div>
+      {c.detectionNotes.length > 0 && (
+        <details className="mt-1 text-xs text-muted-foreground">
+          <summary className="cursor-pointer">Detection notes ({c.detectionNotes.length})</summary>
+          {c.detectionNotes.map((n, i) => (
+            <p key={i}>• {n}</p>
+          ))}
+        </details>
+      )}
+      <p className="mt-1 text-xs text-muted-foreground">
+        The recommendation is only a starting point — you can override it by picking any model below. Nothing downloads
+        without your explicit consent.
       </p>
     </div>
+  );
+}
+
+/**
+ * LOCAL MODEL QUALITY vs REMOTE MODEL QUALITY — the honest disclosure.
+ * The UI never pretends the local tier matches the online tier.
+ */
+function QualityHonesty() {
+  return (
+    <div className="rounded-md border border-amber-400/50 bg-amber-50/60 p-3 text-xs dark:bg-amber-950/20">
+      <p className="font-medium">Local model quality vs remote model quality (honest)</p>
+      <p className="mt-1">
+        <strong>LOCAL:</strong> small open-weight models (135M–4B, quantized). Real, private, works offline — but
+        expect shorter, shallower answers, weaker math, and occasional factual errors. Every local answer is stamped{" "}
+        <em>LOCAL MODEL</em>.
+      </p>
+      <p className="mt-1">
+        <strong>REMOTE:</strong> when online (and only then), Sophira uses the Gemini free tier — larger models with
+        substantially better reasoning and accuracy. If the local model is weaker, this page says so; it never
+        pretends otherwise.
+      </p>
+      <p className="mt-1 text-muted-foreground">
+        Estimated performance per tier: TIER 1 (phone/lightweight) — basic drafts; TIER 2 (1–4B) — meaningful
+        assistance; TIER 3 (4B q4) — the strongest local quality Sophira can verify, still below remote quality.
+      </p>
+    </div>
+  );
+}
+
+/** Offline-mode toggle: the user&apos;s explicit choice, persisted locally. */
+function OfflineModeToggle() {
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    setOn(getOfflineModeChoice());
+  }, []);
+  const flip = (v: boolean) => {
+    setOfflineModeChoice(v);
+    setOn(v);
+  };
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <input type="checkbox" checked={on === true} onChange={(e) => flip(e.target.checked)} />
+      Offline mode (never contact remote AI, search, or source verification until you turn this off)
+    </label>
   );
 }

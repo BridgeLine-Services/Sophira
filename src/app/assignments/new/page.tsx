@@ -9,6 +9,7 @@ import type { Course, Mode, Teacher } from "@/lib/types";
 import {
   BookOpen, ClipboardCheck, FileText, Layers, Lightbulb, PenLine, Sparkles, Wrench, X,
 } from "lucide-react";
+import { guardedAiFetch } from "@/lib/ai/offline-guard";
 
 const MODE_ICONS: Record<Mode, React.ReactNode> = {
   learn: <BookOpen className="h-5 w-5" />,
@@ -168,7 +169,7 @@ function Wizard() {
     }
     setBusy(true);
     try {
-      const res = await fetch("/api/ai/solve", {
+      const res = await guardedAiFetch("/api/ai/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

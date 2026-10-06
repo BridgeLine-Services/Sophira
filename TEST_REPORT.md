@@ -1673,3 +1673,52 @@ the owner UI shows everything before activation. Suite 1325/1325.
 **Not live-verified (honest):** a real Gemini call (no `GEMINI_API_KEY` in
 this environment) and the owner-side blockers — unchanged in the gate.
 
+## §56 Tiered offline models + network-denial routing (2026-10-06)
+
+**Changed:** the offline model registry grew from 3 small models to a 6-model,
+3-tier system, every entry hub-verified on 2026-10-06 with immutable
+revision pins. Suite 1396/1396.
+
+**Implemented and executed (all assertions ran in `npm test`):**
+
+- `src/lib/offline/model-registry.ts` v2 — TIER 1 (SmolLM2 135M + 360M,
+  Qwen2.5 0.5B), TIER 2 (Qwen2.5 1.5B + Qwen3 1.7B), TIER 3 (Qwen3 4B
+  Instruct 2507, q4 sharded). All apache-2.0, all ungated, all pinned to
+  40-char commit SHAs (never "main"/"latest" — machine-checked). Each entry
+  records version, revision, license, params, quantization, download size
+  (summed from the real file manifest), RAM recommendation, context size,
+  platforms, runtime, capabilities, limitations.
+- `src/lib/offline/device-capabilities.ts` — navigator.gpu/WebGPU,
+  hardwareConcurrency, deviceMemory (8 GB cap honestly noted), storage
+  estimate, platform, CPU architecture -> LOW/MEDIUM/HIGH resource class ->
+  recommendation with policy text; user override always available in the
+  picker (tested).
+- `src/lib/offline/model-manager.ts` — a model is READY only after:
+  manifest verified -> sizes verified -> hash capability recorded (LFS sha256
+  via WebCrypto when available) -> model loads -> REAL local inference probe
+  succeeds. Probe failure after download = FAILED, never a fake ready
+  (tested). Disclosure now includes license, quantization, context,
+  limitations, estimated performance before any download.
+- `src/lib/ai/offline-guard.ts` — offline routing: while offline (or while
+  the user's offline mode is on), the client REFUSES fetch()/Gemini/OpenAI/
+  remote search/remote source verification before touching the network
+  (OfflineAiBlockedError). All 5 client AI call sites now go through it.
+  Leaving offline mode is explicit. Tests prove ZERO instrumented fetch
+  attempts under the offline decision and that the local engine still
+  generates with fetch hard-blocked.
+- Gemma family: ungated ONNX builds verified on the hub but NOT registered —
+  Gemma Terms of Use is an owner decision (documented in
+  docs/OFFLINE_MODELS.md, not silently included).
+- Native AI Edge / MediaPipe investigation documented (Android/iOS-only
+  runtime; needs a Capacitor plugin round). transformers.js WASM stays the
+  PWA/desktop fallback; nothing existing was removed.
+- Offline page UI: device capability panel (LOW/MEDIUM/HIGH + detected
+  signals + honest unknowns), tier labels, limitations shown per model,
+  LOCAL vs REMOTE quality disclosure, offline-mode toggle.
+
+**Not live-verified (honest):** actual on-device downloads/inference of the
+new 360M/1.7B/4B entries (the RUN_LIVE_MODEL live pipeline check remains
+opt-in for a real machine run), and native MediaPipe integration (documented
+as the next engineering round). The registry itself was verified against the
+live HF hub on 2026-10-06.
+

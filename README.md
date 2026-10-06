@@ -237,6 +237,17 @@ Sophira never silently depends on a paid API:
 - **Model-level fail-closed** — with paid AI off, only models on the verified free-tier list (`VERIFIED_FREE_TIER_GEMINI_MODELS`) may run; an unknown `GEMINI_MODEL` is rejected. This is the "free forever" guard: if Google moves a model off the free tier, removing it from the list blocks it.
 - **Startup diagnostic** — `GET /api/provider-diagnostics` (owner session) returns ONLY: `configured_provider`, `configured_model`, `local_model_availability`, `free_tier_mode`, `paid_ai_allowed`. Never API keys.
 
+#### Offline models (tiers)
+
+The Offline page offers tiered on-device models, all verified on the HF hub
+and pinned to immutable revisions: TIER 1 phone/lightweight (SmolLM2 135M/360M,
+Qwen2.5 0.5B), TIER 2 phone-performance/laptop (Qwen2.5 1.5B, Qwen3 1.7B),
+TIER 3 laptop/desktop (Qwen3 4B q4). Device capability detection recommends
+a tier (LOW/MEDIUM/HIGH) you can always override; nothing downloads without
+explicit confirmation, and a model is only "ready" after a real local
+inference probe. While offline, no remote AI/search/verification call is
+ever attempted. See `docs/OFFLINE_MODELS.md`.
+
 ### 3. Run
 
 ```bash

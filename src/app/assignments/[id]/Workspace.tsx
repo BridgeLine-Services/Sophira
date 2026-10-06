@@ -16,6 +16,7 @@ import { ResearchPanel } from "@/components/app/ResearchPanel";
 import { MODE_MAP } from "@/lib/modes";
 import type { AiResponse, Assignment, Course, Teacher, WorkSession } from "@/lib/types";
 import { AlertTriangle, BookOpen, Check, Copy, Pencil, Save, Send, X } from "lucide-react";
+import { guardedAiFetch } from "@/lib/ai/offline-guard";
 
 const QUICK_ACTIONS = [
   "Explain this step",
@@ -200,7 +201,7 @@ export function Workspace({
     if (!lastFeedbackId) return;
     setRuleBusy(true);
     try {
-      const res = await fetch("/api/ai/feedback-to-proposal", {
+      const res = await guardedAiFetch("/api/ai/feedback-to-proposal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ feedback_id: lastFeedbackId }),
@@ -224,7 +225,7 @@ export function Workspace({
     if (!followUp.trim()) return;
     setSending(true);
     try {
-      const res = await fetch("/api/ai/solve", {
+      const res = await guardedAiFetch("/api/ai/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

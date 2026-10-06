@@ -60,8 +60,12 @@ export class LocalInferenceEngine {
     const cached = this.pipelines.get(spec.id);
     if (cached) return cached;
     const t = await getTransformers();
+    // dtype follows the REGISTRY's verified quantization (q4 models load q4,
+    // int8 models load q8) — never a hardcoded guess.
+    const dtype = /q4/i.test(spec.quantization) ? "q4" : "q8";
     const pipe = (await t.pipeline("text-generation", spec.hfRepo, {
-      dtype: "q8",
+      dtype,
+      revision: spec.revision, // immutable SHA pin — never "main"/"latest"
     })) as PipelineApi;
     this.pipelines.set(spec.id, pipe);
     return pipe;

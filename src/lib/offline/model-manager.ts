@@ -73,7 +73,7 @@ export class ModelManager {
     return this.integrity.get(modelId) ?? null;
   }
 
-  /** The pre-download disclosure the UI must show (size, RAM, capabilities). */
+  /** The pre-download disclosure the UI must show BEFORE activation. */
   describe(modelId: string): (LocalModelSpec & { state: ModelState; disclosure: string }) | null {
     const spec = findModel(modelId);
     if (!spec) return null;
@@ -82,8 +82,61 @@ export class ModelManager {
       state: this.stateOf(modelId),
       disclosure:
         `Download ~${spec.approxSizeMB} MB (one time) · needs roughly ${spec.minRAMMB} MB free memory · ` +
-        `supports: ${spec.capabilities.join(", ")} · ${spec.notes}`,
+        `license: ${spec.license} · quantization: ${spec.quantization} · context: ${spec.contextSize} tokens · ` +
+        `capabilities: ${spec.capabilities.join(", ")} · ` +
+        `limitations: ${spec.limitations} · estimated performance: ${spec.tierLabel} — small-model quality, always stamped LOCAL MODEL · ` +
+        `${spec.notes}`,
     };
+  }
+
+  /**
+   * REAL local inference probe: generate a tiny completion through the
+   * actual loaded pipeline. A model is marked READY only after this probe
+   * succeeds — a download that cannot generate is never reported ready.
+   * The pipeline is injected so tests run without weights.
+   */
+  async probeModel(
+    modelId: string,
+    inject?: { pipeline?: unknown; generate?: (modelId: string, prompt: string, opts?: { maxNewTokens?: number }) => Promise<{ text: string }> }
+  ): Promise<{ ok: boolean; detail: string; output: string }> {
+    const spec = findModel(modelId);
+    if (!spec) return { ok: false, detail: "unknown model id", output: "" };
+    const generate =
+      inject?.generate ??
+      (async (mid: string, prompt: string, opts?: { maxNewTokens?: number }) => {
+        const { LocalInferenceEngine } = await import("./local-engine");
+        const engine = new LocalInferenceEngine();
+        return engine.generate(mid, prompt, opts);
+      });
+    try {
+      const r = await generate(modelId, "Reply with exactly: ok", { maxNewTokens: 8 });
+      const text = (r?.text ?? "").trim();
+      if (!text) {
+        return { ok: false, detail: "probe failed: model loaded but produced no output", output: "" };
+      }
+      return { ok: true, detail: `real local inference probe succeeded (${text.slice(0, 24)}…)`, output: text };
+    } catch (e) {
+      return { ok: false, detail: `probe failed: ${(e as Error).message}`, output: "" };
+    }
+  }
+
+  /**
+   * Verify a downloaded blob's sha256 against the manifest's LFS oid
+   * (hashes "when available" — LFS files carry them on the HF hub).
+   * Uses WebCrypto (browser + Node >= 15). Returns null when the platform
+   * cannot hash.
+   */
+  static async verifyBlobHash(blob: ArrayBuffer, expectedSha256: string): Promise<boolean | null> {
+    if (typeof crypto === "undefined" || !crypto.subtle) return null;
+    try {
+      const digest = await crypto.subtle.digest("SHA-256", blob);
+      const hex = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      return hex === expectedSha256.toLowerCase();
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -136,7 +189,15 @@ export class ModelManager {
    * already have seen `describe().disclosure` — the manager enforces this:
    * it refuses silent downloads.
    */
-  async download(modelId: string, opts: { confirmed: boolean; onProgress?: (p: DownloadProgress) => void }): Promise<{ ok: boolean; detail: string }> {
+  async download(
+    modelId: string,
+    opts: {
+      confirmed: boolean;
+      onProgress?: (p: DownloadProgress) => void;
+      /** injected probe (tests); defaults to the REAL local-engine probe */
+      probe?: (modelId: string) => Promise<{ ok: boolean; detail: string; output: string }>;
+    }
+  ): Promise<{ ok: boolean; detail: string }> {
     const spec = findModel(modelId);
     if (!spec) return { ok: false, detail: "unknown model id" };
     if (!opts.confirmed) {
@@ -175,9 +236,16 @@ export class ModelManager {
         this.states.set(modelId, was === "ready" ? "ready" : "corrupt");
         return { ok: false, detail: `integrity check failed: ${integrity.detail}` };
       }
+      report({ modelId, progress: 0.98, stage: "running local inference probe" });
+      const probe = opts.probe ? await opts.probe(modelId) : await this.probeModel(modelId);
+      if (!probe.ok) {
+        // downloaded and hash-verified but CANNOT generate → NOT ready
+        this.states.set(modelId, was === "ready" ? "ready" : "failed");
+        return { ok: false, detail: `probe failed after download — model is NOT marked ready: ${probe.detail}` };
+      }
       this.states.set(modelId, "ready");
       report({ modelId, progress: 1, stage: "ready" });
-      return { ok: true, detail: `model ready (${spec.label}), integrity: ${integrity.detail}` };
+      return { ok: true, detail: `model ready (${spec.label}) — ${probe.detail}; integrity: ${integrity.detail}` };
     } catch (e) {
       // rollback/failure handling: restore previous state, surface the error
       this.states.set(modelId, was === "ready" ? "ready" : "failed");

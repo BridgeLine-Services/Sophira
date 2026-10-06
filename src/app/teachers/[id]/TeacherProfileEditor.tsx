@@ -7,6 +7,7 @@ import {
 } from "@/components/ui";
 import type { Teacher, TeacherDoc, TeacherProfile } from "@/lib/types";
 import { ProfileVersionHistory } from "@/components/app/ProfileVersionHistory";
+import { guardedAiFetch } from "@/lib/ai/offline-guard";
 
 type ReqField =
   | "required_methods" | "required_steps" | "preferred_notation" | "units_sig_figs"
@@ -223,7 +224,7 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
     }
     setExtractBusy(true);
     try {
-      const res = await fetch("/api/ai/extract-teacher-doc", {
+      const res = await guardedAiFetch("/api/ai/extract-teacher-doc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teacher_id: teacher.id, kind, title: docTitle.trim(), content: docContent }),
