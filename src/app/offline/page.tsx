@@ -159,6 +159,12 @@ export default function OfflinePage() {
             <CardTitle className="flex items-center gap-2"><Cpu className="h-4 w-4" /> Local AI model</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <p className="rounded border border-warn/30 bg-warn/5 p-3 text-xs text-ink-soft">
+              One-time setup: Sophira needs an internet connection to download the AI engine and
+              the model. After setup is complete (engine + model cached), supported local AI can
+              run without internet — we never claim offline-from-first-launch before the cache
+              exists.
+            </p>
             <DeviceRecommendation />
             <QualityHonesty />
             {LOCAL_MODELS.map((m) => {

@@ -2590,3 +2590,53 @@ package.json anywhere in the tracked tree; no monorepo tooling files;
 desktop files unchanged. Supabase env names, owner bootstrap 0025, and
 optional OpenAI re-verified unchanged.
 
+## §75 LOCAL-FIRST TESTING MODE (2026-10-06): real local AI with no Vercel/Supabase/paid API
+
+**LIVE-VERIFIED behavior (npm run dev, no Supabase configured):**
+- SOPHIRA_LOCAL_FIRST=true (development build): /local HTTP 200,
+  /offline HTTP 200, /dashboard redirects to /local (the explanatory
+  landing page) — NOT to a dead /login loop.
+- Mode OFF: /offline redirects to /login exactly as before — production
+  authentication unchanged (byte-for-byte same code path).
+
+**Implementation:**
+- middleware: explicit dev-only gate — requires BOTH
+  SOPHIRA_LOCAL_FIRST === "true" AND NODE_ENV !== "production" (a
+  Vercel production build always has NODE_ENV=production, so the mode
+  is impossible to activate accidentally in production). Scoped to
+  /local + /offline only; every other path redirects to /local.
+- /local landing page (plain English, reuses the REAL engine — no
+  duplicated inference code): local testing mode banner; what the mode
+  means (on-device AI, no paid API, model stays on device, cloud
+  honestly "not connected"); one-time-setup honesty (first setup needs
+  internet for the engine + model); one obvious "Test Local AI" button
+  into the existing Offline page.
+- Offline page: explicit one-time-setup note — never claims
+  offline-from-first-launch before the engine + model are cached.
+- npm run local:test — PASS/FAIL verification (Node >= 20, deps,
+  engine files, registry, middleware gate, docs, tsc) with NO downloads.
+- npm run local:test:model — explicit opt-in (--yes) HEAD reachability
+  check of the smallest model's source; never silently downloads
+  weights.
+- docs/QUICK_START_LOCAL.md — PATH A (PWA, for total beginners) and
+  PATH B (GitHub clone, SOPHIRA_LOCAL_FIRST=true npm run dev); honest
+  capability table (what works with no internet after first setup;
+  what still needs internet; what needs Supabase; what needs a remote
+  AI provider — nothing).
+- README: "Test Sophira without Vercel" section.
+
+**Unchanged by design:** the real Transformers.js/ONNX engine, tiered
+device-aware model registry (TIER 1 phone → TIER 3 desktop), encrypted
+offline storage, sync engine, offline routing guard, PWA, Capacitor
+(production builds still require SOPHIRA_APP_URL), Tauri, owner
+bootstrap, invitations, RLS. Native dev flows (android:debug, ios:sync,
+desktop:dev) already resolve to the local dev server in development.
+
+**Tests (2081/2081 PASS; local:test 14/14 PASS; build PASS; secret scan
+CLEAN):** new tests/local-first.ts — production-impossible gate, scoped
+bypass, mode-off behavior unchanged, plain-English landing claims,
+reuse of the real engine, one-time-setup honesty, failure/rollback
+honesty (never falsely ready), offline-guard never attempts remote,
+tiered registry intact, docs/scripts contracts, no remote-provider or
+secret references in the local flow.**
+

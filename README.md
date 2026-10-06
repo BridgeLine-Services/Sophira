@@ -403,6 +403,21 @@ placeholders remain unresolved.
 | Release-gate hardening + legal status + gate workload wiring | **Implemented and unit-tested (offline)** — the release workflow runs `scripts/verify-deployment.mjs` against the target's live `/api/health` and refuses to ship when any required capability is unconfigured (search optional); `npm run legal:status` machine-reports the 17 remaining bracketed legal owner facts (owner action + attorney review); `/api/readiness/final` wires the workload estimator into the gate's deadline feasibility (applied only while blockers exist). Suite: 440. |
 | LONG-TERM STUDENT MEMORY (workflow §28) | **Implemented and unit-tested (offline + live-wired)** — migration 0020 (`student_memories` + `student_memory_evidence`, strict own-row RLS on both, owner NOT exempt) + `src/lib/memory/engine.ts` (pure): 13 structured categories (goals, strengths, weaknesses, learning/explanation preferences, study habits, recurring mistakes, conceptual misunderstandings, academic history, subject preferences, motivation patterns, effective/ineffective strategies); every AI-inferred memory is an EVIDENCE-BACKED HYPOTHESIS, never an asserted fact — structured evidence rows (type, polarity, summary, source refs, observed date), confidence recomputed from the full evidence history with RECENCY WEIGHTING (120-day half-life: fresh evidence dominates, outdated behavior never permanently defines the student; diminishing returns, symmetric supports/contradictions, floor 0.05/cap 0.95); AI-inferred memories stay `monitoring` until confidence clears 0.5; improvement trends computed from the evidence sequence (3 consecutive clean machine-verified solutions on a weakness → trend `improving`); full lifecycle: create/update/confirm/contradict/improve/archive/disable/forget(hard delete, evidence cascades)/restore with student-controlled transitions (forgotten stays forgotten). AI retrieval (`selectRelevantMemories`): ONLY memories relevant to the current academic context (subject-tag matching, relevance-ranked, hard cap 8, archived/disabled/forgotten never injected) — never a dump of the student's history; decisions persisted per response for auditability. Solve-route evidence loop: observed mistakes → `incorrect_problem` evidence; machine-verified clean answers → `correct_solution` CONTRADICTING evidence on matching weaknesses. Student Memory Management UI (`/memories`): view/search/filter, inspect every evidence row, edit, disable, re-enable, archive, permanently forget (with confirm), add manual memories clearly badged `student-stated fact` vs `AI-inferred`. Privacy: requireUser + explicit user_id scoping + RLS (defense in depth), NO service-role client anywhere in the memory layer, owner network-stats never touch memories; live RLS regression matrix extended to TEN private categories (owner NO ACCESS to student memories). Structured relational data — deliberately NO vector/embedding store (transparent matching, every selection explainable). Suite §28: 1051/1051. |
 
+## Test Sophira without Vercel
+
+Clone the repository, then:
+
+```bash
+npm install
+SOPHIRA_LOCAL_FIRST=true npm run dev   # Mac/Linux
+# Windows: $env:SOPHIRA_LOCAL_FIRST="true"; npm run dev
+```
+
+Open http://localhost:3000 → "Test Sophira locally" → Test Local AI →
+download the recommended on-device model → ask a question, offline. No
+Vercel, no Supabase, no OpenAI, no API keys. Full instructions for
+total beginners: **docs/QUICK_START_LOCAL.md**.
+
 ## Deploying
 
 See **docs/VERCEL_DEPLOYMENT.md**: Vercel deploys the repository root as a single Next.js application (`vercel.json` pins the framework); `src-tauri` stays in the repository as the desktop app and is never a Vercel service.

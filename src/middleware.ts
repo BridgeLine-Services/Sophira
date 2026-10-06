@@ -18,11 +18,39 @@ function hasSupabaseEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
+// LOCAL-FIRST DEVELOPMENT MODE (2026-10-06, docs/QUICK_START_LOCAL.md):
+// lets a person clone Sophira, run `SOPHIRA_LOCAL_FIRST=true npm run dev`,
+// and test the REAL local AI (model download + on-device inference) with no
+// Supabase, no Vercel, and no remote AI key. Security rules:
+//   - impossible to activate accidentally in production: it requires BOTH
+//     SOPHIRA_LOCAL_FIRST === "true" AND NODE_ENV !== "production" (a Vercel
+//     production build always has NODE_ENV=production, so even a stray env
+//     var cannot open this path there);
+//   - scoped ONLY to the local testing surface (/local + /offline): every
+//     other protected path still redirects (to /local, which explains the
+//     mode, instead of a dead /login loop);
+//   - when Supabase IS configured the middleware behaves EXACTLY as before
+//     (full authentication, invitation checks, revoked-status deny) — this
+//     branch only runs in the Supabase-absent case.
+const LOCAL_FIRST = process.env.SOPHIRA_LOCAL_FIRST === "true" && process.env.NODE_ENV !== "production";
+const LOCAL_TEST_PATHS = ["/local", "/offline"];
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC.some((p) => path === p || path.startsWith(p + "/"));
   if (!hasSupabaseEnv()) {
+    if (LOCAL_FIRST) {
+      const isLocalTest = LOCAL_TEST_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+      if (isPublic || isLocalTest) return NextResponse.next();
+      // Local-first mode: send everything else to the local test landing
+      // page (which explains the mode in plain English) — NOT to /login,
+      // which cannot work without Supabase.
+      const url = request.nextUrl.clone();
+      url.pathname = "/local";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
     if (isPublic) return NextResponse.next();
     const url = request.nextUrl.clone();
     url.pathname = "/login";
