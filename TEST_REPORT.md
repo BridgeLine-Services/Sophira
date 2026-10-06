@@ -1279,3 +1279,46 @@ users via the live-database status check, so it grants nothing; the
 operator/deployer (Supabase project access) remains the trust root for
 owner-account recovery — by design. Suite **989/989**, tsc clean,
 `next build` passes, all security self-tests pass.
+
+## 46. Deployment-readiness audit for real end-to-end AI testing (2026-10-06) — 1051/1051 offline, live deployment confirmed DEGRADED, not broken
+
+**Round intent:** make the existing deployment ready for REAL end-to-end AI
+testing. Audit only — no authentication, owner-access, revocation,
+invitation, RLS, AI-routing, or security code was modified this round.
+
+**Actually run today (offline):**
+- `npm test` — **1051/1051 PASSED** (compiles tests via tsc, runs the full suite).
+- `npm run build` — **passes** (Next 14.2.35).
+- Release gate (full mode, includes build + tsc) — **20 PASS / 0 FAIL / 17 BLOCKED / 1 NOT RUN**, RELEASE STATUS: BLOCKED; every blocker is an owner-credential item. `docs/RELEASE_GATE_REPORT.txt` regenerated (the committed copy was stale — it still said "migrations 0001–0018" from before the 0020 memory migration; the file now records the current 0001–0020 chain and today's gate run).
+- `node scripts/verify-deployment.mjs --self-test` — 7/7.
+- Secrets scan (repo-wide pattern scan + gate secrets check) — no hardcoded keys/credentials in source.
+
+**Actually verified LIVE against https://sophira.vercel.app (today):**
+- `GET /api/health` → `{"ok":true,"name":"sophira","configuration":{"supabase":false,"supabase_service_role":false,"ai":false,"search":false}}` — the production deployment is **degraded, and it reports that honestly** (booleans only, never values, per the health contract).
+- `GET /` (unauthenticated) → 307 to `/login`; `/login` → 200 prerendered shell (client-rendered sign-in form, no misleading "working" claim).
+- `node scripts/verify-deployment.mjs https://sophira.vercel.app` → exit 1: "Deployment NOT ready: Supabase (auth + database); Supabase service-role key (AI/extract/account routes); AI provider key. Optional: web-search provider" — the deployment verifier fails closed exactly as designed.
+- Unauthenticated probe `POST /api/invitations/accept` (fake token) → 500, no data exposed: with no Supabase configuration the route cannot run and does not pretend to succeed.
+
+**Audit-verified by reading code + suite assertions (not modified):**
+- Health route exposes ONLY boolean configuration status.
+- Owner bootstrap is fail-closed via `public.app_config.owner_email` (migration 0008): no owner_email → first signup rejected; the old "first signup becomes owner" rule is removed; no default password exists; no owner credentials in source.
+- Invitation-only signup is enforced inside the database trigger (atomic claim, expiry + revocation, email binding); `requireUser` chain enforces authenticated → revoked-rejected(403) → resource on every protected API route; migration 0019 carries the revocation audit trail + `revoke_all_sessions`; migrations 0001–0020 are present in the repo.
+- Missing AI config returns honest 503 `needsConfig` (never a fake answer); missing Supabase config never yields a misleading "working" state.
+
+**BLOCKED — requires owner/deployment credentials (not tested; no fake claims):**
+- Production Supabase connection, production migration status (0001–0020), live security matrices (need `SUPABASE_TEST_URL` / `SUPABASE_TEST_ANON_KEY` / `SUPABASE_TEST_SERVICE_ROLE_KEY` on a disposable test project), the real AI flow end-to-end (needs `OPENAI_API_KEY` + configured Supabase), search-provider live test (needs `SEARCH_API_KEY`), and the all-true `/api/health` state.
+
+**Exact production environment variables still missing (set in Vercel →
+Project → Settings → Environment Variables):**
+1. `NEXT_PUBLIC_SUPABASE_URL`
+2. `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. `SUPABASE_SERVICE_ROLE_KEY`
+4. `OPENAI_API_KEY`
+5. `SOPHIRA_MODEL` (recommended; default `gpt-4o-mini`) and `OPENAI_BASE_URL` (only for a non-OpenAI provider)
+6. `SEARCH_PROVIDER` + `SEARCH_API_KEY` — ONLY if web research is being tested (optional; research degrades gracefully)
+7. `SOPHIRA_APP_URL` (release gate + native build URL; e.g. `https://sophira.vercel.app`)
+
+**Operator SQL still required on the production database (see
+docs/RELEASE_PROCESS.md):** run migrations 0001–0020, then
+`insert into public.app_config (key, value) values ('owner_email', to_jsonb('<owner email>')) ...`
+BEFORE the first owner signup. No owner password is created by the app.

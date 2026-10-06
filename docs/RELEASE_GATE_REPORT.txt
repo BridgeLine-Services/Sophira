@@ -1,10 +1,10 @@
 
-SOPHIRA RELEASE GATE — 2026-10-05T16:39:35.526Z
+SOPHIRA RELEASE GATE — 2026-10-06T03:02:24.293Z
 ==============================================================================
 [✗] BLOCKED Production URL works
           SOPHIRA_APP_URL is not configured (owner must set the production deployment URL)
 [✗] BLOCKED Database migrations applied
-          database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — verify migrations 0001-0018 on the production database
+          database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — verify migrations 0001-0020 on the production database
 [✗] BLOCKED AI provider configured
           OPENAI_API_KEY is not configured
 [✗] BLOCKED Search provider configured
@@ -22,35 +22,35 @@ SOPHIRA RELEASE GATE — 2026-10-05T16:39:35.526Z
 [✗] BLOCKED Student-to-student isolation tested
           SUPABASE_TEST_URL / SUPABASE_TEST_ANON_KEY / SUPABASE_TEST_SERVICE_ROLE_KEY are not configured — the live matrices cannot run — cross-student isolation is not LIVE-tested
 [✓] PASS    Writing profile tested
-          offline suite green — suite §3/§5 (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §3/§5 (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Teacher-specific rules tested
-          offline suite green — suite §1/§4 (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §1/§4 (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Teacher rules override old personal habits
-          offline suite green — suite §8/§12a + §18 conflict loop (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §8/§12a + §18 conflict loop (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Learning corrections tested
-          offline suite green — suite §9-§12 (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §9-§12 (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Learning stale-pattern detection tested
-          offline suite green — suite §8d + §18 decay (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §8d + §18 decay (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Typing test tested
-          offline suite green — suite §13/§15d (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §13/§15d (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Typing-paced output tested
-          offline suite green — suite §14/§15b (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §14/§15b (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Deadline scheduler tested
-          offline suite green — suite §15/§15c (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §15/§15c (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Persisted break/session state tested
-          offline suite green — suite §19 execution state machine (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §19 execution state machine (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Rubric audit tested
-          offline suite green — suite §15e (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §15e (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Submission readiness gate tested
-          offline suite green — suite §15j/§15k + §16b-§16d (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §15j/§15k + §16b-§16d (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Research retrieval tested
-          offline suite green — suite §15i (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §15i (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Claim-to-source verification tested
-          offline suite green — suite §16b (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §16b (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Citation integrity tested
-          offline suite green — suite §15h/§16d (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §15h/§16d (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✓] PASS    Source authority ranking tested
-          offline suite green — suite §16c (--fast: npm test skipped (must have run in the same job))
+          offline suite green — suite §16c (npm test RESULTS: 1051 passed, 0 failed, 1051 total)
 [✗] BLOCKED PWA tested on Android
           docs/DEVICE_ACCEPTANCE.md row is NOT TESTED — NOT TESTED — no physical device available
 [✗] BLOCKED PWA tested on iPhone
@@ -62,19 +62,19 @@ SOPHIRA RELEASE GATE — 2026-10-05T16:39:35.526Z
 [✗] BLOCKED Native URL configured
           native URL not configured for release — set SOPHIRA_APP_URL (::error::Native build URL is invalid (release build) — refusing to build:   - SOPHIRA_APP_URL must be defined for a release build — refusing to build.   - There is no fallback anymore (the old silent )
 [✓] PASS    Capacitor versions aligned
-          all @capacitor/* toolchain packages are on major 8 (@capacitor/android@^8.5.2, @capacitor/app@^8.1.1, @capacitor/camera@^8.2.4, @capacitor/core@^8.5.2, @capacitor/ios@^8.5.2, @capacitor/cli@^8.5.2)
+          all @capacitor/* toolchain packages are on major 8 (@capacitor/android@^8.5.2, @capacitor/app@^8.1.1, @capacitor/camera@^8.2.4, @capacitor/core@^8.5.2, @capacitor/ios@^8.5.2, @capacitor/cli@^8.4.3)
 [✗] BLOCKED Legal placeholders removed or explicitly blocked pending owner input
           legal documents still carry unresolved owner-fact placeholders (see docs/legal/LEGAL_CONFIGURATION.md) — explicitly blocked pending owner input; agent must not invent them
 [✗] BLOCKED Production environment variables verified
           missing production environment variables: SOPHIRA_APP_URL, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY, SEARCH_API_KEY
 [✓] PASS    No secrets committed
-          no secret patterns in 306 tracked files (private keys, sk-/rk-, AWS, ghp_, xox)
+          no secret patterns in 319 tracked files (private keys, sk-/rk-, AWS, ghp_, xox)
 [✓] PASS    npm test passes
-          --fast: npm test skipped (must have run in the same job)
+          npm test RESULTS: 1051 passed, 0 failed, 1051 total
 [✓] PASS    npm build passes
-          --fast: npm run build skipped (must have run in the same job)
+          next build succeeded
 [✓] PASS    Type checking passes
-          --fast: tsc skipped (must have run in the same job)
+          tsc --noEmit clean
 [✗] BLOCKED Security tests pass
           security suites pass offline; SUPABASE_TEST_URL / SUPABASE_TEST_ANON_KEY / SUPABASE_TEST_SERVICE_ROLE_KEY are not configured — the live matrices cannot run
 ------------------------------------------------------------------------------
@@ -84,7 +84,7 @@ RELEASE STATUS: BLOCKED
 
 BLOCKERS:
 1. Production URL works — BLOCKED: SOPHIRA_APP_URL is not configured (owner must set the production deployment URL)
-2. Database migrations applied — BLOCKED: database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — verify migrations 0001-0018 on the production database
+2. Database migrations applied — BLOCKED: database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — verify migrations 0001-0020 on the production database
 3. AI provider configured — BLOCKED: OPENAI_API_KEY is not configured
 4. Search provider configured — BLOCKED: SEARCH_API_KEY is not configured (provider: brave)
 5. Search provider live test passes — BLOCKED: cannot live-test the search provider — SEARCH_API_KEY is not configured
