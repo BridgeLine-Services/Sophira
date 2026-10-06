@@ -176,24 +176,19 @@ Key design decisions:
    on the **/setup** page (public operator diagnostic) or via
    **GET /api/setup-status** — they report, in categorical terms only:
    whether the Supabase connection is configured, the migrations are
-   applied, `app_config.owner_email` is set, the owner account exists and
-   is active, and the AI provider is configured. They never display keys,
-   tokens, emails, or passwords.
-3. **Configure the owner email (required — signup is fail-closed without
-   it).** Migration 0008 removed the old "first user to sign up becomes
-   owner" rule (any stranger could claim ownership of a fresh install).
-   The initial owner is now taken from `public.app_config`. Run once,
-   replacing the address with the owner's real email:
-
-   ```sql
-   insert into public.app_config (key, value)
-   values ('owner_email', to_jsonb('owner@example.com'::text))
-   on conflict (key) do update set value = excluded.value;
-   ```
-
-   Until this is set, **every** signup (including the first) is rejected by
-   the database with a clear operator-facing message — that is the intended
-   fail-closed behavior, not a bug.
+   applied, the owner account exists and is active, and the AI provider
+   is configured. They never display keys, tokens, emails, or passwords.
+3. **Create the owner account (no database configuration needed).** With
+   no owner yet, the sign-in screen shows **Create Owner Account** (also
+   available at **/create-owner** and from **/setup**). Enter your email,
+   choose your own password, and you become the owner. Migration 0025
+   enforces this at the database level: the owner slot is a single atomic
+   claim — exactly one owner can ever exist, simultaneous registrations
+   cannot create two owners, and once the owner exists the claim closes
+   permanently and every later signup requires a valid invitation.
+   No manual `app_config.owner_email` insert is needed. (If an operator
+   DID configure `owner_email`, the claim stays restricted to that exact
+   address — that restriction remains supported but is optional.)
 4. In **Authentication → Providers**, keep Email enabled. For a truly closed
    group, also set **Authentication → Sign In / Up → "Confirm email" on**, and
    consider disabling anonymous access. Signup is invitation-only **at the
@@ -271,8 +266,8 @@ npm install
 npm run dev        # http://localhost:3000
 ```
 
-The account configured as `owner_email` in `app_config` (step 3 above) becomes the
-**owner** on first signup. The owner manages membership from the **Owner Dashboard**
+The first account registered through **Create Owner Account** (step 3 above) becomes the
+**owner**. The owner manages membership from the **Owner Dashboard**
 (`/owner`): invite by email, copy the one-time `/signup?invite=TOKEN` link, approve or
 reject invitation requests from members (the owner can grant a member permission to
 *request* invitations for others — requests never create access on their own), and

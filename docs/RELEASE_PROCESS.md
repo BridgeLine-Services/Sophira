@@ -57,19 +57,16 @@ an owner action, and qualified counsel must review before production use
 (see docs/legal/LEGAL_REVIEW_NOTICE.md).
 
 **One-time Supabase bootstrap (fresh installs only).** Migration 0008
-makes signup invitation-only at the database level and fail-closed: no
-account at all can be created until the owner email is configured. In the
-Supabase SQL editor, once, replacing the address with the real owner:
-
-```sql
-insert into public.app_config (key, value)
-values ('owner_email', to_jsonb('owner@example.com'::text))
-on conflict (key) do update set value = excluded.value;
-```
-
-(Already documented in README setup step 3; repeated here because the
-release checklist is the operator's bring-up path.) Until this runs, the
-first signup is rejected with a clear operator-facing message — intended
+makes signup invitation-only at the database level. Migration 0025 adds
+the secure first-owner bootstrap: with no owner yet, the FIRST completed
+registration at **/create-owner** claims the single owner slot atomically
+(database-decided, race-safe, permanently closed afterwards). No manual
+`owner_email` insert is needed. (A configured `owner_email` remains a
+supported OPTIONAL restriction: the claim then requires that exact
+address.) Verify the deployment by opening **/setup** and clicking
+**Create Owner Account** — the page reads the real server-side status and
+honestly reports whether owner creation is available. The release gate
+stays the technical enforcement path.
 fail-closed behavior.
 
 After the environment is configured, set the repository

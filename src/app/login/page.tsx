@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -14,6 +14,20 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // First-owner path (2026-10-06): the CTA appears ONLY when the SERVER says
+  // no owner exists yet (/api/setup-status ownerCreation - the same secure
+  // server-side status used by /create-owner). Never a browser-only flag;
+  // when the status cannot be checked the CTA simply stays hidden (fail
+  // closed - /create-owner itself still gates honestly).
+  const [ownerCreationOpen, setOwnerCreationOpen] = useState(false);
+  useEffect(() => {
+    fetch("/api/setup-status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { ownerCreation?: { possible: boolean | null } } | null) => {
+        setOwnerCreationOpen(d?.ownerCreation?.possible === true);
+      })
+      .catch(() => setOwnerCreationOpen(false));
+  }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -82,6 +96,15 @@ function LoginForm() {
           </Button>
         </div>
       </form>
+
+      {ownerCreationOpen && (
+        <div className="mt-5 rounded-lg border border-success/30 bg-success/5 p-4 text-center">
+          <p className="text-sm text-ink-soft">This Sophira has no owner yet.</p>
+          <Link href="/create-owner" className="mt-2 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+            Create Owner Account
+          </Link>
+        </div>
+      )}
 
       <div className="mt-5 space-y-2 text-center text-sm">
         <p>

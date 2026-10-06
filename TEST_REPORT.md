@@ -2426,3 +2426,36 @@ regression) and updated invitation-regression assertions for the live
 trigger. RLS, invitation tests, offline, learning, research, readiness:
 all untouched and passing.
 
+## §70 LOGIN FIRST-OWNER PATH (2026-10-06): Create Owner Account visible from the entry screen
+
+**Problem:** the sign-in screen had no visible path to /create-owner —
+the owner could not discover first-owner registration from the normal
+UI. Docs still described the obsolete manual owner_email insert.
+
+**Fix (UI/navigation + documentation only; 0025 security untouched):**
+- The sign-in screen now shows a clear **Create Owner Account** button
+  linking to /create-owner, but ONLY while the SERVER says no owner
+  exists. Visibility comes from /api/setup-status ownerCreation — the
+  same secure server-side status used by /create-owner and /setup.
+  Never a browser-only flag; if the status cannot be checked the button
+  stays hidden (fail closed).
+- Once an owner exists, the button disappears and the normal Sign In +
+  invitation flow remains. /create-owner itself still refuses a second
+  owner.
+- No secrets, claim-table, or authorization internals appear anywhere
+  in the page (asserted).
+- Docs cleaned: README, docs/OWNER_ACCESS.md, docs/RELEASE_PROCESS.md,
+  docs/IMPLEMENTATION_AUDIT.md no longer instruct manual owner_email
+  inserts; they document the in-app flow: open Sophira → Create Owner
+  Account → email + own password → owner dashboard → invite people.
+  The optional configured-email restriction is still documented as
+  supported. Technical deployment diagnostics remain available on /setup
+  as a separate optional section.
+
+**Tests (2033/2033 PASS; build PASS; secret scan CLEAN; gate self-test
+PASS):** new tests/login-owner-cta.ts — CTA exists and links correctly;
+visibility server-driven with fail-closed fallback; no secret names or
+claim-table references in the page; migration 0025 single-owner,
+atomic, invitation-only, client-blind contract re-verified; docs must
+not contain the manual owner_email SQL and must document /create-owner.
+

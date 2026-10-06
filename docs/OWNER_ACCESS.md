@@ -19,25 +19,27 @@ so none was added.
 
 ## How the initial owner account is created
 
-Signup is invitation-only at the DATABASE level (migration 0008). The
-bootstrap is **fail-closed**:
+Signup is invitation-only at the DATABASE level (migrations 0008 +
+0025). The first-owner bootstrap is **in-app and atomic**:
 
-1. The person deploying Sophira sets the owner's email address ONCE, in
-   the Supabase SQL editor:
+1. With no owner yet, the sign-in screen shows **Create Owner Account**
+   (also at `/create-owner`, linked from `/setup`). No database editing
+   and no API keys are required.
 
-   ```sql
-   insert into public.app_config (key, value)
-   values ('owner_email', to_jsonb('owner@example.com'::text))
-   on conflict (key) do update set value = excluded.value;
-   ```
+2. The owner registers with their email and a password they choose. The
+   database trigger claims the single owner slot ATOMICALLY
+   (`public.owner_bootstrap` is a one-row table with `INSERT ... ON
+   CONFLICT DO NOTHING`): exactly one owner can ever exist, simultaneous
+   registrations cannot create two owners, and once claimed the window
+   closes permanently. Later signups all require valid invitations.
 
-2. The owner then signs up at `/signup` with THAT email. The database
-   trigger recognizes it as the configured owner and creates their
-   profile with `role = 'owner'`.
+3. An OPTIONAL restriction remains supported: if an operator HAS
+   configured `app_config.owner_email`, the claim is restricted to that
+   exact address. This is no longer required.
 
-3. If `owner_email` is NOT configured, the very first signup is rejected.
-   No password is hardcoded in source, and no stranger can claim
-   ownership of a fresh install.
+4. No password is hardcoded in source, and the owner claim is invisible
+   to every browser (revoked from anon/authenticated, RLS with no client
+   policies).
 
 **No plaintext owner password exists anywhere in the codebase.** The
 owner sets their password themselves through the normal signup form,
@@ -51,17 +53,18 @@ any account exists:
 
 - Is the Supabase connection configured?
 - Are the database migrations applied (through 0020)?
-- Is `app_config.owner_email` configured? (existence only - the email
-  value is NEVER displayed)
+- Is the optional owner-email restriction configured? (existence only -
+  the email value is NEVER displayed; since migration 0025 it is optional)
 - Does an owner account exist, and is it active?
+- Is owner creation still available (`ownerCreation.possible` - the same
+  server-side status that drives the sign-in screen CTA and /create-owner)?
 - Is the AI provider configured?
 
-If no owner is initialized, the page explains the exact steps: configure
-`app_config.owner_email`, then sign up at `/signup` with that exact
-email, choosing your own password in the normal signup flow (there is
-no predefined/default owner password). If an owner already exists, it
-states the owner account is initialized without exposing any
-credential, and links the existing password-reset flow
+If no owner is initialized, the page leads with **Create Owner Account**
+(taking the owner to `/create-owner`, where they choose their own
+password — there is no predefined/default owner password). If an owner
+already exists, it states the owner account is initialized without
+exposing any credential, and links the existing password-reset flow
 (`/reset-password`) for recovery.
 
 The diagnostic is public BY DESIGN (the operator must be able to check

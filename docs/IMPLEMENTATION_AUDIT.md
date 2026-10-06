@@ -118,7 +118,8 @@ workload estimation with user-estimate-wins. Unit-tested.
 ### 16. Invitation-only access — IMPLEMENTED
 Database-level gate (0008): `handle_new_user` atomically claims a pending,
 unexpired, email-bound invitation — no client path can bypass it;
-fail-closed bootstrap via `app_config.owner_email`. Expiry 0006, owner-only
+bootstrap via `app_config.owner_email` (0008; now OPTIONAL — migration
+0025 adds the atomic in-app first-owner claim). Expiry 0006, owner-only
 policies 0002. 26 security assertions. **Runbook defect found and fixed
 this round** (see CB2).
 
