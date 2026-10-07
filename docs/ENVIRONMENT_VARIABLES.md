@@ -16,6 +16,8 @@ Never paste a secret into chat or into a file in the repository.
 | Variable | Where to get it | Secret? |
 |---|---|---|
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase API page → "service_role" key | **YES — the master key.** Server-only. Sophira never sends it to the browser and its secret scan checks for leaks. |
+| `SUPABASE_ACCESS_TOKEN` | supabase.com → Account → Access Tokens | Yes (server/CI only) | OPTIONAL. Powers AUTOMATED MIGRATIONS: the CI Migrations job and the one-click "Repair Setup" apply every missing migration through the Supabase Management API. Never browser-visible; the app runs fine without it. |
+| `SUPABASE_PROJECT_REF` | Supabase dashboard → Settings → API (project ref) | No (not a secret, but server/CI scoped) | OPTIONAL. Companion to `SUPABASE_ACCESS_TOKEN` for automated migrations. |
 
 ## THIRD-PARTY (all optional — Sophira runs without them)
 
