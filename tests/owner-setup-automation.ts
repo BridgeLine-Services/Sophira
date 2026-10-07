@@ -131,6 +131,11 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "J14: /api/setup-status exposes the safe coarse state, checklist, and stale count");
   assert(statusRoute.includes("TEMPORARILY_UNAVAILABLE") === false || readFileSync("src/lib/owner-setup.ts", "utf8").includes("TEMPORARILY_UNAVAILABLE"),
     "J14: the four safe states are defined in one place");
+  // ---- NEW (2026-10-07): the never-initialized database ------------------
+  const emptyDb = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: false });
+  assert(emptyDb.state === "SETUP_REQUIRED" && emptyDb.repair.reason.includes("never been initialized") && emptyDb.repair.reason.includes("SUPABASE_ACCESS_TOKEN") && emptyDb.repair.reason.includes("FULL migration chain"),
+    "TRACE: a never-initialized database (the ACTUAL production state) gets the exact one-time pipeline configuration - never a dead-end 'nothing to repair'");
+
   // ---- NEW (2026-10-07): the drifted-database signup bug -----------------
   // Supabase wraps a failed DB trigger in HTTP 400 "Database error saving
   // new user" (code 50026). The old status-400 catch-all turned that into
