@@ -3501,8 +3501,8 @@ async function runOwnerSetupTests(): Promise<void> {
     migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "unknown",
   }));
   assert(c.ready === false, "setup: missing migrations => not ready");
-  assert(c.guidance.some((g) => g.includes("0001-0026")) && c.guidance.some((g) => g.includes("SUPABASE_ACCESS_TOKEN")) && !c.guidance.some((g) => g.includes("SQL editor")),
-    "setup: missing-migrations guidance names the AUTOMATED repair (migrations 0001-0026, one-time token config) - never manual SQL");
+  assert(c.guidance.some((g) => g.includes("Set Up Sophira")) && !c.guidance.some((g) => g.includes("SUPABASE_ACCESS_TOKEN")) && !c.guidance.some((g) => g.includes("SQL editor")) && !c.guidance.some((g) => g.includes("GitHub")),
+    "setup: missing-migrations guidance names the AUTOMATED in-app repair (Set Up Sophira) - never tokens, never repository secrets, never manual SQL");
 
   // ---- scenario D: owner_email NOT configured, no owner yet (NEW: automatic) ----
   const d = evaluateOwnerSetup(mk({
