@@ -31,6 +31,7 @@ export async function GET() {
       aiConfigured: status.probe.aiConfigured,
       database: status.probe.database,
       migrationsPresent: status.probe.migrationsPresent,
+      migrationAutomationConfigured: status.probe.migrationAutomationConfigured,
       ownerEmailConfigured: status.probe.ownerEmailConfigured,
       ownerAccount: status.probe.ownerAccount,
     },

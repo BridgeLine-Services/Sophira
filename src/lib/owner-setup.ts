@@ -346,7 +346,11 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
   }
   if (probe.database === "checked") {
     if (probe.migrationsPresent === false) {
-      guidance.push("Let Sophira repair the database automatically: set SUPABASE_ACCESS_TOKEN (a Supabase personal access token, supabase.com -> Account -> Access Tokens) and SUPABASE_PROJECT_REF in the deployment environment / CI secrets, then push or use the Repair Setup action - the deployment pipeline (npm run db:migrate) applies every missing migration (0001-0026) in order. No manual SQL, no database editing.");
+      if (probe.migrationAutomationConfigured) {
+        guidance.push("Open /setup and use Set Up Sophira - it prepares the database automatically, entirely from the app. No manual SQL, no tokens, no database editing.");
+      } else {
+        guidance.push("Open /setup and use Set Up Sophira - it prepares the database automatically, entirely from the app. If the action is unavailable, reconnect the Vercel project to its Supabase project (the official Supabase integration provisions the connection automatically); no tokens, no repository secrets, no manual SQL are ever needed.");
+      }
     }
     if (probe.ownerAccount === "none") {
       guidance.push("Open /create-owner and register with your email and a password you choose. The first registration becomes the owner; owner creation then closes permanently. Sophira has no predefined or default owner password.");
