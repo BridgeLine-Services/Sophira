@@ -29,14 +29,24 @@ function LoginForm() {
   // shown only when the SERVER says the database cannot be reached - never
   // when an owner exists, and never with technical variable names or secrets.
   const [databaseUnreachable, setDatabaseUnreachable] = useState(false);
+  // FIRST-LAUNCH (2026-10-07): when the private database is checked but its
+  // setup is not finished AND no owner exists yet, the sign-in form cannot
+  // possibly succeed - route the visitor to the guided setup instead of the
+  // normal login experience (never the misleading "wrong password" path).
+  const [setupNeeded, setSetupNeeded] = useState(false);
   useEffect(() => {
     fetch("/api/setup-status", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { ownerCreation?: { possible: boolean | null }; probe?: { database?: string } } | null) => {
+      .then((d: { state?: string; ownerCreation?: { possible: boolean | null }; probe?: { database?: string; ownerAccount?: string } } | null) => {
         setOwnerCreationOpen(d?.ownerCreation?.possible === true);
         // null = cannot check (missing config / unreachable) — distinct from
         // "an owner exists", which sets possible=false and shows no notice.
         setDatabaseUnreachable(d?.ownerCreation?.possible === null && d?.probe?.database !== "checked");
+        setSetupNeeded(
+          d?.state === "SETUP_REQUIRED" &&
+            d?.probe?.database === "checked" &&
+            (d?.probe?.ownerAccount === "none" || d?.probe?.ownerAccount === "unknown")
+        );
       })
       .catch(() => {
         setOwnerCreationOpen(false);
@@ -101,6 +111,30 @@ function LoginForm() {
     router.refresh();
   }
 
+  if (setupNeeded) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
+        <div className="mb-8 flex flex-col items-center gap-3 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-white">
+            <Sparkles className="h-6 w-6" />
+          </span>
+          <div>
+            <h1 className="text-xl font-semibold text-ink">Welcome to Sophira</h1>
+            <p className="text-sm text-ink-soft">Let&apos;s set up your private academic assistant.</p>
+          </div>
+        </div>
+        <div className="rounded-card border border-warn/30 bg-warn/5 p-5 text-center">
+          <p className="text-sm">
+            Your private Sophira is almost ready. Sign-in opens automatically once setup is finished -
+            there is nothing to sign in with yet.
+          </p>
+          <a href="/setup" className="mt-4 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+            Continue Setup
+          </a>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
       <Link href="/install" className="mb-8 flex flex-col items-center gap-3 text-center">

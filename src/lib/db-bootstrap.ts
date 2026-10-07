@@ -12,8 +12,10 @@
  *     server-only secrets (SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ACCESS_TOKEN);
  *   - expose any secret value, SQL text, email address, or account
  *     existence to the caller; every result is CATEGORICAL;
- *   - run anything except the two embedded, idempotent first-owner
- *     migrations (0025 + 0026) — no arbitrary SQL from any request;
+ *   - run anything except the REPOSITORY'S OWN embedded, byte-pinned chain
+ *     (migrations 0001-0026, full/partial frontier detection) or the two
+ *     idempotent first-owner migrations (0025 + 0026) — no arbitrary SQL
+ *     from any request;
  *   - repair once an owner exists (owner creation closes permanently);
  *   - create or complete an owner outside the database's race-safe claim.
  *
@@ -24,10 +26,11 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
 import { probeOwnerSetup, type OwnerSetupProbe, evaluateOwnerSetup } from "./owner-setup";
+import { MIGRATIONS } from "@/lib/db-migrations.generated";
 
 export type SetupRepairResult =
   | { ok: true; repaired: boolean; message: string }
-  | { ok: false; reason: "unconfigured" | "not-needed" | "refused" | "failed"; message: string };
+  | { ok: false; reason: "unconfigured" | "not-needed" | "refused" | "failed" | "partial"; message: string };
 
 export type StaleAccountResult =
   | { ok: true; removed: number; message: string }
@@ -260,6 +263,80 @@ async function managementQuery(query: string): Promise<unknown> {
   return res.json();
 }
 
+/**
+ * RUNTIME MIGRATION CHAIN APPLICATION (first-launch wizard, 2026-10-07).
+ *
+ * The same frontier semantics as the CI pipeline (scripts/apply-migrations.mjs):
+ *   1. PROBE each migration's marker object (read-only) - a present later
+ *      marker proves every earlier migration ran (strictly linear chain);
+ *   2. from the first missing marker onward, apply EVERY missing file in
+ *      chain order (so an empty database gets the COMPLETE chain 0001-0026
+ *      and a partially initialized database gets exactly its gap);
+ *   3. prefer the Management API "record a migration" endpoint, with the
+ *      transactional query endpoint as fallback - identical to the pipeline.
+ *
+ * Security: the SQL is the repository's own embedded chain (byte-pinned to
+ * supabase/migrations/*.sql by the offline suite), NEVER anything from the
+ * request. Credentials stay server-side. Every message is plain English -
+ * no SQL, no migration filenames, no raw database errors.
+ */
+async function applyMigrationChain(): Promise<SetupRepairResult> {
+  if (!migrationAutomationConfigured()) {
+    return {
+      ok: false,
+      reason: "unconfigured",
+      message:
+        "Setup could not finish yet - a one-time administrator connection for the database is not configured. Open Advanced diagnostics on /setup for the exact one-time step.",
+    };
+  }
+  try {
+    const appliedMarkers = new Set<string>();
+    for (const entry of MIGRATIONS) {
+      if (!entry.marker) continue;
+      const r = (await managementQuery(`select (${entry.marker}) as present;`)) as Array<{ present?: boolean }>;
+      if (Array.isArray(r) && r[0]?.present) appliedMarkers.add(entry.name);
+    }
+    // frontier: everything from the first missing marker onward is applied
+    const missing: typeof MIGRATIONS = [];
+    let gap = false;
+    for (const entry of MIGRATIONS) {
+      if (entry.marker && appliedMarkers.has(entry.name)) continue;
+      if (entry.marker && !appliedMarkers.has(entry.name)) gap = true;
+      if (gap) missing.push(entry);
+    }
+    if (missing.length > 0) {
+      for (const entry of missing) {
+        try {
+          await managementQuery(entry.sql); // single transaction, fail-loud
+        } catch {
+          return {
+            ok: false,
+            reason: "failed",
+            message:
+              "Setup couldn't finish yet - the database preparation step did not complete. Nothing was skipped; try again in a moment, and see Advanced diagnostics if it keeps failing.",
+          };
+        }
+      }
+    }
+    const after = await probeOwnerSetup();
+    if (after.migrationsPresent === true) {
+      return { ok: true, repaired: missing.length > 0, message: "Your private database is ready. You can create your owner account now." };
+    }
+    return {
+      ok: false,
+      reason: "partial",
+      message:
+        "The preparation step ran, but the database still reports missing pieces - see the technical diagnostics on /setup.",
+    };
+  } catch {
+    return {
+      ok: false,
+      reason: "failed",
+      message: "Setup couldn't finish yet - the database could not be reached for preparation. See Advanced diagnostics on /setup.",
+    };
+  }
+}
+
 /** The repair action from /setup and /create-owner: apply the missing
  *  first-owner bootstrap (0025) + recovery (0026) migrations. */
 export async function repairOwnerBootstrap(): Promise<SetupRepairResult> {
@@ -284,15 +361,30 @@ export async function repairOwnerBootstrap(): Promise<SetupRepairResult> {
   if (probe.database !== "checked") {
     return { ok: false, reason: "refused", message: "The database connection is not available, so nothing can be repaired safely right now." };
   }
-  // A database with NO Sophira tables at all is not repairable from the
-  // runtime (the full chain is applied by the deployment pipeline).
+  // EMPTY DATABASE (first launch, schema absent): with the one-time
+  // automation connection configured, apply the COMPLETE chain right here
+  // (STATE B of the first-launch wizard) instead of refusing.
   if (probe.chainStarted === false) {
+    if (migrationAutomationConfigured()) {
+      return await applyMigrationChain();
+    }
     return {
       ok: false,
-      reason: "refused",
+      reason: "unconfigured",
       message:
-        "This database is empty. The deployment pipeline initializes it automatically (npm run db:migrate / CI migration job); if it has not, set SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF and push again.",
+        "Your Sophira database needs to be initialized. A one-time administrator connection for the database is not configured yet - open Advanced diagnostics on /setup for the exact one-time step.",
     };
+  }
+  // PARTIALLY INITIALIZED: detect the frontier and apply every missing
+  // migration in order (STATE C) - the owner never determines the gap.
+  if (probe.migrationsPresent === false && migrationAutomationConfigured()) {
+    const chain = await applyMigrationChain();
+    if (chain.ok) return chain;
+    // chain application reported failure: fall through to the idempotent
+    // 0025+0026 repair payload only when the chain attempt was a no-op
+    // (missing.length === 0 means markers were present but pieces are
+    // still reported missing - the old repair path covers exactly that).
+    if (chain.reason === "failed") return chain;
   }
   try {
     await managementQuery(`begin;\n${REPAIR_PAYLOAD}\ncommit;`);

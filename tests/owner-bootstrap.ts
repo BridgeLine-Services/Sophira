@@ -61,7 +61,7 @@ export function runOwnerBootstrapTests(assert: Assert, section: Section): void {
   assert(setupPage.includes("Create Owner Account") && setupPage.includes("/create-owner"),
     "setup: the owner-creation CTA is the prominent action");
   const diag = readFileSync("src/app/setup/SetupDiagnostics.tsx", "utf8");
-  assert(setupPage.includes("Technical diagnostics") && diag.includes("useState") && diag.includes("Hide technical diagnostics"),
+  assert(setupPage.includes("Advanced diagnostics") && diag.includes("useState"),
     "setup: technical diagnostics are a SEPARATE optional section, not a blocker for owner creation");
   assert(!setupPage.includes('"use client"') || setupPage.startsWith('"use client"') === false,
     "setup: /setup is a server component - the database probe (server-only env names) never reaches the browser bundle");

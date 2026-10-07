@@ -408,12 +408,20 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
             "The first-owner database setup is missing pieces and can be repaired automatically. One-time configuration: set SUPABASE_ACCESS_TOKEN (a Supabase personal access token) and SUPABASE_PROJECT_REF in the deployment environment, then use Repair Setup here (or push - the CI pipeline runs the same repair).",
         }
     : neverInitialized
-      ? {
-          available: false,
-          action: null,
-          reason:
-            "This database has never been initialized (the Sophira schema is absent). One-time configuration: set SUPABASE_ACCESS_TOKEN (a Supabase personal access token, supabase.com -> Account -> Access Tokens) and SUPABASE_PROJECT_REF as GitHub repository secrets - the CI Migrations pipeline then applies the FULL migration chain (0001-0026) automatically on the next push. No SQL editor, no manual steps. Until then, sign-up cannot work because the database has no tables.",
-        }
+      ? probe.migrationAutomationConfigured
+        ? {
+            // First launch with the one-time connection configured: the
+            // wizard initializes the COMPLETE chain in one click.
+            available: true,
+            action: "migrations",
+            reason: "Your Sophira database needs to be initialized. Sophira can prepare it automatically - one click, no technical steps.",
+          }
+        : {
+            available: false,
+            action: null,
+            reason:
+              "This database has never been initialized (the Sophira schema is absent). One-time configuration: set SUPABASE_ACCESS_TOKEN (a Supabase personal access token, supabase.com -> Account -> Access Tokens) and SUPABASE_PROJECT_REF as GitHub repository secrets - the CI Migrations pipeline then applies the FULL migration chain (0001-0026) automatically on the next push. No SQL editor, no manual steps. Until then, sign-up cannot work because the database has no tables.",
+          }
       : { available: false, action: null, reason: "No automatic repair is needed or possible for the current state." };
 
   return { state, repair, staleAuthUsers: null, probe, steps, ready, headline, guidance, ownerCreation };

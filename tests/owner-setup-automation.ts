@@ -12,7 +12,18 @@
  * expired callback, invitation-only, concurrency, secret hygiene,
  * deployment verification, useful diagnostics).
  */
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync, statSync } from "fs";
+import { join } from "path";
+
+function walkFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) out.push(...walkFiles(p));
+    else out.push(p);
+  }
+  return out;
+}
 
 export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): Promise<void> {
   section("Owner setup automation (deploy -> /create-owner -> done, no SQL editor)");
@@ -135,6 +146,73 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   const emptyDb = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: false });
   assert(emptyDb.state === "SETUP_REQUIRED" && emptyDb.repair.reason.includes("never been initialized") && emptyDb.repair.reason.includes("SUPABASE_ACCESS_TOKEN") && emptyDb.repair.reason.includes("FULL migration chain"),
     "TRACE: a never-initialized database (the ACTUAL production state) gets the exact one-time pipeline configuration - never a dead-end 'nothing to repair'");
+
+  // ---- FIRST-LAUNCH WIZARD (2026-10-07) ------------------------------------
+  // The generated runtime chain: one entry per migration file, in order,
+  // SQL byte-identical to the files, markers byte-identical to the pipeline's
+  // shared table - the runtime wizard and the CI pipeline can never disagree.
+  const genSrc = readFileSync("src/lib/db-migrations.generated.ts", "utf8");
+  const markerMod = readFileSync("scripts/migration-markers.mjs", "utf8");
+  const migrationFiles = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
+  assert(genSrc.includes(`export const MIGRATIONS: MigrationEntry[] =`) && genSrc.split('"name": "').length - 1 === migrationFiles.length,
+    "wizard: the embedded chain covers EXACTLY the migration files (a new migration requires regenerating)");
+  for (const f of migrationFiles) {
+    const fileSql = readFileSync(join("supabase/migrations", f), "utf8");
+    assert(genSrc.includes(JSON.stringify(fileSql).slice(1, -1)),
+      `wizard: embedded SQL for ${f} is byte-identical to the repository file`);
+  }
+  for (const line of markerMod.split("\n")) {
+    const m = line.match(/^\s*"([0-9]+_[a-z0-9_]+\.sql)": "(.+)",?$/);
+    if (m) assert(genSrc.includes(`"marker": "${m[2]}"`),
+      `wizard: marker for ${m[1]} matches the pipeline's shared table`);
+  }
+  // db-bootstrap: empty + configured => the COMPLETE chain (STATE B);
+  // partial => frontier detection (STATE C). Owner exists => closed (F).
+  const bootSrc = readFileSync("src/lib/db-bootstrap.ts", "utf8");
+  assert(bootSrc.includes("import { MIGRATIONS } from") && bootSrc.includes("applyMigrationChain"),
+    "wizard: the runtime applies the repository's own embedded chain");
+  assert(bootSrc.includes("probe.chainStarted === false") && bootSrc.includes("if (migrationAutomationConfigured()) {\n      return await applyMigrationChain();"),
+    "wizard: an EMPTY database with the one-time connection configured gets the FULL chain from the app itself (never refused to the SQL editor)");
+  assert(bootSrc.includes("const after = await probeOwnerSetup();") && bootSrc.includes("after.migrationsPresent === true"),
+    "wizard: the server re-probes and only reports ready when the schema is ACTUALLY present");
+  // Wizard UI: plain English, progress lines, NO raw env names in the normal flow.
+  const wizardSrc = readFileSync("src/app/setup/SetupWizard.tsx", "utf8");
+  for (const line of ["Preparing your private database...", "Installing Sophira's security rules...", "Preparing owner access...", "Checking everything...", "Setup complete."]) {
+    assert(wizardSrc.includes(line) || (line === "Setup complete." && wizardSrc.includes("Setup complete.")),
+      `wizard UI shows plain-English progress: "${line}"`);
+  }
+  assert(!wizardSrc.includes("SUPABASE_ACCESS_TOKEN") && !wizardSrc.includes("SUPABASE_SERVICE_ROLE"),
+    "wizard UI: no raw environment variable names in the owner-facing flow");
+  const setupPageSrc = readFileSync("src/app/setup/page.tsx", "utf8");
+  const detailsAt = setupPageSrc.indexOf("Advanced diagnostics");
+  const firstEnvName = setupPageSrc.search(/SUPABASE_[A-Z_]+/); // -1 = absent entirely (even better)
+  assert(setupPageSrc.includes("Welcome to Sophira") && setupPageSrc.includes("set up your private academic assistant"),
+    "wizard: /setup is the guided Welcome flow");
+  assert(setupPageSrc.includes("Connect Sophira") && setupPageSrc.includes("Prepare your private database") && setupPageSrc.includes("Create your owner account") && setupPageSrc.includes("Finish setup"),
+    "wizard: the four plain-English checklist steps are present");
+  assert(detailsAt !== -1 && (firstEnvName === -1 || firstEnvName > detailsAt),
+    "wizard: raw variable names appear ONLY inside the Advanced diagnostics section (or not at all)");
+  // login: first-launch visitors are routed to setup, never into a dead form.
+  const loginSrc = readFileSync("src/app/login/page.tsx", "utf8");
+  assert(loginSrc.includes("setupNeeded") && loginSrc.includes("Continue Setup") && loginSrc.includes("Welcome to Sophira"),
+    "wizard: when setup is unfinished and no owner exists, /login shows the Continue Setup path instead of the sign-in form");
+  // evaluator: empty DB + configured => one-click repair is AVAILABLE.
+  const emptyConfigured = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: true });
+  assert(emptyConfigured.repair.available === true && emptyConfigured.repair.action === "migrations",
+    "wizard (STATE B): an empty database with the one-time connection configured gets the one-click Set Up Sophira repair");
+  // CI workflow: missing secrets fail LOUDLY, never a silent green skip.
+  const wf = readFileSync(".github/workflows/migrations.yml", "utf8");
+  assert(wf.includes("HAS NOT OCCURRED") && wf.includes("exit 1"),
+    "wizard: the Migrations workflow fails loudly when the one-time secrets are missing (the deployment clearly reports the database was NOT initialized)");
+  // server-only: the embedded chain is never imported by a client component.
+  const clientFiles = walkFiles("src").filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"));
+  for (const f of clientFiles) {
+    const t = readFileSync(f, "utf8");
+    if (t.startsWith('"use client"') || t.includes("'use client'")) {
+      assert(!t.includes("db-migrations.generated") && !t.includes("db-bootstrap"),
+        `wizard: client component ${f} must never import the embedded chain or the bootstrap module`);
+    }
+  }
 
   // ---- NEW (2026-10-07): the drifted-database signup bug -----------------
   // Supabase wraps a failed DB trigger in HTTP 400 "Database error saving

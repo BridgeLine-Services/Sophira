@@ -3584,7 +3584,7 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(pageSrc.includes('href="/create-owner"'), "setup: the page links the in-app owner registration (no database editing)");
   assert(pageSrc.includes("no predefined or default") || pageSrc.includes("password you choose") || pageSrc.includes("choose your own password"), "setup: the owner account section states the owner chooses their own password");
   assert(!/password\s*[:=]\s*["'][^"']{4,}/.test(pageSrc), "setup: the page contains no password literals");
-  assert(pageSrc.includes("Technical diagnostics") && readFileSync(path.join(process.cwd(), "src", "app", "setup", "SetupDiagnostics.tsx"), "utf8").includes("useState"),
+  assert(pageSrc.includes("Advanced diagnostics") && readFileSync(path.join(process.cwd(), "src", "app", "setup", "SetupDiagnostics.tsx"), "utf8").includes("useState"),
     "setup: the page SEPARATES owner creation from technical diagnostics (diagnostics optional, never a blocker)");
 
   const setupDiagSrc = readFileSync(path.join(process.cwd(), "src", "app", "setup", "SetupDiagnostics.tsx"), "utf8");
