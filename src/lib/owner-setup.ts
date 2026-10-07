@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
+import { directPostgresConfigured } from "./db-ddl";
 
 /**
  * Owner setup / status diagnostic (operator round 2026-10-06).
@@ -118,7 +119,8 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     ownerBootstrapPresent: null,
     recoveryPresent: null,
     migrationAutomationConfigured:
-      present("SUPABASE_ACCESS_TOKEN") && present("SUPABASE_PROJECT_REF"),
+      directPostgresConfigured() ||
+      (present("SUPABASE_ACCESS_TOKEN") && present("SUPABASE_PROJECT_REF")),
   };
   if (!probe.serviceRoleConfigured) return probe;
 
@@ -266,7 +268,7 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
           ? cannotCheck
           : probe.migrationsPresent
             ? "All required tables and columns are present, through migration 0026."
-            : "Some migrations are missing - the deployment pipeline repairs them automatically once configured (one-time: SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF), or use the Repair Setup action on /setup.",
+            : "Some migrations are missing - Set Up Sophira on /setup repairs them automatically from the app itself. If that action is unavailable, reconnecting the Vercel project to its Supabase project (the official Supabase integration) restores the automatic path; no tokens and no SQL editor are ever needed.",
     },
     {
       done: probe.invitationsPresent === null ? null : probe.invitationsPresent,
@@ -405,7 +407,7 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
           available: false,
           action: null,
           reason:
-            "The first-owner database setup is missing pieces and can be repaired automatically. One-time configuration: set SUPABASE_ACCESS_TOKEN (a Supabase personal access token) and SUPABASE_PROJECT_REF in the deployment environment, then use Repair Setup here (or push - the CI pipeline runs the same repair).",
+            "The first-owner database setup is missing pieces and can be repaired automatically from the app. The deployment has no server-side path to its database yet - reconnecting the Vercel project to its Supabase project (the official Supabase integration provisions the connection automatically) fixes this; no tokens, no repository configuration, no SQL editor.",
         }
     : neverInitialized
       ? probe.migrationAutomationConfigured
@@ -420,7 +422,7 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
             available: false,
             action: null,
             reason:
-              "This database has never been initialized (the Sophira schema is absent). One-time configuration: set SUPABASE_ACCESS_TOKEN (a Supabase personal access token, supabase.com -> Account -> Access Tokens) and SUPABASE_PROJECT_REF as GitHub repository secrets - the CI Migrations pipeline then applies the FULL migration chain (0001-0026) automatically on the next push. No SQL editor, no manual steps. Until then, sign-up cannot work because the database has no tables.",
+              "This database has never been initialized (the Sophira schema is absent), and the deployment has no server-side path to its database yet. Reconnect the Vercel project to its Supabase project - the official Supabase integration provisions the database connection automatically, and first-launch setup then initializes the full schema from the app itself. No tokens, no repository configuration, no SQL editor. Until then, sign-up cannot work because the database has no tables.",
           }
       : { available: false, action: null, reason: "No automatic repair is needed or possible for the current state." };
 

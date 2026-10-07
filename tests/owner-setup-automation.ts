@@ -132,10 +132,10 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "J14: a pre-0025 database reports SETUP_REQUIRED with an available one-click repair (not a mysterious auth error)");
   const unconfigured = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "none", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: false });
   const unknownOwner = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "unknown", chainStarted: true, invitationsPresent: null, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: false });
-  assert(unknownOwner.state === "SETUP_REQUIRED" && unknownOwner.repair.reason.toLowerCase().includes("one-time"),
-    "J14: an owner-unknown + migrations-missing database STILL names the exact one-time repair configuration (no 'nothing to repair' dead end)");
-  assert(unconfigured.repair.available === false && unconfigured.repair.reason.toLowerCase().includes("one-time"),
-    "J14: without the token the repair names the exact ONE-TIME configuration, never manual SQL");
+  assert(unknownOwner.state === "SETUP_REQUIRED" && unknownOwner.repair.reason.toLowerCase().includes("official supabase integration"),
+    "J14: an owner-unknown + migrations-missing database STILL names the exact automatic fix (no 'nothing to repair' dead end)");
+  assert(unconfigured.repair.available === false && unconfigured.repair.reason.toLowerCase().includes("official supabase integration") && !unconfigured.repair.reason.toLowerCase().includes("github"),
+    "J14: without ANY automation path the repair names the integration-based fix - never GitHub secrets, never manual SQL");
   assert(!ownerSetup.includes("Supabase SQL editor"),
     "J14/H: no guidance anywhere tells the developer to open the Supabase SQL editor");
   assert(statusRoute.includes("state") && statusRoute.includes("checklist") && statusRoute.includes("staleAuthUsers"),
@@ -144,8 +144,8 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "J14: the four safe states are defined in one place");
   // ---- NEW (2026-10-07): the never-initialized database ------------------
   const emptyDb = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: false });
-  assert(emptyDb.state === "SETUP_REQUIRED" && emptyDb.repair.reason.includes("never been initialized") && emptyDb.repair.reason.includes("SUPABASE_ACCESS_TOKEN") && emptyDb.repair.reason.includes("FULL migration chain"),
-    "TRACE: a never-initialized database (the ACTUAL production state) gets the exact one-time pipeline configuration - never a dead-end 'nothing to repair'");
+  assert(emptyDb.state === "SETUP_REQUIRED" && emptyDb.repair.reason.includes("never been initialized") && emptyDb.repair.reason.includes("official Supabase integration") && !emptyDb.repair.reason.includes("GitHub"),
+    "TRACE: a never-initialized, unconnected database gets the integration-based fix - NO GitHub secret instructions, NO access-token creation");
 
   // ---- FIRST-LAUNCH WIZARD (2026-10-07) ------------------------------------
   // The generated runtime chain: one entry per migration file, in order,
@@ -171,7 +171,7 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   const bootSrc = readFileSync("src/lib/db-bootstrap.ts", "utf8");
   assert(bootSrc.includes("import { MIGRATIONS } from") && bootSrc.includes("applyMigrationChain"),
     "wizard: the runtime applies the repository's own embedded chain");
-  assert(bootSrc.includes("probe.chainStarted === false") && bootSrc.includes("if (migrationAutomationConfigured()) {\n      return await applyMigrationChain();"),
+  assert(bootSrc.includes("probe.chainStarted === false") && bootSrc.includes("if (migrationAutomationConfigured()) {\n      return await runChainAutomation();"),
     "wizard: an EMPTY database with the one-time connection configured gets the FULL chain from the app itself (never refused to the SQL editor)");
   assert(bootSrc.includes("const after = await probeOwnerSetup();") && bootSrc.includes("after.migrationsPresent === true"),
     "wizard: the server re-probes and only reports ready when the schema is ACTUALLY present");
@@ -200,10 +200,34 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   const emptyConfigured = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: true });
   assert(emptyConfigured.repair.available === true && emptyConfigured.repair.action === "migrations",
     "wizard (STATE B): an empty database with the one-time connection configured gets the one-click Set Up Sophira repair");
-  // CI workflow: missing secrets fail LOUDLY, never a silent green skip.
+  // RUNTIME FIRST-LAUNCH INITIALIZATION (direct Postgres, zero operator config)
+  const ddlSrc = readFileSync("src/lib/db-ddl.ts", "utf8");
+  assert(ddlSrc.includes("import { MIGRATIONS } from") && ddlSrc.includes("BEGIN;") && ddlSrc.includes("COMMIT;") && ddlSrc.includes("ROLLBACK;"),
+    "ddl: the direct runtime path applies the repository's own embedded chain, one transaction per migration, with rollback - fail-loud, never silent");
+  assert(ddlSrc.includes("directPostgresConfigured") && ddlSrc.includes("POSTGRES_URL_NON_POOLING") && ddlSrc.includes("SUPABASE_DB_PASSWORD"),
+    "ddl: the zero-configuration credentials auto-provisioned by the Vercel Supabase Integration are used automatically");
+  assert(!/console\.|\.message|err\.message/.test(ddlSrc.replace(/never, logs, or embeds/g, "")) || !ddlSrc.includes("console."),
+    "ddl: nothing is logged (connection strings and driver errors never reach logs)");
+  const setupSrc2 = readFileSync("src/lib/db-bootstrap.ts", "utf8");
+  assert(setupSrc2.includes("directPostgresConfigured() || managementConfigured()") && setupSrc2.includes("runChainAutomation"),
+    "ddl: first-launch prefers the direct database connection; the Management API token is optional/secondary");
+  const evalSrc2 = readFileSync("src/lib/owner-setup.ts", "utf8");
+  assert(evalSrc2.includes("directPostgresConfigured() ||"),
+    "ddl: the setup probe counts the integration-provisioned direct connection as automation - the Set Up button appears with zero operator configuration");
+  const ddlPins = ["pg", "db-ddl"];
+  assert(!readFileSync("src/app/setup/SetupWizard.tsx", "utf8").includes("db-ddl") && !readFileSync("src/app/create-owner/page.tsx", "utf8").includes("db-ddl"),
+    "ddl: no client component imports the direct-connection module (credentials stay server-side)");
+  // manifest: the auto-provisioned direct-database variables are declared server-only
+  const manifestSrc = readFileSync("src/config/env.manifest.json", "utf8");
+  assert(manifestSrc.includes('"POSTGRES_URL_NON_POOLING"') && manifestSrc.includes('"SUPABASE_DB_PASSWORD"'),
+    "ddl: the integration-provisioned credentials are declared in the env manifest");
+  const exampleSrc = readFileSync(".env.example", "utf8");
+  assert(exampleSrc.includes("POSTGRES_URL_NON_POOLING") && exampleSrc.includes("SUPABASE_DB_PASSWORD"),
+    "ddl: .env.example is regenerated from the manifest and stays in sync");
+  // CI workflow: missing secrets skip with a notice (secondary mechanism).
   const wf = readFileSync(".github/workflows/migrations.yml", "utf8");
-  assert(wf.includes("HAS NOT OCCURRED") && wf.includes("exit 1"),
-    "wizard: the Migrations workflow fails loudly when the one-time secrets are missing (the deployment clearly reports the database was NOT initialized)");
+  assert(wf.includes("exit 0") && wf.includes("Optional CI migrations skipped") && !wf.includes("exit 1\n"),
+    "wizard: a missing optional CI token only SKIPS the secondary job with a notice - first-launch production initialization never depends on GitHub Actions");
   // server-only: the embedded chain is never imported by a client component.
   const clientFiles = walkFiles("src").filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"));
   for (const f of clientFiles) {

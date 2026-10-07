@@ -16,7 +16,9 @@ Never paste a secret into chat or into a file in the repository.
 | Variable | Where to get it | Secret? |
 |---|---|---|
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase API page → "service_role" key | **YES — the master key.** Server-only. Sophira never sends it to the browser and its secret scan checks for leaks. |
-| `SUPABASE_ACCESS_TOKEN` | supabase.com → Account → Access Tokens | Yes (server/CI only) | OPTIONAL. Powers AUTOMATED MIGRATIONS: the CI Migrations job and the one-click "Repair Setup" apply every missing migration through the Supabase Management API. Never browser-visible; the app runs fine without it. |
+| `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING` / `POSTGRES_POOLER_URL` / `POSTGRES_POOLER_URL_NON_POOLING` | **Auto-provisioned by the Vercel Supabase Integration** — you never set these | YES — direct database access. Server-only. Powers the fully automatic first-launch database initialization from /setup ("Set Up Sophira"); no access token, no GitHub secret, no SQL editor needed. |
+| `SUPABASE_DB_PASSWORD` | **Auto-provisioned by the Vercel Supabase Integration** | YES. Alternative direct-connection credential used by the same automatic initialization when the URLs are absent. Server-only. |
+| `SUPABASE_ACCESS_TOKEN` | supabase.com → Account → Access Tokens | Yes (server/CI only) | OPTIONAL, SECONDARY. The CI Migrations job can also apply migrations through the Supabase Management API. Not needed for first-launch setup: the primary path is the integration-provisioned direct database connection above. Never browser-visible. |
 | `SUPABASE_PROJECT_REF` | Supabase dashboard → Settings → API (project ref) | No (not a secret, but server/CI scoped) | OPTIONAL. Companion to `SUPABASE_ACCESS_TOKEN` for automated migrations. |
 
 ## THIRD-PARTY (all optional — Sophira runs without them)

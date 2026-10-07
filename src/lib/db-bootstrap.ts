@@ -26,7 +26,8 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
 import { probeOwnerSetup, type OwnerSetupProbe, evaluateOwnerSetup } from "./owner-setup";
-import { MIGRATIONS } from "@/lib/db-migrations.generated";
+import { MIGRATIONS } from "./db-migrations.generated";
+import { directPostgresConfigured, applyMigrationChainDirect } from "./db-ddl";
 
 export type SetupRepairResult =
   | { ok: true; repaired: boolean; message: string }
@@ -37,8 +38,57 @@ export type StaleAccountResult =
   | { ok: false; reason: "unconfigured" | "refused" | "failed"; message: string };
 
 /** Server-only: is migration-automation configured (token + project ref)? */
-export function migrationAutomationConfigured(): boolean {
+/** The Management API path (optional, secondary - a Supabase personal
+ *  access token is NO LONGER required for first-launch setup). */
+export function managementConfigured(): boolean {
   return present("SUPABASE_ACCESS_TOKEN") && present("SUPABASE_PROJECT_REF");
+}
+
+/** First-launch initialization is available when EITHER the direct
+ *  database connection (auto-provisioned by the Vercel Supabase
+ *  Integration - the primary, zero-configuration path) OR the optional
+ *  Management API credentials are configured. */
+export function migrationAutomationConfigured(): boolean {
+  return directPostgresConfigured() || managementConfigured();
+}
+
+/** Unified executor: prefer the direct Postgres connection (no external
+ *  token at all), fall back to the Management API when it is configured.
+ *  Re-probes the database afterwards and only reports ready when the
+ *  schema is ACTUALLY present. */
+async function runChainAutomation(): Promise<SetupRepairResult> {
+  // Direct Postgres connection (primary, zero-configuration path):
+  if (!directPostgresConfigured()) {
+    if (managementConfigured()) {
+      // Secondary path (re-probes and messages on its own).
+      return await applyMigrationChain();
+    }
+    return {
+      ok: false,
+      reason: "unconfigured",
+      message:
+        "Setup couldn't finish yet - the deployment does not have a server-side path to its database yet. Reconnecting the Vercel project to its Supabase project (the official integration provisions the connection automatically) fixes this; nothing else is needed.",
+    };
+  }
+  const pass = await applyMigrationChainDirect();
+  if (!pass.ok) {
+    return {
+      ok: false,
+      reason: "failed",
+      message:
+        "Setup couldn't finish yet - the database preparation step did not complete. Nothing was skipped; try again in a moment, and open Advanced diagnostics on /setup if it keeps failing.",
+    };
+  }
+  const after = await probeOwnerSetup();
+  if (after.migrationsPresent === true) {
+    return { ok: true, repaired: pass.applied > 0, message: "Your private database is ready. You can create your owner account now." };
+  }
+  return {
+    ok: false,
+    reason: "partial",
+    message:
+      "The preparation step ran, but the database still reports missing pieces - open the Advanced diagnostics on /setup.",
+  };
 }
 
 // The embedded repair payload is the concatenation of the two first-owner
@@ -281,7 +331,7 @@ async function managementQuery(query: string): Promise<unknown> {
  * no SQL, no migration filenames, no raw database errors.
  */
 async function applyMigrationChain(): Promise<SetupRepairResult> {
-  if (!migrationAutomationConfigured()) {
+  if (!managementConfigured()) {
     return {
       ok: false,
       reason: "unconfigured",
@@ -366,19 +416,19 @@ export async function repairOwnerBootstrap(): Promise<SetupRepairResult> {
   // (STATE B of the first-launch wizard) instead of refusing.
   if (probe.chainStarted === false) {
     if (migrationAutomationConfigured()) {
-      return await applyMigrationChain();
+      return await runChainAutomation();
     }
     return {
       ok: false,
       reason: "unconfigured",
       message:
-        "Your Sophira database needs to be initialized. A one-time administrator connection for the database is not configured yet - open Advanced diagnostics on /setup for the exact one-time step.",
+        "Your Sophira database needs to be initialized. The deployment does not have a server-side path to its database yet - reconnecting the Vercel project to its Supabase project (the official integration provisions the connection automatically) fixes this; nothing else is needed.",
     };
   }
   // PARTIALLY INITIALIZED: detect the frontier and apply every missing
   // migration in order (STATE C) - the owner never determines the gap.
   if (probe.migrationsPresent === false && migrationAutomationConfigured()) {
-    const chain = await applyMigrationChain();
+    const chain = await runChainAutomation();
     if (chain.ok) return chain;
     // chain application reported failure: fall through to the idempotent
     // 0025+0026 repair payload only when the chain attempt was a no-op

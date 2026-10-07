@@ -106,7 +106,7 @@ export default async function SetupPage() {
         <div className="mt-4 space-y-4">
           <p className="text-sm text-ink-soft">
             {!connected
-              ? "Administrator setup: connect Sophira to its Supabase project by setting the three server-side environment variables listed in docs/ENVIRONMENT_VARIABLES.md (public URL, public anon key, server-only service-role key) in the deployment environment. If the database preparation step above is unavailable, also set the one-time migration credentials described in README (the automatic database initialization)."
+              ? "Administrator setup: connect the Vercel project to its Supabase project with the official Supabase integration - it provisions every required connection automatically (see docs/VERCEL_DEPLOYMENT.md). No tokens, no GitHub configuration, no SQL."
               : status.repair.available === false && status.state === "SETUP_REQUIRED"
                 ? status.repair.reason
                 : "Everything below is the technical state; the steps above are the guided flow."}

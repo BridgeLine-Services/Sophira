@@ -1,6 +1,7 @@
 import { repairOwnerBootstrap, cleanupStaleAuthUsers } from "@/lib/db-bootstrap";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // full first-launch chain (26 migrations) needs headroom
 
 /**
  * ONE-CLICK SETUP REPAIR (public BY DESIGN, pre-first-owner only).

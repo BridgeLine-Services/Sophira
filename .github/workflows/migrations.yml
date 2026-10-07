@@ -13,10 +13,13 @@
 #                            dashboard -> Account -> Access Tokens.
 #   SUPABASE_PROJECT_REF   - the project ref (Settings -> API -> Ref).
 #
-# Until both secrets are set the job FAILS LOUDLY (requirement: the
-# deployment must clearly report that the one-time database initialization
-# has NOT occurred, never silently skip and then serve a login page that
-# cannot work). It never touches a database it cannot authenticate to.
+# FIRST-LAUNCH NOTE (2026-10-07): this job is a SECONDARY safety net. The
+# PRIMARY database initialization is the deployed application itself
+# (/setup -> "Set Up Sophira"), which uses the Vercel Supabase Integration's
+# direct database connection - no GitHub secrets, no access tokens, no
+# manual operator step. When the optional secrets below are absent this job
+# skips with a notice (never a red failure) and never touches a database it
+# cannot authenticate to.
 name: Migrations
 
 on:
@@ -38,8 +41,8 @@ jobs:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ] || [ -z "${SUPABASE_PROJECT_REF:-}" ]; then
-            echo "::error::ONE-TIME DATABASE INITIALIZATION HAS NOT OCCURRED. The repository secrets SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF are not configured (Settings -> Secrets and variables -> Actions), so the Sophira database schema was NOT applied and sign-up CANNOT work yet. This is the single one-time administrator step; after setting both secrets, re-run this workflow (or push) and the full migration chain is applied automatically."
-            exit 1
+            echo "::notice::Optional CI migrations skipped (no Supabase Management API secrets configured). First-launch production initialization does not depend on this job: the deployed app initializes its database itself from /setup using the Vercel Supabase Integration's direct connection."
+            exit 0
           fi
           npm run db:migrate
       - name: Verify the live deployment serves the first-owner flow
