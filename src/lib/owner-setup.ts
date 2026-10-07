@@ -184,22 +184,27 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       probe.ownerBootstrapPresent = false;
       probe.recoveryPresent = false;
       probe.migrationsPresent = false;
-      return probe;
+      // Do NOT return early: the owner-account check below must still run
+      // (profiles is from 0001, so it is trustworthy) - the repair UX needs
+      // to know whether an owner exists before offering any repair.
+    } else {
+      probe.ownerBootstrapPresent = true;
     }
-    probe.ownerBootstrapPresent = true;
 
     // ---- invitations table (0002/0006): the invitation system ----
     const { error: invErr } = await admin.from("invitations").select("id").limit(1);
     probe.invitationsPresent = invErr && isMissingRelation(invErr) ? false : !invErr;
 
     // ---- migration 0026: recovery marker (sophira_meta.schema_version) ----
-    const { error: metaErr } = await admin
-      .from("sophira_meta")
-      .select("key")
-      .eq("key", "schema_version")
-      .limit(1);
-    probe.recoveryPresent = !metaErr;
-    if (metaErr && isMissingRelation(metaErr)) probe.migrationsPresent = false;
+    if (probe.migrationsPresent !== false) {
+      const { error: metaErr } = await admin
+        .from("sophira_meta")
+        .select("key")
+        .eq("key", "schema_version")
+        .limit(1);
+      probe.recoveryPresent = !metaErr;
+      if (metaErr && isMissingRelation(metaErr)) probe.migrationsPresent = false;
+    }
 
     // ---- owner account: categorical status only (never email/id) ----
     const { data: owners, error: ownerErr } = await admin
@@ -373,7 +378,8 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
   // ---- single safe repair action (E/F) --------------------------------
   const repairable =
     state === "SETUP_REQUIRED" &&
-    probe.ownerAccount === "none" &&
+    probe.ownerAccount !== "active" &&
+    probe.ownerAccount !== "revoked" && // no owner known to exist
     probe.database === "checked" &&
     probe.chainStarted === true &&
     probe.migrationsPresent === false;

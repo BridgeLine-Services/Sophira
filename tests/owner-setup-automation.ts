@@ -120,6 +120,9 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   assert(broken.state === "SETUP_REQUIRED" && broken.repair.available === true && broken.repair.action === "migrations",
     "J14: a pre-0025 database reports SETUP_REQUIRED with an available one-click repair (not a mysterious auth error)");
   const unconfigured = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "none", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: false });
+  const unknownOwner = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "unknown", chainStarted: true, invitationsPresent: null, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: false });
+  assert(unknownOwner.state === "SETUP_REQUIRED" && unknownOwner.repair.reason.toLowerCase().includes("one-time"),
+    "J14: an owner-unknown + migrations-missing database STILL names the exact one-time repair configuration (no 'nothing to repair' dead end)");
   assert(unconfigured.repair.available === false && unconfigured.repair.reason.toLowerCase().includes("one-time"),
     "J14: without the token the repair names the exact ONE-TIME configuration, never manual SQL");
   assert(!ownerSetup.includes("Supabase SQL editor"),

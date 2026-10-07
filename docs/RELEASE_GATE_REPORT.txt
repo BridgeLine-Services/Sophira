@@ -1,5 +1,5 @@
 
-SOPHIRA RELEASE GATE — 2026-10-07T16:41:27.531Z
+SOPHIRA RELEASE GATE — 2026-10-07T16:50:33.714Z
 ==============================================================================
 [✗] BLOCKED Production URL works
           SOPHIRA_APP_URL is not configured (owner must set the production deployment URL)
@@ -22,35 +22,35 @@ SOPHIRA RELEASE GATE — 2026-10-07T16:41:27.531Z
 [✗] BLOCKED Student-to-student isolation tested
           SUPABASE_TEST_URL / SUPABASE_TEST_ANON_KEY / SUPABASE_TEST_SERVICE_ROLE_KEY are not configured — the live matrices cannot run — cross-student isolation is not LIVE-tested
 [✓] PASS    Writing profile tested
-          offline suite green — suite §3/§5 (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §3/§5 (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Teacher-specific rules tested
-          offline suite green — suite §1/§4 (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §1/§4 (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Teacher rules override old personal habits
-          offline suite green — suite §8/§12a + §18 conflict loop (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §8/§12a + §18 conflict loop (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Learning corrections tested
-          offline suite green — suite §9-§12 (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §9-§12 (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Learning stale-pattern detection tested
-          offline suite green — suite §8d + §18 decay (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §8d + §18 decay (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Typing test tested
-          offline suite green — suite §13/§15d (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §13/§15d (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Typing-paced output tested
-          offline suite green — suite §14/§15b (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §14/§15b (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Deadline scheduler tested
-          offline suite green — suite §15/§15c (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §15/§15c (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Persisted break/session state tested
-          offline suite green — suite §19 execution state machine (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §19 execution state machine (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Rubric audit tested
-          offline suite green — suite §15e (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §15e (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Submission readiness gate tested
-          offline suite green — suite §15j/§15k + §16b-§16d (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §15j/§15k + §16b-§16d (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Research retrieval tested
-          offline suite green — suite §15i (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §15i (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Claim-to-source verification tested
-          offline suite green — suite §16b (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §16b (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Citation integrity tested
-          offline suite green — suite §15h/§16d (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §15h/§16d (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✓] PASS    Source authority ranking tested
-          offline suite green — suite §16c (npm test RESULTS: 2369 passed, 0 failed, 2369 total)
+          offline suite green — suite §16c (npm test RESULTS: 2370 passed, 0 failed, 2370 total)
 [✗] BLOCKED PWA tested on Android
           docs/DEVICE_ACCEPTANCE.md row is NOT TESTED — NOT TESTED — no physical device available
 [✗] BLOCKED PWA tested on iPhone
@@ -68,9 +68,9 @@ SOPHIRA RELEASE GATE — 2026-10-07T16:41:27.531Z
 [✗] BLOCKED Production environment variables verified
           missing production environment variables: SOPHIRA_APP_URL, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SEARCH_API_KEY
 [✓] PASS    No secrets committed
-          no secret patterns in 433 tracked files (private keys, sk-/rk-, AWS, ghp_, xox)
+          no secret patterns in 441 tracked files (private keys, sk-/rk-, AWS, ghp_, xox)
 [✓] PASS    npm test passes
-          npm test RESULTS: 2369 passed, 0 failed, 2369 total
+          npm test RESULTS: 2370 passed, 0 failed, 2370 total
 [✓] PASS    npm build passes
           next build succeeded
 [✓] PASS    Client bundle secret scan passes

@@ -45,7 +45,7 @@ export default async function SetupPage() {
             {creation.reason} <Link href="/login" className="text-accent hover:underline">Go to sign in</Link>
           </p>
         )}
-        {status.state === "SETUP_REQUIRED" && status.probe.ownerAccount === "none" && (
+        {status.state === "SETUP_REQUIRED" && status.probe.ownerAccount !== "active" && status.probe.ownerAccount !== "revoked" && (
           <SetupRepair available={status.repair.available} reason={status.repair.reason} />
         )}
         {creation?.possible === null && (

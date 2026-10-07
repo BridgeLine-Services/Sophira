@@ -192,7 +192,7 @@ export default function CreateOwnerPage() {
         </div>
       )}
 
-      {!ownerExists && staleCount > 0 && status?.probe?.ownerAccount === "none" && (
+      {!ownerExists && staleCount > 0 && (status?.probe?.ownerAccount === "none" || status?.probe?.ownerAccount === "unknown") && (
         <div className="mt-4 rounded-lg border border-warn/30 bg-warn/5 p-4 text-sm">
           <p className="font-medium">An incomplete account was left behind by an earlier attempt.</p>
           <p className="mt-1 text-ink-soft">
