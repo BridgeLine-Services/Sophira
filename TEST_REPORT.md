@@ -2671,3 +2671,48 @@ backend/service URL variables, no bindings, no Dockerfiles, no reachable
 hard-coded localhost in web source, and EVERY environment variable read
 by the code (middleware included) must be documented in the guide.
 
+
+## 52. First-owner setup automation (2026-10-07) — 2369/2369 offline, build green, CI + Migrations workflows green
+
+The manual-migration requirement is ELIMINATED. Root cause: nothing in
+the deployment applied migrations, so a pre-0025 production database
+kept the 0008 invitation-only trigger, and the only documented fix was
+pasting SQL. Fix, in three layers:
+
+1. PIPELINE (primary): scripts/apply-migrations.mjs probes each
+   migration's signature object and applies only the missing files, in
+   chain order, through the Supabase Management API; deep-verifies the
+   owner-bootstrap trigger, invitation enforcement and recovery
+   function afterwards; fails loudly. npm run db:migrate /
+   db:migrate:check. The CI Migrations workflow runs it on every master
+   push and verifies /create-owner, /login, /auth/callback and
+   /api/setup-status are reachable live.
+2. RUNTIME SELF-HEALING: /setup and /create-owner offer one-click
+   "Repair Setup" (POST /api/setup-repair) applying the embedded
+   idempotent 0025+0026 payload; refuses permanently once an owner
+   exists; accepts no SQL, credentials or identifiers from requests.
+3. STALE-AUTH-USER RECOVERY (migration 0026): complete_first_owner()
+   SECURITY DEFINER completes a real auth account missing its profile
+   into the first owner via the same atomic single-row claim, only
+   through the account's own signed-in session (/api/complete-owner;
+   /login auto-detects and completes). Safe single-action cleanup for
+   unconfirmable leftovers, pre-owner only.
+
+/api/setup-status now returns the safe coarse state (READY /
+OWNER_EXISTS / SETUP_REQUIRED / TEMPORARILY_UNAVAILABLE), a six-item
+checklist, repair availability, and the categorical stale-account
+count. SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF (optional,
+server/CI-only) are the ONE-TIME configuration for automatic
+migrations, documented in README, VERCEL_DEPLOYMENT, OWNER_ACCESS and
+ENVIRONMENT_VARIABLES.
+
+**Tests (2369/2369 PASS; build PASS; secret scan CLEAN; gate 21 PASS /
+0 FAIL / 17 BLOCKED):** new tests/owner-setup-automation.ts covers the
+mandated scenarios J1-J14: fresh install, unauthenticated reachability,
+both email-confirmation modes, second-owner refusal, stale recovery,
+generic/confirmation/expired-callback errors, invitation-only intact,
+concurrent first-owner exactly-one claim, secret hygiene (client pages
+never reference service-role or migration-token names), deployment
+verification, and SETUP_REQUIRED diagnostics instead of mysterious
+auth errors. Security unchanged: no auth bypass, no stored/default
+passwords, RLS untouched, service-role never browser-visible.
