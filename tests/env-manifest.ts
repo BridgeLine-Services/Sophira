@@ -95,7 +95,7 @@ export function runEnvManifestTests(assert: (c: boolean, n: string) => void, sec
   const warns = (r: R) => r.issues.filter((i) => i.level === "warn");
 
   const none = checkEnv({}, { production: false }) as R;
-  assert(none.ready === true && warns(none).some((w) => w.message.includes("No AI provider key")),
+  assert(none.ready === true && warns(none).some((w) => w.message.includes("No AI runtime is configured")),
     "env: local context with nothing set is READY (all vars optional) but honestly warns about AI");
 
   const prodEmpty = checkEnv({}, { production: true }) as R;

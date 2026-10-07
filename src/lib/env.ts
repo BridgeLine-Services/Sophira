@@ -130,8 +130,12 @@ export function checkEnv(
   const paidAllowed = (env["ALLOW_PAID_AI"] || "false").toLowerCase() === "true";
   const budget = Number(env["MONTHLY_AI_BUDGET_USD"] || "0");
 
+  const selfhost = present("LOCAL_LLM_BASE_URL", env);
   if (provider === "gemini" && !gemini) {
     err("GEMINI_API_KEY", "AI_PROVIDER=gemini but GEMINI_API_KEY is not set.");
+  }
+  if (provider === "selfhost" && !selfhost) {
+    err("LOCAL_LLM_BASE_URL", "AI_PROVIDER=selfhost but LOCAL_LLM_BASE_URL is not set — point it at your local inference server (e.g. http://127.0.0.1:11434 for Ollama). No API key is needed.");
   }
   if (provider === "openai" && !openai) {
     err("OPENAI_API_KEY", "AI_PROVIDER=openai but OPENAI_API_KEY is not set.");
@@ -145,8 +149,8 @@ export function checkEnv(
   if (paidAllowed && budget <= 0) {
     warn("MONTHLY_AI_BUDGET_USD", "ALLOW_PAID_AI=true but MONTHLY_AI_BUDGET_USD is 0: no paid spend is possible. Raise the budget to enable the paid fallback.");
   }
-  if (provider === "auto" && !gemini && !openai) {
-    warn("GEMINI_API_KEY", "No AI provider key is configured (GEMINI_API_KEY preferred, free tier): AI features will honestly report not-configured until one is added.");
+  if (provider === "auto" && !gemini && !openai && !selfhost) {
+    warn("LOCAL_LLM_BASE_URL", "No AI runtime is configured. Self-hosted AI is the default path: set LOCAL_LLM_BASE_URL (Ollama/vLLM/llama.cpp — no key required). GEMINI_API_KEY (free tier) is an optional alternative; Offline mode's on-device model needs nothing.");
   }
 
   // ---- native release ----------------------------------------------------
@@ -185,6 +189,7 @@ export function healthConfiguration(env: Record<string, string | undefined> = pr
       present("NEXT_PUBLIC_SUPABASE_URL", env) &&
       present("NEXT_PUBLIC_SUPABASE_ANON_KEY", env),
     supabase_service_role: present("SUPABASE_SERVICE_ROLE_KEY", env),
-    ai: present("OPENAI_API_KEY", env) || present("GEMINI_API_KEY", env),
+    ai: present("LOCAL_LLM_BASE_URL", env) || present("OPENAI_API_KEY", env) || present("GEMINI_API_KEY", env),
+    ai_selfhost: present("LOCAL_LLM_BASE_URL", env),
   };
 }

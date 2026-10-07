@@ -102,3 +102,21 @@ environment, AI, search, native URLs, secret hygiene, and the production
 build. `/setup` on a deployment reports the live configuration status.
 Nothing in Sophira fakes readiness: a missing configuration is reported,
 never simulated.
+
+## 9. Local inference server unreachable (self-hosted AI)
+
+Symptom: AI answers say the local runtime is unavailable;
+`/api/ai/health` reports `{"available":false,"reason":"Local inference
+server unreachable…"}`.
+Fix:
+1. Is the server running? (`ollama serve`, or your llama.cpp/vLLM/LM
+   Studio server; `curl http://127.0.0.1:11434/api/tags` should answer.)
+2. Does `LOCAL_LLM_BASE_URL` in `.env.local` point at it exactly (e.g.
+   `http://127.0.0.1:11434`)? No port typos; Sophira normalizes a
+   trailing `/v1` for you.
+3. Is the model installed? (`ollama pull llama3.1:8b`, or set
+   `LOCAL_LLM_MODEL` to a model your server actually has — the 404 error
+   names the missing model.)
+4. Restart the dev server after editing `.env.local`.
+Non-AI features keep working; Sophira will not silently call a paid
+cloud provider as a substitute.

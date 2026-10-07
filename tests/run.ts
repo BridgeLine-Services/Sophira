@@ -101,6 +101,7 @@ import { runLoginOwnerCtaTests } from "./login-owner-cta";
 import { runVercelConfigTests } from "./vercel-config";
 import { runEnvManifestTests } from "./env-manifest";
 import { runGitHubInstallTests } from "./github-install";
+import { runSelfHostedAiTests } from "./selfhosted-ai";
 import { runLocalFirstTests } from "./local-first";
 import { runReadinessCompletionTests } from "./readiness-completion";
 import { runProdEnvPolicyTests } from "./prod-env-policy";
@@ -3063,10 +3064,12 @@ async function runAccessControlTests(): Promise<void> {
     walkApi(apiRoot);
     // Genuinely public by design: health (config status only, no user data),
     // invitations/accept (account creation via a single-use invitation
-    // token; must be callable before authentication exists), and
+    // token; must be callable before authentication exists),
     // setup-status (pre-auth OPERATOR bootstrap diagnostic — categorical
-    // booleans only, machine-checked for zero secret material below).
-    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status"];
+    // booleans only, machine-checked for zero secret material below), and
+    // ai/health (AI runtime status indicator — categorical availability
+    // only, never keys or endpoint hosts; no user data).
+    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status", "/api/ai/health"];
     for (const rf of routeFiles) {
       const rel = ("/api" + rf.slice(apiRoot.length)).replaceAll("\\", "/").replace("/route.ts", "");
       const src = fs.readFileSync(rf, "utf8");
@@ -3078,8 +3081,9 @@ async function runAccessControlTests(): Promise<void> {
         assert(
           rel === "/api/health" ||
           rel === "/api/setup-status" ||
+          rel === "/api/ai/health" ||
           src.includes("token"),
-          `access: public route ${rel} is health/setup-status (config booleans only) or operates solely on its single-use token`
+          `access: public route ${rel} is health/ai-health/setup-status (categorical status only) or operates solely on its single-use token`
         );
       }
     }
@@ -3576,4 +3580,4 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section))
-    .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
+    .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

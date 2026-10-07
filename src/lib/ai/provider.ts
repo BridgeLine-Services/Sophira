@@ -12,13 +12,18 @@
  *   ALLOW_PAID_AI=true or a budget > 0. With the defaults, Sophira never
  *   sends a request to a paid endpoint, even if a paid key is configured.
  *
- * Provider selection:
- *   AI_PROVIDER=local | gemini | openai | auto (default auto)
- *     auto: gemini (if GEMINI_API_KEY set, free tier) first, then openai
- *           (only if paid use is explicitly allowed). Server routes have no
- *           local inference; "local" candidates are a client concern (the
- *           Offline page runs the real on-device model) — the server reports
- *           honestly that no remote provider is available.
+ * Provider selection (SELF-HOSTED FIRST, 2026-10-06):
+ *   AI_PROVIDER=selfhost | local | gemini | openai | auto (default auto)
+ *     selfhost: an OpenAI-compatible LOCAL inference server (Ollama, llama.cpp
+ *           server, vLLM, LM Studio, ...) configured via LOCAL_LLM_BASE_URL +
+ *           LOCAL_LLM_MODEL. Self-hosted AI is the DEFAULT path: in auto mode
+ *           it is tried FIRST, before any cloud provider, and requires no API
+ *           key at all. Nothing is hardcoded — the endpoint is fully
+ *           configurable (dev: a machine on your LAN; prod: your own server).
+ *     auto: selfhost (if LOCAL_LLM_BASE_URL set) → gemini (if GEMINI_API_KEY
+ *           set, free tier) → openai (only if paid use is explicitly allowed).
+ *           Server routes have no local inference; "local" candidates are a
+ *           client concern (the Offline page runs the real on-device model).
  *
  * All decisions return REASONS, surfaced by the owner diagnostics screen —
  * never silent.
@@ -26,7 +31,7 @@
 
 import { VERIFIED_FREE_TIER_GEMINI_MODELS } from "./capabilities";
 
-export type ProviderId = "local" | "gemini" | "openai";
+export type ProviderId = "local" | "selfhost" | "gemini" | "openai";
 export type ProviderCostClass = "local" | "free-tier" | "paid";
 
 export interface AiEnv {
@@ -38,10 +43,18 @@ export interface AiEnv {
   SOPHIRA_MODEL: string;
   ALLOW_PAID_AI: string;
   MONTHLY_AI_BUDGET_USD: string;
+  /** OpenAI-compatible LOCAL inference server (Ollama/vLLM/llama.cpp/LM Studio). */
+  LOCAL_LLM_BASE_URL: string;
+  LOCAL_LLM_MODEL: string;
+  /** Optional: only if your local server requires a bearer token. */
+  LOCAL_LLM_API_KEY: string;
 }
 
 /** The Gemini free tier currently includes this model; owner can override. */
 export const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
+
+/** Self-hosted default (works with `ollama pull llama3.1:8b`); owner can override. */
+export const SELFHOST_DEFAULT_MODEL = "llama3.1:8b";
 
 export function readAiEnv(overrides: Partial<AiEnv> = {}): AiEnv {
   const e = typeof process !== "undefined" ? (process.env as Record<string, string | undefined>) : {};
@@ -54,6 +67,9 @@ export function readAiEnv(overrides: Partial<AiEnv> = {}): AiEnv {
     SOPHIRA_MODEL: overrides.SOPHIRA_MODEL ?? (e.SOPHIRA_MODEL || "gpt-4o-mini"),
     ALLOW_PAID_AI: overrides.ALLOW_PAID_AI ?? (e.ALLOW_PAID_AI || "false"),
     MONTHLY_AI_BUDGET_USD: overrides.MONTHLY_AI_BUDGET_USD ?? (e.MONTHLY_AI_BUDGET_USD || "0"),
+    LOCAL_LLM_BASE_URL: overrides.LOCAL_LLM_BASE_URL ?? (e.LOCAL_LLM_BASE_URL || ""),
+    LOCAL_LLM_MODEL: overrides.LOCAL_LLM_MODEL ?? (e.LOCAL_LLM_MODEL || SELFHOST_DEFAULT_MODEL),
+    LOCAL_LLM_API_KEY: overrides.LOCAL_LLM_API_KEY ?? (e.LOCAL_LLM_API_KEY || ""),
   };
 }
 
@@ -64,7 +80,7 @@ export function paidAllowed(env: AiEnv): boolean {
 }
 
 export function costClassOf(provider: ProviderId): ProviderCostClass {
-  if (provider === "local") return "local";
+  if (provider === "local" || provider === "selfhost") return "local";
   if (provider === "gemini") return "free-tier"; // free-tier quotas apply; we never attach a billing account
   return "paid";
 }
@@ -115,6 +131,20 @@ export function resolveProviders(env: AiEnv): ProviderPlan {
     return true;
   };
 
+  const selfhostEligible = () => {
+    if (!env.LOCAL_LLM_BASE_URL) {
+      reasons.selfhost = "not configured (LOCAL_LLM_BASE_URL is unset) — self-hosted AI is the default path: point it at your Ollama/vLLM/llama.cpp server (see docs/SELF_HOSTED_AI_ARCHITECTURE.md)";
+      return false;
+    }
+    reasons.selfhost = `self-hosted inference server configured (model ${env.LOCAL_LLM_MODEL}) — no API key required, nothing leaves your machines`;
+    return true;
+  };
+
+  if (mode === "selfhost") {
+    if (selfhostEligible()) candidates.push("selfhost");
+    else reasons.selfhost += "; AI_PROVIDER=selfhost was requested — set LOCAL_LLM_BASE_URL (and optionally LOCAL_LLM_MODEL)";
+    return { candidates, reasons };
+  }
   if (mode === "local") {
     reasons.local = "AI_PROVIDER=local — the server performs no remote AI; use Offline mode (on-device model)";
     return { candidates, reasons };
@@ -129,12 +159,13 @@ export function resolveProviders(env: AiEnv): ProviderPlan {
     else reasons.openai += "; AI_PROVIDER=openai was requested — fix the configuration";
     return { candidates, reasons };
   }
-  // auto (default): free first, then paid only if explicitly allowed
+  // auto (default): SELF-HOSTED FIRST, then free cloud, then paid only if explicitly allowed
+  if (selfhostEligible()) candidates.push("selfhost");
   if (geminiEligible()) candidates.push("gemini");
   if (openaiEligible()) candidates.push("openai");
   if (candidates.length === 0) {
-    if (!env.GEMINI_API_KEY && !env.OPENAI_API_KEY) {
-      reasons.local = "no remote provider is configured — Offline mode can still run the on-device model";
+    if (!env.GEMINI_API_KEY && !env.OPENAI_API_KEY && !env.LOCAL_LLM_BASE_URL) {
+      reasons.local = "no remote provider is configured — self-hosted AI (LOCAL_LLM_BASE_URL) or Offline mode can still run locally";
     } else {
       reasons.local = "no eligible remote provider (see reasons above) — Offline mode can still run the on-device model";
     }
@@ -265,6 +296,112 @@ export async function geminiChat(
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* SELF-HOSTED inference (2026-10-06): any OpenAI-compatible local      */
+/* server — Ollama, llama.cpp server, vLLM, LM Studio, llama-cpp-python */
+/* — via /v1/chat/completions. No API key required (an optional bearer  */
+/* token is supported for secured endpoints). The endpoint comes from   */
+/* LOCAL_LLM_BASE_URL; nothing is hardcoded and no cloud call is made.  */
+/* ------------------------------------------------------------------ */
+
+/** Normalize a local base URL (accepts both http://host:11434 and …/v1). */
+export function selfhostBaseUrl(raw: string): string {
+  const base = raw.trim().replace(/\/+$/, "");
+  return base.endsWith("/v1") ? base : `${base}/v1`;
+}
+
+export async function selfhostChat(
+  env: AiEnv,
+  messages: ChatMessage[],
+  opts: ChatOpts,
+  fetchFn: FetchLike = fetch
+): Promise<{ text: string; tokensIn: number | null; tokensOut: number | null }> {
+  const baseUrl = selfhostBaseUrl(env.LOCAL_LLM_BASE_URL);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120_000);
+  const finalMessages: { role: string; content: unknown }[] = messages.map((m) => ({ role: m.role, content: m.content }));
+  if (opts.images && opts.images.length > 0 && finalMessages.length > 0) {
+    const last = finalMessages[finalMessages.length - 1];
+    if (last.role === "user") {
+      last.content = [
+        { type: "text", text: String(last.content) },
+        ...opts.images.map((dataUrl) => ({ type: "image_url", image_url: { url: dataUrl } })),
+      ];
+    }
+  }
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (env.LOCAL_LLM_API_KEY) headers.Authorization = `Bearer ${env.LOCAL_LLM_API_KEY}`;
+    const res = await fetchFn(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: env.LOCAL_LLM_MODEL,
+        messages: finalMessages,
+        temperature: opts.temperature ?? 0.4,
+        max_tokens: opts.maxTokens ?? 4096,
+        ...(opts.jsonMode ? { response_format: { type: "json_object" } } : {}),
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new Error(
+          `The local inference server responded 404 for model "${env.LOCAL_LLM_MODEL}". Pull the model (e.g. ollama pull ${env.LOCAL_LLM_MODEL}) or set LOCAL_LLM_MODEL to an installed model.`
+        );
+      }
+      // Never echo the body or any credentials.
+      throw new Error(`The local inference server returned an error (HTTP ${res.status}).`);
+    }
+    const data = await res.json();
+    const msg = (data as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]?.message;
+    const text = typeof msg?.content === "string" ? msg.content : "";
+    if (!text.trim()) throw new Error("The local inference server returned an empty response.");
+    const u = (data as { usage?: { prompt_tokens?: number; completion_tokens?: number } })?.usage;
+    return {
+      text,
+      tokensIn: typeof u?.prompt_tokens === "number" ? u.prompt_tokens : null,
+      tokensOut: typeof u?.completion_tokens === "number" ? u.completion_tokens : null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Probe a local inference server: detect the runtime WITHOUT secrets. */
+export async function selfhostRuntime(
+  env: AiEnv,
+  fetchFn: FetchLike = fetch
+): Promise<{ available: boolean; runtime: string; reason: string }> {
+  if (!env.LOCAL_LLM_BASE_URL) {
+    return { available: false, runtime: "none", reason: "LOCAL_LLM_BASE_URL is not configured" };
+  }
+  const base = env.LOCAL_LLM_BASE_URL.trim().replace(/\/+$/, "");
+  const probe = async (url: string): Promise<{ ok: boolean; runtime: string }> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4_000);
+    try {
+      const headers: Record<string, string> = {};
+      if (env.LOCAL_LLM_API_KEY) headers.Authorization = `Bearer ${env.LOCAL_LLM_API_KEY}`;
+      const res = await fetchFn(url, { signal: controller.signal, headers });
+      return { ok: res.ok, runtime: "" };
+    } catch {
+      return { ok: false, runtime: "" };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const ollama = await probe(`${base}/api/tags`);
+  if (ollama.ok) return { available: true, runtime: "ollama", reason: "" };
+  const openaiCompat = await probe(`${base}/v1/models`);
+  if (openaiCompat.ok) return { available: true, runtime: "openai-compatible", reason: "" };
+  return {
+    available: false,
+    runtime: "none",
+    reason: "Local inference server unreachable — start it (e.g. `ollama serve`) and check LOCAL_LLM_BASE_URL. Non-AI features keep working; no cloud call is made as a substitute.",
+  };
+}
+
 export async function openaiChat(
   env: AiEnv,
   messages: ChatMessage[],
@@ -339,6 +476,12 @@ export async function serverAiChat(
   const errors: string[] = [];
   for (const p of plan.candidates) {
     try {
+      if (p === "selfhost") {
+        const r = await selfhostChat(env, messages, opts, hooks.fetchFn);
+        if (!r.text) throw new Error("The local inference server returned an empty response.");
+        hooks.onUse?.({ provider: "selfhost", model: env.LOCAL_LLM_MODEL, classification: "local", ok: true, tokensIn: r.tokensIn, tokensOut: r.tokensOut });
+        return { text: r.text, provider: "selfhost", model: env.LOCAL_LLM_MODEL };
+      }
       if (p === "gemini") {
         const r = await geminiChat(env, messages, opts, hooks.fetchFn);
         if (!r.text) throw new Error("Gemini returned an empty response.");
@@ -352,7 +495,12 @@ export async function serverAiChat(
       }
     } catch (e) {
       errors.push(`${p}: ${(e as Error).message}`);
-      hooks.onUse?.({ provider: p, model: p === "gemini" ? env.GEMINI_MODEL : env.SOPHIRA_MODEL, classification: costClassOf(p), ok: false });
+      hooks.onUse?.({
+        provider: p,
+        model: p === "gemini" ? env.GEMINI_MODEL : p === "selfhost" ? env.LOCAL_LLM_MODEL : env.SOPHIRA_MODEL,
+        classification: costClassOf(p),
+        ok: false,
+      });
     }
   }
   const err = new AiProviderUnavailableError(plan, {
@@ -381,6 +529,8 @@ export interface ProviderDiagnostics {
   monthlyBudgetUSD: string;
   geminiConfigured: boolean;
   openaiKeyPresent: boolean;
+  selfhostConfigured: boolean;
+  selfhostModel: string | null;
   notes: string[];
 }
 
@@ -392,7 +542,10 @@ export function providerDiagnostics(env: AiEnv): ProviderDiagnostics {
     notes.push("OPENAI_API_KEY is present but IGNORED: zero-billing policy (ALLOW_PAID_AI=false, MONTHLY_AI_BUDGET_USD=0).");
   }
   if (!env.GEMINI_API_KEY) {
-    notes.push("GEMINI_API_KEY is unset — the free-tier path is available to the owner at any time.");
+    notes.push("GEMINI_API_KEY is unset — optional; the self-hosted path (LOCAL_LLM_BASE_URL) needs no key at all.");
+  }
+  if (!env.LOCAL_LLM_BASE_URL) {
+    notes.push("LOCAL_LLM_BASE_URL is unset — self-hosted AI is the default path; point it at your Ollama/vLLM/llama.cpp server (docs/SELF_HOSTED_AI_ARCHITECTURE.md).");
   }
   if (plan.candidates.length === 0) {
     notes.push("No remote provider eligible — Offline mode still runs the on-device model.");
@@ -400,7 +553,11 @@ export function providerDiagnostics(env: AiEnv): ProviderDiagnostics {
   return {
     configuredMode: env.AI_PROVIDER,
     activeProvider: active,
-    activeModel: active === "gemini" ? env.GEMINI_MODEL : active === "openai" ? env.SOPHIRA_MODEL : null,
+    activeModel:
+      active === "gemini" ? env.GEMINI_MODEL
+      : active === "openai" ? env.SOPHIRA_MODEL
+      : active === "selfhost" ? env.LOCAL_LLM_MODEL
+      : null,
     classification: active ? costClassOf(active) : null,
     candidates: plan.candidates,
     reasons: plan.reasons,
@@ -408,6 +565,8 @@ export function providerDiagnostics(env: AiEnv): ProviderDiagnostics {
     monthlyBudgetUSD: env.MONTHLY_AI_BUDGET_USD,
     geminiConfigured: Boolean(env.GEMINI_API_KEY),
     openaiKeyPresent: Boolean(env.OPENAI_API_KEY),
+    selfhostConfigured: Boolean(env.LOCAL_LLM_BASE_URL),
+    selfhostModel: env.LOCAL_LLM_BASE_URL ? env.LOCAL_LLM_MODEL : null,
     notes,
   };
 }

@@ -186,24 +186,37 @@ npm run dev          # → http://localhost:3000
 `npm run setup` is safe to re-run: it never overwrites an existing
 `.env.local`.
 
-### Which AI will answer? (configure it consciously)
+### Which AI will answer? (self-hosted by default)
+
+**You do NOT need an OpenAI, Anthropic, Gemini, or other paid AI API key
+to run Sophira.** The default AI path is your own self-hosted inference
+server (Ollama / llama.cpp / vLLM / LM Studio):
 
 ```bash
-npm run setup:ai                  # explain modes + current status
-npm run setup:ai -- --mode gemini # CLOUD: free-tier Gemini API (needs a
-                                  # free key from aistudio.google.com)
-npm run setup:ai -- --mode local  # LOCAL: on-device model — no key, offline
-npm run setup:ai -- --mode openai # CLOUD: PAID — stays disabled until you
-                                  # also set ALLOW_PAID_AI=true + a budget
+ollama pull llama3.1:8b && ollama serve     # your AI server, no keys
+npm run setup:ai -- --mode selfhost          # point Sophira at it
+# .env.local: LOCAL_LLM_BASE_URL=http://127.0.0.1:11434
+#             LOCAL_LLM_MODEL=llama3.1:8b
+curl localhost:3000/api/ai/health           # verify the connection
 ```
 
-- **CLOUD AI** = Gemini/OpenAI APIs. The model runs on the provider's
-  servers; your key stays server-side and never reaches the browser or
-  the mobile shell.
-- **LOCAL AI** = a model running on your own device. Free, private, and
-  offline-capable after a one-time download from the app.
+Modes (`npm run setup:ai` explains all of them):
+
+- **SELF-HOSTED** (default path, tried first in `auto`): your own
+  OpenAI-compatible inference server. No key, no cloud, no billing
+  possible — math, explanations, and homework images all run through it.
+- **CLOUD AI** (optional): Gemini free tier or paid OpenAI. The models
+  run on the provider's servers and are NOT downloadable from GitHub;
+  your key stays server-side and never reaches the browser or the mobile
+  shell.
+- **ON-DEVICE AI**: a small model running in your browser — no key, no
+  cloud, offline after a one-time download.
 - **Paid AI is off by default** (`ALLOW_PAID_AI=false`,
-  `MONTHLY_AI_BUDGET_USD=0`) and never activates silently.
+  `MONTHLY_AI_BUDGET_USD=0`) and never activates silently. If no AI
+  runtime is reachable, Sophira says so — it never fakes a response and
+  never secretly calls a paid provider.
+
+Full architecture: **docs/SELF_HOSTED_AI_ARCHITECTURE.md**.
 
 ### One-command validation
 

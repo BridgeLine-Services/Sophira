@@ -3,7 +3,10 @@
  * provider, configurable via environment variables. API keys NEVER reach
  * the browser — this module is imported only by server routes.
  *
- *   SEARCH_PROVIDER  = "brave" | "tavily" | "custom"   (default "brave")
+ *   SEARCH_PROVIDER  = "brave" | "tavily" | "custom" | "local" (default "brave")
+ *                     "local" = no web search at all (no paid API, no
+ *                     external calls) — used when research must stay
+ *                     fully local/self-hosted.
  *   SEARCH_API_KEY   = provider key                   (server-side only)
  *   SEARCH_BASE_URL  = custom endpoint for "custom" (a Brave-compatible
  *                      JSON API, e.g. a self-hosted proxy)
@@ -43,6 +46,19 @@ export class SearchProviderError extends Error {
   }
 }
 
+/**
+ * LOCAL search provider (2026-10-06): retrieval WITHOUT any web search API.
+ * SEARCH_PROVIDER=local performs no external calls and no paid API — web
+ * research is honestly reported as unavailable while document-based and
+ * on-device workflows keep working. It never fabricates results.
+ */
+export class LocalSearchProvider implements SearchProvider {
+  readonly name = "local";
+  async search(): Promise<SearchHit[]> {
+    return [];
+  }
+}
+
 export class SearchNotConfiguredError extends Error {
   constructor() {
     super("No search provider is configured on the server (SEARCH_PROVIDER / SEARCH_API_KEY).");
@@ -51,6 +67,7 @@ export class SearchNotConfiguredError extends Error {
 
 export function searchProviderConfigured(): boolean {
   const provider = (process.env.SEARCH_PROVIDER || "brave").toLowerCase();
+  if (provider === "local") return true; // fully local: no key, no external calls
   if (provider === "custom") return Boolean(process.env.SEARCH_BASE_URL && process.env.SEARCH_API_KEY);
   return Boolean(process.env.SEARCH_API_KEY);
 }
@@ -135,6 +152,7 @@ class CustomProvider implements SearchProvider {
 
 export function getSearchProvider(): SearchProvider {
   const provider = (process.env.SEARCH_PROVIDER || "brave").toLowerCase();
+  if (provider === "local") return new LocalSearchProvider(); // no key, no external calls
   const key = process.env.SEARCH_API_KEY;
   if (!key) throw new SearchNotConfiguredError();
   if (provider === TAVILY_INJECTED) return new TavilyProvider(key);
