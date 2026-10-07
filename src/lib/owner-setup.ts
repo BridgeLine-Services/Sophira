@@ -130,7 +130,7 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     );
 
     // ---- migration 0008: app_config exists (and owner_email configured?) ----
-    const { error: configErr } = await admin
+    const { data: configRows, error: configErr } = await admin
       .from("app_config")
       .select("key")
       .eq("key", "owner_email")
@@ -142,7 +142,7 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     probe.database = "checked";
     probe.chainStarted = true;
     probe.migrationsPresent = true;
-    probe.ownerEmailConfigured = true; // row exists for key='owner_email'
+    probe.ownerEmailConfigured = Array.isArray(configRows) && configRows.length > 0; // row for key='owner_email' actually present
 
     // ---- migration 0019: profiles.access_revoked_at column ----
     const { error: colErr } = await admin

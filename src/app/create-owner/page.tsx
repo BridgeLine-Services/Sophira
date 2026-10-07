@@ -143,9 +143,39 @@ export default function CreateOwnerPage() {
       // state that does not exist, and never redirect to /owner without a
       // valid session (the middleware would bounce straight back to /login).
       if (data.session) {
-        setDone(true);
+        // SERVER-VERIFIED success (2026-10-07): never route on a browser
+        // guess. Ask the server what actually exists for this session,
+        // complete the profile server-side if the database left it
+        // missing (stale/retry path), and go to /owner ONLY once the
+        // server confirms role === "owner".
+        setBusy(true);
+        let verify: { hasProfile?: boolean; role?: string | null } = {};
+        try {
+          const g = await fetch("/api/complete-owner");
+          verify = await g.json();
+          if (!verify.hasProfile) {
+            // owner slot is open and this is our own session: let the
+            // database's race-safe claim finish the bootstrap (Case C).
+            const c = await fetch("/api/complete-owner", { method: "POST" });
+            verify = await c.json();
+          }
+        } catch {
+          verify = {};
+        }
+        if (verify.role === "owner") {
+          setDone(true);
+          await refreshStatus();
+          router.push("/owner");
+          router.refresh();
+          return;
+        }
+        setBusy(null);
+        setError(
+          verify.hasProfile
+            ? "Your account exists but is not the owner - an owner was already created by another registration."
+            : "Your account was created, but the server could not verify the owner profile yet. Sign in from the login page - Sophira will finish the setup automatically."
+        );
         await refreshStatus();
-        router.push("/owner");
       } else {
         // Account created; confirmation required. Show guidance; the
         // owner account is preserved and NO duplicate is ever created.

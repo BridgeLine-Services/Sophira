@@ -23,6 +23,34 @@ export const dynamic = "force-dynamic";
  *   - the service-role client is used ONLY to invoke that function with
  *     the caller's own verified user id, and NEVER reaches the browser.
  */
+/**
+ * GET = SERVER-VERIFIED owner/account state for the CURRENT session.
+ * The first-owner flow never routes on a browser guess: after signup the
+ * client asks the server what actually exists (auth user? profile? role?)
+ * and only navigates to /owner when the server confirms role === "owner".
+ * Returns only categorical state about the CALLER'S OWN account - never
+ * another user's existence, never emails or secret material.
+ */
+export async function GET() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ authenticated: false, hasProfile: false, role: null });
+  }
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  return NextResponse.json({
+    authenticated: true,
+    hasProfile: !!profile,
+    role: profile?.role ?? null,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const supabase = createClient();
   const {
@@ -45,6 +73,10 @@ export async function POST(request: NextRequest) {
   });
 
   const { error } = await admin.rpc("complete_first_owner", { p_user_id: user.id });
+  if (!error) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    return NextResponse.json({ completed: true, hasProfile: !!profile, role: profile?.role ?? null });
+  }
   if (error) {
     // Categorical, honest, never leaks other accounts:
     // "owner exists" / "claim lost the race" / "profile already exists".

@@ -79,6 +79,29 @@ export function classifyAuthError(err: AuthErrorInput): ClassifiedAuthError {
     return { kind: "invitation_required", userMessage: INVITATION_MESSAGE };
   }
 
+  // 3b. DATABASE failure during signup/sign-in (the drifted-database bug,
+  // 2026-10-07): Supabase wraps a failed trigger (missing relation, missing
+  // function, invitation check hitting a table that does not exist) in
+  // HTTP 400 "Database error saving new user" (code 50026). This MUST be
+  // reported as a setup problem - previously it fell into the status-400
+  // branch below and the owner was told their fresh password was wrong.
+  if (
+    code === "50026" ||
+    code === "database_error" ||
+    code === "unexpected_failure" ||
+    message.includes("database error saving") ||
+    message.includes("db error saving") ||
+    message.includes("database error") ||
+    message.includes("could not find the function") ||
+    message.includes("does not exist") && (message.includes("relation") || message.includes("schema"))
+  ) {
+    return {
+      kind: "service_unavailable",
+      userMessage:
+        "Sophira's database is not fully set up yet - this is a server configuration problem, not a problem with your email or password. Open /setup and use Repair Setup (or see the setup status) to finish the one-time initialization.",
+    };
+  }
+
   // 4. Invalid credentials — the ONLY generic case, by design.
   if (
     code === "invalid_credentials" ||

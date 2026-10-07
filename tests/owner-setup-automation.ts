@@ -131,6 +131,32 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "J14: /api/setup-status exposes the safe coarse state, checklist, and stale count");
   assert(statusRoute.includes("TEMPORARILY_UNAVAILABLE") === false || readFileSync("src/lib/owner-setup.ts", "utf8").includes("TEMPORARILY_UNAVAILABLE"),
     "J14: the four safe states are defined in one place");
+  // ---- NEW (2026-10-07): the drifted-database signup bug -----------------
+  // Supabase wraps a failed DB trigger in HTTP 400 "Database error saving
+  // new user" (code 50026). The old status-400 catch-all turned that into
+  // "That email or password is not right" - the EXACT production symptom.
+  const dbErr1 = classifyAuthError({ code: "50026", message: "Database error saving new user", status: 400 });
+  assert(dbErr1.kind === "service_unavailable" && dbErr1.userMessage.includes("not a problem with your email or password"),
+    "TRACE: a 400 database error on signup is a SETUP problem, never a wrong-password message");
+  const dbErr2 = classifyAuthError({ code: null, message: "Database error saving new user", status: 400 });
+  assert(dbErr2.kind === "service_unavailable",
+    "TRACE: same, without a machine-readable code (message signal only)");
+  const dbErr3 = classifyAuthError({ code: null, message: "could not find the function public.handle_new_user in schema public", status: 400 });
+  assert(dbErr3.kind === "service_unavailable",
+    "TRACE: a missing-trigger function is a SETUP problem, never a wrong-password message");
+  const badPw = classifyAuthError({ code: "invalid_credentials", message: "Invalid login credentials", status: 400 });
+  assert(badPw.kind === "invalid_credentials",
+    "TRACE: a genuine wrong password STILL gets the honest generic message");
+  // Server-verified routing: the client asks the SERVER what exists.
+  const completeSrc = readFileSync("src/app/api/complete-owner/route.ts", "utf8");
+  assert(completeSrc.includes("SERVER-VERIFIED") && completeSrc.includes("hasProfile") && completeSrc.includes('role: profile?.role ?? null'),
+    "TRACE: /api/complete-owner GET returns the server-verified session state (profile + role)");
+  assert(createOwner.includes('verify.role === "owner"') && createOwner.includes('router.push("/owner")'),
+    "TRACE: /create-owner routes to /owner ONLY after the server confirms role === owner");
+  const ownerSetupSrc = readFileSync("src/lib/owner-setup.ts", "utf8");
+  assert(ownerSetupSrc.includes("configRows.length > 0"),
+    "TRACE: ownerEmailConfigured reflects the actual owner_email ROW, not mere query success");
+
   // repair endpoint hard gates
   assert(repairRoute.includes("action === \"migrations\"") && repairRoute.includes("cleanup-stale") && !repairRoute.includes("exec("),
     "J14: the repair endpoint accepts ONLY fixed action names - never SQL from a request");
