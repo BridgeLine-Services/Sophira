@@ -150,10 +150,11 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       .select("access_revoked_at")
       .limit(1);
     if (colErr && (isMissingRelation(colErr) || isMissingColumn(colErr))) {
+      // 0019 missing on an older database: record it and KEEP PROBING - the
+      // repair UX below needs the owner-account status, and profiles (0001)
+      // is still trustworthy. Never return early on a missing marker.
       probe.migrationsPresent = false;
-      return probe;
-    }
-    if (colErr) {
+    } else if (colErr) {
       probe.database = "unreachable";
       probe.migrationsPresent = null;
       probe.ownerEmailConfigured = null;
@@ -167,10 +168,10 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       .select("id")
       .limit(1);
     if (memErr && isMissingRelation(memErr)) {
+      // 0020 missing: same fall-through as 0019 - keep probing so the
+      // owner-account status and repair guidance stay honest.
       probe.migrationsPresent = false;
-      return probe;
-    }
-    if (memErr) {
+    } else if (memErr) {
       probe.migrationsPresent = null;
       return probe;
     }
