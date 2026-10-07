@@ -395,7 +395,7 @@ export async function repairOwnerBootstrap(): Promise<SetupRepairResult> {
       ok: false,
       reason: "unconfigured",
       message:
-        "Automatic repair is not configured. One-time setup: set SUPABASE_ACCESS_TOKEN (a Supabase personal access token) and SUPABASE_PROJECT_REF in the deployment environment, then try again.",
+        "Setup couldn't finish yet - the deployment does not have a server-side path to its database. Reconnecting the Vercel project to its Supabase project (the official Supabase integration provisions the connection automatically) fixes this; no tokens, no repository secrets, no SQL editor are needed.",
     };
   }
   const probe = await probeOwnerSetup();
