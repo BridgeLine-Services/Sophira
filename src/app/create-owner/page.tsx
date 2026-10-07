@@ -169,7 +169,7 @@ export default function CreateOwnerPage() {
           router.refresh();
           return;
         }
-        setBusy(null);
+        setBusy(false);
         setError(
           verify.hasProfile
             ? "Your account exists but is not the owner - an owner was already created by another registration."
