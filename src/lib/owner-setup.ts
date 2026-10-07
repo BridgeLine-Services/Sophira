@@ -1,4 +1,5 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { present } from "./env";
 
 /**
  * Owner setup / status diagnostic (operator round 2026-10-06).
@@ -60,14 +61,8 @@ export interface OwnerSetupStatus {
   };
 }
 
-const configured = (v: string | undefined): boolean =>
-  typeof v === "string" && v.trim().length > 0;
-
 export function serviceRoleConfigured(): boolean {
-  return (
-    configured(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-    configured(process.env.SUPABASE_SERVICE_ROLE_KEY)
-  );
+  return present("NEXT_PUBLIC_SUPABASE_URL") && present("SUPABASE_SERVICE_ROLE_KEY");
 }
 
 /**
@@ -81,15 +76,15 @@ export function serviceRoleConfigured(): boolean {
 export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
   const probe: OwnerSetupProbe = {
     supabaseConfigured:
-      configured(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-      configured(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      present("NEXT_PUBLIC_SUPABASE_URL") &&
+      present("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
     serviceRoleConfigured: serviceRoleConfigured(),
     // Free-first policy: the Gemini free tier counts as configured; a paid
     // OpenAI key counts ONLY when ALLOW_PAID_AI=true or budget > 0
     // (zero-billing defaults leave it inert — never silently spend money).
     aiConfigured:
-      configured(process.env.GEMINI_API_KEY) ||
-      (configured(process.env.OPENAI_API_KEY) &&
+      present("GEMINI_API_KEY") ||
+      (present("OPENAI_API_KEY") &&
         (process.env.ALLOW_PAID_AI === "true" ||
           (parseFloat(process.env.MONTHLY_AI_BUDGET_USD || "0") || 0) > 0)),
     database: "unconfigured",

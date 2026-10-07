@@ -420,4 +420,28 @@ total beginners: **docs/QUICK_START_LOCAL.md**.
 
 ## Deploying
 
-See **docs/VERCEL_DEPLOYMENT.md**: Vercel deploys the repository root as a single Next.js application (`vercel.json` pins the framework); `src-tauri` stays in the repository as the desktop app and is never a Vercel service.
+See **docs/VERCEL_DEPLOYMENT.md** for the full guide. In short:
+
+1. **Import** the GitHub repository into Vercel — Vercel detects the single
+   Next.js application at the root (`vercel.json` pins the framework; the
+   desktop/mobile shells are excluded via `.vercelignore`).
+2. **Connect Supabase**: the Vercel Supabase Integration provisions
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
+   `SUPABASE_SERVICE_ROLE_KEY` automatically (a separate preview project can
+   be scoped to Preview so test deployments never write to the production
+   database). Supabase migrations 0001-0025 apply the schema.
+3. **Add the remaining secrets** (Vercel cannot create third-party
+   credentials): `GEMINI_API_KEY` (free tier, preferred) and optionally
+   `SEARCH_API_KEY`; set `NEXT_PUBLIC_SITE_URL` to the production URL.
+   Every variable - with defaults and where to get it - is listed in the
+   generated `.env.example` and `docs/ENVIRONMENT_VARIABLES.md`.
+4. **Deploy**, then confirm configuration with `curl <url>/api/health` or
+   `npm run verify:deployment` - it reports readiness honestly, capability
+   by capability.
+5. **Sync locally** with `vercel link` + `vercel env pull .env.local`
+   (or `vercel env push` to upload a filled `.env.local`). `npm run
+   verify:env` validates any environment against the catalog without ever
+   printing secret values.
+
+`src-tauri` stays in the repository as the desktop app and is never a
+Vercel service.

@@ -18,7 +18,10 @@
     "legal:status": "node scripts/legal-status.mjs",
     "scan:secrets": "node scripts/secret-scan.mjs",
     "local:test": "node scripts/local-test.mjs",
-    "local:test:model": "node scripts/local-model-download.mjs"
+    "local:test:model": "node scripts/local-model-download.mjs",
+    "verify:deployment": "node scripts/verify-deployment.mjs",
+    "verify:env": "node scripts/verify-deployment.mjs --env-only",
+    "env:example": "node scripts/gen-env-example.mjs --check"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

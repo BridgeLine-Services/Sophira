@@ -10,9 +10,22 @@
     "rootDir": "..",
     "noEmitOnError": true,
     "jsx": "react-jsx",
-    "paths": { "@/*": ["../src/*"] }
+    "paths": {
+      "@/*": [
+        "../src/*"
+      ]
+    },
+    "resolveJsonModule": true
   },
-  "include": ["./**/*.ts", "../src/lib/ai/context.ts", "../src/lib/ai/subjects.ts", "../src/lib/ai/mathverify.ts", "../src/lib/ai/compliance.ts",
-    "../src/lib/ai/subjects.ts", "../src/lib/ai/context.ts",
-    "../src/lib/extract/documents.ts", "../src/lib/types.ts"]
+  "include": [
+    "./**/*.ts",
+    "../src/lib/ai/context.ts",
+    "../src/lib/ai/subjects.ts",
+    "../src/lib/ai/mathverify.ts",
+    "../src/lib/ai/compliance.ts",
+    "../src/lib/ai/subjects.ts",
+    "../src/lib/ai/context.ts",
+    "../src/lib/extract/documents.ts",
+    "../src/lib/types.ts"
+  ]
 }

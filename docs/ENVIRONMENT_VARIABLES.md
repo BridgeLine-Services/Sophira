@@ -40,3 +40,23 @@ Never paste a secret into chat or into a file in the repository.
 
 Sophira never fakes a value. The deployment shows a clear configuration
 status (the `/setup` page) telling you exactly what is missing.
+
+## Machine-readable catalog and self-check (2026-10-06)
+
+This guide is for humans; the machine-readable source of truth is
+**src/config/env.manifest.json**. From it:
+
+- `.env.example` is generated (`node scripts/gen-env-example.mjs`;
+  `npm run env:example` verifies sync),
+- `src/lib/env.ts` validates configuration centrally at runtime,
+- `npm run verify:env` checks your local environment against the catalog
+  and prints exactly what is missing or invalid — never any secret values,
+- `npm run verify:deployment` checks a live deployment's readiness
+  (Supabase, AI, search) via `/api/health`.
+
+Free-first AI policy is pinned in the catalog: `ALLOW_PAID_AI=false` and
+`MONTHLY_AI_BUDGET_USD=0` by default; the Gemini free tier is the preferred
+provider; the paid OpenAI fallback stays inert until explicitly allowed.
+Vercel deployment and environment sync (including the Supabase
+Integration and `vercel env pull`) are documented in
+**docs/VERCEL_DEPLOYMENT.md**.
