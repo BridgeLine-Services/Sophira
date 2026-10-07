@@ -3,7 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // /setup: pre-auth OPERATOR diagnostic (owner bootstrap status). It needs
 // to be reachable before any account exists — including the owner.
-const PUBLIC = ["/login", "/signup", "/reset-password", "/auth/callback", "/install", "/downloads", "/setup", "/terms", "/privacy", "/license"];
+// /create-owner (2026-10-07): the FIRST owner by definition has no session
+// yet — the page must be reachable signed-out or the owner-creation path
+// is impossible (it bounces to /login and the owner-to-be is trapped).
+// The page itself gates on the server's /api/setup-status, so this is NOT
+// an auth bypass: ownership is still decided by the database (0025).
+const PUBLIC = ["/login", "/signup", "/reset-password", "/auth/callback", "/create-owner", "/install", "/downloads", "/setup", "/terms", "/privacy", "/license"];
 
 // Degraded-mode guard (found by the local production-serve smoke test, §24
 // and the 2026-09-27 production 500s): without Supabase env config, PUBLIC

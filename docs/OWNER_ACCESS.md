@@ -45,6 +45,21 @@ Signup is invitation-only at the DATABASE level (migrations 0008 +
 owner sets their password themselves through the normal signup form,
 stored only by the configured authentication provider (Supabase Auth).
 
+**Email confirmation (2026-10-07).** If the Supabase project has email
+confirmation enabled (the default), a successful registration does NOT
+mean the owner is signed in - Supabase returns no session until the
+email address is confirmed. `/create-owner` detects this and shows
+"Check your email to confirm your account, then sign in." instead of
+redirecting to `/owner`. The created owner account is preserved; after
+confirming (the link returns to the app via `/auth/callback`) the owner
+signs in normally and is routed to `/owner`. If confirmation is
+disabled, Supabase returns a session immediately and the owner is taken
+straight to `/owner`. Login failures are classified honestly
+(`src/lib/auth-errors.ts`): invalid credentials stay generic, an
+unconfirmed email gets confirmation guidance, and server configuration
+problems are reported as configuration problems - never as "wrong
+password".
+
 ## Owner setup status diagnostic (/setup)
 
 Operators get a one-page, pre-auth diagnostic at **/setup** (and a
@@ -52,7 +67,8 @@ scriptable **GET /api/setup-status**) that answers, honestly and before
 any account exists:
 
 - Is the Supabase connection configured?
-- Are the database migrations applied (through 0020)?
+- Are the database migrations applied (through 0025, including the
+  first-owner bootstrap)?
 - Is the optional owner-email restriction configured? (existence only -
   the email value is NEVER displayed; since migration 0025 it is optional)
 - Does an owner account exist, and is it active?

@@ -26,6 +26,7 @@
     "../src/lib/ai/subjects.ts",
     "../src/lib/ai/context.ts",
     "../src/lib/extract/documents.ts",
-    "../src/lib/types.ts"
+    "../src/lib/types.ts",
+    "../src/lib/auth-errors.ts"
   ]
 }

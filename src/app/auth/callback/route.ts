@@ -35,6 +35,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const url = new URL(next && next.startsWith("/") ? next : "/dashboard", request.url);
-  return NextResponse.redirect(url);
+  // Role routing (2026-10-07): an owner confirming their email for the
+  // first time lands on /owner; everyone else on /dashboard. An explicit
+  // ?next= target always wins (it is validated to be a same-origin path).
+  if (next && next.startsWith("/")) {
+    return NextResponse.redirect(new URL(next, request.url));
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userData.user?.id ?? "")
+    .single();
+  return NextResponse.redirect(new URL(profile?.role === "owner" ? "/owner" : "/dashboard", request.url));
 }

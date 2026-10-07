@@ -3,6 +3,7 @@ import { Suspense, useState, type FormEvent, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { classifyAuthError } from "@/lib/auth-errors";
 import { Button, Input, Label } from "@/components/ui";
 import { Sparkles } from "lucide-react";
 
@@ -20,6 +21,10 @@ function LoginForm() {
   // when the status cannot be checked the CTA simply stays hidden (fail
   // closed - /create-owner itself still gates honestly).
   const [ownerCreationOpen, setOwnerCreationOpen] = useState(false);
+  // ?error=auth arrives from /auth/callback when a confirmation/recovery
+  // link was expired, already used, or tampered with. It must be SHOWN -
+  // previously it was silently ignored (the user just saw the login form).
+  const [callbackError, setCallbackError] = useState<string | null>(null);
   // Plain-language database-connection notice (C is never confused with A/B):
   // shown only when the SERVER says the database cannot be reached - never
   // when an owner exists, and never with technical variable names or secrets.
@@ -39,24 +44,46 @@ function LoginForm() {
       });
   }, []);
 
+  useEffect(() => {
+    if (search.get("error")) setCallbackError(
+      "That sign-in link is not valid anymore - it may have expired or been used already. Sign in with your email and password below, or request a new link."
+    );
+  }, [search]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
     if (error) {
-      if (error.message.toLowerCase().includes("invalid login")) {
-        setError("That email or password is not right. Please try again.");
-      } else if (error.message.toLowerCase().includes("email not confirmed")) {
-        setError("Please check your inbox and confirm your email first.");
-      } else {
-        setError(error.message);
-      }
+      // Classify honestly (src/lib/auth-errors.ts): invalid credentials stay
+      // generic (never reveal account existence); unconfirmed email gets
+      // confirmation guidance; transport/config failures are reported as
+      // configuration problems, NOT as "wrong password".
+      const classified = classifyAuthError({
+        code: (error as { code?: string }).code ?? null,
+        message: error.message,
+        status: (error as { status?: number }).status ?? null,
+      });
+      setError(classified.userMessage);
       return;
     }
     const next = search.get("next");
-    router.push(next && next.startsWith("/") ? next : "/dashboard");
+    if (next && next.startsWith("/")) {
+      router.push(next);
+      router.refresh();
+      return;
+    }
+    // Role routing (2026-10-07): the OWNER signs in to /owner, everyone
+    // else to their /dashboard. (The dashboard also redirects owners, so
+    // deep links keep working - this is the direct, expected landing.)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user?.id ?? "")
+      .single();
+    router.push(profile?.role === "owner" ? "/owner" : "/dashboard");
     router.refresh();
   }
 
@@ -100,6 +127,9 @@ function LoginForm() {
               placeholder="Your password"
             />
           </div>
+          {callbackError && !error && (
+            <p className="text-sm text-danger" role="alert">{callbackError}</p>
+          )}
           {error && <p className="text-sm text-danger" role="alert">{error}</p>}
           <Button type="submit" disabled={busy} className="w-full" size="lg">
             {busy ? "Signing in…" : "Sign in"}

@@ -281,7 +281,7 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
   }
   if (probe.database === "checked") {
     if (probe.migrationsPresent === false) {
-      guidance.push("Apply the Sophira database setup once: in the Supabase SQL editor, run the single combined file supabase/bootstrap-all.sql (migrations 0001-0025, in order) - see docs/RELEASE_PROCESS.md.");
+      guidance.push("Apply the Sophira database setup: for a FRESH database, run the single combined file supabase/bootstrap-all.sql (migrations 0001-0025, in order). For a database set up before October 2026, apply the missing migrations in the Supabase SQL editor - at minimum 0025_first_owner_bootstrap.sql (the first-owner bootstrap), or owner creation will be rejected as invitation-only.");
     }
     if (probe.ownerAccount === "none") {
       guidance.push("Open /create-owner and register with your email and a password you choose. The first registration becomes the owner; owner creation then closes permanently. Sophira has no predefined or default owner password.");

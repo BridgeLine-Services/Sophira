@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { classifyAuthError } from "@/lib/auth-errors";
 
 /**
  * FIRST-OWNER REGISTRATION (migration 0025).
@@ -35,6 +36,9 @@ export default function CreateOwnerPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // Supabase email confirmation is ON by default: signUp can succeed with
+  // NO session. Only a real session may ever be treated as signed-in.
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -58,19 +62,47 @@ export default function CreateOwnerPage() {
     setBusy(true);
     try {
       const supabase = createClient();
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
       if (signUpError) {
-        // The database rejects a lost race and any non-invited signup with
-        // the honest invitation message - surface it plainly, never fake success.
-        setError(signUpError.message.includes("invitation")
-          ? "Owner creation is no longer available - an owner account may have just been created, or this email needs an invitation."
-          : signUpError.message);
+        // The database rejects a lost race and any non-invited signup
+        // with the honest invitation message - surface it plainly,
+        // never fake success, and never create a second account.
+        // Classify honestly. A previous attempt may have ALREADY created the
+        // auth user (email confirmation pending) - never attempt a second
+        // signup in that case; guide to confirmation/sign-in instead.
+        const classified = classifyAuthError({
+          code: (signUpError as { code?: string }).code ?? null,
+          message: signUpError.message,
+        });
+        if (classified.kind === "user_already_exists") {
+          setError(
+            "An owner account with this email may already exist - it is waiting for email confirmation. Check your inbox for the confirmation message (look in spam too), then sign in. No second account was created."
+          );
+        } else if (classified.kind === "invitation_required") {
+          setError(
+            "The database rejected this registration (invitation-only). An owner account may have just been created by someone else, or this database needs the first-owner bootstrap migration (0025) - see the setup diagnostics."
+          );
+        } else {
+          setError(classified.userMessage);
+        }
         await refreshStatus();
         return;
       }
-      setDone(true);
-      await refreshStatus();
-      router.push("/owner");
+      // EMAIL-CONFIRMATION CONTRACT (2026-10-07): a successful signUp does
+      // NOT mean the owner is signed in. Supabase returns a session ONLY
+      // when email confirmation is disabled. Never claim an authenticated
+      // state that does not exist, and never redirect to /owner without a
+      // valid session (the middleware would bounce straight back to /login).
+      if (data.session) {
+        setDone(true);
+        await refreshStatus();
+        router.push("/owner");
+      } else {
+        // Account created; confirmation required. Show guidance; the
+        // owner account is preserved and NO duplicate is ever created.
+        setNeedsConfirmation(true);
+        await refreshStatus();
+      }
     } finally {
       setBusy(false);
     }
@@ -98,7 +130,7 @@ export default function CreateOwnerPage() {
         </div>
       )}
 
-      {!ownerExists && (mayCreate || status === null) && !done && (
+      {!ownerExists && (mayCreate || status === null) && !done && !needsConfirmation && (
         <form onSubmit={submit} className="mt-6 space-y-4">
           <label className="block text-sm font-medium">
             Your email
@@ -124,7 +156,19 @@ export default function CreateOwnerPage() {
 
       {done && (
         <div className="mt-6 rounded-lg border border-success/30 bg-success/5 p-4 text-sm">
-          Your account is ready. Taking you to the owner dashboard - from there you can invite people by email.
+          Your owner account is ready and you are signed in. Taking you to the owner dashboard - from there you can invite people by email.
+        </div>
+      )}
+
+      {needsConfirmation && (
+        <div className="mt-6 rounded-lg border border-warn/30 bg-warn/5 p-4 text-sm">
+          <p className="font-medium">Check your email to confirm your account, then sign in.</p>
+          <p className="mt-1 text-ink-soft">
+            Your owner account was created, but Sophira needs you to confirm your email address first.
+            Open the confirmation message we sent to <span className="font-medium">{email}</span> (look in spam too),
+            click the link, then {" "}
+            <Link href="/login" className="text-accent hover:underline">sign in with this email and your password</Link>.
+          </p>
         </div>
       )}
     </main>
