@@ -43,10 +43,18 @@ Vercel deploys the repository root as a single Next.js application. `src-tauri/`
    `package.json` script (npm, `package-lock.json`).
 5. Add the environment variables listed in README (Supabase URL, anon
    key, service-role key; AI keys optional; no OpenAI required).
-6. Deploy, then run the one-time database setup: paste
-   `supabase/bootstrap-all.sql` in the Supabase SQL editor.
+6. **Database setup is automatic.** One-time: create a personal access
+   token (supabase.com → Account → Access Tokens) and set the GitHub
+   repository secrets `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF`.
+   The CI **Migrations** job then applies every missing migration
+   (0001-0026) on every push, and fails loudly if it cannot. Optionally
+   set the same two variables in Vercel → Settings → Environment
+   Variables to also enable the one-click **Repair Setup** action on
+   `/setup` and `/create-owner` (self-healing fallback).
 7. Open the site — with no owner yet, the sign-in screen shows
-   **Create Owner Account**.
+   **Create Owner Account**. If the database is not ready, the page
+   explains exactly what is missing and repairs it when safe — never a
+   mysterious "wrong email or password" error.
 
 ## Why the desktop app does not interfere
 

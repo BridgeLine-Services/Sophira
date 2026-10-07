@@ -24,7 +24,9 @@
     "env:example": "node scripts/gen-env-example.mjs --check",
     "setup": "node scripts/setup.mjs",
     "setup:ai": "node scripts/setup-ai.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "db:migrate": "node scripts/apply-migrations.mjs",
+    "db:migrate:check": "node scripts/apply-migrations.mjs --check-only"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

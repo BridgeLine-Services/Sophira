@@ -100,7 +100,7 @@ export async function runOwnerAuthFlowTests(assert: (c: boolean, n: string) => v
     "H: /login shows the /auth/callback link-expired error instead of silently swallowing it");
 
   // ---- I. existing owner login: reaches /owner --------------------------
-  assert(login.includes('router.push(profile?.role === "owner" ? "/owner" : "/dashboard")'),
+  assert(login.includes('router.push(profile.role === "owner" ? "/owner" : "/dashboard")'),
     "I: after sign-in the OWNER is routed to /owner, everyone else to /dashboard");
   assert(callback.includes('profile?.role === "owner" ? "/owner" : "/dashboard"'),
     "I: after email confirmation the owner lands on /owner via /auth/callback");

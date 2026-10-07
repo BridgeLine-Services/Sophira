@@ -82,8 +82,22 @@ function LoginForm() {
       .from("profiles")
       .select("role")
       .eq("id", data.user?.id ?? "")
-      .single();
-    router.push(profile?.role === "owner" ? "/owner" : "/dashboard");
+      .maybeSingle();
+    // STALE-ACCOUNT RECOVERY: an earlier failed attempt may have left a
+    // real auth account WITHOUT its profile row. The database's race-safe
+    // complete_first_owner function finishes it into the first owner -
+    // but only while no owner exists, and only for this signed-in user.
+    if (!profile) {
+      const r = await fetch("/api/complete-owner", { method: "POST" });
+      if (r.ok) {
+        router.push("/owner");
+        router.refresh();
+        return;
+      }
+      setError("Your account exists but could not be finished automatically. See the setup status for what is missing.");
+      return;
+    }
+    router.push(profile.role === "owner" ? "/owner" : "/dashboard");
     router.refresh();
   }
 

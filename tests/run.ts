@@ -103,6 +103,7 @@ import { runEnvManifestTests } from "./env-manifest";
 import { runGitHubInstallTests } from "./github-install";
 import { runSelfHostedAiTests } from "./selfhosted-ai";
 import { runOwnerAuthFlowTests } from "./owner-auth-flow";
+import { runOwnerSetupAutomationTests } from "./owner-setup-automation";
 import { runLocalFirstTests } from "./local-first";
 import { runReadinessCompletionTests } from "./readiness-completion";
 import { runProdEnvPolicyTests } from "./prod-env-policy";
@@ -3067,14 +3068,22 @@ async function runAccessControlTests(): Promise<void> {
     // invitations/accept (account creation via a single-use invitation
     // token; must be callable before authentication exists),
     // setup-status (pre-auth OPERATOR bootstrap diagnostic — categorical
-    // booleans only, machine-checked for zero secret material below), and
+    // booleans only, machine-checked for zero secret material below),
     // ai/health (AI runtime status indicator — categorical availability
-    // only, never keys or endpoint hosts; no user data).
-    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status", "/api/ai/health"];
+    // only, never keys or endpoint hosts; no user data), and setup-repair
+    // (the ONE-CLICK repair action, 2026-10-07: accepts only a fixed action
+    // name, never SQL or identifiers; every response categorical; refuses
+    // permanently once an owner exists — see tests/owner-setup-automation.ts).
+    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status", "/api/ai/health", "/api/setup-repair"];
     for (const rf of routeFiles) {
       const rel = ("/api" + rf.slice(apiRoot.length)).replaceAll("\\", "/").replace("/route.ts", "");
       const src = fs.readFileSync(rf, "utf8");
-      const guarded = src.includes("requireUser") || src.includes("requireOwner");
+      // /api/complete-owner is the ONE documented exception: it serves a
+      // signed-in user whose profile row does not exist YET (the stale-
+      // account recovery), so it authenticates via supabase.auth.getUser()
+      // and cannot require an active profile. The owner role itself is
+      // granted only by the database's race-safe claim (0026), never here.
+      const guarded = src.includes("requireUser") || src.includes("requireOwner") || rel === "/api/complete-owner";
       const publicOk = intentionallyPublic.some((p) => rel === p);
       assert(guarded || publicOk,
         `access: ${rel} enforces the server guard (authenticated -> active) or is on the documented public allowlist`);
@@ -3083,8 +3092,9 @@ async function runAccessControlTests(): Promise<void> {
           rel === "/api/health" ||
           rel === "/api/setup-status" ||
           rel === "/api/ai/health" ||
+          rel === "/api/setup-repair" ||
           src.includes("token"),
-          `access: public route ${rel} is health/ai-health/setup-status (categorical status only) or operates solely on its single-use token`
+          `access: public route ${rel} is health/ai-health/setup-status/setup-repair (categorical status only) or operates solely on its single-use token`
         );
       }
     }
@@ -3454,10 +3464,15 @@ async function runOwnerSetupTests(): Promise<void> {
     supabaseConfigured: boolean; serviceRoleConfigured: boolean; aiConfigured: boolean;
     database: "unconfigured" | "unreachable" | "checked";
     migrationsPresent: boolean | null; ownerEmailConfigured: boolean | null; ownerAccount: OwnerAccountStatus;
+    chainStarted: boolean | null; invitationsPresent: boolean | null;
+    ownerBootstrapPresent: boolean | null; recoveryPresent: boolean | null;
+    migrationAutomationConfigured: boolean;
   }
   const mk = (o: Partial<Probe>): Probe => ({
     supabaseConfigured: false, serviceRoleConfigured: false, aiConfigured: false,
     database: "unconfigured", migrationsPresent: null, ownerEmailConfigured: null, ownerAccount: "unknown",
+    chainStarted: null, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null,
+    migrationAutomationConfigured: false,
     ...o,
   });
 
@@ -3472,6 +3487,8 @@ async function runOwnerSetupTests(): Promise<void> {
   const b = evaluateOwnerSetup(mk({
     supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: true,
     database: "checked", migrationsPresent: true, ownerEmailConfigured: true, ownerAccount: "active",
+    chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: true, recoveryPresent: true,
+    migrationAutomationConfigured: true,
   }));
   assert(b.ready === true, "setup: fully configured + active owner reports ready");
   assert(b.headline.includes("initialized"), "setup: ready headline states the owner account is initialized");
@@ -3484,8 +3501,8 @@ async function runOwnerSetupTests(): Promise<void> {
     migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "unknown",
   }));
   assert(c.ready === false, "setup: missing migrations => not ready");
-  assert(c.guidance.some((g) => g.includes("0001-0025")) || c.guidance.some((g) => g.includes("bootstrap-all.sql")),
-    "setup: missing-migrations guidance names the one-file database setup (migrations 0001-0025)");
+  assert(c.guidance.some((g) => g.includes("0001-0026")) && c.guidance.some((g) => g.includes("SUPABASE_ACCESS_TOKEN")) && !c.guidance.some((g) => g.includes("SQL editor")),
+    "setup: missing-migrations guidance names the AUTOMATED repair (migrations 0001-0026, one-time token config) - never manual SQL");
 
   // ---- scenario D: owner_email NOT configured, no owner yet (NEW: automatic) ----
   const d = evaluateOwnerSetup(mk({
@@ -3581,4 +3598,4 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section))
-    .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
+    .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

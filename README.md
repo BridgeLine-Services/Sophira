@@ -253,18 +253,19 @@ invalid `SOPHIRA_APP_URL`.
 ### 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run the **one combined setup file**:
-   `supabase/bootstrap-all.sql` (applies every migration, `0001` through
-   `0025_first_owner_bootstrap`, in order — a single paste)
-   (0001 schema + RLS + private `private-docs` bucket; 0002 owner-only
-   invitations; 0003 profile versioning; 0004 sources + audit trail;
-   0005 owner membership, invitation requests, learning patterns, aggregate
-   owner analytics; 0006 invitation expiry; 0007 intentional habits;
-   0008 invitation-only signup; 0009 typing calibration; 0010 deadline
-   scheduling; 0011 rubric audits; 0012 research tables; 0013 claim
-   evidence; 0014 source authority; 0015 submission gate; 0016 pattern
-   evidence; 0017 schedule executions; 0018 adaptive typing profile;
-   0019 access revocation audit; 0020 student memory).
+2. **No SQL editor, no copy/paste.** One-time configuration for automatic
+   migrations: create a personal access token (supabase.com → Account →
+   Access Tokens), then set the repository/CI secrets
+   `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` (GitHub → Settings →
+   Secrets → Actions). From then on, the CI **Migrations** job applies
+   every missing migration (`0001` through `0026_first_owner_recovery`)
+   automatically on every push — and if the database drifts, the
+   **Repair Setup** action on the `/setup` page repairs it with one
+   click (the same two variables in your Vercel environment enable that).
+   The migrations themselves (schema + RLS, invitation-only signup,
+   first-owner bootstrap 0025, owner recovery 0026) live in
+   `supabase/migrations/`; `npm run db:migrate` runs the same automation
+   from any machine.
 
    After configuring the deployment you can check readiness at any time
    on the **/setup** page (public operator diagnostic) or via
@@ -522,7 +523,9 @@ See **docs/VERCEL_DEPLOYMENT.md** for the full guide. In short:
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
    `SUPABASE_SERVICE_ROLE_KEY` automatically (a separate preview project can
    be scoped to Preview so test deployments never write to the production
-   database). Supabase migrations 0001-0025 apply the schema.
+   database). Supabase migrations 0001-0026 are applied AUTOMATICALLY by
+   the CI Migrations job (one-time `SUPABASE_ACCESS_TOKEN` /
+   `SUPABASE_PROJECT_REF` secrets) - no SQL editor, ever.
 3. **Add the remaining secrets** (Vercel cannot create third-party
    credentials): `GEMINI_API_KEY` (free tier, preferred) and optionally
    `SEARCH_API_KEY`; set `NEXT_PUBLIC_SITE_URL` to the production URL.

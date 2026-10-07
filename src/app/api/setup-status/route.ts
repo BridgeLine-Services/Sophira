@@ -1,4 +1,5 @@
 import { evaluateOwnerSetup, probeOwnerSetup } from "@/lib/owner-setup";
+import { countStaleAuthUsers } from "@/lib/db-bootstrap";
 
 export const dynamic = "force-dynamic";
 
@@ -8,16 +9,20 @@ export const dynamic = "force-dynamic";
  * The operator who deploys Sophira needs this BEFORE any account exists -
  * including the owner - so it cannot require authentication (the chicken-
  * and-egg of fail-closed bootstrap). It therefore reports ONLY categorical
- * configuration status: booleans and small enums. It never returns keys,
- * tokens, emails, passwords, or the owner_email VALUE (see the security
- * contract in src/lib/owner-setup.ts, machine-checked by the offline suite).
+ * configuration status: booleans, small enums, and the SAFE coarse state
+ * (READY / OWNER_EXISTS / SETUP_REQUIRED / TEMPORARILY_UNAVAILABLE). It
+ * never returns keys, tokens, emails, passwords, SQL, or the owner_email
+ * VALUE (see the security contract in src/lib/owner-setup.ts,
+ * machine-checked by the offline suite).
  */
 export async function GET() {
   const probe = await probeOwnerSetup();
   const status = evaluateOwnerSetup(probe);
+  const stale = await countStaleAuthUsers(probe);
   return Response.json({
     ok: true,
     name: "sophira-setup",
+    state: status.state,
     ready: status.ready,
     headline: status.headline,
     probe: {
@@ -29,6 +34,16 @@ export async function GET() {
       ownerEmailConfigured: status.probe.ownerEmailConfigured,
       ownerAccount: status.probe.ownerAccount,
     },
+    checklist: {
+      supabaseConfigured: status.probe.supabaseConfigured,
+      databaseConnected: status.probe.database === "checked",
+      migrationsCurrent: status.probe.migrationsPresent === true,
+      ownerBootstrapReady: status.probe.ownerBootstrapPresent === true,
+      invitationSystemReady: status.probe.invitationsPresent === true,
+      authenticationReady: status.probe.supabaseConfigured && status.probe.database === "checked",
+    },
+    repair: { available: status.repair.available, action: status.repair.action, reason: status.repair.reason },
+    staleAuthUsers: stale,
     guidance: status.guidance,
     ownerCreation: status.ownerCreation,
   });

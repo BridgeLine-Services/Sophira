@@ -37,6 +37,13 @@ export interface OwnerSetupProbe {
   migrationsPresent: boolean | null; // null = could not check
   ownerEmailConfigured: boolean | null; // null = could not check (never the value)
   ownerAccount: OwnerAccountStatus; // categorical only, never email/id
+  /** 2026-10-07 automation round: fine-grained readiness probes so the app
+   *  can SELF-HEAL instead of telling the operator to run SQL by hand. */
+  chainStarted: boolean | null; // app_config exists (0008) - the chain began
+  invitationsPresent: boolean | null; // the invitations table exists (0002/0006)
+  ownerBootstrapPresent: boolean | null; // the single-row claim table exists (0025)
+  recoveryPresent: boolean | null; // sophira_meta.schema_version row exists (0026)
+  migrationAutomationConfigured: boolean; // SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF on the server
 }
 
 export interface OwnerSetupStep {
@@ -45,7 +52,22 @@ export interface OwnerSetupStep {
   detail: string; // honest explanation
 }
 
+export type OwnerSetupState =
+  | "OWNER_EXISTS" // the single owner exists - creation closed
+  | "READY" // no owner yet, database ready - create it now
+  | "SETUP_REQUIRED" // something is missing (repairable or not)
+  | "TEMPORARILY_UNAVAILABLE"; // cannot determine (missing config / unreachable)
+
+export interface OwnerSetupRepair {
+  available: boolean; // can Sophira repair it itself right now?
+  action: "migrations" | null; // what the single repair action does
+  reason: string; // plain language, never secret material
+}
+
 export interface OwnerSetupStatus {
+  state: OwnerSetupState; // safe coarse state for normal users (D)
+  repair: OwnerSetupRepair;
+  staleAuthUsers: number | null; // accounts without profiles (categorical count only)
   probe: OwnerSetupProbe;
   steps: OwnerSetupStep[];
   ready: boolean | null; // null = cannot determine (missing config)
@@ -91,6 +113,12 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     migrationsPresent: null,
     ownerEmailConfigured: null,
     ownerAccount: "unknown",
+    chainStarted: null,
+    invitationsPresent: null,
+    ownerBootstrapPresent: null,
+    recoveryPresent: null,
+    migrationAutomationConfigured:
+      present("SUPABASE_ACCESS_TOKEN") && present("SUPABASE_PROJECT_REF"),
   };
   if (!probe.serviceRoleConfigured) return probe;
 
@@ -107,9 +135,12 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       .select("key")
       .eq("key", "owner_email")
       .limit(1);
-    if (configErr && isMissingRelation(configErr)) return { ...probe, database: "checked", migrationsPresent: false };
+    if (configErr && isMissingRelation(configErr)) {
+      return { ...probe, database: "checked", chainStarted: false, migrationsPresent: false };
+    }
     if (configErr) return { ...probe, database: "unreachable" };
     probe.database = "checked";
+    probe.chainStarted = true;
     probe.migrationsPresent = true;
     probe.ownerEmailConfigured = true; // row exists for key='owner_email'
 
@@ -150,9 +181,25 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       .select("id")
       .limit(1);
     if (bootErr && isMissingRelation(bootErr)) {
+      probe.ownerBootstrapPresent = false;
+      probe.recoveryPresent = false;
       probe.migrationsPresent = false;
       return probe;
     }
+    probe.ownerBootstrapPresent = true;
+
+    // ---- invitations table (0002/0006): the invitation system ----
+    const { error: invErr } = await admin.from("invitations").select("id").limit(1);
+    probe.invitationsPresent = invErr && isMissingRelation(invErr) ? false : !invErr;
+
+    // ---- migration 0026: recovery marker (sophira_meta.schema_version) ----
+    const { error: metaErr } = await admin
+      .from("sophira_meta")
+      .select("key")
+      .eq("key", "schema_version")
+      .limit(1);
+    probe.recoveryPresent = !metaErr;
+    if (metaErr && isMissingRelation(metaErr)) probe.migrationsPresent = false;
 
     // ---- owner account: categorical status only (never email/id) ----
     const { data: owners, error: ownerErr } = await admin
@@ -207,13 +254,23 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
     },
     {
       done: probe.migrationsPresent,
-      label: "Database migrations applied (0001-0025)",
+      label: "Database migrations applied (0001-0026)",
       detail:
         probe.migrationsPresent === null
           ? cannotCheck
           : probe.migrationsPresent
-            ? "All required tables and columns are present, through migration 0025."
-            : "Some migrations are missing - run the migration chain in the Supabase SQL editor (see docs/RELEASE_PROCESS.md).",
+            ? "All required tables and columns are present, through migration 0026."
+            : "Some migrations are missing - the deployment pipeline repairs them automatically once configured (one-time: SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF), or use the Repair Setup action on /setup.",
+    },
+    {
+      done: probe.invitationsPresent === null ? null : probe.invitationsPresent,
+      label: "Invitation system ready",
+      detail:
+        probe.invitationsPresent === null
+          ? cannotCheck
+          : probe.invitationsPresent
+            ? "Invitations work: after the owner exists, new people join by valid, unused email invitations only."
+            : "The invitations table is missing - the deployment pipeline repairs this automatically (see above).",
     },
     {
       // Informational since migration 0025: the automatic first-owner
@@ -281,7 +338,7 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
   }
   if (probe.database === "checked") {
     if (probe.migrationsPresent === false) {
-      guidance.push("Apply the Sophira database setup: for a FRESH database, run the single combined file supabase/bootstrap-all.sql (migrations 0001-0025, in order). For a database set up before October 2026, apply the missing migrations in the Supabase SQL editor - at minimum 0025_first_owner_bootstrap.sql (the first-owner bootstrap), or owner creation will be rejected as invitation-only.");
+      guidance.push("Let Sophira repair the database automatically: set SUPABASE_ACCESS_TOKEN (a Supabase personal access token, supabase.com -> Account -> Access Tokens) and SUPABASE_PROJECT_REF in the deployment environment / CI secrets, then push or use the Repair Setup action - the deployment pipeline (npm run db:migrate) applies every missing migration (0001-0026) in order. No manual SQL, no database editing.");
     }
     if (probe.ownerAccount === "none") {
       guidance.push("Open /create-owner and register with your email and a password you choose. The first registration becomes the owner; owner creation then closes permanently. Sophira has no predefined or default owner password.");
@@ -301,5 +358,39 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
         ? "Sophira is initialized: the owner account exists and is active."
         : "Sophira is not fully initialized - follow the steps below in order.";
 
-  return { probe, steps, ready, headline, guidance, ownerCreation };
+  // ---- SAFE COARSE STATE (D): what a normal user may learn -----------
+  const state: OwnerSetupState =
+    probe.ownerAccount === "active"
+      ? "OWNER_EXISTS"
+      : probe.ownerAccount === "revoked"
+        ? "SETUP_REQUIRED" // an owner exists but is revoked: needs an operator action
+        : probe.database !== "checked"
+          ? "TEMPORARILY_UNAVAILABLE"
+          : probe.ownerAccount === "none" && probe.migrationsPresent === true
+            ? "READY"
+            : "SETUP_REQUIRED";
+
+  // ---- single safe repair action (E/F) --------------------------------
+  const repairable =
+    state === "SETUP_REQUIRED" &&
+    probe.ownerAccount === "none" &&
+    probe.database === "checked" &&
+    probe.chainStarted === true &&
+    probe.migrationsPresent === false;
+  const repair: OwnerSetupRepair = repairable
+    ? probe.migrationAutomationConfigured
+      ? {
+          available: true,
+          action: "migrations",
+          reason: "The first-owner database setup is missing pieces, but Sophira can repair them automatically - one click, no SQL.",
+        }
+      : {
+          available: false,
+          action: null,
+          reason:
+            "The first-owner database setup is missing pieces and can be repaired automatically. One-time configuration: set SUPABASE_ACCESS_TOKEN (a Supabase personal access token) and SUPABASE_PROJECT_REF in the deployment environment, then use Repair Setup here (or push - the CI pipeline runs the same repair).",
+        }
+    : { available: false, action: null, reason: "No automatic repair is needed or possible for the current state." };
+
+  return { state, repair, staleAuthUsers: null, probe, steps, ready, headline, guidance, ownerCreation };
 }

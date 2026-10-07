@@ -1,0 +1,55 @@
+# AUTOMATED DATABASE MIGRATIONS (2026-10-07).
+#
+# Nobody bootstrapping Sophira should ever open the Supabase SQL editor:
+# this job probes the project and applies every missing migration (in
+# chain order) after each push to master, then deep-verifies the
+# owner-bootstrap security contract. If migrations cannot be applied, the
+# job fails LOUDLY with an actionable error (requirement: the deployment
+# must not pretend to be ready).
+#
+# ONE-TIME repository configuration (Settings -> Secrets and variables ->
+# Actions -> Secrets):
+#   SUPABASE_ACCESS_TOKEN  - a personal access token: supabase.com ->
+#                            dashboard -> Account -> Access Tokens.
+#   SUPABASE_PROJECT_REF   - the project ref (Settings -> API -> Ref).
+#
+# Until both secrets are set the job skips with a clear warning (it never
+# touches a database it cannot authenticate to) - the same repair is also
+# available at runtime from /setup once the variables exist in Vercel.
+name: Migrations
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: node scripts/apply-migrations.mjs --self-test
+      - name: Probe and apply missing migrations (idempotent, fail-loud)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ] || [ -z "${SUPABASE_PROJECT_REF:-}" ]; then
+            echo "::warning::Automated migrations SKIPPED - set SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF repository secrets to enable them (one-time setup)."
+            exit 0
+          fi
+          npm run db:migrate
+      - name: Verify the live deployment serves the first-owner flow
+        if: ${{ vars.SOPHIRA_APP_URL != '' }}
+        run: |
+          url="${{ vars.SOPHIRA_APP_URL }}"
+          for path in /create-owner /login /auth/callback /api/setup-status; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$url$path")
+            echo "$path -> $code"
+            case "$code" in
+              200|307|308) ;;
+              *) echo "::error::$url$path returned $code - the first-owner flow is not reachable."; exit 1 ;;
+            esac
+          done

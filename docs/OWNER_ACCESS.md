@@ -67,8 +67,21 @@ scriptable **GET /api/setup-status**) that answers, honestly and before
 any account exists:
 
 - Is the Supabase connection configured?
-- Are the database migrations applied (through 0025, including the
-  first-owner bootstrap)?
+- Are the database migrations applied (through 0026)? They are applied
+  AUTOMATICALLY: the CI Migrations job (one-time `SUPABASE_ACCESS_TOKEN`
+  + `SUPABASE_PROJECT_REF` repository secrets) probes the project and
+  applies every missing migration on each push - and the /setup page
+  offers a one-click "Repair Setup" when the same variables are set in
+  the deployment environment. No SQL editor, no manual SQL.
+
+**Stale-account recovery (2026-10-07).** If an earlier failed attempt
+left a real Supabase Auth account without its profile row, Sophira
+recovers it automatically: signing in with that account completes it
+into the first owner through the database's race-safe claim
+(`complete_first_owner`, migration 0026 - only while no owner exists,
+only for the signed-in user's own account). If the email cannot be
+confirmed anymore, `/create-owner` offers a single "Remove the
+incomplete account" action (safe only before the first owner exists).
 - Is the optional owner-email restriction configured? (existence only -
   the email value is NEVER displayed; since migration 0025 it is optional)
 - Does an owner account exist, and is it active?

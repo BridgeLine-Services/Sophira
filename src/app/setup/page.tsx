@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { evaluateOwnerSetup, probeOwnerSetup, type OwnerSetupStatus } from "@/lib/owner-setup";
 import SetupDiagnostics from "./SetupDiagnostics";
+import SetupRepair from "./SetupRepair";
 
 /**
  * Setup experience (2026-10-06 first-owner bootstrap) — SERVER component.
@@ -43,6 +44,9 @@ export default async function SetupPage() {
           <p className="mt-2 text-sm text-ink-soft">
             {creation.reason} <Link href="/login" className="text-accent hover:underline">Go to sign in</Link>
           </p>
+        )}
+        {status.state === "SETUP_REQUIRED" && status.probe.ownerAccount === "none" && (
+          <SetupRepair available={status.repair.available} reason={status.repair.reason} />
         )}
         {creation?.possible === null && (
           <p className="mt-2 text-sm text-ink-soft">

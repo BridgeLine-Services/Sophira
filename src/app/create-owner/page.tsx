@@ -24,7 +24,10 @@ import { classifyAuthError } from "@/lib/auth-errors";
 
 interface SetupStatus {
   ownerCreation: { possible: boolean | null; reason: string; url: string };
-  probe: { ownerAccount?: string };
+  probe: { ownerAccount?: string; database?: string };
+  state?: "READY" | "OWNER_EXISTS" | "SETUP_REQUIRED" | "TEMPORARILY_UNAVAILABLE";
+  repair?: { available: boolean; action: string | null; reason: string };
+  staleAuthUsers?: number | null;
 }
 
 export default function CreateOwnerPage() {
@@ -39,6 +42,11 @@ export default function CreateOwnerPage() {
   // Supabase email confirmation is ON by default: signUp can succeed with
   // NO session. Only a real session may ever be treated as signed-in.
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  // One-click self-healing (2026-10-07): when the database is missing its
+  // first-owner bootstrap pieces, Sophira repairs them itself - the owner
+  // never opens a SQL editor.
+  const [repairing, setRepairing] = useState(false);
+  const [repairResult, setRepairResult] = useState<string | null>(null);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -53,6 +61,46 @@ export default function CreateOwnerPage() {
 
   const ownerExists = status?.probe?.ownerAccount === "active" || status?.probe?.ownerAccount === "revoked";
   const mayCreate = status?.ownerCreation?.possible === true;
+  const needsRepair = status?.state === "SETUP_REQUIRED" && !ownerExists && status?.repair !== undefined;
+  const staleCount = typeof status?.staleAuthUsers === "number" ? status.staleAuthUsers : 0;
+
+  async function repair() {
+    setRepairing(true);
+    setRepairResult(null);
+    try {
+      const r = await fetch("/api/setup-repair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "migrations" }),
+      });
+      const d = await r.json().catch(() => null);
+      setRepairResult(d?.message || "The repair could not be completed.");
+      await refreshStatus();
+    } catch {
+      setRepairResult("The repair could not be completed.");
+    } finally {
+      setRepairing(false);
+    }
+  }
+
+  async function cleanupStale() {
+    setRepairing(true);
+    setRepairResult(null);
+    try {
+      const r = await fetch("/api/setup-repair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cleanup-stale" }),
+      });
+      const d = await r.json().catch(() => null);
+      setRepairResult(d?.message || "The cleanup could not be completed.");
+      await refreshStatus();
+    } catch {
+      setRepairResult("The cleanup could not be completed.");
+    } finally {
+      setRepairing(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,7 +124,8 @@ export default function CreateOwnerPage() {
         });
         if (classified.kind === "user_already_exists") {
           setError(
-            "An owner account with this email may already exist - it is waiting for email confirmation. Check your inbox for the confirmation message (look in spam too), then sign in. No second account was created."
+            "An account with this email already exists. If you just created it, check your inbox for the confirmation message (look in spam too) and then sign in - Sophira will finish setting up your owner account automatically. No second account was created." +
+              (staleCount > 0 ? " If you cannot confirm that email, you can remove the incomplete account below and try again." : "")
           );
         } else if (classified.kind === "invitation_required") {
           setError(
@@ -128,6 +177,37 @@ export default function CreateOwnerPage() {
         <div className="mt-6 rounded-lg border border-warn/30 bg-warn/5 p-4 text-sm">
           {status.ownerCreation.reason}
         </div>
+      )}
+
+      {needsRepair && (
+        <div className="mt-4 rounded-lg border border-warn/30 bg-warn/5 p-4 text-sm">
+          <p className="font-medium">Sophira can set this up for you.</p>
+          <p className="mt-1 text-ink-soft">{status!.repair!.reason}</p>
+          {status!.repair!.available ? (
+            <button type="button" onClick={repair} disabled={repairing}
+              className="mt-3 rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-60">
+              {repairing ? "Repairing..." : "Repair Setup"}
+            </button>
+          ) : null}
+        </div>
+      )}
+
+      {!ownerExists && staleCount > 0 && status?.probe?.ownerAccount === "none" && (
+        <div className="mt-4 rounded-lg border border-warn/30 bg-warn/5 p-4 text-sm">
+          <p className="font-medium">An incomplete account was left behind by an earlier attempt.</p>
+          <p className="mt-1 text-ink-soft">
+            It has no data attached. You can remove it and create your owner account fresh, or sign in with it
+            if you still have its confirmation email - Sophira will complete it automatically.
+          </p>
+          <button type="button" onClick={cleanupStale} disabled={repairing}
+            className="mt-3 rounded-lg border border-ink/20 px-4 py-2 font-medium disabled:opacity-60">
+            {repairing ? "Removing..." : "Remove the incomplete account"}
+          </button>
+        </div>
+      )}
+
+      {repairResult && (
+        <div className="mt-4 rounded-lg border border-success/30 bg-success/5 p-4 text-sm">{repairResult}</div>
       )}
 
       {!ownerExists && (mayCreate || status === null) && !done && !needsConfirmation && (
