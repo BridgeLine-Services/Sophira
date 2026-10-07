@@ -155,6 +155,86 @@ Key design decisions:
   instructions → official course rules/rubrics → teacher examples & corrections.
   Conflicts are surfaced to the user, never silently resolved.
 
+## Get Sophira from GitHub (2026-10-06)
+
+**This repository is the source of truth for Sophira's application code.**
+Cloud AI models (Gemini/OpenAI) are *not* inside it — they run on their
+providers' servers and are reached through their APIs with a key.
+LOCAL AI is a small model that genuinely runs on your own machine,
+downloaded at first use from the app (never committed to GitHub).
+
+### Option A - download as a ZIP (no Git needed)
+
+1. On the repository page: **Code → Download ZIP**, then unzip it.
+2. Install Node.js 20+ from nodejs.org.
+3. Open a terminal in the unzipped folder and run:
+   `npm run setup`
+4. Follow the prompts (it creates `.env.local`, installs dependencies,
+   validates configuration, and tells you exactly which credentials are
+   still needed — never printing any values).
+
+### Option B - clone with Git
+
+```bash
+git clone https://github.com/BridgeLine-Services/Sophira.git
+cd Sophira
+npm run setup        # Node check + dependencies + .env.local + validation
+npm run setup:ai     # choose the AI mode (see below)
+npm run dev          # → http://localhost:3000
+```
+
+`npm run setup` is safe to re-run: it never overwrites an existing
+`.env.local`.
+
+### Which AI will answer? (configure it consciously)
+
+```bash
+npm run setup:ai                  # explain modes + current status
+npm run setup:ai -- --mode gemini # CLOUD: free-tier Gemini API (needs a
+                                  # free key from aistudio.google.com)
+npm run setup:ai -- --mode local  # LOCAL: on-device model — no key, offline
+npm run setup:ai -- --mode openai # CLOUD: PAID — stays disabled until you
+                                  # also set ALLOW_PAID_AI=true + a budget
+```
+
+- **CLOUD AI** = Gemini/OpenAI APIs. The model runs on the provider's
+  servers; your key stays server-side and never reaches the browser or
+  the mobile shell.
+- **LOCAL AI** = a model running on your own device. Free, private, and
+  offline-capable after a one-time download from the app.
+- **Paid AI is off by default** (`ALLOW_PAID_AI=false`,
+  `MONTHLY_AI_BUDGET_USD=0`) and never activates silently.
+
+### One-command validation
+
+```bash
+npm run verify       # dependencies + env + AI/Supabase/search coherence +
+                     # native URL + secret scan + production build
+npm run verify -- --fast   # same, without the build
+```
+
+### How the pieces fit together
+
+```
+GitHub source (this repository)
+        ↓  npm run setup / npm run dev (or deploy)
+Next.js Sophira web application
+        ↓  import into Vercel (docs/VERCEL_DEPLOYMENT.md)
+Vercel deployment (https://…vercel.app)
+        ↓  Capacitor shell loads the DEPLOYED web app
+Capacitor mobile shell (android/ , ios/)
+        ↓  npm run android:build / ios:sync (docs/NATIVE_BUILDS.md)
+Android APK / iOS app — contains NO secrets: all AI and database calls
+go through the deployed app's server-side routes.
+```
+
+Trouble? **docs/TROUBLESHOOTING.md** covers missing `.env.local`, missing
+Gemini key, invalid Supabase config, failed AI requests, Vercel
+environment issues, local AI problems, Capacitor connectivity, and
+invalid `SOPHIRA_APP_URL`.
+
+---
+
 ## Setup
 
 ### 1. Supabase

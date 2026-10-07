@@ -92,7 +92,12 @@ export function checkEnv(
         err(def.name, `${def.name} is set but is not a valid URL.`);
       }
       if (def.type === "https-url" && !value.toLowerCase().startsWith("https://")) {
-        err(def.name, `${def.name} must be an https:// URL (a plain URL would break auth redirects / native release builds).`);
+        // The loopback http default is intended for DEVELOPMENT; only
+        // production deployments must use https (auth redirects, invites).
+        const localhostDev = value.toLowerCase().startsWith("http://localhost") && !opts.production;
+        if (!localhostDev) {
+          err(def.name, `${def.name} must be an https:// URL in production (a plain or non-local URL would break auth redirects / native release builds).`);
+        }
       }
       if (def.type === "enum" && def.enum && !def.enum.includes(value.toLowerCase())) {
         err(def.name, `${def.name} must be one of: ${def.enum.join(", ")}.`);

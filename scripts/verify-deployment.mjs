@@ -78,7 +78,7 @@ function evaluateEnv(env, { production, nativeRelease = false, liveTests = false
     const set = v.length > 0;
     if (set) {
       if ((def.type === "url" || def.type === "https-url") && !isUrl(v)) errors.push(`${def.name} is set but is not a valid URL`);
-      if (def.type === "https-url" && !v.toLowerCase().startsWith("https://")) errors.push(`${def.name} must be an https:// URL`);
+      if (def.type === "https-url" && !v.toLowerCase().startsWith("https://") && !(v.toLowerCase().startsWith("http://localhost") && !production)) errors.push(`${def.name} must be an https:// URL (http://localhost is allowed only in development)`);
       if (def.type === "enum" && def.enum && !def.enum.includes(v.toLowerCase())) errors.push(`${def.name} must be one of: ${def.enum.join(", ")}`);
       if (def.type === "number" && Number.isNaN(Number(v))) errors.push(`${def.name} must be a number`);
       if (def.type === "boolean" && !["true", "false"].includes(v.toLowerCase())) errors.push(`${def.name} must be "true" or "false"`);

@@ -74,9 +74,10 @@ export function runVercelConfigTests(assert: (c: boolean, n: string) => void, se
   assert(!("bindings" in vc), "audit: no Vercel service bindings (nothing to bind - one application only)");
   const localhostHits = allSrc.filter(([, c]) => /(^|[^.A-Za-z])localhost(:|\/|$|\b)/.test(c))
     .filter(([f, c]) => !(f.includes("native-url") && c.includes("a release build cannot point at localhost"))
+      && !(f.includes("lib/env") && c.includes("!opts.production"))
       && !(f.includes("ServiceWorkerRegister") && c.includes("window.location.hostname")));
   assert(localhostHits.length === 0,
-    "audit: no reachable hard-coded localhost URLs in web source (the only matches are the release guard that REJECTS localhost and the dev-only service-worker registration)");
+    "audit: no reachable hard-coded localhost URLs in web source (the only matches are the release guard that REJECTS localhost, the env validator's DEVELOPMENT-only allowance (gated on !opts.production), and the dev-only service-worker registration)");
   assert(!execSync2("git ls-files").some((f: string) => f.startsWith("Dockerfile") || f.startsWith("docker-compose")),
     "audit: no Dockerfiles or docker-compose (no container service discovery)");
 

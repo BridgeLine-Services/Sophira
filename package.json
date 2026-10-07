@@ -21,7 +21,10 @@
     "local:test:model": "node scripts/local-model-download.mjs",
     "verify:deployment": "node scripts/verify-deployment.mjs",
     "verify:env": "node scripts/verify-deployment.mjs --env-only",
-    "env:example": "node scripts/gen-env-example.mjs --check"
+    "env:example": "node scripts/gen-env-example.mjs --check",
+    "setup": "node scripts/setup.mjs",
+    "setup:ai": "node scripts/setup-ai.mjs",
+    "verify": "node scripts/verify.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
