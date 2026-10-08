@@ -142,8 +142,29 @@ export async function middleware(request: NextRequest) {
   }
 
     if (user && (path === "/login" || path === "/signup")) {
+      // LOOP-PROOF BOUNCE (fix #2, 2026-10-08): this bounce used to send
+      // EVERY valid session to /dashboard — including sessions whose profile
+      // could not be resolved server-side. Those users ping-ponged forever:
+      // /dashboard redirects unresolved profiles to /login, the middleware
+      // bounced them straight back to /dashboard, and nothing ever rendered
+      // (blank page; the browser just reloads endlessly). Two changes make
+      // the loop structurally impossible:
+      //   1. the bounce is ROLE-AWARE (owner → /owner, others → /dashboard);
+      //   2. if the profile cannot be resolved for a valid session, the
+      //      bounce is SKIPPED — /login renders with the sign-in form, so
+      //      the chain always TERMINATES somewhere visible.
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, status")
+        .eq("id", user.id)
+        .single();
+      if (!profile) {
+        // Valid session, unresolvable profile: the worst thing to do is
+        // redirect (any target either loops or dead-ends). Render /login.
+        return response;
+      }
       const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
+      url.pathname = profile.role === "owner" ? "/owner" : "/dashboard";
       url.search = "";
       return NextResponse.redirect(url);
     }

@@ -63,12 +63,30 @@ export function runAuthRedirectLoopTests(assert: (c: boolean, n: string) => void
   const errorBoundary = readFileSync("src/app/error.tsx", "utf8");
   assert(errorBoundary.includes("Something went wrong") && errorBoundary.includes("onClick={() => reset()}"),
     "blank: a route error boundary exists — render/data failures show a message with a retry, never a blank page");
-  assert(!/console\.(log|error)/.test(errorBoundary),
-    "blank: the error boundary prints nothing (no tokens/paths leaked)");
+  assert(!/console\.(log|warn|info)/.test(errorBoundary),
+    "blank: the error boundary never log/warn/info's (no tokens/paths leaked)");
+  assert(errorBoundary.includes('console.error("Sophira page error:", error.message'),
+    "blank: the error boundary logs the underlying failure to the browser console (message+digest only) for diagnosis");
 
   // 6. SESSION DEATH INSIDE THE APP — the shell reacts once
   assert(appShell.includes("onAuthStateChange") && appShell.includes('"SIGNED_OUT"') && appShell.includes('router.replace("/login")'),
     "blank: AppShell listens for SIGNED_OUT and routes to /login once — a dying session never renders a dead frame");
+
+  // 8. LOOP-PROOF BOUNCE (fix #2): the middleware /login bounce is the loop
+  // engine when a page sends a VALID session back to /login. It must be
+  // role-aware AND fail-safe.
+  const loginBounce = middleware.slice(middleware.indexOf("user && (path === \"/login\""));
+  assert(loginBounce.includes('profile.role === "owner" ? "/owner" : "/dashboard"'),
+    "loop: the /login bounce is ROLE-AWARE — the owner lands on /owner (the dashboard bounces owners again)");
+  assert(loginBounce.includes("if (!profile)") && /return response;\s*\}\s*const url = request.nextUrl.clone\(\);/.test(loginBounce),
+    "loop: the bounce is SKIPPED when the profile cannot be resolved — /login renders instead of a redirect war");
+  assert(dashboard.includes("Your account could not be loaded") && dashboard.includes("SignOutButton"),
+    "loop: /dashboard with a valid session and unresolvable profile shows an explicit error + sign-out — NEVER redirects to /login");
+  assert(owner.includes("Your account could not be loaded") && owner.includes("SignOutButton"),
+    "loop: /owner with a valid session and unresolvable profile shows the same explicit error state");
+  const signOutBtn = readFileSync("src/components/app/SignOutButton.tsx", "utf8");
+  assert(signOutBtn.includes("supabase.auth.signOut()") && signOutBtn.includes('router.replace("/login")'),
+    "loop: the SignOutButton destroys the session and routes to /login exactly once");
 
   // 7. SIGN-IN NAVIGATION — await before navigate (no cookie race)
   assert(login.includes("await supabase.auth.signInWithPassword") && login.indexOf("await supabase.auth.signInWithPassword") < login.indexOf("router.push("),

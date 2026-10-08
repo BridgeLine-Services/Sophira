@@ -14,6 +14,10 @@ export default function ErrorBoundary({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // Diagnostics (user-requested): log the underlying failure so the cause is
+  // visible in the browser console. Only the error's own message/digest —
+  // never tokens, cookies, or user content.
+  console.error("Sophira page error:", error.message, error.digest ?? "");
   return (
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
       <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-white">!</span>

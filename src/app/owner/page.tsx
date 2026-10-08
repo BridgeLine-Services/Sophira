@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/require-user";
+import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { OwnerDashboard } from "@/components/app/OwnerDashboard";
 import { Badge, Button } from "@/components/ui";
@@ -25,7 +26,28 @@ export default async function OwnerPage() {
   const user = await requireUser(supabase);
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  if (!profile) redirect("/login");
+  if (!profile) {
+    // LOOP-PROOF (fix #2, 2026-10-08): a VALID session with an unresolvable
+    // profile previously redirected to /login — which the middleware
+    // bounced right back to a guarded page, forever, rendering nothing
+    // (the reported "blank dashboard" + endless reload). A valid session is
+    // NEVER sent back to /login: the user gets an explicit, visible error
+    // and a way out instead of a redirect war.
+    return (
+      <AppShell title="Account problem">
+        <div className="mx-auto max-w-md space-y-3 py-10 text-center">
+          <h1 className="text-xl font-semibold text-ink">Your account could not be loaded</h1>
+          <p className="text-sm text-ink-soft">
+            You are signed in, but your profile record could not be read. This
+            is not a password problem — do not keep refreshing. Sign out and
+            sign back in; if it persists, the account needs the operator&apos;s
+            attention.
+          </p>
+          <SignOutButton />
+        </div>
+      </AppShell>
+    );
+  }
   if (profile.status === "revoked") redirect("/access-denied");
   if (profile.role !== "owner") redirect("/dashboard");
 
