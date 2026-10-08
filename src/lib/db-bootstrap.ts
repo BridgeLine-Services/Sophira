@@ -24,6 +24,7 @@
  * is simply unavailable (fail closed, never pretend).
  */
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { listProfileIds } from "./db-privileged";
 import { publicSupabaseUrl, serviceRoleKey } from "./supabase-config";
 import { present } from "./env";
 import { probeOwnerSetup, type OwnerSetupProbe, evaluateOwnerSetup } from "./owner-setup";
@@ -480,8 +481,11 @@ export async function countStaleAuthUsers(probe: OwnerSetupProbe): Promise<numbe
       if (page > 20) break;
     }
     if (ids.length === 0) return 0;
-    const { data: profiles } = await admin.from("profiles").select("id").limit(1000);
-    const profileIds = new Set((profiles || []).map((p: { id: string }) => p.id));
+    // 2026-10-07: profile ids come from the VERIFIED direct channel when
+    // available (a restricted admin key cannot read PostgREST tables and
+    // would otherwise count every auth user as stale).
+    const directIds = await listProfileIds();
+    const profileIds = new Set(directIds !== null ? directIds : ((await admin.from("profiles").select("id").limit(1000)).data || []).map((p: { id: string }) => p.id));
     return ids.filter((id) => !profileIds.has(id)).length;
   } catch {
     return null;
@@ -500,14 +504,17 @@ export async function cleanupStaleAuthUsers(): Promise<StaleAccountResult> {
   if (probe.ownerAccount === "active" || probe.ownerAccount === "revoked") {
     return { ok: false, reason: "refused", message: "An owner exists, so stale-account cleanup is closed." };
   }
-  const { data: profiles } = await createSupabaseClient(
-    publicSupabaseUrl()!,
-    serviceRoleKey()!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-    .from("profiles")
-    .select("id")
-    .limit(1000);
+  const directProfileIds = await listProfileIds();
+  const profiles = directProfileIds !== null
+    ? directProfileIds.map((id) => ({ id }))
+    : (await createSupabaseClient(
+        publicSupabaseUrl()!,
+        serviceRoleKey()!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+        .from("profiles")
+        .select("id")
+        .limit(1000)).data || [];
   if (profiles && profiles.length > 0) {
     return { ok: false, reason: "refused", message: "Member profiles exist, so nothing can be safely cleaned up automatically." };
   }

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { publicSupabaseUrl, serviceRoleKey } from "../../../lib/supabase-config";
 import { createClient } from "../../../lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { callDbFunction, privilegedChannelConfigured } from "../../../lib/db-privileged";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,21 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // 2026-10-07: privileged table/function access runs over the VERIFIED
+  // direct database connection (the deployment's admin API key can be a
+  // restricted new-style key - the live deployment proved PostgREST answers
+  // "permission denied" while the direct channel is fully privileged).
+  if (privilegedChannelConfigured()) {
+    const res = await callDbFunction("complete_first_owner", [user.id]);
+    if (res.ok) {
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+      return NextResponse.json({ completed: true, hasProfile: !!profile, role: profile?.role ?? null });
+    }
+    // The direct channel exists but the call was refused BY THE DATABASE
+    // FUNCTION (owner exists / race lost / profile already present).
+    return NextResponse.json({ error: "Owner creation is closed or was just claimed by another registration." }, { status: 409 });
+  }
+  // Fallback for deployments with a valid service key but no direct channel.
   const { error } = await admin.rpc("complete_first_owner", { p_user_id: user.id });
   if (!error) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();

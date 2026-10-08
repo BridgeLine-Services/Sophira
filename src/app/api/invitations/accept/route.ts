@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { selectRow, acceptInvitationAtomic, privilegedChannelConfigured } from "@/lib/db-privileged";
 
 export const runtime = "nodejs";
 
@@ -33,13 +34,15 @@ export async function POST(request: NextRequest) {
   const token = (body.token || "").trim();
   if (!token) return NextResponse.json({ error: "Missing invitation token." }, { status: 400 });
 
-  const admin = createAdminClient();
-  const { data: invitation, error } = await admin
-    .from("invitations")
-    .select("*")
-    .eq("token", token)
-    .single();
-  if (error || !invitation) {
+  // 2026-10-07: privileged reads/writes prefer the VERIFIED direct
+  // database channel (restricted new-style admin keys cannot read
+  // PostgREST tables); the admin client is only the fallback.
+  const direct = privilegedChannelConfigured();
+  const admin = direct ? null : createAdminClient();
+  const invitation = direct
+    ? await selectRow("invitations", "token", token)
+    : (await admin!.from("invitations").select("*").eq("token", token).single()).data;
+  if (!invitation) {
     return NextResponse.json({ error: "That invitation is no longer valid. Ask the owner for a new link." }, { status: 404 });
   }
   if (invitation.status !== "pending") {
@@ -70,14 +73,20 @@ export async function POST(request: NextRequest) {
   // Atomic single-use enforcement: the update only fires while the row is
   // STILL pending, so two concurrent accepts cannot both succeed (the loser
   // sees zero affected rows and gets the already-used response).
-  const { data: accepted, error: uErr } = await admin
-    .from("invitations")
-    .update({ status: "accepted", accepted_at: new Date().toISOString() })
-    .eq("id", invitation.id)
-    .eq("status", "pending")
-    .select("id")
-    .single();
-  if (uErr || !accepted) {
+  const accepted = direct
+    ? await acceptInvitationAtomic(String(invitation.id))
+    : Boolean(
+        (
+          await admin!
+            .from("invitations")
+            .update({ status: "accepted", accepted_at: new Date().toISOString() })
+            .eq("id", invitation.id)
+            .eq("status", "pending")
+            .select("id")
+            .single()
+        ).data
+      );
+  if (!accepted) {
     return NextResponse.json({ error: "That invitation was already used or revoked." }, { status: 410 });
   }
 

@@ -140,7 +140,7 @@ function rawConnectionString(): string | null {
 
 /** The VERIFIED connection string: only a direct connection that points at
  *  THIS project's own Supabase database (see connectionTarget) is used. */
-function connectionString(): string | null {
+export function connectionString(): string | null {
   const raw = rawConnectionString();
   if (raw === null) return null;
   return connectionTarget() === "same-project" ? raw : null;
@@ -213,6 +213,95 @@ function categorizeFailure(err: unknown): MigrationFailure {
  * the pass completed without error. The CALLER re-probes the database and
  * only reports ready when the schema is actually present.
  */
+/**
+ * DIRECT SCHEMA PROBER (2026-10-07 live finding): the deployment's admin
+ * API key can be a restricted new-style key ("permission denied for table
+ * app_config") while the VERIFIED direct Postgres connection to the same
+ * database is fully privileged (it is the channel that applies migrations).
+ * The setup probe therefore runs over direct SQL whenever that channel
+ * exists - PostgREST becomes the fallback, not the requirement. Every
+ * query is failure-tolerant (a missing table is a FACT about the schema,
+ * never an error) and returns categorical booleans only.
+ */
+export type DirectSchemaProbe = {
+  ok: boolean; // connection established
+  appConfig: boolean | null; // public.app_config exists (migration 0008)
+  ownerEmailRow: boolean | null; // app_config row key='owner_email'
+  profilesRevokedColumn: boolean | null; // profiles.access_revoked_at (0019)
+  studentMemories: boolean | null; // public.student_memories (0020)
+  ownerBootstrap: boolean | null; // public.owner_bootstrap (0025)
+  invitations: boolean | null; // public.invitations (0002/0006)
+  schemaVersionRow: boolean | null; // sophira_meta row key='schema_version' (0026)
+  ownerExists: boolean | null; // any profiles role='owner'
+  ownerActive: boolean | null; // an owner with status='active'
+};
+
+async function oneBool(client: { query: (q: string) => Promise<{ rows: unknown[] }> }, sql: string): Promise<boolean | null> {
+  try {
+    const r = await client.query(sql);
+    return Boolean((r.rows[0] as Record<string, unknown> | undefined)?.v);
+  } catch {
+    return null;
+  }
+}
+
+export async function probeSchemaStateDirect(): Promise<DirectSchemaProbe> {
+  const out: DirectSchemaProbe = {
+    ok: false, appConfig: null, ownerEmailRow: null, profilesRevokedColumn: null,
+    studentMemories: null, ownerBootstrap: null, invitations: null,
+    schemaVersionRow: null, ownerExists: null, ownerActive: null,
+  };
+  const url = connectionString();
+  if (!url) return out;
+  const client = new Client({ connectionString: stripSslmode(url), ssl: sslConfigFor(url) });
+  try {
+    await client.connect();
+    out.ok = true;
+    const exists = (rel: string) =>
+      oneBool(client, `select to_regclass('${rel}') is not null as v`);
+    out.appConfig = await exists("public.app_config");
+    out.studentMemories = await exists("public.student_memories");
+    out.ownerBootstrap = await exists("public.owner_bootstrap");
+    out.invitations = await exists("public.invitations");
+    out.profilesRevokedColumn = await oneBool(
+      client,
+      `select exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='access_revoked_at') as v`
+    );
+    if (out.appConfig === true) {
+      out.ownerEmailRow = await oneBool(
+        client,
+        `select exists(select 1 from public.app_config where key='owner_email') as v`
+      );
+    }
+    out.schemaVersionRow = await oneBool(
+      client,
+      `select exists(select 1 from public.sophira_meta where key='schema_version') as v`
+    );
+    const owner = await oneBool(
+      client,
+      `select exists(select 1 from public.profiles where role='owner') as v`
+    );
+    if (owner === true) {
+      out.ownerExists = true;
+      out.ownerActive = await oneBool(
+        client,
+        `select exists(select 1 from public.profiles where role='owner' and status='active') as v`
+      );
+    } else {
+      out.ownerExists = owner === null ? null : false;
+      out.ownerActive = owner === null ? null : false;
+    }
+  } catch {
+    out.ok = false;
+  }
+  try {
+    await client.end();
+  } catch {
+    /* already closed */
+  }
+  return out;
+}
+
 export async function applyMigrationChainDirect(): Promise<{
   ok: boolean;
   applied: number;

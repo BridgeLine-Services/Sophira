@@ -3472,7 +3472,7 @@ async function runOwnerSetupTests(): Promise<void> {
     connectionEnvNames: string[];
     connectionTarget: "same-project" | "foreign" | "none";
     databaseError:
-      | { category: "auth-rejected" | "network" | "server-error"; message: string }
+      | { category: "auth-rejected" | "network" | "server-error" | "connection"; message: string }
       | null;
     setupChannel: "direct-postgres" | "management-api" | "none";
   }

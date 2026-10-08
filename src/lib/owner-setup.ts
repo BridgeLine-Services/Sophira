@@ -1,6 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
-import { setupChannel, connectionTarget } from "./db-ddl";
+import { setupChannel, connectionTarget, directPostgresConfigured, probeSchemaStateDirect } from "./db-ddl";
 import { publicSupabaseUrl, publicAnonKey, serviceRoleKey, connectionEnvNames, supabaseConfigStatus } from "./supabase-config";
 
 /**
@@ -61,7 +61,7 @@ export interface OwnerSetupProbe {
    * driver message. Secrets, keys, and long tokens are always redacted.
    */
   databaseError:
-    | { category: "auth-rejected" | "network" | "server-error"; message: string }
+    | { category: "auth-rejected" | "network" | "server-error" | "connection"; message: string }
     | null;
   /** 2026-10-07 second automation round: the PRECISE channel (or "none") so
    *  the setup UI can diagnose the exact missing infrastructure capability
@@ -154,6 +154,49 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     setupChannel: setupChannel(),
     databaseError: null,
   };
+  // ---- 2026-10-07 live finding: the admin API key can be a restricted
+  // new-style key ("permission denied") while the VERIFIED direct
+  // database connection is fully privileged. The direct channel is the
+  // PRIMARY probe whenever it exists; PostgREST is only the fallback. ----
+  if (directPostgresConfigured()) {
+    const dp = await probeSchemaStateDirect();
+    if (!dp.ok) {
+      probe.database = "unreachable";
+      probe.databaseError = { category: "connection", message: "direct database probe failed" };
+      return probe;
+    }
+    probe.database = "checked";
+    // Same semantics as the PostgREST path below, one source of truth.
+    if (dp.appConfig === false || dp.appConfig === null) {
+      return { ...probe, chainStarted: false, migrationsPresent: false };
+    }
+    probe.chainStarted = true;
+    probe.migrationsPresent = true;
+    probe.ownerEmailConfigured = dp.ownerEmailRow === true;
+    if (dp.profilesRevokedColumn === false) probe.migrationsPresent = false; // 0019 marker
+    if (dp.studentMemories === false) probe.migrationsPresent = false; // 0020 marker
+    if (dp.ownerBootstrap === false || dp.ownerBootstrap === null) {
+      probe.ownerBootstrapPresent = false;
+      probe.recoveryPresent = false;
+      probe.migrationsPresent = false;
+    } else {
+      probe.ownerBootstrapPresent = true;
+    }
+    probe.invitationsPresent = dp.invitations === true;
+    if (probe.migrationsPresent !== false) {
+      probe.recoveryPresent = dp.schemaVersionRow !== null;
+      if (dp.schemaVersionRow === false) probe.migrationsPresent = false;
+    }
+    if (dp.ownerExists === null || dp.ownerExists === undefined) {
+      probe.ownerAccount = "unknown";
+    } else if (dp.ownerExists === false) {
+      probe.ownerAccount = "none";
+    } else {
+      probe.ownerAccount = dp.ownerActive === true ? "active" : "revoked";
+    }
+    return probe;
+  }
+
   if (!probe.serviceRoleConfigured) return probe;
 
   try {
@@ -303,7 +346,11 @@ function isMissingColumn(err: { message: string; code?: string }): boolean {
  * and /api/setup-status so they can never diverge.
  */
 export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
-  const cannotCheck = "Cannot check yet - set SUPABASE_SERVICE_ROLE_KEY on the server (never in the browser).";
+  // 2026-10-07: setup uses the VERIFIED direct database channel as its
+  // privileged path; the admin API key is a fallback. The wording must
+  // never claim a missing credential when privileged access works.
+  const cannotCheck =
+    "Cannot check yet - the server has no privileged database access configured (direct connection or admin key).";
 
   const steps: OwnerSetupStep[] = [
     {
