@@ -33,7 +33,15 @@ export async function POST(request: Request) {
   if (action === "migrations") {
     const result = await repairOwnerBootstrap();
     return Response.json(
-      { ok: result.ok, reason: result.ok ? null : result.reason, message: result.message },
+      {
+        ok: result.ok,
+        reason: result.ok ? null : result.reason,
+        message: result.message,
+        // Categorical developer diagnostics: which migration step failed
+        // and what class of failure (never raw SQL, never identifiers).
+        failedAt: result.ok ? null : (result as { failedAt?: string }).failedAt ?? null,
+        failure: result.ok ? null : (result as { failure?: string }).failure ?? null,
+      },
       { status: result.ok ? 200 : 409 }
     );
   }

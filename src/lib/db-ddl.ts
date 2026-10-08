@@ -36,6 +36,54 @@ export function directPostgresConfigured(): boolean {
   return connectionString() !== null;
 }
 
+/**
+ * SAFETY GUARD (2026-10-07, live-deployment finding): a deployment can carry
+ * direct-connection variables that point at a DIFFERENT database than
+ * Sophira's own Supabase project (e.g. a leftover Vercel Postgres/Neon
+ * instance provisioned alongside it). Applying the migration chain there
+ * would corrupt an unrelated database. Every candidate connection is
+ * therefore verified to point at THIS project before it is used: the
+ * Supabase project ref (derived from the public project URL) must appear
+ * in the connection's hostname.
+ */
+export function connectionTarget(): "same-project" | "foreign" | "none" {
+  const url = rawConnectionString();
+  if (!url) return "none";
+  const ref = supabaseProjectRef();
+  if (!ref) return "foreign";
+  try {
+    const parsed = new URL(url);
+    // Supabase direct hosts embed the ref (db.<ref>.supabase.co); the
+    // supavisor POOLED connections carry it in the username instead
+    // (postgres.<ref>:...@aws-....pooler.supabase.com) - both are this
+    // project; anything else is a different database and is refused.
+    const same =
+      parsed.host.includes(ref) ||
+      decodeURIComponent(parsed.username).includes(ref);
+    return same ? "same-project" : "foreign";
+  } catch {
+    return "foreign";
+  }
+}
+
+function supabaseProjectRef(): string | null {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host.split(".")[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Categorical failure codes for developer diagnostics (never raw SQL
+ *  errors, never identifiers, never connection details). */
+export type MigrationFailure =
+  | "relation-missing"
+  | "permission"
+  | "unsupported-feature"
+  | "connection"
+  | "syntax"
+  | "unknown";
+
 /** OPTIONAL secondary channel: Supabase Management API credentials
  *  (server-only). A personal access token is NOT required for first-launch
  *  setup - the direct connection above is the primary path. */
@@ -87,7 +135,8 @@ export function connectionEnvNames(): string[] {
   return CONNECTION_ENV_NAMES.filter((name) => present(name));
 }
 
-function connectionString(): string | null {
+/** The raw first matching connection string (unverified - internal only). */
+function rawConnectionString(): string | null {
   // Preferred order: the integration-provisioned direct URLs first.
   for (const name of CONNECTION_ENV_NAMES) {
     if (present(name)) return process.env[name]!;
@@ -106,13 +155,38 @@ function connectionString(): string | null {
   return null;
 }
 
+/** The VERIFIED connection string: only a direct connection that points at
+ *  THIS project's own Supabase database (see connectionTarget) is used. */
+function connectionString(): string | null {
+  const raw = rawConnectionString();
+  if (raw === null) return null;
+  return connectionTarget() === "same-project" ? raw : null;
+}
+
+/** Categorize a Postgres error for safe developer diagnostics. */
+function categorizeFailure(err: unknown): MigrationFailure {
+  const code = (err as { code?: string })?.code ?? "";
+  const message = String((err as { message?: string })?.message ?? "");
+  if (code === "42P01" || code === "42704" || /relation .* does not exist/i.test(message)) return "relation-missing";
+  if (code === "42501" || code === "28000" || /permission denied|does not have privilege/i.test(message)) return "permission";
+  if (code === "0A000") return "unsupported-feature";
+  if (/connect|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|SSL/i.test(message)) return "connection";
+  if (code === "42601" || /syntax error/i.test(message)) return "syntax";
+  return "unknown";
+}
+
 /**
  * Apply the migration chain over the direct Postgres connection.
  * Returns categorically: how many migrations were applied, and whether
  * the pass completed without error. The CALLER re-probes the database and
  * only reports ready when the schema is actually present.
  */
-export async function applyMigrationChainDirect(): Promise<{ ok: boolean; applied: number }> {
+export async function applyMigrationChainDirect(): Promise<{
+  ok: boolean;
+  applied: number;
+  failedAt?: string;
+  failure?: MigrationFailure;
+}> {
   const url = connectionString();
   if (!url) return { ok: false, applied: 0 };
   const client = new Client({ connectionString: url });
@@ -145,25 +219,36 @@ export async function applyMigrationChainDirect(): Promise<{ ok: boolean; applie
       try {
         await client.query(`BEGIN;\n${entry.sql}\nCOMMIT;`);
         applied += 1;
-      } catch {
+      } catch (err) {
+        // SERVER-SIDE developer logging: migration name + sanitized
+        // category + the raw server message (which never contains the
+        // connection string or credentials). Never returned to users.
+        console.error(
+          `[setup] migration ${entry.name} failed (${categorizeFailure(err)}):`,
+          String((err as { message?: string })?.message ?? "unknown error").replace(url, "[connection]")
+        );
         try {
           await client.query("ROLLBACK;");
         } catch {
           /* the server already aborted the transaction */
         }
         await client.end();
-        return { ok: false, applied };
+        return { ok: false, applied, failedAt: entry.name, failure: categorizeFailure(err) };
       }
     }
     await client.end();
     return { ok: true, applied };
-  } catch {
+  } catch (err) {
     // Categorical only: never leak connection details or driver errors.
+    console.error(
+      "[setup] migration chain connection phase failed:",
+      String((err as { message?: string })?.message ?? "unknown error").replace(/:[^:@/]+@/, ":[redacted]@")
+    );
     try {
       await client.end();
     } catch {
       /* already closed */
     }
-    return { ok: false, applied: 0 };
+    return { ok: false, applied: 0, failure: categorizeFailure(err) };
   }
 }

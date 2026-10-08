@@ -27,6 +27,7 @@ export async function GET() {
     // categorical only: supabase-credentials | service-role |
     // initialization-channel | null.
     connectionEnvNames: status.probe.connectionEnvNames,
+    connectionTarget: status.probe.connectionTarget,
     capability: status.capability,
     ready: status.ready,
     headline: status.headline,

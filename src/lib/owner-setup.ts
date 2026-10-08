@@ -1,6 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
-import { setupChannel, connectionEnvNames } from "./db-ddl";
+import { setupChannel, connectionEnvNames, connectionTarget } from "./db-ddl";
 
 /**
  * Owner setup / status diagnostic (operator round 2026-10-06).
@@ -48,6 +48,10 @@ export interface OwnerSetupProbe {
   /** Categorical names-only diagnostics: which direct-connection env
    *  conventions this deployment provides (values are NEVER included). */
   connectionEnvNames: string[];
+  /** Whether the deployment's direct connection points at THIS project's
+   *  own Supabase database ("same-project"), a different database
+   *  ("foreign" - never used for migrations), or is absent ("none"). */
+  connectionTarget: "same-project" | "foreign" | "none";
   /** 2026-10-07 second automation round: the PRECISE channel (or "none") so
    *  the setup UI can diagnose the exact missing infrastructure capability
    *  instead of a vague "administrator connection". Categorical only. */
@@ -79,7 +83,12 @@ export interface OwnerSetupStatus {
   probe: OwnerSetupProbe;
   /** The exact missing infrastructure capability, or null (requirement K/L).
    *  Categorical only - never a credential, never a connection string. */
-  capability: "supabase-credentials" | "service-role" | "initialization-channel" | null;
+  capability:
+    | "supabase-credentials"
+    | "service-role"
+    | "initialization-channel"
+    | "foreign-database"
+    | null;
   steps: OwnerSetupStep[];
   ready: boolean | null; // null = cannot determine (missing config)
   headline: string;
@@ -130,6 +139,7 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     recoveryPresent: null,
     migrationAutomationConfigured: setupChannel() !== "none",
     connectionEnvNames: connectionEnvNames(),
+    connectionTarget: connectionTarget(),
     setupChannel: setupChannel(),
   };
   if (!probe.serviceRoleConfigured) return probe;
@@ -447,16 +457,19 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
     | "supabase-credentials"
     | "service-role"
     | "initialization-channel"
+    | "foreign-database"
     | null =
     !probe.supabaseConfigured
       ? "supabase-credentials"
       : !probe.serviceRoleConfigured
         ? "service-role"
-        : probe.database === "checked" &&
-            probe.migrationsPresent === false &&
-            !probe.migrationAutomationConfigured
-          ? "initialization-channel"
-          : null;
+        : probe.database === "checked" && probe.migrationsPresent === false
+        ? probe.connectionTarget === "foreign"
+          ? "foreign-database"
+          : !probe.migrationAutomationConfigured
+            ? "initialization-channel"
+            : null
+        : null;
 
   return { state, repair, staleAuthUsers: null, probe, capability, steps, ready, headline, guidance, ownerCreation };
 }

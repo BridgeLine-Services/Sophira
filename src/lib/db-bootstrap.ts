@@ -31,7 +31,14 @@ import { directPostgresConfigured, managementConfigured, applyMigrationChainDire
 
 export type SetupRepairResult =
   | { ok: true; repaired: boolean; message: string }
-  | { ok: false; reason: "unconfigured" | "not-needed" | "refused" | "failed" | "partial"; message: string };
+  | {
+      ok: false;
+      reason: "unconfigured" | "not-needed" | "refused" | "failed" | "partial";
+      message: string;
+      /** Safe categorical developer diagnostics (never raw SQL errors). */
+      failedAt?: string;
+      failure?: string;
+    };
 
 export type StaleAccountResult =
   | { ok: true; removed: number; message: string }
@@ -71,6 +78,8 @@ async function runChainAutomation(): Promise<SetupRepairResult> {
       reason: "failed",
       message:
         "Setup couldn't finish yet - the database preparation step did not complete. Nothing was skipped; try again in a moment, and open Advanced diagnostics on /setup if it keeps failing.",
+      failedAt: pass.failedAt,
+      failure: pass.failure,
     };
   }
   const after = await probeOwnerSetup();

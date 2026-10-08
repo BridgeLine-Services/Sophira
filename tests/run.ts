@@ -3470,6 +3470,7 @@ async function runOwnerSetupTests(): Promise<void> {
     ownerBootstrapPresent: boolean | null; recoveryPresent: boolean | null;
     migrationAutomationConfigured: boolean;
     connectionEnvNames: string[];
+    connectionTarget: "same-project" | "foreign" | "none";
     setupChannel: "direct-postgres" | "management-api" | "none";
   }
   const mk = (o: Partial<Probe>): Probe => ({
@@ -3478,6 +3479,7 @@ async function runOwnerSetupTests(): Promise<void> {
     chainStarted: null, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null,
     migrationAutomationConfigured: false,
     connectionEnvNames: [],
+    connectionTarget: "none",
     setupChannel: "none",
     ...o,
   });

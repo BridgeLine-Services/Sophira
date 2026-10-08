@@ -206,8 +206,12 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "ddl: the direct runtime path applies the repository's own embedded chain, one transaction per migration, with rollback - fail-loud, never silent");
   assert(ddlSrc.includes("directPostgresConfigured") && ddlSrc.includes("POSTGRES_URL_NON_POOLING") && ddlSrc.includes("SUPABASE_DB_PASSWORD"),
     "ddl: the zero-configuration credentials auto-provisioned by the Vercel Supabase Integration are used automatically");
-  assert(!/console\.|\.message|err\.message/.test(ddlSrc.replace(/never, logs, or embeds/g, "")) || !ddlSrc.includes("console."),
-    "ddl: nothing is logged (connection strings and driver errors never reach logs)");
+  assert(ddlSrc.includes("console.error") && ddlSrc.includes(".replace(url, \"[connection]\")"),
+    "ddl: migration failures ARE logged server-side for developers (requirement 1) with the connection string scrubbed");
+  assert(!/console\.(log|info|warn|debug|trace)\(/.test(ddlSrc),
+    "ddl: no casual logging levels - only error-level developer diagnostics");
+  assert(!/return.*url|message: *url/.test(ddlSrc.replace(/never, logs, or embeds/g, "")),
+    "ddl: the connection string is never returned or embedded in any result");
   const setupSrc2 = readFileSync("src/lib/db-bootstrap.ts", "utf8");
   assert(setupSrc2.includes("directPostgresConfigured() || managementConfigured()") && setupSrc2.includes("runChainAutomation"),
     "ddl: first-launch prefers the direct database connection; the Management API token is optional/secondary");
@@ -245,7 +249,7 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     //      by the integration previously reported "no initialization channel"
     //      and forced non-technical owners into manual repair).
     delete process.env.POSTGRES_URL_NON_POOLING;
-    process.env.SUPABASE_DB_URL = "postgresql://postgres.x:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres";
+    process.env.SUPABASE_DB_URL = "postgresql://postgres.abc:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres";
     assert(ddl.directPostgresConfigured() === true && ddl.setupChannel() === "direct-postgres",
       "N2b: SUPABASE_DB_URL (the official Supabase-Vercel integration's convention) enables the direct channel");
     assert(JSON.stringify(ddl.connectionEnvNames()).includes("SUPABASE_DB_URL"),
@@ -256,6 +260,18 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     assert(ddl.directPostgresConfigured() === true && ddl.setupChannel() === "direct-postgres",
       "N2d: DATABASE_URL enables the direct channel (all conventions normalized into one model)");
     delete process.env.DATABASE_URL;
+    // N2e: THE SAFETY GUARD - a direct connection pointing at a DIFFERENT
+    //      database than Sophira's own Supabase project (a leftover Vercel
+    //      Postgres/Neon instance) is REFUSED, never used for migrations.
+    process.env.POSTGRES_URL_NON_POOLING = "postgresql://postgres:x@ep-cool-name-123456.us-east-1.aws.neon.tech:5432/postgres";
+    assert(ddl.directPostgresConfigured() === false && ddl.connectionTarget() === "foreign",
+      "N2e: a foreign direct connection (different database than the Supabase project) is refused - migrations would corrupt an unrelated database (live-deployment finding 2026-10-07)");
+    delete process.env.POSTGRES_URL_NON_POOLING;
+    // N2f: the same-project shape (ref in the pooler USERNAME) is accepted.
+    process.env.POSTGRES_URL = "postgresql://postgres.abc:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres";
+    assert(ddl.directPostgresConfigured() === true && ddl.connectionTarget() === "same-project",
+      "N2f: the Supabase pooler convention (project ref in the username) is accepted as this project's connection");
+    delete process.env.POSTGRES_URL;
     // N3: password + public URL -> the direct endpoint is derived automatically.
     delete process.env.POSTGRES_URL_NON_POOLING;
     process.env.SUPABASE_DB_PASSWORD = "pw";
