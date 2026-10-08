@@ -23,6 +23,10 @@ export async function GET() {
     ok: true,
     name: "sophira-setup",
     state: status.state,
+    // The precise missing infrastructure capability (requirement K/L) -
+    // categorical only: supabase-credentials | service-role |
+    // initialization-channel | null.
+    capability: status.capability,
     ready: status.ready,
     headline: status.headline,
     probe: {
@@ -33,7 +37,6 @@ export async function GET() {
       migrationsPresent: status.probe.migrationsPresent,
       migrationAutomationConfigured: status.probe.migrationAutomationConfigured,
       setupChannel: status.probe.setupChannel,
-      capability: status.capability,
       ownerEmailConfigured: status.probe.ownerEmailConfigured,
       ownerAccount: status.probe.ownerAccount,
     },
