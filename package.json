@@ -26,7 +26,8 @@
     "setup:ai": "node scripts/setup-ai.mjs",
     "verify": "node scripts/verify.mjs",
     "db:migrate": "node scripts/apply-migrations.mjs",
-    "db:migrate:check": "node scripts/apply-migrations.mjs --check-only"
+    "db:migrate:check": "node scripts/apply-migrations.mjs --check-only",
+    "doctor": "node scripts/doctor.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
