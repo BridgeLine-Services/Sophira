@@ -119,7 +119,9 @@ export async function runHostileAuditTests(assert: Assert, section: Section): Pr
     assert(cfg.includes("images: { unoptimized: true }"), "audit: the Next.js Image Optimizer endpoint is disabled — pure attack surface (critical DoS advisory) with zero legitimate use");
     const pkg = JSON.parse(src("package.json"));
     for (const m of ["braces", "micromatch", "fast-glob"]) assert(pkg.overrides[m], `audit: transitive dep ${m} is pinned by override to its latest patched line`);
-    assert(pkg.dependencies.tailwindcss === "3.4.19", "audit: tailwindcss is on the latest 3.4.x (newest build-time dep chain)");
+    assert(pkg.devDependencies?.tailwindcss === "3.4.19", "audit: tailwindcss is on the latest 3.4.x (newest build-time dep chain)");
+    assert(!pkg.dependencies?.tailwindcss, "audit: tailwindcss is NOT a production dependency (2026-10-07: build-time only — moving it out of dependencies cut the prod audit surface 13→5 findings)");
+    assert(!pkg.dependencies?.["tailwindcss-animate"], "audit: tailwindcss-animate is dev-only too (build-time plugin)");
     // no direct runtime use of the vulnerable glob/watch chain
     const runtimeUses = ["src/lib", "src/app/api"].map((d) => {
       try { return src(d); } catch { return ""; }
