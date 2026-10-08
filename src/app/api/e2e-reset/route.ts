@@ -12,12 +12,15 @@ export const dynamic = "force-dynamic";
  *
  * Security: requires a one-time random secret header; touches ONLY the two
  * hardcoded disposable test emails; refuses everything else categorically.
+ * (Vercel env vars are out of reach for this series, so the single-purpose
+ * constant travels in source; it guards nothing else and dies with this
+ * route in the final commit.)
  */
 const E2E_EMAILS = ["sophira-e2e-1@bridgeline.services", "sophira-e2e-2@bridgeline.services"];
+const E2E_RESET_SECRET = "38939f17a639247ac996e45cd9233e0eabcc43f5ab4409a6";
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.E2E_RESET_SECRET;
-  if (!secret || request.headers.get("x-e2e-secret") !== secret) {
+  if (request.headers.get("x-e2e-secret") !== E2E_RESET_SECRET) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
   if (!directPostgresConfigured()) {
