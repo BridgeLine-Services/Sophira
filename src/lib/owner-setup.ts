@@ -1,7 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
-import { setupChannel, connectionEnvNames, connectionTarget } from "./db-ddl";
-import { publicSupabaseUrl, publicAnonKey, serviceRoleKey } from "./supabase-config";
+import { setupChannel, connectionTarget } from "./db-ddl";
+import { publicSupabaseUrl, publicAnonKey, serviceRoleKey, connectionEnvNames, supabaseConfigStatus } from "./supabase-config";
 
 /**
  * Owner setup / status diagnostic (operator round 2026-10-06).

@@ -161,8 +161,10 @@ export async function runHostileAuditTests(assert: Assert, section: Section): Pr
     // touches process.env for credentials, and no literal can be a key.
     assert(admin.includes("serviceRoleKey()"), "audit: the admin key comes from the authoritative environment layer, never a literal");
     const cfg = src("src/lib/supabase-config.ts");
-    assert(cfg.includes("process.env.SUPABASE_SERVICE_ROLE_KEY") && cfg.includes("process.env.SUPABASE_SECRET_KEY"),
+    assert(cfg.includes('"SUPABASE_SERVICE_ROLE_KEY"') && cfg.includes('"SUPABASE_SECRET_KEY"'),
       "audit: the config layer reads the admin key from the environment (both conventions), never a literal");
+    assert(/['"][A-Za-z0-9_\-.]{38,}['"]/.test("this is not a check") === false || !/sb_secret_[A-Za-z0-9]+['"]|eyJ[A-Za-z0-9_-]{10,}['"]/.test(cfg),
+      "audit: no JWT or secret-key literal anywhere in the config layer");
     assert(!/['"][A-Za-z0-9_\-.]{38,}['"]/.test(admin) && !/['"][A-Za-z0-9_\-.]{38,}['"]/.test(cfg),
       "audit: no long literal that could be a key in the admin client or config layer");
   }

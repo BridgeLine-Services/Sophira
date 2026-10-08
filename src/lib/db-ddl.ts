@@ -29,7 +29,9 @@
 import { Client } from "pg";
 import { MIGRATIONS } from "./db-migrations.generated";
 import { present } from "./env";
-import { publicSupabaseUrl } from "./supabase-config";
+import { publicSupabaseUrl, CONNECTION_ENV_NAMES, connectionEnvNames } from "./supabase-config";
+
+export { connectionEnvNames };
 
 /** Which database connection the deployment can reach (presence only -
  *  values are never exposed, logged, or echoed). */
@@ -115,26 +117,6 @@ export function setupChannel(): "direct-postgres" | "management-api" | "none" {
  * manual repair. One model, every accepted convention, values never
  * exposed anywhere.
  */
-const CONNECTION_ENV_NAMES = [
-  "SUPABASE_DB_URL_NON_POOLING",
-  "SUPABASE_DB_URL",
-  "POSTGRES_URL_NON_POOLING",
-  "POSTGRES_URL",
-  "POSTGRES_POOLER_URL_NON_POOLING",
-  "POSTGRES_POOLER_URL",
-  "POSTGRES_PRISMA_URL",
-  "DATABASE_URL",
-] as const;
-
-/**
- * Categorical connection diagnostics (names ONLY - values are never
- * returned, logged, or embedded). /setup and /api/setup-status surface
- * this so an operator (or the deployed app itself) can see exactly WHICH
- * convention this deployment uses, without exposing any credential.
- */
-export function connectionEnvNames(): string[] {
-  return CONNECTION_ENV_NAMES.filter((name) => present(name));
-}
 
 /** The raw first matching connection string (unverified - internal only). */
 function rawConnectionString(): string | null {

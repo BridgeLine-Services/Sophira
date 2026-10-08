@@ -1,4 +1,5 @@
 import { evaluateOwnerSetup, probeOwnerSetup } from "@/lib/owner-setup";
+import { supabaseConfigStatus } from "@/lib/supabase-config";
 import { countStaleAuthUsers } from "@/lib/db-bootstrap";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export async function GET() {
     connectionEnvNames: status.probe.connectionEnvNames,
     connectionTarget: status.probe.connectionTarget,
     databaseError: status.probe.databaseError,
+    configStatus: supabaseConfigStatus(),
     capability: status.capability,
     ready: status.ready,
     headline: status.headline,
