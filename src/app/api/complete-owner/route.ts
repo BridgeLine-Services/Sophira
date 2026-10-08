@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { publicSupabaseUrl, serviceRoleKey } from "../../../lib/supabase-config";
 import { createClient } from "../../../lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
@@ -73,8 +74,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = publicSupabaseUrl();
+  const key = serviceRoleKey();
   if (!url || !key) {
     return NextResponse.json(
       { error: "The server is missing its database access configuration." },

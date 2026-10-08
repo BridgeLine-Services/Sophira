@@ -29,6 +29,7 @@
 import { Client } from "pg";
 import { MIGRATIONS } from "./db-migrations.generated";
 import { present } from "./env";
+import { publicSupabaseUrl } from "./supabase-config";
 
 /** Which database connection the deployment can reach (presence only -
  *  values are never exposed, logged, or echoed). */
@@ -68,7 +69,7 @@ export function connectionTarget(): "same-project" | "foreign" | "none" {
 
 function supabaseProjectRef(): string | null {
   try {
-    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host.split(".")[0] || null;
+    return new URL(publicSupabaseUrl()!).host.split(".")[0] || null;
   } catch {
     return null;
   }
@@ -144,9 +145,9 @@ function rawConnectionString(): string | null {
   // Fallback: the integration-provisioned database password + the public
   // project URL (the ref is its subdomain) -> the project's direct
   // endpoint. Still fully automatic: zero operator configuration.
-  if (present("SUPABASE_DB_PASSWORD") && present("NEXT_PUBLIC_SUPABASE_URL")) {
+  if (present("SUPABASE_DB_PASSWORD") && publicSupabaseUrl() !== null) {
     try {
-      const ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host.split(".")[0];
+      const ref = new URL(publicSupabaseUrl()!).host.split(".")[0];
       return `postgresql://postgres:${encodeURIComponent(process.env.SUPABASE_DB_PASSWORD!)}@db.${ref}.supabase.co:5432/postgres?sslmode=require`;
     } catch {
       return null;

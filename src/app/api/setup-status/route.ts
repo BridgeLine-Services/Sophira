@@ -28,6 +28,7 @@ export async function GET() {
     // initialization-channel | null.
     connectionEnvNames: status.probe.connectionEnvNames,
     connectionTarget: status.probe.connectionTarget,
+    databaseError: status.probe.databaseError,
     capability: status.capability,
     ready: status.ready,
     headline: status.headline,

@@ -24,6 +24,7 @@
  * is simply unavailable (fail closed, never pretend).
  */
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { publicSupabaseUrl, serviceRoleKey } from "./supabase-config";
 import { present } from "./env";
 import { probeOwnerSetup, type OwnerSetupProbe, evaluateOwnerSetup } from "./owner-setup";
 import { MIGRATIONS } from "./db-migrations.generated";
@@ -464,8 +465,8 @@ export async function countStaleAuthUsers(probe: OwnerSetupProbe): Promise<numbe
   if (!probe.serviceRoleConfigured || probe.database !== "checked") return null;
   try {
     const admin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      publicSupabaseUrl()!,
+      serviceRoleKey()!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
     let page = 1;
@@ -500,8 +501,8 @@ export async function cleanupStaleAuthUsers(): Promise<StaleAccountResult> {
     return { ok: false, reason: "refused", message: "An owner exists, so stale-account cleanup is closed." };
   }
   const { data: profiles } = await createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    publicSupabaseUrl()!,
+    serviceRoleKey()!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
     .from("profiles")
@@ -511,8 +512,8 @@ export async function cleanupStaleAuthUsers(): Promise<StaleAccountResult> {
     return { ok: false, reason: "refused", message: "Member profiles exist, so nothing can be safely cleaned up automatically." };
   }
   const admin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    publicSupabaseUrl()!,
+    serviceRoleKey()!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
   let page = 1;

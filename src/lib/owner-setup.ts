@@ -1,6 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
 import { setupChannel, connectionEnvNames, connectionTarget } from "./db-ddl";
+import { publicSupabaseUrl, publicAnonKey, serviceRoleKey } from "./supabase-config";
 
 /**
  * Owner setup / status diagnostic (operator round 2026-10-06).
@@ -52,6 +53,16 @@ export interface OwnerSetupProbe {
    *  own Supabase database ("same-project"), a different database
    *  ("foreign" - never used for migrations), or is absent ("none"). */
   connectionTarget: "same-project" | "foreign" | "none";
+  /**
+   * PRECISE database-failure diagnostics (requirement A-F separation,
+   * 2026-10-07): when the service-role client initializes but the database
+   * query fails (state C - NOT the same as A "config missing" or D/E
+   * "migration failure"), this carries the exact category and a sanitized
+   * driver message. Secrets, keys, and long tokens are always redacted.
+   */
+  databaseError:
+    | { category: "auth-rejected" | "network" | "server-error"; message: string }
+    | null;
   /** 2026-10-07 second automation round: the PRECISE channel (or "none") so
    *  the setup UI can diagnose the exact missing infrastructure capability
    *  instead of a vague "administrator connection". Categorical only. */
@@ -104,7 +115,9 @@ export interface OwnerSetupStatus {
 }
 
 export function serviceRoleConfigured(): boolean {
-  return present("NEXT_PUBLIC_SUPABASE_URL") && present("SUPABASE_SERVICE_ROLE_KEY");
+  // The authoritative layer resolves BOTH key conventions (legacy
+  // service-role name and the new-style secret-key alias).
+  return publicSupabaseUrl() !== null && serviceRoleKey() !== null;
 }
 
 /**
@@ -117,9 +130,7 @@ export function serviceRoleConfigured(): boolean {
  */
 export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
   const probe: OwnerSetupProbe = {
-    supabaseConfigured:
-      present("NEXT_PUBLIC_SUPABASE_URL") &&
-      present("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    supabaseConfigured: publicSupabaseUrl() !== null && publicAnonKey() !== null,
     serviceRoleConfigured: serviceRoleConfigured(),
     // Free-first policy: the Gemini free tier counts as configured; a paid
     // OpenAI key counts ONLY when ALLOW_PAID_AI=true or budget > 0
@@ -141,13 +152,14 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     connectionEnvNames: connectionEnvNames(),
     connectionTarget: connectionTarget(),
     setupChannel: setupChannel(),
+    databaseError: null,
   };
   if (!probe.serviceRoleConfigured) return probe;
 
   try {
     const admin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      publicSupabaseUrl()!,
+      serviceRoleKey()!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
@@ -160,7 +172,8 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     if (configErr && isMissingRelation(configErr)) {
       return { ...probe, database: "checked", chainStarted: false, migrationsPresent: false };
     }
-    if (configErr) return { ...probe, database: "unreachable" };
+    if (configErr)
+      return { ...probe, database: "unreachable", databaseError: categorizeDbError(configErr) };
     probe.database = "checked";
     probe.chainStarted = true;
     probe.migrationsPresent = true;
@@ -178,6 +191,7 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       probe.migrationsPresent = false;
     } else if (colErr) {
       probe.database = "unreachable";
+      probe.databaseError = categorizeDbError(colErr);
       probe.migrationsPresent = null;
       probe.ownerEmailConfigured = null;
       probe.ownerAccount = "unknown";
@@ -194,6 +208,8 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       // owner-account status and repair guidance stay honest.
       probe.migrationsPresent = false;
     } else if (memErr) {
+      probe.database = "unreachable";
+      probe.databaseError = categorizeDbError(memErr);
       probe.migrationsPresent = null;
       return probe;
     }
@@ -248,6 +264,30 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
   } catch {
     return { ...probe, database: "unreachable" };
   }
+}
+
+function sanitizeDbMessage(message: string): string {
+  return String(message)
+    .replace(/[A-Za-z0-9_\-]{20,}/g, "[redacted]") // any JWT/key-shaped token
+    .replace(/\s+/g, " ")
+    .slice(0, 160);
+}
+
+function categorizeDbError(err: {
+  message: string;
+  code?: string;
+  status?: number;
+}): { category: "auth-rejected" | "network" | "server-error"; message: string } {
+  const message = String(err.message ?? "unknown error");
+  const status = typeof err.status === "number" ? err.status : 0;
+  const auth =
+    status === 401 ||
+    status === 403 ||
+    /invalid api key|jwt|apikey|unauthorized|not allowed/i.test(message);
+  if (auth) return { category: "auth-rejected", message: sanitizeDbMessage(message) };
+  if (/fetch|network|econn|timeout|socket|dns/i.test(message))
+    return { category: "network", message: sanitizeDbMessage(message) };
+  return { category: "server-error", message: sanitizeDbMessage(message) };
 }
 
 function isMissingRelation(err: { message: string; code?: string }): boolean {

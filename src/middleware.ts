@@ -1,4 +1,6 @@
+
 import { createServerClient } from "@supabase/ssr";
+import { publicSupabaseUrl, publicAnonKey } from "./lib/supabase-config";
 import { NextResponse, type NextRequest } from "next/server";
 
 // /setup: pre-auth OPERATOR diagnostic (owner bootstrap status). It needs
@@ -20,14 +22,14 @@ const PUBLIC = ["/login", "/signup", "/reset-password", "/auth/callback", "/crea
 // behavior changes when the environment IS configured: with env present,
 // this branch never runs.
 function hasSupabaseEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = publicSupabaseUrl();
   // Crash-audit 2026-10-07: a SET-but-MALFORMED URL must count as NOT
   // configured. supabase-js throws synchronously on an invalid URL
   // ("Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL"), which
   // previously 500-crashed EVERY page (public included) in deployments
   // with a typo'd URL. Degrade honestly instead: public pages render,
   // protected pages redirect to /login.
-  if (!url || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return false;
+  if (!url || !publicAnonKey()) return false;
   try {
     const parsed = new URL(url);
     return parsed.protocol === "http:" || parsed.protocol === "https:";
@@ -84,8 +86,8 @@ export async function middleware(request: NextRequest) {
   // state can only deny access, never grant it.
   try {
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      publicSupabaseUrl()!,
+      publicAnonKey()!,
       {
         cookies: {
           getAll() { return request.cookies.getAll(); },

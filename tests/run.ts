@@ -3471,6 +3471,9 @@ async function runOwnerSetupTests(): Promise<void> {
     migrationAutomationConfigured: boolean;
     connectionEnvNames: string[];
     connectionTarget: "same-project" | "foreign" | "none";
+    databaseError:
+      | { category: "auth-rejected" | "network" | "server-error"; message: string }
+      | null;
     setupChannel: "direct-postgres" | "management-api" | "none";
   }
   const mk = (o: Partial<Probe>): Probe => ({
@@ -3480,6 +3483,7 @@ async function runOwnerSetupTests(): Promise<void> {
     migrationAutomationConfigured: false,
     connectionEnvNames: [],
     connectionTarget: "none",
+    databaseError: null,
     setupChannel: "none",
     ...o,
   });

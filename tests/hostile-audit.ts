@@ -155,7 +155,15 @@ export async function runHostileAuditTests(assert: Assert, section: Section): Pr
     }
     // env keys referenced, values never literal
     const admin = src("src/lib/supabase/admin.ts");
-    assert(admin.includes("process.env.SUPABASE_SERVICE_ROLE_KEY"), "audit: the service-role key comes from the environment, never a literal");
-    assert(!/['"][A-Za-z0-9_\-.]{38,}['"]/.test(admin), "audit: no long literal that could be a key in the admin client");
+    // 2026-10-07: the admin key is read through the single authoritative
+    // config layer (which resolves BOTH the legacy service-role name and
+    // the new-style secret-key alias) - the admin client itself never
+    // touches process.env for credentials, and no literal can be a key.
+    assert(admin.includes("serviceRoleKey()"), "audit: the admin key comes from the authoritative environment layer, never a literal");
+    const cfg = src("src/lib/supabase-config.ts");
+    assert(cfg.includes("process.env.SUPABASE_SERVICE_ROLE_KEY") && cfg.includes("process.env.SUPABASE_SECRET_KEY"),
+      "audit: the config layer reads the admin key from the environment (both conventions), never a literal");
+    assert(!/['"][A-Za-z0-9_\-.]{38,}['"]/.test(admin) && !/['"][A-Za-z0-9_\-.]{38,}['"]/.test(cfg),
+      "audit: no long literal that could be a key in the admin client or config layer");
   }
 }
