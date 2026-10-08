@@ -210,8 +210,8 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "ddl: migration failures ARE logged server-side for developers (requirement 1) with the connection string scrubbed");
   assert(!/console\.(log|info|warn|debug|trace)\(/.test(ddlSrc),
     "ddl: no casual logging levels - only error-level developer diagnostics");
-  assert(!/return.*url|message: *url/.test(ddlSrc.replace(/never, logs, or embeds/g, "")),
-    "ddl: the connection string is never returned or embedded in any result");
+  assert(!/\$\{url\}/.test(ddlSrc) && !/message: *url/.test(ddlSrc),
+    "ddl: the connection string value is never interpolated into any result, message, or user-visible text (it appears only as the redaction argument)");
   const setupSrc2 = readFileSync("src/lib/db-bootstrap.ts", "utf8");
   assert(setupSrc2.includes("directPostgresConfigured() || managementConfigured()") && setupSrc2.includes("runChainAutomation"),
     "ddl: first-launch prefers the direct database connection; the Management API token is optional/secondary");
@@ -286,6 +286,16 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   } finally {
     for (const k of ENV_KEYS) { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; }
   }
+  // N2g: TLS - Supabase requires SSL; node-postgres never enables it from a
+  //      bare URL (live-deployment finding 2026-10-07: connection-phase
+  //      "unknown" failure on the CORRECT database).
+  assert(ddl.sslConfigFor("postgresql://postgres.abc:pw@aws-0.pooler.supabase.com:6543/postgres").rejectUnauthorized === false,
+    "N2g: a bare connection URL gets TLS enabled (sslmode=require semantics) so Supabase accepts it");
+  assert(ddl.sslConfigFor("postgresql://x@db.abc.supabase.co:5432/postgres?sslmode=verify-full").rejectUnauthorized === true,
+    "N2h: an explicit verify-full URL keeps full certificate verification");
+  const ddlSrc2 = readFileSync("src/lib/db-ddl.ts", "utf8");
+  assert(ddlSrc2.includes("ssl: sslConfigFor(url)"),
+    "N2i: the direct migration client is constructed WITH the TLS config");
   // N5: pooler-safe atomicity - each migration is ONE BEGIN/COMMIT query.
   const ddl3 = readFileSync("src/lib/db-ddl.ts", "utf8");
   assert(ddl3.includes("BEGIN;\\n${entry.sql}\\nCOMMIT;") && ddl3.includes("ROLLBACK;"),

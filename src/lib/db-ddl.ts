@@ -163,6 +163,21 @@ function connectionString(): string | null {
   return connectionTarget() === "same-project" ? raw : null;
 }
 
+/**
+ * TLS for the direct connection (live-deployment finding 2026-10-07):
+ * Supabase REQUIRES SSL on its Postgres endpoints, and node-postgres does
+ * not enable TLS for a bare connection URL - the repair previously failed
+ * at the connection phase ("unknown" category) on the correct database.
+ * We mirror supabase-js's documented sslmode=require semantics (encrypt,
+ * do not verify the private-CA chain) unless the URL explicitly demands
+ * full verification.
+ */
+export function sslConfigFor(url: string): { rejectUnauthorized: boolean } {
+  return /sslmode=(verify-full|verify-ca)/.test(url)
+    ? { rejectUnauthorized: true }
+    : { rejectUnauthorized: false };
+}
+
 /** Categorize a Postgres error for safe developer diagnostics. */
 function categorizeFailure(err: unknown): MigrationFailure {
   const code = (err as { code?: string })?.code ?? "";
@@ -170,7 +185,7 @@ function categorizeFailure(err: unknown): MigrationFailure {
   if (code === "42P01" || code === "42704" || /relation .* does not exist/i.test(message)) return "relation-missing";
   if (code === "42501" || code === "28000" || /permission denied|does not have privilege/i.test(message)) return "permission";
   if (code === "0A000") return "unsupported-feature";
-  if (/connect|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|SSL/i.test(message)) return "connection";
+  if (/connect|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|SSL|sslmode|pg_hba|handshake/i.test(message)) return "connection";
   if (code === "42601" || /syntax error/i.test(message)) return "syntax";
   return "unknown";
 }
@@ -189,7 +204,7 @@ export async function applyMigrationChainDirect(): Promise<{
 }> {
   const url = connectionString();
   if (!url) return { ok: false, applied: 0 };
-  const client = new Client({ connectionString: url });
+  const client = new Client({ connectionString: url, ssl: sslConfigFor(url) });
   try {
     await client.connect();
     // 1. PROBE: which migrations are already applied (marker objects).
