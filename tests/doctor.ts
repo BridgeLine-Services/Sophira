@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync } from "fs";
 import { createServer, type Server } from "http";
 
 const SENTINEL = "sk-supersecret-doctor-sentinel-1234567890";
-const BARE_ENV = { PATH: process.env.PATH } as NodeJS.ProcessEnv;
+const BARE_ENV: NodeJS.ProcessEnv = { PATH: process.env.PATH, NODE_ENV: process.env.NODE_ENV };
 
 function doctor(args: string[], env: NodeJS.ProcessEnv = BARE_ENV) {
   return spawnSync("node", ["scripts/doctor.mjs", ...args], { encoding: "utf8", env });
