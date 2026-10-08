@@ -24,6 +24,13 @@ alter table public.profiles
 
 -- Owner-only membership view, extended with email + revocation date.
 -- SECURITY: unchanged fail-closed owner check; aggregate metadata only.
+-- Postgres cannot change a function's return type with CREATE OR REPLACE
+-- (live-deployment finding 2026-10-07: the chain failed here with
+-- "cannot change return type of existing function" whenever 0005's
+-- original signature was already present). Drop first, then recreate;
+-- the function body re-establishes the grants below, and the body's
+-- owner-only check keeps the drop window safe.
+drop function if exists public.network_stats();
 create or replace function public.network_stats()
 returns table (
   user_id uuid,
