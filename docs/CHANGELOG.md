@@ -95,3 +95,54 @@ Key design decisions:
 - **Instruction priority** (baked into the system prompt): current assignment
   instructions → official course rules/rubrics → teacher examples & corrections.
   Conflicts are surfaced to the user, never silently resolved.
+
+---
+
+### Upgrade round 2026-10-07: consistency, doctor, crash-guard, dependency security
+
+Four rounds, all landed on master:
+
+- **Documentation consistency (e7d230e)** — every guide now agrees with the
+  actual code: self-hosted AI is the default (free-first, paid opt-in),
+  /create-owner is the real first-owner path, 26 migrations, 2503+ tests.
+  README shrunk to a 135-line index; history moved here.
+- **`npm run doctor` (9e0254e, 39caf8c)** — one command prints a plain-English
+  ✅/❌ checklist of setup state with the exact next step for each gap; 25 new
+  tests. Born from the live finding that a misconfigured production deployment
+  was indistinguishable from a healthy one.
+- **Crash-guard audit (f7579b8)** — a SET-but-MALFORMED Supabase URL made
+  supabase-js throw synchronously, 500-crashing the middleware on EVERY page;
+  an unreachable database rejected getUser() with the same effect. Now:
+  middleware validates the URL and degrades (public pages render, protected
+  redirect to /login, always fail-CLOSED); requireUser converts any failure on
+  the 37 guarded routes to an honest 503; the server client is a lazy proxy;
+  the first-owner bootstrap routes degrade honestly. 11 regression tests.
+- **Dependency security round (a2ca7dc, branch merged)** — production audit
+  findings 13 → 5: mammoth 1.13.0, fast-glob override, tailwind moved to
+  devDependencies (build-time only). The two remaining Next.js criticals are
+  mitigated by design (images already unoptimized) but the honest fix is the
+  next 16.4.0 major — docs/SECURITY_UPGRADE.md records the exact migration
+  scope (async request APIs, middleware→proxy.ts, React 19) for a scheduled
+  project, not a squeezed version bump.
+
+Key decisions:
+
+- **Degrade, never crash, always fail-closed.** A broken configuration can
+  only deny access (redirect/503 with plain-English cause), never grant it
+  and never leak a stack trace.
+- **Tailwind is not a production dependency.** It is a build-time PostCSS
+  plugin; the hostile-audit test now enforces both its version and its
+  dev-only placement.
+- **No major upgrades inside dependency rounds.** The Next.js 16 migration
+  is documented precisely and scheduled separately.
+
+Production state at close of round (read-only verification,
+https://sophira.vercel.app): health 200, Supabase + service role + AI
+configured, database reachable but schema absent (state SETUP_REQUIRED,
+capability initialization-channel, no owner, 0 stale auth users), crash-guard
+behavior live (/dashboard → 307 → /login, /login 200, guessed asset 404).
+Initializing the production database (via /setup) is deliberately left to an
+explicit owner decision — it creates schema and the owner account on the live
+database.
+
+Test count at close: **2541** (`npm test`), build PASS, tsc clean.
