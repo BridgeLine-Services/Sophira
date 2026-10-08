@@ -178,6 +178,22 @@ export function sslConfigFor(url: string): { rejectUnauthorized: boolean } {
     : { rejectUnauthorized: false };
 }
 
+/**
+ * Sanitized connection-phase diagnostics (developer-only). Driver
+ * connection errors contain no SQL and no credentials, but may name the
+ * host - which is why EVERY hostname, credential pair, and IP is redacted
+ * before this string ever leaves the server. Truncated to 200 chars.
+ */
+function sanitizeConnectionError(err: unknown): string {
+  return String((err as { message?: string })?.message ?? "unknown error")
+    .replace(/:\/\/[^@\s]+@/g, "://[redacted]@")
+    .replace(/[a-zA-Z0-9-]+:[^@\s]+@/g, "[redacted]@")
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[ip]")
+    .replace(/\b([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/g, "[host]")
+    .replace(/\s+/g, " ")
+    .slice(0, 200);
+}
+
 /** Categorize a Postgres error for safe developer diagnostics. */
 function categorizeFailure(err: unknown): MigrationFailure {
   const code = (err as { code?: string })?.code ?? "";
@@ -206,6 +222,10 @@ export async function applyMigrationChainDirect(): Promise<{
   applied: number;
   failedAt?: string;
   failure?: MigrationFailure;
+  /** Sanitized connection-phase driver message (hostnames/credentials/IPs
+   *  redacted; developer diagnostics only, connection failures only -
+   *  migration failures stay fully categorical). */
+  detail?: string;
 }> {
   const url = connectionString();
   if (!url) return { ok: false, applied: 0 };
@@ -262,13 +282,13 @@ export async function applyMigrationChainDirect(): Promise<{
     // Categorical only: never leak connection details or driver errors.
     console.error(
       "[setup] migration chain connection phase failed:",
-      String((err as { message?: string })?.message ?? "unknown error").replace(/:[^:@/]+@/, ":[redacted]@")
+      String((err as { message?: string })?.message ?? "unknown error").replace(url, "[connection]")
     );
     try {
       await client.end();
     } catch {
       /* already closed */
     }
-    return { ok: false, applied: 0, failure: categorizeFailure(err) };
+    return { ok: false, applied: 0, failure: categorizeFailure(err), detail: sanitizeConnectionError(err) };
   }
 }

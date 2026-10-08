@@ -44,6 +44,9 @@ export async function POST(request: Request) {
         // build served the response; not a secret, not user-facing copy).
         engine: 3,
         failure: result.ok ? null : (result as { failure?: string }).failure ?? null,
+        // Sanitized connection-phase driver message (hosts/credentials/IPs redacted) -
+        // developer diagnostics for the Advanced area only.
+        detail: result.ok ? null : (result as { detail?: string }).detail ?? null,
       },
       { status: result.ok ? 200 : 409 }
     );

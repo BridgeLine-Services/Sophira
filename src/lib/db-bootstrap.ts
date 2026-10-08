@@ -38,6 +38,8 @@ export type SetupRepairResult =
       /** Safe categorical developer diagnostics (never raw SQL errors). */
       failedAt?: string;
       failure?: string;
+      /** Sanitized connection-phase driver message (redacted). */
+      detail?: string;
     };
 
 export type StaleAccountResult =
@@ -80,6 +82,7 @@ async function runChainAutomation(): Promise<SetupRepairResult> {
         "Setup couldn't finish yet - the database preparation step did not complete. Nothing was skipped; try again in a moment, and open Advanced diagnostics on /setup if it keeps failing.",
       failedAt: pass.failedAt,
       failure: pass.failure,
+      detail: pass.detail,
     };
   }
   const after = await probeOwnerSetup();
