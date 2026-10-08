@@ -246,11 +246,22 @@ export async function applyMigrationChainDirect(): Promise<{
   try {
     await client.connect();
     // 1. PROBE: which migrations are already applied (marker objects).
+    //    Failure-tolerant BY DESIGN (live-deployment finding 2026-10-07):
+    //    a marker like `conrelid = 'public.profiles'::regclass` THROWS
+    //    42P01 on a completely empty database instead of evaluating to
+    //    false - which made the very first launch on an EMPTY database
+    //    fail. A marker query that errors simply means "not present"
+    //    (migrations are idempotent by construction, so a probe error can
+    //    never cause an unsafe re-application).
     const appliedMarkers = new Set<string>();
     for (const entry of MIGRATIONS) {
       if (!entry.marker) continue;
-      const r = await client.query(`select (${entry.marker}) as present;`);
-      if (r.rows[0]?.present) appliedMarkers.add(entry.name);
+      try {
+        const r = await client.query(`select (${entry.marker}) as present;`);
+        if (r.rows[0]?.present) appliedMarkers.add(entry.name);
+      } catch (err) {
+        console.error(`[setup] marker probe for ${entry.name} errored -> treated as absent (${categorizeFailure(err)})`);
+      }
     }
     // 2. FRONTIER: everything from the first missing marker onward.
     const missing: typeof MIGRATIONS = [];

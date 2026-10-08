@@ -303,6 +303,8 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "N2j: sslmode= is stripped from the URL so pg's parser cannot override the explicit TLS config (live root cause: self-signed certificate in certificate chain)");
   assert(ddlSrc2.includes("connectionString: stripSslmode(url)"),
     "N2k: the client is constructed with the sslmode-stripped URL");
+  assert(ddlSrc2.includes("marker probe for ${entry.name} errored -> treated as absent"),
+    "N2l: marker probes are failure-tolerant - a marker that throws (e.g. ::regclass casts on an EMPTY database, live finding 2026-10-07) counts as not-applied, never as a hard failure");
   // N5: pooler-safe atomicity - each migration is ONE BEGIN/COMMIT query.
   const ddl3 = readFileSync("src/lib/db-ddl.ts", "utf8");
   assert(ddl3.includes("BEGIN;\\n${entry.sql}\\nCOMMIT;") && ddl3.includes("ROLLBACK;"),
