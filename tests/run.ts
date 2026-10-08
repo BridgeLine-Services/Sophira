@@ -3076,7 +3076,7 @@ async function runAccessControlTests(): Promise<void> {
     // (the ONE-CLICK repair action, 2026-10-07: accepts only a fixed action
     // name, never SQL or identifiers; every response categorical; refuses
     // permanently once an owner exists — see tests/owner-setup-automation.ts).
-    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status", "/api/ai/health", "/api/setup-repair", "/api/e2e-reset"];
+    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status", "/api/ai/health", "/api/setup-repair"];
     for (const rf of routeFiles) {
       const rel = ("/api" + rf.slice(apiRoot.length)).replaceAll("\\", "/").replace("/route.ts", "");
       const src = fs.readFileSync(rf, "utf8");
@@ -3095,10 +3095,6 @@ async function runAccessControlTests(): Promise<void> {
           rel === "/api/setup-status" ||
           rel === "/api/ai/health" ||
           rel === "/api/setup-repair" ||
-          (rel === "/api/e2e-reset" &&
-            src.includes("x-e2e-secret") &&
-            src.includes("E2E_RESET_SECRET") &&
-            src.includes("sophira-e2e-1@bridgeline.services")) ||
           src.includes("token"),
           `access: public route ${rel} is health/ai-health/setup-status/setup-repair (categorical status only) or operates solely on its single-use token`
         );
