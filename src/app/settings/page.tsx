@@ -32,6 +32,12 @@ export default function SettingsPage() {
   const [reqReason, setReqReason] = useState("");
   const [reqBusy, setReqBusy] = useState(false);
 
+  // Password change (signed-in path: works for the owner and every member
+  // identically — Supabase Auth credential ONLY, no email dependency)
+  const [pw, setPw] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+
   // Account deletion
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteText, setDeleteText] = useState("");
@@ -118,6 +124,33 @@ export default function SettingsPage() {
     }
   }
 
+
+  async function changePassword(e: FormEvent) {
+    e.preventDefault();
+    if (pw.length < 8) {
+      toast("error", "Please choose a password with at least 8 characters.");
+      return;
+    }
+    if (pw !== pwConfirm) {
+      toast("error", "The two passwords don't match.");
+      return;
+    }
+    setPwBusy(true);
+    // ONLY the authentication credential changes (Supabase Auth
+    // updateUser): role, status, profile, and app data are untouched —
+    // the owner keeps owner privileges, no second account is created.
+    const { error: pwError } = await supabase.auth.updateUser({ password: pw });
+    setPwBusy(false);
+    if (pwError) {
+      toast("error", "Could not update the password (" + pwError.message + ")");
+      return;
+    }
+    // Sign out everywhere so the old session (and any stolen token) is
+    // invalidated, then sign back in with the new password.
+    await supabase.auth.signOut();
+    toast("success", "Password changed. Please sign in with your new password.");
+    router.replace("/login");
+  }
 
   async function deleteAccount() {
     setDeleting(true);
@@ -304,6 +337,52 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Change password — same path for every account, owner included */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-accent" /> Change password
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-ink-soft">
+              Choose a new password for your account ({email}). This changes only your sign-in
+              credential — your role, profile, and data stay exactly as they are, and you will be
+              signed out of all devices.
+            </p>
+            <form onSubmit={changePassword} className="max-w-sm space-y-3" noValidate>
+              <div>
+                <Label htmlFor="newpw">New password</Label>
+                <Input
+                  id="newpw"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  className="mt-1.5"
+                  value={pw}
+                  onChange={(e) => setPw(e.target.value)}
+                  placeholder="At least 8 characters"
+                />
+              </div>
+              <div>
+                <Label htmlFor="newpw2">Repeat the new password</Label>
+                <Input
+                  id="newpw2"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  className="mt-1.5"
+                  value={pwConfirm}
+                  onChange={(e) => setPwConfirm(e.target.value)}
+                />
+              </div>
+              <Button type="submit" disabled={pwBusy}>{pwBusy ? "Changing…" : "Change password"}</Button>
+            </form>
+          </CardContent>
+        </Card>
 
         {/* Danger zone */}
         <Card className="border-danger/30">

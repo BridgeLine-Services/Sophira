@@ -52,6 +52,36 @@ export function runResetPasswordTests(assert: (c: boolean, n: string) => void, s
   assert(!reqHandler.includes("setError(error.message)"),
     "reset: raw Supabase error messages are NEVER shown on the request path (could leak account existence)");
 
+  // 2b. HONEST PROVIDER FAILURES (2026-10-07 fix): a genuinely broken email
+  // configuration (SMTP provider failure, auth disabled, redirect rejected)
+  // must NEVER be masked as the fake "check your inbox" success — that
+  // masking made reset failures undiagnosable. The honest message is a
+  // CONSTANT (no dependence on the entered email), so it creates no
+  // existence oracle; only the user-not-found shape keeps the generic
+  // success form.
+  assert(reqHandler.includes("user_not_found") && reqHandler.includes('code === "user_not_found"'),
+    "reset: the user-not-found shape alone keeps the generic success form (enumeration-safe)");
+  assert(reqHandler.includes("could not send a reset link right now") && reqHandler.includes("nothing was sent"),
+    "reset: provider/configuration failures get an HONEST constant error — never a fake sent state");
+  assert(reqHandler.includes("change your password from Settings"),
+    "reset: the honest failure points at the signed-in Settings change-password alternative");
+  const honestBranch = reqHandler.slice(reqHandler.indexOf("ANY OTHER failure"), reqHandler.indexOf("return;", reqHandler.indexOf("ANY OTHER failure")) + 8);
+  assert(!honestBranch.includes("setSent("),
+    "reset: the honest-failure branch can never set the fake inbox state");
+
+  // 2c. SIGNED-IN CHANGE PASSWORD (settings) — the no-email path that works
+  // for the owner and every member identically.
+  const settings = readFileSync("src/app/settings/page.tsx", "utf8");
+  assert(settings.includes("async function changePassword") && settings.includes("updateUser({ password: pw })"),
+    "reset: /settings offers a signed-in password change via Supabase Auth updateUser (credential only)");
+  const changeHandler = settings.slice(settings.indexOf("async function changePassword"), settings.indexOf("async function deleteAccount"));
+  assert(changeHandler.includes("pw.length < 8") && changeHandler.includes("pw !== pwConfirm"),
+    "reset: the settings change enforces minimum length and confirmation match");
+  assert(changeHandler.includes("await supabase.auth.signOut()") && changeHandler.includes('router.replace("/login")'),
+    "reset: after a settings password change the session is signed out and the user signs in with the new password");
+  assert(!changeHandler.includes('from("profiles")') && !changeHandler.includes("from('profiles')") && !changeHandler.includes('"owner"') && !changeHandler.includes("updateUserWithEmailAndPassword"),
+    "reset: the settings password change never touches profiles/roles — owner privileges and membership are untouched");
+
   // 3. RECOVERY LINK — authorization model NOT bypassed
   assert(page.includes("if (data.session) setMode(\"set\")"),
     "reset: the page switches to password-change mode ONLY when Supabase established a recovery session");

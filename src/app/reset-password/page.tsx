@@ -104,18 +104,34 @@ export default function ResetPasswordPage() {
     setBusy(false);
     if (error) {
       const msg = (error.message || "").toLowerCase();
+      const code = ((error as { code?: string }).code || "").toLowerCase();
       if (/fetch|network|offline|failed to fetch|load failed/.test(msg)) {
         setError("Password recovery requires connectivity — the reset service could not be reached, so no email was sent. This is an online operation; try again once you are connected.");
         return;
       }
-      if (/rate|once every|seconds|too many/.test(msg)) {
+      if (/rate|once every|seconds|too many|over_email_send_rate_limit/.test(msg + " " + code)) {
         setError("The reset provider is limiting requests for security. Please wait a moment and try again.");
         return;
       }
-      // Any other error (including "user not found"-style responses that
-      // could reveal account existence) gets the SAME generic response
-      // as success. Nothing about this message depends on the account.
-      setSent(true);
+      // "User not found"-style responses could reveal account existence, so
+      // they keep the SAME generic success shape as a real send (this is
+      // purely defensive — GoTrue already returns success for unknown
+      // addresses; the branch guarantees the property client-side too).
+      if (code === "user_not_found" || /user not found/.test(msg)) {
+        setSent(true);
+        return;
+      }
+      // ANY OTHER failure is a genuine server-side problem (email/SMTP
+      // provider misconfiguration, auth disabled, redirect not allowed,
+      // provider 5xx). Showing the fake "check your inbox" success here
+      // was the dishonest state that made reset failures undiagnosable:
+      // the honest message is CONSTANT for every email address, so it
+      // still reveals nothing about which accounts exist.
+      setError(
+        "Sophira could not send a reset link right now — nothing was sent. " +
+        "This is a server-side email configuration problem, not anything you did. " +
+        "Please contact the operator, or if you are still signed in, change your password from Settings."
+      );
       return;
     }
     setSent(true);
