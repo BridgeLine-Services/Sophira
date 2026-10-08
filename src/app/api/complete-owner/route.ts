@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "../../../lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +33,15 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user;
+  try {
+    ({ data: { user } } = await supabase.auth.getUser());
+  } catch {
+    // Degraded deployment (crash-audit 2026-10-07): honest "cannot check"
+    // instead of a 500 — the client keeps its not-authenticated shape and
+    // the POST path reports the unavailability when it matters.
+    return NextResponse.json({ authenticated: false, hasProfile: false, role: null, unavailable: true });
+  }
   if (!user) {
     return NextResponse.json({ authenticated: false, hasProfile: false, role: null });
   }
@@ -53,9 +59,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user;
+  try {
+    ({ data: { user } } = await supabase.auth.getUser());
+  } catch {
+    // Degraded deployment (crash-audit 2026-10-07): honest 503, never a 500.
+    return NextResponse.json(
+      { error: "Sophira cannot reach its database right now. Please try again later." },
+      { status: 503 }
+    );
+  }
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }

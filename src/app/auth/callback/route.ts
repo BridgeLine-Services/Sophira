@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "../../../lib/supabase/server";
 
 /** Handles email-confirmation and password-recovery links (code → session). */
 export async function GET(request: NextRequest) {
@@ -19,7 +19,15 @@ export async function GET(request: NextRequest) {
   // or tampered code fails here — safely and generically (the error
   // message reveals nothing about which account the link belonged to).
   const supabase = createClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  let error;
+  try {
+    ({ error } = await supabase.auth.exchangeCodeForSession(code));
+  } catch {
+    // Degraded deployment (crash-audit 2026-10-07): an unconfigured or
+    // unreachable Supabase takes the SAME friendly redirect path as an
+    // invalid link — never an unhandled 500.
+    error = { message: "supabase unavailable" } as { message: string };
+  }
   if (error) {
     const recovery = next === "/reset-password";
     const url = new URL(recovery ? "/reset-password" : "/login", request.url);

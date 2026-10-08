@@ -30,6 +30,26 @@ const ACTIVE_STATUSES: ReadonlySet<string> = new Set(["pending", "accepted", "ac
 export async function requireUser(
   supabase: SupabaseClient
 ): Promise<{ ok: true; data: GuardResult } | { ok: false; response: NextResponse }> {
+  // Crash-audit 2026-10-07: EVERY protected API route flows through this
+  // guard. If Supabase is unconfigured, unreachable, or misbehaves, the
+  // error is converted to an honest 503 — never an unhandled 500 on all
+  // 37 guarded routes. Fail CLOSED: the degraded state denies access.
+  try {
+    return await requireUserInner(supabase);
+  } catch {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Sophira cannot reach its database right now. Please try again later or contact the operator." },
+        { status: 503 }
+      ),
+    };
+  }
+}
+
+async function requireUserInner(
+  supabase: SupabaseClient
+): Promise<{ ok: true; data: GuardResult } | { ok: false; response: NextResponse }> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
