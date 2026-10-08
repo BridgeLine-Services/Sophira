@@ -27,7 +27,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
 import { probeOwnerSetup, type OwnerSetupProbe, evaluateOwnerSetup } from "./owner-setup";
 import { MIGRATIONS } from "./db-migrations.generated";
-import { directPostgresConfigured, applyMigrationChainDirect } from "./db-ddl";
+import { directPostgresConfigured, managementConfigured, applyMigrationChainDirect } from "./db-ddl";
 
 export type SetupRepairResult =
   | { ok: true; repaired: boolean; message: string }
@@ -38,12 +38,6 @@ export type StaleAccountResult =
   | { ok: false; reason: "unconfigured" | "refused" | "failed"; message: string };
 
 /** Server-only: is migration-automation configured (token + project ref)? */
-/** The Management API path (optional, secondary - a Supabase personal
- *  access token is NO LONGER required for first-launch setup). */
-export function managementConfigured(): boolean {
-  return present("SUPABASE_ACCESS_TOKEN") && present("SUPABASE_PROJECT_REF");
-}
-
 /** First-launch initialization is available when EITHER the direct
  *  database connection (auto-provisioned by the Vercel Supabase
  *  Integration - the primary, zero-configuration path) OR the optional
@@ -336,7 +330,7 @@ async function applyMigrationChain(): Promise<SetupRepairResult> {
       ok: false,
       reason: "unconfigured",
       message:
-        "Setup could not finish yet - a one-time administrator connection for the database is not configured. Open Advanced diagnostics on /setup for the exact one-time step.",
+        "Setup could not finish yet - this deployment has no database-initialization channel: neither the direct database connection (provisioned automatically by the official Supabase integration when the Vercel project is connected to it) nor the optional migration credentials are configured. Advanced diagnostics on /setup names the exact variables; no SQL editor is ever needed.",
     };
   }
   try {

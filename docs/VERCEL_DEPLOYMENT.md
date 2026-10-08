@@ -43,14 +43,33 @@ Vercel deploys the repository root as a single Next.js application. `src-tauri/`
    `package.json` script (npm, `package-lock.json`).
 5. Add the environment variables listed in README (Supabase URL, anon
    key, service-role key; AI keys optional; no OpenAI required).
-6. **Database setup is automatic.** One-time: create a personal access
-   token (supabase.com → Account → Access Tokens) and set the GitHub
-   repository secrets `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF`.
-   The CI **Migrations** job then applies every missing migration
-   (0001-0026) on every push, and fails loudly if it cannot. Optionally
-   set the same two variables in Vercel → Settings → Environment
-   Variables to also enable the one-click **Repair Setup** action on
-   `/setup` and `/create-owner` (self-healing fallback).
+6. **Database setup is automatic - two supported channels.** The
+   application itself initializes the database on first launch; no SQL
+   editor is ever used.
+   - **Primary (recommended, zero secrets to copy):** connect the Vercel
+     project to its Supabase project with the official **Supabase
+     integration** (Vercel → Project → Integrations → Supabase). The
+     integration provisions the direct database connection
+     (`POSTGRES_URL` / `POSTGRES_URL_NON_POOLING` / pooler URLs, or
+     `SUPABASE_DB_PASSWORD`) that the deployed app uses to apply every
+     missing migration (0001-0026) itself, from `/setup` ("Set Up
+     Sophira") or directly from `/create-owner`.
+   - **Manual alternative (if the project was connected by pasting the
+     three API keys):** add ONE variable in Vercel → Settings →
+     Environment Variables: `POSTGRES_URL_NON_POOLING` (Supabase
+     dashboard → Settings → Database → Connection string, URI form;
+     server-only) or `SUPABASE_DB_PASSWORD` (the project's database
+     password; the app derives the direct endpoint automatically).
+   - **Secondary (optional, for CI-side migration):** set GitHub secrets
+     `SUPABASE_ACCESS_TOKEN` (a Supabase personal access token) +
+     `SUPABASE_PROJECT_REF` and the CI **Migrations** job applies the
+     chain on every push. Without them that job skips with a notice -
+     first-launch production setup does NOT depend on it.
+   `/setup` diagnoses the exact missing capability (Supabase credentials,
+   service-role key, or initialization channel) and never shows a vague
+   "administrator connection" message; `/api/setup-status` exposes the
+   categorical `setupChannel` (`direct-postgres` / `management-api` /
+   `none`).
 7. Open the site — with no owner yet, the sign-in screen shows
    **Create Owner Account**. If the database is not ready, the page
    explains exactly what is missing and repairs it when safe — never a

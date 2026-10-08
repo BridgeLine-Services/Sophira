@@ -1,6 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
-import { directPostgresConfigured } from "./db-ddl";
+import { setupChannel } from "./db-ddl";
 
 /**
  * Owner setup / status diagnostic (operator round 2026-10-06).
@@ -44,7 +44,11 @@ export interface OwnerSetupProbe {
   invitationsPresent: boolean | null; // the invitations table exists (0002/0006)
   ownerBootstrapPresent: boolean | null; // the single-row claim table exists (0025)
   recoveryPresent: boolean | null; // sophira_meta.schema_version row exists (0026)
-  migrationAutomationConfigured: boolean; // SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF on the server
+  migrationAutomationConfigured: boolean; // direct Postgres connection OR Management API credentials
+  /** 2026-10-07 second automation round: the PRECISE channel (or "none") so
+   *  the setup UI can diagnose the exact missing infrastructure capability
+   *  instead of a vague "administrator connection". Categorical only. */
+  setupChannel: "direct-postgres" | "management-api" | "none";
 }
 
 export interface OwnerSetupStep {
@@ -70,6 +74,9 @@ export interface OwnerSetupStatus {
   repair: OwnerSetupRepair;
   staleAuthUsers: number | null; // accounts without profiles (categorical count only)
   probe: OwnerSetupProbe;
+  /** The exact missing infrastructure capability, or null (requirement K/L).
+   *  Categorical only - never a credential, never a connection string. */
+  capability: "supabase-credentials" | "service-role" | "initialization-channel" | null;
   steps: OwnerSetupStep[];
   ready: boolean | null; // null = cannot determine (missing config)
   headline: string;
@@ -118,9 +125,8 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     invitationsPresent: null,
     ownerBootstrapPresent: null,
     recoveryPresent: null,
-    migrationAutomationConfigured:
-      directPostgresConfigured() ||
-      (present("SUPABASE_ACCESS_TOKEN") && present("SUPABASE_PROJECT_REF")),
+    migrationAutomationConfigured: setupChannel() !== "none",
+    setupChannel: setupChannel(),
   };
   if (!probe.serviceRoleConfigured) return probe;
 
@@ -430,5 +436,23 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
           }
       : { available: false, action: null, reason: "No automatic repair is needed or possible for the current state." };
 
-  return { state, repair, staleAuthUsers: null, probe, steps, ready, headline, guidance, ownerCreation };
+  // ---- PRECISE capability diagnostic (requirement K/L): the exact
+  // missing infrastructure capability, or null. Categorical only - never
+  // a credential, never a connection string.
+  const capability:
+    | "supabase-credentials"
+    | "service-role"
+    | "initialization-channel"
+    | null =
+    !probe.supabaseConfigured
+      ? "supabase-credentials"
+      : !probe.serviceRoleConfigured
+        ? "service-role"
+        : probe.database === "checked" &&
+            probe.migrationsPresent === false &&
+            !probe.migrationAutomationConfigured
+          ? "initialization-channel"
+          : null;
+
+  return { state, repair, staleAuthUsers: null, probe, capability, steps, ready, headline, guidance, ownerCreation };
 }

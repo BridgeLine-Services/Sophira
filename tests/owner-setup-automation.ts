@@ -45,7 +45,7 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   const { classifyAuthError } = require("../src/lib/auth-errors.js");
 
   // ---- J1. fresh database: owner creation works, everything automated ----
-  const fresh = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: true, ownerEmailConfigured: false, ownerAccount: "none", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: true, recoveryPresent: true, migrationAutomationConfigured: true });
+  const fresh = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: true, ownerEmailConfigured: false, ownerAccount: "none", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: true, recoveryPresent: true, migrationAutomationConfigured: true, setupChannel: "direct-postgres" });
   assert(fresh.ownerCreation.possible === true && fresh.state === "READY",
     "J1: fresh initialized database with no owner: state READY, creation possible");
   assert(bootAll.includes("-- ===================== 0026_first_owner_recovery.sql") && bootAll.indexOf("0025_first_owner_bootstrap.sql") < bootAll.indexOf("0026_first_owner_recovery.sql"),
@@ -64,7 +64,7 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "J4: confirmation enabled -> the no-session path shows confirmation guidance, never a fake sign-in");
 
   // ---- J5. existing owner: second creation rejected ------------------
-  const owner = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: true, ownerEmailConfigured: false, ownerAccount: "active", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: true, recoveryPresent: true, migrationAutomationConfigured: true });
+  const owner = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: true, ownerEmailConfigured: false, ownerAccount: "active", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: true, recoveryPresent: true, migrationAutomationConfigured: true, setupChannel: "direct-postgres" });
   assert(owner.ownerCreation.possible === false && owner.state === "OWNER_EXISTS",
     "J5: an existing owner closes creation permanently (state OWNER_EXISTS)");
   assert(mig26.includes("An owner already exists; owner creation is permanently closed."),
@@ -127,11 +127,11 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "J13: the deployment also verifies the first-owner flow is reachable");
 
   // ---- J14. missing migration state -> useful diagnostic ------------
-  const broken = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "none", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: true });
+  const broken = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "none", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: true, setupChannel: "direct-postgres" });
   assert(broken.state === "SETUP_REQUIRED" && broken.repair.available === true && broken.repair.action === "migrations",
     "J14: a pre-0025 database reports SETUP_REQUIRED with an available one-click repair (not a mysterious auth error)");
-  const unconfigured = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "none", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: false });
-  const unknownOwner = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "unknown", chainStarted: true, invitationsPresent: null, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: false });
+  const unconfigured = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "none", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: false, setupChannel: "none" });
+  const unknownOwner = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: false, ownerAccount: "unknown", chainStarted: true, invitationsPresent: null, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: false, setupChannel: "none" });
   assert(unknownOwner.state === "SETUP_REQUIRED" && unknownOwner.repair.reason.toLowerCase().includes("official supabase integration"),
     "J14: an owner-unknown + migrations-missing database STILL names the exact automatic fix (no 'nothing to repair' dead end)");
   assert(unconfigured.repair.available === false && unconfigured.repair.reason.toLowerCase().includes("official supabase integration") && !unconfigured.repair.reason.toLowerCase().includes("github"),
@@ -143,7 +143,7 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   assert(statusRoute.includes("TEMPORARILY_UNAVAILABLE") === false || readFileSync("src/lib/owner-setup.ts", "utf8").includes("TEMPORARILY_UNAVAILABLE"),
     "J14: the four safe states are defined in one place");
   // ---- NEW (2026-10-07): the never-initialized database ------------------
-  const emptyDb = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: false });
+  const emptyDb = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: false, setupChannel: "none" });
   assert(emptyDb.state === "SETUP_REQUIRED" && emptyDb.repair.reason.includes("never been initialized") && emptyDb.repair.reason.includes("official Supabase integration") && !emptyDb.repair.reason.includes("GitHub"),
     "TRACE: a never-initialized, unconnected database gets the integration-based fix - NO GitHub secret instructions, NO access-token creation");
 
@@ -197,7 +197,7 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   assert(loginSrc.includes("setupNeeded") && loginSrc.includes("Continue Setup") && loginSrc.includes("Welcome to Sophira"),
     "wizard: when setup is unfinished and no owner exists, /login shows the Continue Setup path instead of the sign-in form");
   // evaluator: empty DB + configured => one-click repair is AVAILABLE.
-  const emptyConfigured = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: true });
+  const emptyConfigured = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: true, setupChannel: "direct-postgres" });
   assert(emptyConfigured.repair.available === true && emptyConfigured.repair.action === "migrations",
     "wizard (STATE B): an empty database with the one-time connection configured gets the one-click Set Up Sophira repair");
   // RUNTIME FIRST-LAUNCH INITIALIZATION (direct Postgres, zero operator config)
@@ -212,8 +212,8 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   assert(setupSrc2.includes("directPostgresConfigured() || managementConfigured()") && setupSrc2.includes("runChainAutomation"),
     "ddl: first-launch prefers the direct database connection; the Management API token is optional/secondary");
   const evalSrc2 = readFileSync("src/lib/owner-setup.ts", "utf8");
-  assert(evalSrc2.includes("directPostgresConfigured() ||"),
-    "ddl: the setup probe counts the integration-provisioned direct connection as automation - the Set Up button appears with zero operator configuration");
+  assert(evalSrc2.includes("setupChannel()") && evalSrc2.includes('setupChannel: setupChannel()'),
+    "ddl: the setup probe reports the exact channel so the Set Up button appears with zero operator configuration and the UI can name the precise missing capability");
   const ddlPins = ["pg", "db-ddl"];
   assert(!readFileSync("src/app/setup/SetupWizard.tsx", "utf8").includes("db-ddl") && !readFileSync("src/app/create-owner/page.tsx", "utf8").includes("db-ddl"),
     "ddl: no client component imports the direct-connection module (credentials stay server-side)");
@@ -224,6 +224,65 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   const exampleSrc = readFileSync(".env.example", "utf8");
   assert(exampleSrc.includes("POSTGRES_URL_NON_POOLING") && exampleSrc.includes("SUPABASE_DB_PASSWORD"),
     "ddl: .env.example is regenerated from the manifest and stays in sync");
+  // ---- N. the exact runtime channel: what makes automation available ----
+  const ddl = require("../src/lib/db-ddl");
+  const ENV_KEYS = ["POSTGRES_URL_NON_POOLING", "POSTGRES_URL", "POSTGRES_POOLER_URL_NON_POOLING", "POSTGRES_POOLER_URL", "SUPABASE_DB_PASSWORD", "SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "NEXT_PUBLIC_SUPABASE_URL"];
+  const savedEnv: Record<string, string | undefined> = {};
+  for (const k of ENV_KEYS) { savedEnv[k] = process.env[k]; delete process.env[k]; }
+  try {
+    // N1: ONLY the public application credentials -> automation must NOT be
+    //     available (the anon key can never initialize a database).
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://abc.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
+    assert(ddl.directPostgresConfigured() === false && ddl.setupChannel() === "none" && ddl.setupChannel() === "none",
+      "N1: a deployment with only the public Supabase URL/anon key NEVER reports migration automation as available");
+    // N2: the integration-provisioned direct connection -> available.
+    process.env.POSTGRES_URL_NON_POOLING = "postgresql://postgres:x@db.abc.supabase.co:5432/postgres";
+    assert(ddl.directPostgresConfigured() === true && ddl.setupChannel() === "direct-postgres" && ddl.setupChannel() !== "none",
+      "N2: a deployment with the supported direct Postgres connection reports automation available");
+    // N3: password + public URL -> the direct endpoint is derived automatically.
+    delete process.env.POSTGRES_URL_NON_POOLING;
+    process.env.SUPABASE_DB_PASSWORD = "pw";
+    assert(ddl.setupChannel() === "direct-postgres",
+      "N3: SUPABASE_DB_PASSWORD + NEXT_PUBLIC_SUPABASE_URL alone enables the direct channel");
+    // N4: management-only credentials -> the secondary channel.
+    delete process.env.SUPABASE_DB_PASSWORD;
+    process.env.SUPABASE_ACCESS_TOKEN = "t";
+    process.env.SUPABASE_PROJECT_REF = "abc";
+    assert(ddl.setupChannel() === "management-api" && ddl.managementConfigured() === true,
+      "N4: Management API credentials alone enable the SECONDARY channel");
+  } finally {
+    for (const k of ENV_KEYS) { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; }
+  }
+  // N5: pooler-safe atomicity - each migration is ONE BEGIN/COMMIT query.
+  const ddl3 = readFileSync("src/lib/db-ddl.ts", "utf8");
+  assert(ddl3.includes("BEGIN;\\n${entry.sql}\\nCOMMIT;") && ddl3.includes("ROLLBACK;"),
+    "N5: each migration runs in a single-query transaction (atomic even behind a transaction-mode pooler), rolled back on failure");
+  // N6: the repair path attempts the DIRECT channel first and RE-PROBES.
+  const boot3 = readFileSync("src/lib/db-bootstrap.ts", "utf8");
+  assert(boot3.includes("if (!directPostgresConfigured())") && boot3.includes("const after = await probeOwnerSetup();") && boot3.includes("after.migrationsPresent === true"),
+    "N6: repair invokes the direct migration path and reports ready ONLY after re-probing the real schema");
+  // N7: no SQL or credential can be supplied by the request.
+  const rr = readFileSync("src/app/api/setup-repair/route.ts", "utf8");
+  assert(rr.includes('typeof body?.action === "string"') && !/body\.(sql|query|statement|credentials|token|connection)/i.test(rr),
+    "N7: the repair endpoint accepts ONLY a fixed action string - no SQL, no credentials, no connection data from any request");
+  // N8: no secret reaches a client component.
+  assert(!/POSTGRES_URL|SUPABASE_DB_PASSWORD|SUPABASE_ACCESS_TOKEN/.test(readFileSync("src/app/setup/SetupWizard.tsx", "utf8")) && !/POSTGRES_URL|SUPABASE_DB_PASSWORD|SUPABASE_ACCESS_TOKEN/.test(readFileSync("src/app/create-owner/page.tsx", "utf8")),
+    "N8: no database credential or access-token variable name appears in any client component");
+  // N9: migrations are never reported ready before the real schema exists.
+  const noSchema = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: true, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: true, invitationsPresent: null, ownerBootstrapPresent: false, recoveryPresent: false, migrationAutomationConfigured: true, setupChannel: "direct-postgres" });
+  assert(noSchema.ready === false && noSchema.state === "SETUP_REQUIRED" && noSchema.repair.available === true,
+    "N9: a connected-but-schema-missing database is never reported ready; the repair is offered instead");
+  const schemaReady = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: true, database: "checked", migrationsPresent: true, ownerEmailConfigured: null, ownerAccount: "none", chainStarted: true, invitationsPresent: true, ownerBootstrapPresent: true, recoveryPresent: true, migrationAutomationConfigured: true, setupChannel: "direct-postgres" });
+  assert(schemaReady.state === "READY",
+    "N9b: only a probe-verified schema (migrationsPresent === true) yields READY");
+  // N10: missing automation credentials produce the EXPLICIT diagnostic.
+  const noChannel = evaluateOwnerSetup({ supabaseConfigured: true, serviceRoleConfigured: true, aiConfigured: false, database: "checked", migrationsPresent: false, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: false, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: false, setupChannel: "none" });
+  assert(noChannel.capability === "initialization-channel" && noChannel.repair.reason.includes("official Supabase integration") && !/open the Supabase SQL editor|paste/.test(noChannel.repair.reason),
+    "N10: a missing initialization channel is diagnosed EXACTLY (capability: initialization-channel), never vaguely and never as a manual-SQL instruction");
+  const noSupa = evaluateOwnerSetup({ supabaseConfigured: false, serviceRoleConfigured: true, aiConfigured: false, database: "unconfigured", migrationsPresent: null, ownerEmailConfigured: null, ownerAccount: "unknown", chainStarted: null, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null, migrationAutomationConfigured: false, setupChannel: "none" });
+  assert(noSupa.capability === "supabase-credentials",
+    "N10b: missing application credentials are distinguished from a missing initialization channel");
   // CI workflow: missing secrets skip with a notice (secondary mechanism).
   const wf = readFileSync(".github/workflows/migrations.yml", "utf8");
   assert(wf.includes("exit 0") && wf.includes("Optional CI migrations skipped") && !wf.includes("exit 1\n"),

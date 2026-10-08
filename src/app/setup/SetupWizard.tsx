@@ -23,10 +23,12 @@ export default function SetupWizard({
   available,
   reason,
   needsDatabase,
+  channel,
 }: {
   available: boolean;
   reason: string;
   needsDatabase: boolean;
+  channel: "direct-postgres" | "management-api" | "none";
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -77,7 +79,9 @@ export default function SetupWizard({
       <p className="mt-2 text-sm text-ink-soft">
         {available
           ? "Sophira can prepare everything for you automatically. This usually takes under a minute."
-          : "Sophira needs a one-time connection from your administrator before it can prepare the database automatically. Open Advanced diagnostics below for the exact one-time step - nothing else is needed."}
+          : channel === "none"
+            ? "Automatic setup is unavailable: this deployment has no database-initialization channel yet. Connecting the Vercel project to its Supabase project (the official Supabase integration) provisions the direct database connection automatically - Advanced diagnostics below names the exact variables. No tokens, no SQL."
+            : "Automatic setup is temporarily unavailable - open Advanced diagnostics below for the exact state."}
       </p>
       {available && (
         <button

@@ -36,6 +36,24 @@ export function directPostgresConfigured(): boolean {
   return connectionString() !== null;
 }
 
+/** OPTIONAL secondary channel: Supabase Management API credentials
+ *  (server-only). A personal access token is NOT required for first-launch
+ *  setup - the direct connection above is the primary path. */
+export function managementConfigured(): boolean {
+  return present("SUPABASE_ACCESS_TOKEN") && present("SUPABASE_PROJECT_REF");
+}
+
+/** The precise, categorical answer to "which automatic initialization
+ *  channel does this deployment have?" - exposed to the operator UI so the
+ *  setup page can diagnose the exact missing infrastructure capability
+ *  instead of a vague "one-time administrator connection" (requirement K/L).
+ *  Never includes any credential VALUE. */
+export function setupChannel(): "direct-postgres" | "management-api" | "none" {
+  if (directPostgresConfigured()) return "direct-postgres";
+  if (managementConfigured()) return "management-api";
+  return "none";
+}
+
 function connectionString(): string | null {
   // Preferred order: the integration-provisioned direct URLs first.
   for (const name of ["POSTGRES_URL_NON_POOLING", "POSTGRES_URL", "POSTGRES_POOLER_URL_NON_POOLING", "POSTGRES_POOLER_URL"]) {
@@ -82,18 +100,24 @@ export async function applyMigrationChainDirect(): Promise<{ ok: boolean; applie
       if (entry.marker && !appliedMarkers.has(entry.name)) gap = true;
       if (gap) missing.push(entry);
     }
-    // 3. APPLY: each missing migration in its own transaction; a failure
-    //    rolls that migration back and stops the pass (fail-loud, never
-    //    silent).
+    // 3. APPLY: each missing migration in its own transaction. The
+    //    transaction is sent as ONE multi-statement query (BEGIN; ...sql...;
+    //    COMMIT;) so atomicity also holds behind a transaction-mode pooler
+    //    (the integration-provisioned POSTGRES_POOLER_URL), where separate
+    //    BEGIN/COMMIT round trips could land on different backends. A
+    //    failure rolls the migration back and stops the pass (fail-loud,
+    //    never silent).
     let applied = 0;
     for (const entry of missing) {
-      await client.query("BEGIN;");
       try {
-        await client.query(entry.sql);
-        await client.query("COMMIT;");
+        await client.query(`BEGIN;\n${entry.sql}\nCOMMIT;`);
         applied += 1;
       } catch {
-        await client.query("ROLLBACK;");
+        try {
+          await client.query("ROLLBACK;");
+        } catch {
+          /* the server already aborted the transaction */
+        }
         await client.end();
         return { ok: false, applied };
       }

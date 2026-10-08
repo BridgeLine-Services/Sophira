@@ -25,7 +25,7 @@ export default async function SetupPage() {
   const ownerReady = status.probe.ownerAccount === "active";
 
   const checklist: { label: string; done: boolean; hint: string }[] = [
-    { label: "Connect Sophira", done: connected, hint: "Sophira isn't connected to its private database yet. A simple administrator setup instruction is in Advanced diagnostics below." },
+    { label: "Connect Sophira", done: connected, hint: "Sophira isn't connected to its private database yet - the exact missing variables are named in Advanced diagnostics below." },
     { label: "Prepare your private database", done: databaseReady, hint: "Your Sophira database needs to be initialized." },
     { label: "Create your owner account", done: ownerReady, hint: "The first account you create becomes the owner." },
     { label: "Finish setup", done: status.ready === true, hint: "Your private Sophira is almost ready." },
@@ -59,13 +59,14 @@ export default async function SetupPage() {
 
         {!connected && (
           <p className="mt-5 text-sm text-ink-soft">
-            Sophira isn&apos;t connected to its private database yet. This is a one-time connection step -
-            open Advanced diagnostics below for the exact, short instruction.
+            Sophira isn&apos;t connected to its private database yet - the Supabase application
+            credentials are missing. Advanced diagnostics below names the exact variables.
           </p>
         )}
 
         <SetupWizard
           available={status.repair.available && status.repair.action === "migrations"}
+          channel={status.probe.setupChannel}
           reason={status.repair.reason}
           needsDatabase={connected && !databaseReady && status.probe.ownerAccount !== "active" && status.probe.ownerAccount !== "revoked"}
         />
