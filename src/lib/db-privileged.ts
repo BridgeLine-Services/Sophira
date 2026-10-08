@@ -120,3 +120,84 @@ export function privilegedChannelConfigured(): boolean {
 export function authAdminEndpoint(): string | null {
   return publicSupabaseUrl();
 }
+
+
+/**
+ * SELF-HEALING PROVISIONING for a signed-in user (2026-10-08).
+ *
+ * Live diagnosis: the owner's auth account exists and its profiles row
+ * EXISTS (the direct channel sees it: ownerAccount "active",
+ * staleAuthUsers 0) — yet EVERY RLS-scoped read (browser AND server
+ * pages) returns no row, so the app decides the account "could not be
+ * finished", the guarded pages redirect-loop, and no error is ever
+ * visible. The repair covers every data state that can cause it, in
+ * order, atomically where it matters, idempotently everywhere:
+ *
+ *   A. profile row exists for this id            -> refresh the RLS
+ *      policies + table grants (a missing/mangled profiles_select_own
+ *      policy or a lost GRANT to authenticated makes the row invisible
+ *      to every RLS-scoped read while admin queries see it fine);
+ *   B. no profile, owner row orphaned            -> RE-LINK the orphaned
+ *      owner row to this signed-in account (its auth user no longer
+ *      exists); exactly one owner row is preserved, claimed_by synced;
+ *   C. no profile, owner row owned by a REAL other auth user -> honest
+ *      refusal (never hijack another live account's ownership);
+ *   D. no profile, no owner anywhere             -> complete_first_owner
+ *      (the race-safe first-owner claim, unchanged).
+ *
+ * Security: the id is the SERVER-VERIFIED session user id (the route
+ * obtains it from supabase.auth.getUser(), never from the request body);
+ * every query is parameterized; nothing here is importable by client
+ * code; the single-owner invariant is never weakened.
+ */
+export async function provisionSignedInUser(userId: string): Promise<
+  { ok: true; role: string | null; action: string } |
+  { ok: false; reason: "owner_elsewhere" | "unavailable"; action: string }
+> {
+  // Idempotent RLS/grant refresh (fixes invisible-profile reads).
+  const refreshProfilesAccess = async (client: { query: (q: string, p?: unknown[]) => Promise<{ rows: unknown[] }> }): Promise<boolean> => {
+    const r = await client.query(`
+      begin;
+      drop policy if exists "profiles_select_own" on public.profiles;
+      create policy "profiles_select_own" on public.profiles for select using (id = auth.uid());
+      drop policy if exists "profiles_update_own" on public.profiles;
+      create policy "profiles_update_own" on public.profiles for update using (id = auth.uid());
+      grant usage on schema public to authenticated;
+      grant select, update on public.profiles to authenticated;
+      commit;
+    `);
+    return Array.isArray(r.rows) && r.rows.length === 0;
+  };
+
+  return (await withClient(async (client) => {
+    // A. does this account already have its profile row?
+    const own = await client.query("select role from public.profiles where id = $1 limit 1", [userId]);
+    if (own.rows.length > 0) {
+      await refreshProfilesAccess(client);
+      const role = (own.rows[0] as { role: string }).role;
+      return { ok: true as const, role, action: "profile-present" };
+    }
+    // B/C. no profile for this account — inspect the existing owner row.
+    const owner = await client.query("select id from public.profiles where role = 'owner' limit 1");
+    if (owner.rows.length === 0) {
+      // D. no owner anywhere: the race-safe first-owner completion.
+      const r = await client.query("select public.complete_first_owner($1) as result", [userId]);
+      await refreshProfilesAccess(client);
+      void r;
+      return { ok: true as const, role: "owner", action: "completed-first-owner" };
+    }
+    const ownerId = (owner.rows[0] as { id: string }).id;
+    const ownerAuth = await client.query("select 1 as one from auth.users where id = $1 limit 1", [ownerId]);
+    if (ownerAuth.rows.length === 0) {
+      // B. the owner row is ORPHANED (its auth user no longer exists):
+      // re-link it to THIS verified signed-in account. One owner row,
+      // updated in place — no duplicate, no data loss.
+      await client.query("update public.profiles set id = $1 where id = $2 and role = 'owner'", [userId, ownerId]);
+      await client.query("update public.owner_bootstrap set claimed_by = $1 where claimed_by = $2", [userId, ownerId]);
+      await refreshProfilesAccess(client);
+      return { ok: true as const, role: "owner", action: "relinked-orphaned-owner" };
+    }
+    // C. the owner belongs to a different, REAL account: honest refusal.
+    return { ok: false as const, reason: "owner_elsewhere" as const, action: "refused-owner-elsewhere" };
+  })) ?? { ok: false as const, reason: "unavailable" as const, action: "channel-unavailable" };
+}

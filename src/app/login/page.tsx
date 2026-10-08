@@ -34,6 +34,48 @@ function LoginForm() {
   // possibly succeed - route the visitor to the guided setup instead of the
   // normal login experience (never the misleading "wrong password" path).
   const [setupNeeded, setSetupNeeded] = useState(false);
+  // SETUP-STATUS PANEL (2026-10-08): "See the setup status" is a WORKING
+  // panel, not a dead-end sentence: it fetches the server's own status
+  // endpoint and shows each check pass/fail with a plain-language reason,
+  // plus a Retry setup action that re-runs the self-healing provisioning.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [statusChecks, setStatusChecks] = useState<null | {
+    checklist: Record<string, boolean>;
+    ownerAccount: string;
+    guidance: string[];
+  }>(null);
+  const [retryBusy, setRetryBusy] = useState(false);
+
+  async function loadStatusPanel() {
+    setStatusChecks(null);
+    fetch("/api/setup-status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.checklist) {
+          setStatusChecks({ checklist: d.checklist, ownerAccount: d.probe?.ownerAccount ?? "unknown", guidance: d.guidance ?? [] });
+        }
+      })
+      .catch(() => setStatusChecks(null));
+  }
+
+  async function retrySetup() {
+    setRetryBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/complete-owner", { method: "POST" });
+      if (r.ok) {
+        const done = (await r.json()) as { role?: string | null };
+        router.push(done.role === "owner" ? "/owner" : "/dashboard");
+        router.refresh();
+        return;
+      }
+      const body = (await r.json().catch(() => ({}))) as { error?: string };
+      setError(body.error ?? "Setup could not be completed automatically. Check the setup status below.");
+      void loadStatusPanel();
+    } finally {
+      setRetryBusy(false);
+    }
+  }
   useEffect(() => {
     fetch("/api/setup-status", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -100,13 +142,18 @@ function LoginForm() {
     // complete_first_owner function finishes it into the first owner -
     // but only while no owner exists, and only for this signed-in user.
     if (!profile) {
+      // SELF-HEALING PROVISIONING (2026-10-08): the server repairs the
+      // account (RLS refresh / orphaned-owner re-link / first-owner claim)
+      // and returns the SERVER-verified role; the client never guesses.
       const r = await fetch("/api/complete-owner", { method: "POST" });
       if (r.ok) {
-        router.push("/owner");
+        const done = (await r.json()) as { role?: string | null };
+        router.push(done.role === "owner" ? "/owner" : "/dashboard");
         router.refresh();
         return;
       }
-      setError("Your account exists but could not be finished automatically. See the setup status for what is missing.");
+      setError("Your account exists but could not be finished automatically. Open the setup status below for what is missing.");
+      setPanelOpen(true);
       return;
     }
     router.push(profile.role === "owner" ? "/owner" : "/dashboard");
@@ -181,6 +228,52 @@ function LoginForm() {
             <p className="text-sm text-danger" role="alert">{callbackError}</p>
           )}
           {error && <p className="text-sm text-danger" role="alert">{error}</p>}
+          {error && (
+            <div className="rounded-card border border-ink/10 bg-white p-3 shadow-sm">
+              <button
+                type="button"
+                className="text-sm font-medium text-accent underline underline-offset-2"
+                onClick={() => {
+                  const next = !panelOpen;
+                  setPanelOpen(next);
+                  if (next && !statusChecks) void loadStatusPanel();
+                }}
+              >
+                {panelOpen ? "Hide setup status" : "See the setup status"}
+              </button>
+              {panelOpen && (
+                <div className="mt-2 space-y-2">
+                  {statusChecks === null ? (
+                    <p className="text-sm text-ink-soft">Checking the setup status…</p>
+                  ) : (
+                    <>
+                      <ul className="space-y-1 text-sm">
+                        {Object.entries(statusChecks.checklist).map(([name, pass]) => (
+                          <li key={name} className="flex items-center gap-2">
+                            <span aria-hidden>{pass ? "✔" : "✖"}</span>
+                            <span className={pass ? "text-ink" : "text-danger"}>
+                              {name}: {pass ? "OK" : "missing"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      {statusChecks.guidance.slice(0, 2).map((g, i) => (
+                        <p key={i} className="text-xs text-ink-soft">{g}</p>
+                      ))}
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void retrySetup()}
+                    disabled={retryBusy}
+                    className="w-full rounded-button bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-60"
+                  >
+                    {retryBusy ? "Retrying setup…" : "Retry setup"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <Button type="submit" disabled={busy} className="w-full" size="lg">
             {busy ? "Signing in…" : "Sign in"}
           </Button>

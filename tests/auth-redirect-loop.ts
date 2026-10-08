@@ -89,6 +89,7 @@ export function runAuthRedirectLoopTests(assert: (c: boolean, n: string) => void
     "loop: the SignOutButton destroys the session and routes to /login exactly once");
 
   // 7. SIGN-IN NAVIGATION — await before navigate (no cookie race)
-  assert(login.includes("await supabase.auth.signInWithPassword") && login.indexOf("await supabase.auth.signInWithPassword") < login.indexOf("router.push("),
+  const onSubmitBody = login.slice(login.indexOf("async function onSubmit"), login.indexOf("if (setupNeeded)"));
+  assert(onSubmitBody.includes("await supabase.auth.signInWithPassword") && onSubmitBody.indexOf("await supabase.auth.signInWithPassword") < onSubmitBody.indexOf("router.push("),
     "blank: the sign-in call is fully awaited (cookies set) BEFORE any navigation happens");
 }

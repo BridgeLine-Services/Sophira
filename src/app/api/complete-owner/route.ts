@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { publicSupabaseUrl, serviceRoleKey } from "../../../lib/supabase-config";
 import { createClient } from "../../../lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { callDbFunction, privilegedChannelConfigured } from "../../../lib/db-privileged";
+import { callDbFunction, privilegedChannelConfigured, provisionSignedInUser } from "../../../lib/db-privileged";
 
 export const dynamic = "force-dynamic";
 
@@ -87,19 +87,32 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // 2026-10-07: privileged table/function access runs over the VERIFIED
-  // direct database connection (the deployment's admin API key can be a
-  // restricted new-style key - the live deployment proved PostgREST answers
-  // "permission denied" while the direct channel is fully privileged).
+  // 2026-10-08 SELF-HEALING PROVISIONING (owner's blank/looping account
+  // diagnosis): the account exists, its profile row exists on the direct
+  // channel, yet every RLS-scoped read returns nothing. The complete-owner
+  // call therefore now repairs instead of only claiming:
+  //   profile present -> RLS policy/grant refresh (invisible-row fix);
+  //   owner row orphaned -> re-linked to this verified account;
+  //   no owner anywhere -> the race-safe first-owner claim;
+  //   owner belongs to a different REAL account -> honest 409.
+  // The user id is the SERVER-verified session id; the repair runs over
+  // the verified direct channel, never from browser input.
   if (privilegedChannelConfigured()) {
-    const res = await callDbFunction("complete_first_owner", [user.id]);
+    const res = await provisionSignedInUser(user.id);
     if (res.ok) {
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-      return NextResponse.json({ completed: true, hasProfile: !!profile, role: profile?.role ?? null });
+      return NextResponse.json({ completed: true, hasProfile: !!profile, role: profile?.role ?? null, action: res.action });
     }
-    // The direct channel exists but the call was refused BY THE DATABASE
-    // FUNCTION (owner exists / race lost / profile already present).
-    return NextResponse.json({ error: "Owner creation is closed or was just claimed by another registration." }, { status: 409 });
+    if (res.reason === "owner_elsewhere") {
+      return NextResponse.json(
+        { error: "The owner account is attached to a different email address. Sign in with the owner's email, or ask the owner to invite you." },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Sophira cannot reach its database right now. Please try again later." },
+      { status: 503 }
+    );
   }
   // Fallback for deployments with a valid service key but no direct channel.
   const { error } = await admin.rpc("complete_first_owner", { p_user_id: user.id });

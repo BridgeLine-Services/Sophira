@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
+import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { CorrectionsPanel } from "@/components/app/CorrectionsPanel";
 import type { LearningPattern } from "@/lib/learning/patterns";
@@ -13,13 +15,26 @@ export const dynamic = "force-dynamic";
  */
 export default async function CorrectionsPage() {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // Shared session validation + LOOP-PROOF account guard (2026-10-08): an
+  // incomplete/unreadable profile NEVER redirects to /login (that was the
+  // redirect loop); the user sees one explicit account-problem screen.
+  const user = await requireUser(supabase);
 
   const { data: profile } = await supabase.from("profiles").select("status, onboarded").eq("id", user.id).single();
-  if (!profile) redirect("/login");
+  if (!profile) {
+    return (
+      <AppShell title="Account problem">
+        <div className="mx-auto max-w-md space-y-3 py-10 text-center">
+          <h1 className="text-xl font-semibold text-ink">Your account could not be loaded</h1>
+          <p className="text-sm text-ink-soft">
+            You are signed in, but your profile record could not be read. Sign out and sign back in;
+            if it persists, the account needs the operator&apos;s attention.
+          </p>
+          <SignOutButton />
+        </div>
+      </AppShell>
+    );
+  }
   if (profile.status === "revoked") redirect("/access-denied");
   if (!profile.onboarded) redirect("/onboarding");
 
