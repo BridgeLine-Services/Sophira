@@ -25,7 +25,10 @@ Never paste a secret into chat or into a file in the repository.
 
 | Variable | Where to get it | Secret? | Notes |
 |---|---|---|---|
-| `GEMINI_API_KEY` | Google AI Studio (free tier available) | Yes | Preferred free remote AI. |
+| `LOCAL_LLM_BASE_URL` | your own OpenAI-compatible inference server (Ollama, llama.cpp server, vLLM, LM Studio) | Only if your server requires a bearer token | **The DEFAULT AI path** — tried FIRST in `auto` mode; no key, no cloud. |
+| `LOCAL_LLM_MODEL` | e.g. `llama3.1:8b` (works with `ollama pull llama3.1:8b`) | No | Self-hosted model name. |
+| `LOCAL_LLM_API_KEY` | only if your local server requires one | Yes (rarely needed) | Optional bearer token for the self-hosted server. |
+| `GEMINI_API_KEY` | Google AI Studio (free tier available) | Yes | Free-tier cloud fallback (second in `auto` mode, after self-hosted). |
 | `GEMINI_MODEL` | e.g. `gemini-2.5-flash` | No | |
 | `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `SOPHIRA_MODEL` | OpenAI (paid) | Yes | Paid fallback, disabled by default; requires `ALLOW_PAID_AI=true` or `MONTHLY_AI_BUDGET_USD>0`. Never required. |
 | `ALLOW_PAID_AI`, `MONTHLY_AI_BUDGET_USD` | you choose | No | Opt-in switches for the paid path. |
@@ -59,8 +62,11 @@ This guide is for humans; the machine-readable source of truth is
   (Supabase, AI, search) via `/api/health`.
 
 Free-first AI policy is pinned in the catalog: `ALLOW_PAID_AI=false` and
-`MONTHLY_AI_BUDGET_USD=0` by default; the Gemini free tier is the preferred
-provider; the paid OpenAI fallback stays inert until explicitly allowed.
+`MONTHLY_AI_BUDGET_USD=0` by default. In `AI_PROVIDER=auto` (the default)
+the server tries providers in this order: self-hosted
+(`LOCAL_LLM_BASE_URL`, no key required), then the Gemini free tier, then
+OpenAI — and the paid fallback stays inert until explicitly allowed.
+`docs/SELF_HOSTED_AI_ARCHITECTURE.md` has the full architecture.
 Vercel deployment and environment sync (including the Supabase
 Integration and `vercel env pull`) are documented in
 **docs/VERCEL_DEPLOYMENT.md**.

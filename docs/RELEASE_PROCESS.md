@@ -11,7 +11,7 @@ NEVER the service-role key):
 - `NEXT_PUBLIC_SUPABASE_URL` — the Supabase project HTTPS URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` — server-only (needed by admin routes)
-- `GEMINI_API_KEY` (free tier — preferred remote AI), or `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`, `SOPHIRA_MODEL`) as the optional paid fallback, used ONLY when `ALLOW_PAID_AI=true` or `MONTHLY_AI_BUDGET_USD>0`
+- `LOCAL_LLM_BASE_URL` + `LOCAL_LLM_MODEL` (self-hosted inference server — the DEFAULT AI path; no key needed), or `GEMINI_API_KEY` (free-tier cloud fallback), or `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`, `SOPHIRA_MODEL`) as the optional paid fallback, used ONLY when `ALLOW_PAID_AI=true` or `MONTHLY_AI_BUDGET_USD>0`
 - `SEARCH_PROVIDER` / `SEARCH_API_KEY` (optional) — verified web research
 - `NEXT_PUBLIC_SITE_URL` — the public URL, used in invitation links
 
@@ -67,7 +67,6 @@ address.) Verify the deployment by opening **/setup** and clicking
 **Create Owner Account** — the page reads the real server-side status and
 honestly reports whether owner creation is available. The release gate
 stays the technical enforcement path.
-fail-closed behavior.
 
 After the environment is configured, set the repository
 variable `SOPHIRA_APP_URL` to `https://sophira.vercel.app` — the native
@@ -103,7 +102,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The release workflow then: runs the offline test suite (285 assertions), TypeScript check, production
+The release workflow then: runs the offline test suite (2503 assertions), TypeScript check, production
 build → Android APK (signed or honestly unsigned) → iOS archive (signed .ipa
 export or honest unsigned archive) → desktop matrix (Windows .msi, macOS
 .dmg, Linux .AppImage + .deb) → per-platform SHA256SUMS files → GitHub
@@ -137,7 +136,7 @@ The in-app Downloads page also displays the per-artifact SHA-256 directly.
 
 ## CI (non-release)
 
-`.github/workflows/ci.yml` runs on every push/PR: npm ci, the offline test suite (285 assertions; the CI step label still says "144" from an older round — cosmetic only),
+.github/workflows/ci.yml` runs on every push/PR: npm ci, the offline test suite (2503 assertions),
 TypeScript strict check, production build, and validation that the Android,
 iOS and Tauri projects are intact. It fails loudly and never fabricates a
 successful build.

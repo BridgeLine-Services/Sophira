@@ -22,9 +22,12 @@ download button for an artifact that actually exists, with its SHA-256.
 
 - The live URL (above) or a local checkout (`npm ci && npm run build && npm run start`).
 - An email address for the OWNER account and a second one for a TEST USER.
-- (Optional, for full AI features) `OPENAI_API_KEY`, search provider keys,
-  and the Supabase env vars — the app runs without them and says so
-  honestly; it never fakes an answer.
+- (Optional, for full AI features) an AI provider — the default is a
+  self-hosted server (`LOCAL_LLM_BASE_URL`, no key needed) or the free
+  `GEMINI_API_KEY`; `OPENAI_API_KEY` is the paid fallback and is IGNORED
+  unless paid use is explicitly allowed. Search provider keys and the
+  Supabase env vars are also optional — the app runs without them and says
+  so honestly; it never fakes an answer.
 
 ## 1. Install (PWA)
 
@@ -35,13 +38,17 @@ download button for an artifact that actually exists, with its SHA-256.
 
 ## 2. Create the owner
 
-1. You need an invitation — the signup gate is closed by design (a DB
-   trigger refuses account creation without a valid invitation).
-2. First owner bootstrap: use the owner bootstrap invitation path in the
-   docs (or run the SQL bootstrap from `docs/`), then sign up with the
-   invite link.
-3. Confirm: signing up WITHOUT an invitation fails. That is correct
-   behavior, not a bug.
+1. Open **/setup** and click **Set Up Sophira** first (once, on a fresh
+   deployment): the app applies its own migration chain (0001-0026) and
+   verifies the schema — no SQL editor, no tokens.
+2. The FIRST owner needs NO invitation: open **/create-owner** (also
+   linked from the sign-in screen and /setup), enter your email and choose
+   your own password. Migration 0025 lets the first completed registration
+   claim the single owner slot atomically; the claim then closes
+   permanently.
+3. Confirm: signing up WITHOUT an invitation AFTER the owner exists fails.
+   That is correct behavior, not a bug (invitation-only, enforced in the
+   database).
 
 ## 3. Configure the owner
 

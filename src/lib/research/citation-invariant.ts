@@ -72,7 +72,15 @@ export interface CitationVerdict {
 export function checkUrlSyntax(url: string): boolean {
   try {
     const u = new URL(url);
-    return (u.protocol === "http:" || u.protocol === "https:") && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(u.hostname) && !/\s/.test(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    if (/\s/.test(url)) return false;
+    if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(u.hostname)) return false;
+    // WHATWG URL parsing keeps the malformed empty-punycode label "xn--"
+    // (and broken "xn--" labels) instead of rejecting it, so reject it here:
+    // a label that is exactly "xn--" has no IDN payload and is never valid.
+    const labels = u.hostname.toLowerCase().split(".");
+    if (labels.some((label) => label === "xn--")) return false;
+    return true;
   } catch {
     return false;
   }
