@@ -191,5 +191,6 @@ export function healthConfiguration(env: Record<string, string | undefined> = pr
     supabase_service_role: present("SUPABASE_SERVICE_ROLE_KEY", env),
     ai: present("LOCAL_LLM_BASE_URL", env) || present("OPENAI_API_KEY", env) || present("GEMINI_API_KEY", env),
     ai_selfhost: present("LOCAL_LLM_BASE_URL", env),
+    site_url: present("NEXT_PUBLIC_SITE_URL", env),
   };
 }

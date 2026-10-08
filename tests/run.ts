@@ -3601,3 +3601,30 @@ async function runOwnerSetupTests(): Promise<void> {
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
+
+// ===== SECTION 50: doctor + crash-safety contract (2026-10-07) =====
+{
+  // Task 2 (doctor): the one-command setup check exists and is safe.
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  assert(pkg.scripts.doctor === "node scripts/doctor.mjs", "doctor: npm run doctor is wired to scripts/doctor.mjs");
+  const doc = readFileSync("scripts/doctor.mjs", "utf8");
+  assert(doc.includes("/api/health") && doc.includes("/api/setup-status"), "doctor: checks the two public categorical endpoints (health + setup-status)");
+  assert(!/console\.log\(process\.env\.[A-Z_]+\)/.test(doc) && !doc.includes("printEnvValue"), "doctor: NEVER prints a secret value (booleans from public endpoints only)");
+  assert(doc.includes("Supabase is connected") && doc.includes("migrations are applied") && doc.includes("owner account exists") && doc.includes("AI provider is working") && doc.includes("production URL is set"), "doctor: prints the six mandated checklist items in plain English");
+  assert(doc.includes("→ Next step:") && (doc.match(/\bmiss\(/g) || []).length >= 4, "doctor: every failure category carries an exact plain-English next step");
+  assert(doc.includes("AbortSignal.timeout"), "doctor: never hangs (bounded network timeout)");
+}
+{
+  // Task 3 (crash-safety): missing configuration NEVER produces a 500.
+  const mw = readFileSync("src/middleware.ts", "utf8");
+  assert(mw.includes("hasSupabaseEnv()") && mw.includes("NextResponse.redirect"), "crash: middleware degrades to a REDIRECT when Supabase env is missing (never MIDDLEWARE_INVOCATION_FAILED)");
+  assert((mw.match(/catch/g) || []).length >= 2 && mw.includes("fail closed"), "crash: middleware wraps Supabase construction + getUser in try/catch and FAILS CLOSED on runtime errors");
+  const cb = readFileSync("src/app/auth/callback/route.ts", "utf8");
+  assert(cb.includes("error === 'unconfigured'".replace(/'/g, '"')) || cb.includes('"unconfigured"'), "crash: /auth/callback degrades to /setup (categorical) instead of a 500 when unconfigured");
+  assert((cb.match(/try \{/g) || []).length >= 2, "crash: /auth/callback try/catches client creation and the code exchange");
+  for (const f of ["account/delete", "network/stats", "provider-diagnostics", "readiness", "readiness/final"]) {
+    const r = readFileSync(`src/app/api/${f}/route.ts`, "utf8");
+    assert(r.includes("NEXT_PUBLIC_SUPABASE_URL") && r.includes("503") && r.includes("unavailable"),
+      `crash: /api/${f} returns an honest categorical 503 (never a 500) when configuration is missing`);
+  }
+}

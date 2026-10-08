@@ -23,6 +23,15 @@ export const runtime = "nodejs";
  * counts — and persists the gate result with the evaluated draft.
  */
 export async function GET(request: NextRequest) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    // Missing configuration NEVER 500s (crash-safety contract): a public
+    // route must degrade to an honest, categorical 503 with a plain-English
+    // message, not a server error (regression test: tests, middleware §).
+    return Response.json(
+      { ok: false, reason: "unavailable", message: "Sophira isn't connected to its database yet. The setup page (/setup) explains exactly what is missing." },
+      { status: 503 },
+    );
+  }
   const supabase = createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;

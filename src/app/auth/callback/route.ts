@@ -11,6 +11,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  // Crash-safety contract: a missing/unreachable Supabase must NEVER produce
+  // a 500 on a public route. Degrade to /setup (which explains the exact
+  // missing piece in plain English) with a categorical message.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    const url = new URL("/setup", request.url);
+    url.searchParams.set("error", "unconfigured");
+    return NextResponse.redirect(url);
+  }
+
   // The PKCE code verifier lives in the shared cookie store, so the
   // server-side exchange is the standards-correct step for this SSR
   // architecture (email confirmation AND password recovery alike).
@@ -18,8 +27,23 @@ export async function GET(request: NextRequest) {
   // never echoed into a redirect URL. An expired, malformed, already-used,
   // or tampered code fails here — safely and generically (the error
   // message reveals nothing about which account the link belonged to).
-  const supabase = createClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  let supabase;
+  try {
+    supabase = createClient();
+  } catch {
+    const url = new URL("/setup", request.url);
+    url.searchParams.set("error", "unconfigured");
+    return NextResponse.redirect(url);
+  }
+  let exchange;
+  try {
+    exchange = await supabase.auth.exchangeCodeForSession(code);
+  } catch {
+    const url = new URL("/login", request.url);
+    url.searchParams.set("error", "auth");
+    return NextResponse.redirect(url);
+  }
+  const { error } = exchange;
   if (error) {
     const recovery = next === "/reset-password";
     const url = new URL(recovery ? "/reset-password" : "/login", request.url);

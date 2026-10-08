@@ -63,22 +63,43 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll(); },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+  // Crash-safety contract: a malformed URL/key or a Supabase network
+  // failure must NEVER abort the middleware (that 500s EVERY route). The
+  // middleware FAILS CLOSED: no verified user => protected routes redirect
+  // to /login, public routes pass through. This is the same failure
+  // behavior as the missing-env branch — no auth behavior changes when
+  // the environment is healthy.
+  let supabase;
+  try {
+    supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return request.cookies.getAll(); },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+            response = NextResponse.next({ request });
+            cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+          },
         },
-      },
-    }
-  );
+      }
+    );
+  } catch {
+    if (isPublic) return NextResponse.next();
+    const degraded = request.nextUrl.clone();
+    degraded.pathname = "/login";
+    degraded.search = "";
+    return NextResponse.redirect(degraded);
+  }
 
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const r = await supabase.auth.getUser();
+    user = r.data?.user ?? null;
+  } catch {
+    user = null; // fail closed: an unreachable auth server never 500s a route
+  }
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

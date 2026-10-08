@@ -22,9 +22,11 @@ download button for an artifact that actually exists, with its SHA-256.
 
 - The live URL (above) or a local checkout (`npm ci && npm run build && npm run start`).
 - An email address for the OWNER account and a second one for a TEST USER.
-- (Optional, for full AI features) `OPENAI_API_KEY`, search provider keys,
-  and the Supabase env vars — the app runs without them and says so
-  honestly; it never fakes an answer.
+- (Optional, for remote AI) a `GEMINI_API_KEY` (free tier — preferred) or a
+  local model server such as Ollama (`LOCAL_LLM_BASE_URL`, no key); search
+  provider keys are optional. `OPENAI_API_KEY` is a paid fallback that is
+  DISABLED by default and never required. The app runs without any of them
+  and says so honestly; it never fakes an answer.
 
 ## 1. Install (PWA)
 
@@ -35,11 +37,12 @@ download button for an artifact that actually exists, with its SHA-256.
 
 ## 2. Create the owner
 
-1. You need an invitation — the signup gate is closed by design (a DB
-   trigger refuses account creation without a valid invitation).
-2. First owner bootstrap: use the owner bootstrap invitation path in the
-   docs (or run the SQL bootstrap from `docs/`), then sign up with the
-   invite link.
+1. With no owner yet, open **/create-owner**: the FIRST completed
+   registration claims the single owner slot atomically (no invitation,
+   no SQL, no `owner_email` setting — the old invitation/SQL bootstrap is
+   retired).
+2. After the owner exists, the signup gate is closed by design: a DB
+   trigger refuses account creation without a valid invitation.
 3. Confirm: signing up WITHOUT an invitation fails. That is correct
    behavior, not a bug.
 

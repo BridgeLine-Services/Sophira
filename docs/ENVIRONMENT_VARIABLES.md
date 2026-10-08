@@ -25,7 +25,7 @@ Never paste a secret into chat or into a file in the repository.
 
 | Variable | Where to get it | Secret? | Notes |
 |---|---|---|---|
-| `GEMINI_API_KEY` | Google AI Studio (free tier available) | Yes | Preferred free remote AI. |
+| `GEMINI_API_KEY` | Google AI Studio (free tier) | Yes | Preferred free REMOTE AI. The default provider chain is `AI_PROVIDER=auto`: selfhost (if `LOCAL_LLM_BASE_URL` is set — no key) → gemini (if `GEMINI_API_KEY` is set) → openai (only if paid use is explicitly allowed) → local/offline (no key). `GEMINI_MODEL` must be a verified free-tier model (default `gemini-2.5-flash`). |
 | `GEMINI_MODEL` | e.g. `gemini-2.5-flash` | No | |
 | `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `SOPHIRA_MODEL` | OpenAI (paid) | Yes | Paid fallback, disabled by default; requires `ALLOW_PAID_AI=true` or `MONTHLY_AI_BUDGET_USD>0`. Never required. |
 | `ALLOW_PAID_AI`, `MONTHLY_AI_BUDGET_USD` | you choose | No | Opt-in switches for the paid path. |
