@@ -54,9 +54,42 @@ export function setupChannel(): "direct-postgres" | "management-api" | "none" {
   return "none";
 }
 
+/**
+ * The complete catalog of direct-connection variable conventions, in
+ * priority order. 2026-10-07 normalization round: the official Supabase
+ * Vercel integration provisions SUPABASE_DB_URL / SUPABASE_DB_URL_NON_
+ * POOLING, the older Vercel Postgres convention used POSTGRES_* / DATABASE_
+ * URL, and the manual fallback uses the database password. The deployment
+ * previously recognized only a subset - so a deployment whose credentials
+ * WERE provisioned correctly by the integration still reported "no
+ * initialization channel" and forced the non-technical owner toward
+ * manual repair. One model, every accepted convention, values never
+ * exposed anywhere.
+ */
+const CONNECTION_ENV_NAMES = [
+  "SUPABASE_DB_URL_NON_POOLING",
+  "SUPABASE_DB_URL",
+  "POSTGRES_URL_NON_POOLING",
+  "POSTGRES_URL",
+  "POSTGRES_POOLER_URL_NON_POOLING",
+  "POSTGRES_POOLER_URL",
+  "POSTGRES_PRISMA_URL",
+  "DATABASE_URL",
+] as const;
+
+/**
+ * Categorical connection diagnostics (names ONLY - values are never
+ * returned, logged, or embedded). /setup and /api/setup-status surface
+ * this so an operator (or the deployed app itself) can see exactly WHICH
+ * convention this deployment uses, without exposing any credential.
+ */
+export function connectionEnvNames(): string[] {
+  return CONNECTION_ENV_NAMES.filter((name) => present(name));
+}
+
 function connectionString(): string | null {
   // Preferred order: the integration-provisioned direct URLs first.
-  for (const name of ["POSTGRES_URL_NON_POOLING", "POSTGRES_URL", "POSTGRES_POOLER_URL_NON_POOLING", "POSTGRES_POOLER_URL"]) {
+  for (const name of CONNECTION_ENV_NAMES) {
     if (present(name)) return process.env[name]!;
   }
   // Fallback: the integration-provisioned database password + the public

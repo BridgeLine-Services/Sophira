@@ -1,6 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
-import { setupChannel } from "./db-ddl";
+import { setupChannel, connectionEnvNames } from "./db-ddl";
 
 /**
  * Owner setup / status diagnostic (operator round 2026-10-06).
@@ -45,6 +45,9 @@ export interface OwnerSetupProbe {
   ownerBootstrapPresent: boolean | null; // the single-row claim table exists (0025)
   recoveryPresent: boolean | null; // sophira_meta.schema_version row exists (0026)
   migrationAutomationConfigured: boolean; // direct Postgres connection OR Management API credentials
+  /** Categorical names-only diagnostics: which direct-connection env
+   *  conventions this deployment provides (values are NEVER included). */
+  connectionEnvNames: string[];
   /** 2026-10-07 second automation round: the PRECISE channel (or "none") so
    *  the setup UI can diagnose the exact missing infrastructure capability
    *  instead of a vague "administrator connection". Categorical only. */
@@ -126,6 +129,7 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     ownerBootstrapPresent: null,
     recoveryPresent: null,
     migrationAutomationConfigured: setupChannel() !== "none",
+    connectionEnvNames: connectionEnvNames(),
     setupChannel: setupChannel(),
   };
   if (!probe.serviceRoleConfigured) return probe;

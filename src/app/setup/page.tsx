@@ -19,6 +19,18 @@ import SetupWizard from "./SetupWizard";
  */
 export default async function SetupPage() {
   const status: OwnerSetupStatus = evaluateOwnerSetup(await probeOwnerSetup());
+  // The non-technical fallback's ONE guided action: a direct deep link to
+  // this project's Supabase integrations page (derived from the public
+  // project URL - no secret involved). The official integration then
+  // provisions the direct database connection automatically.
+  let supabaseIntegrationsUrl: string | null = null;
+  try {
+    const host = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host;
+    const ref = host.split(".")[0];
+    supabaseIntegrationsUrl = `https://supabase.com/dashboard/project/${ref}/integrations/vercel`;
+  } catch {
+    supabaseIntegrationsUrl = null;
+  }
   const creation = status.ownerCreation;
   const connected = status.probe.supabaseConfigured;
   const databaseReady = status.probe.migrationsPresent === true;
@@ -69,6 +81,7 @@ export default async function SetupPage() {
           channel={status.probe.setupChannel}
           reason={status.repair.reason}
           needsDatabase={connected && !databaseReady && status.probe.ownerAccount !== "active" && status.probe.ownerAccount !== "revoked"}
+          supabaseIntegrationsUrl={supabaseIntegrationsUrl}
         />
 
         {databaseReady && !ownerReady && creation?.possible === true && (

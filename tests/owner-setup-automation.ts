@@ -240,6 +240,22 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     process.env.POSTGRES_URL_NON_POOLING = "postgresql://postgres:x@db.abc.supabase.co:5432/postgres";
     assert(ddl.directPostgresConfigured() === true && ddl.setupChannel() === "direct-postgres" && ddl.setupChannel() !== "none",
       "N2: a deployment with the supported direct Postgres connection reports automation available");
+    // N2b: the OFFICIAL Supabase-Vercel integration convention (SUPABASE_DB_URL)
+    //      is recognized too (2026-10-07 normalization: deployments provisioned
+    //      by the integration previously reported "no initialization channel"
+    //      and forced non-technical owners into manual repair).
+    delete process.env.POSTGRES_URL_NON_POOLING;
+    process.env.SUPABASE_DB_URL = "postgresql://postgres.x:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres";
+    assert(ddl.directPostgresConfigured() === true && ddl.setupChannel() === "direct-postgres",
+      "N2b: SUPABASE_DB_URL (the official Supabase-Vercel integration's convention) enables the direct channel");
+    assert(JSON.stringify(ddl.connectionEnvNames()).includes("SUPABASE_DB_URL"),
+      "N2c: connectionEnvNames() reports the convention by NAME ONLY (categorical diagnostics, never values)");
+    // N2d: generic DATABASE_URL convention (Vercel Postgres style) recognized.
+    delete process.env.SUPABASE_DB_URL;
+    process.env.DATABASE_URL = "postgresql://postgres:x@db.abc.supabase.co:5432/postgres";
+    assert(ddl.directPostgresConfigured() === true && ddl.setupChannel() === "direct-postgres",
+      "N2d: DATABASE_URL enables the direct channel (all conventions normalized into one model)");
+    delete process.env.DATABASE_URL;
     // N3: password + public URL -> the direct endpoint is derived automatically.
     delete process.env.POSTGRES_URL_NON_POOLING;
     process.env.SUPABASE_DB_PASSWORD = "pw";

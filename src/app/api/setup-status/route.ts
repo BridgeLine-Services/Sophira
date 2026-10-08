@@ -26,6 +26,7 @@ export async function GET() {
     // The precise missing infrastructure capability (requirement K/L) -
     // categorical only: supabase-credentials | service-role |
     // initialization-channel | null.
+    connectionEnvNames: status.probe.connectionEnvNames,
     capability: status.capability,
     ready: status.ready,
     headline: status.headline,

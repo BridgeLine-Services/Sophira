@@ -24,11 +24,13 @@ export default function SetupWizard({
   reason,
   needsDatabase,
   channel,
+  supabaseIntegrationsUrl,
 }: {
   available: boolean;
   reason: string;
   needsDatabase: boolean;
   channel: "direct-postgres" | "management-api" | "none";
+  supabaseIntegrationsUrl: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -80,7 +82,7 @@ export default function SetupWizard({
         {available
           ? "Sophira can prepare everything for you automatically. This usually takes under a minute."
           : channel === "none"
-            ? "Automatic setup is unavailable: this deployment has no database-initialization channel yet. Connecting the Vercel project to its Supabase project (the official Supabase integration) provisions the direct database connection automatically - Advanced diagnostics below names the exact variables. No tokens, no SQL."
+            ? "Sophira needs a one-time connection to prepare your database automatically. Open your Sophira database dashboard with the button below, choose Vercel, press Connect project, and pick your Sophira - then come back and press Check again. That single connection is the only step; no passwords to copy, no SQL, nothing else."
             : "Automatic setup is temporarily unavailable - open Advanced diagnostics below for the exact state."}
       </p>
       {available && (
@@ -92,6 +94,27 @@ export default function SetupWizard({
         >
           {busy ? "Working..." : "Set Up Sophira"}
         </button>
+      )}
+      {!available && channel === "none" && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {supabaseIntegrationsUrl && (
+            <a
+              href={supabaseIntegrationsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-accent px-5 py-2.5 font-medium text-white"
+            >
+              Open your database dashboard
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="rounded-lg border px-5 py-2.5 font-medium"
+          >
+            Check again
+          </button>
+        </div>
       )}
       {step >= 0 && step < PROGRESS_STEPS.length && (
         <p className="mt-3 text-sm text-ink-soft" role="status">{PROGRESS_STEPS[step]}</p>
