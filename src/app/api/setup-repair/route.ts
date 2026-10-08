@@ -42,7 +42,7 @@ export async function POST(request: Request) {
         failedAt: result.ok ? null : (result as { failedAt?: string }).failedAt ?? null,
         // Deployed-engine marker (developer diagnostics: verifies which
         // build served the response; not a secret, not user-facing copy).
-        engine: 3,
+        engine: 4,
         failure: result.ok ? null : (result as { failure?: string }).failure ?? null,
         // Sanitized connection-phase driver message (hosts/credentials/IPs redacted) -
         // developer diagnostics for the Advanced area only.

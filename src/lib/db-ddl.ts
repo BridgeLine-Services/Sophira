@@ -172,6 +172,19 @@ function connectionString(): string | null {
  * do not verify the private-CA chain) unless the URL explicitly demands
  * full verification.
  */
+/**
+ * Strip explicit sslmode= parameters from the URL before handing it to
+ * node-postgres (live-deployment root cause 2026-10-07: pg's
+ * connection-string parser turns sslmode=require into its OWN ssl setting,
+ * overriding the explicit ssl option and enabling strict verification
+ * against Supabase's private certificate chain - "self-signed certificate
+ * in certificate chain"). The explicit ssl option below is the single
+ * source of truth for TLS.
+ */
+export function stripSslmode(url: string): string {
+  return url.replace(/([?&])sslmode=[^&]*/g, "$1").replace(/\?&/, "?").replace(/[?&]$/, "");
+}
+
 export function sslConfigFor(url: string): { rejectUnauthorized: boolean } {
   return /sslmode=(verify-full|verify-ca)/.test(url)
     ? { rejectUnauthorized: true }
@@ -229,7 +242,7 @@ export async function applyMigrationChainDirect(): Promise<{
 }> {
   const url = connectionString();
   if (!url) return { ok: false, applied: 0 };
-  const client = new Client({ connectionString: url, ssl: sslConfigFor(url) });
+  const client = new Client({ connectionString: stripSslmode(url), ssl: sslConfigFor(url) });
   try {
     await client.connect();
     // 1. PROBE: which migrations are already applied (marker objects).

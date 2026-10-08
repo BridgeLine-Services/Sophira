@@ -296,6 +296,13 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   const ddlSrc2 = readFileSync("src/lib/db-ddl.ts", "utf8");
   assert(ddlSrc2.includes("ssl: sslConfigFor(url)"),
     "N2i: the direct migration client is constructed WITH the TLS config");
+  assert(ddl.stripSslmode("postgresql://x@db.abc.supabase.co:5432/postgres?sslmode=require&pool=true") ===
+      "postgresql://x@db.abc.supabase.co:5432/postgres?pool=true" &&
+      ddl.stripSslmode("postgresql://x@db.abc.supabase.co:5432/postgres?sslmode=require") ===
+      "postgresql://x@db.abc.supabase.co:5432/postgres",
+    "N2j: sslmode= is stripped from the URL so pg's parser cannot override the explicit TLS config (live root cause: self-signed certificate in certificate chain)");
+  assert(ddlSrc2.includes("connectionString: stripSslmode(url)"),
+    "N2k: the client is constructed with the sslmode-stripped URL");
   // N5: pooler-safe atomicity - each migration is ONE BEGIN/COMMIT query.
   const ddl3 = readFileSync("src/lib/db-ddl.ts", "utf8");
   assert(ddl3.includes("BEGIN;\\n${entry.sql}\\nCOMMIT;") && ddl3.includes("ROLLBACK;"),
