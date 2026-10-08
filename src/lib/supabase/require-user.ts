@@ -1,0 +1,43 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+
+/**
+ * SINGLE shared server-side session validation for protected pages
+ * (redirect-loop fix 2026-10-08).
+ *
+ * Every guarded server page (dashboard, owner, ...) MUST get its user
+ * through this function — never a bare `getUser()` + `redirect("/login")`.
+ * The old per-page pattern was the redirect war: the middleware bounced an
+ * authenticated user from /login to /dashboard while the page bounced the
+ * SAME request to /login because ITS getUser() failed on a stale, expired,
+ * or corrupt auth cookie — producing ERR_TOO_MANY_REDIRECTS, with deleting
+ * the site's cookies as the only escape.
+ *
+ * Self-heal: when the session is missing/invalid/unparseable, the stale
+ * Supabase auth cookies are CLEARED (same names, same path the ssr client
+ * set them with) BEFORE the single redirect to /login — so the browser
+ * arrives at /login with no session at all and the middleware can never
+ * bounce it back. One hop, loop impossible by construction.
+ */
+export async function requireUser(supabase: SupabaseClient): Promise<User> {
+  let user: User | null = null;
+  try {
+    ({ data: { user } } = await supabase.auth.getUser());
+  } catch {
+    user = null; // unreachable/misbehaving auth server: treated as not signed in
+  }
+  if (user) return user;
+  try {
+    const store = cookies();
+    for (const { name } of store.getAll()) {
+      if (name.startsWith("sb-") && name.includes("auth-token")) {
+        // Same name/path supabase-ssr used when setting — guarantees deletion.
+        store.set(name, "", { path: "/", maxAge: 0 });
+      }
+    }
+  } catch {
+    // Read-only cookie context: middleware handles propagation.
+  }
+  redirect("/login");
+}

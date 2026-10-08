@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
 import { AppShell } from "@/components/app/AppShell";
 import { OwnerDashboard } from "@/components/app/OwnerDashboard";
 import { Badge, Button } from "@/components/ui";
@@ -19,10 +20,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function OwnerPage() {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // Shared session validation (redirect-loop fix): a dead session is
+  // cleared ONCE and sent to /login — it can never bounce back.
+  const user = await requireUser(supabase);
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (!profile) redirect("/login");

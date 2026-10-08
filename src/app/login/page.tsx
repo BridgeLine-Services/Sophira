@@ -79,8 +79,10 @@ function LoginForm() {
       setError(classified.userMessage);
       return;
     }
+    // LOOP BREAKER (2026-10-08): a next param pointing back at /login is
+    // by definition a redirect cycle — drop it and take the default route.
     const next = search.get("next");
-    if (next && next.startsWith("/")) {
+    if (next && next.startsWith("/") && next !== "/login") {
       router.push(next);
       router.refresh();
       return;

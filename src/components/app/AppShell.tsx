@@ -50,6 +50,18 @@ export function AppShell({ title, backHref, actions, children }: {
     return () => { alive = false; };
   }, [supabase]);
 
+  // Blank-screen/redirect-loop fix (2026-10-08): if the session dies while
+  // the user is inside the app (token revoked, cookie cleared, signed out
+  // in another tab), the shell previously kept rendering a broken frame.
+  // Route to /login ONCE, on the explicit SIGNED_OUT event only — the
+  // server guard still owns the real protection; this is UX, not security.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT" && !signingOut) router.replace("/login");
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [supabase, router, signingOut]);
+
   async function signOut() {
     setSigningOut(true);
     // Offline logout policy (STEP 12): sign-out deletes ALL local offline

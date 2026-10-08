@@ -106,7 +106,19 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+    const bounce = NextResponse.redirect(url);
+    // SELF-HEAL (redirect-loop fix 2026-10-08): a stale, expired, or
+    // corrupt Supabase auth cookie previously survived this bounce, so the
+    // guarded page and the /login bouncer could ping-pong forever
+    // (ERR_TOO_MANY_REDIRECTS — the only escape was deleting cookies by
+    // hand). Clear every auth cookie on the redirect response so the
+    // browser arrives at /login with NO session. getUser() returning null
+    // while a session cookie exists means the session is dead: clearing it
+    // is correct, and for a signed-out visitor there is nothing to clear.
+    for (const { name } of request.cookies.getAll()) {
+      if (name.startsWith("sb-")) bounce.cookies.delete(name);
+    }
+    return bounce;
   }
 
   // Revoked membership: explicit Access Denied on every protected route —

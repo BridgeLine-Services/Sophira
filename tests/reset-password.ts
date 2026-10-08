@@ -31,8 +31,10 @@ export function runResetPasswordTests(assert: (c: boolean, n: string) => void, s
     "reset: /reset-password is in the middleware PUBLIC list (unauthenticated users may request a reset)");
   assert(page.includes("resetPasswordForEmail"),
     "reset: the request uses Supabase Auth's resetPasswordForEmail (no custom reset mechanism)");
-  assert(page.includes("redirectTo: window.location.origin + \"/auth/callback?next=/reset-password\""),
+  assert(page.includes('redirectTo: site + "/auth/callback?next=/reset-password"'),
     "reset: the recovery link goes through /auth/callback (server-side PKCE code exchange) and returns to /reset-password");
+  assert(page.includes("NEXT_PUBLIC_SITE_URL") && page.includes("window.location.origin"),
+    "reset: the link origin is pinned to NEXT_PUBLIC_SITE_URL when configured, falling back to the current origin — a preview/dead host can never be baked into the emailed link");
   const callback = readFileSync("src/app/auth/callback/route.ts", "utf8");
   assert(callback.includes("exchangeCodeForSession"),
     "reset: the callback exchanges the recovery code server-side (the PKCE verifier lives in the shared cookie store) — no assumption that getSession() creates the session");

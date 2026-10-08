@@ -98,8 +98,18 @@ export default function ResetPasswordPage() {
     // The recovery link lands on /auth/callback (the PKCE code exchange
     // happens server-side with the cookie-stored verifier) and then
     // redirects back here with a valid recovery session.
+    // Reset-404 fix (2026-10-08): pin the emailed link's origin to the
+    // PRODUCTION site when NEXT_PUBLIC_SITE_URL is configured, so a request
+    // made from a preview URL or dead alias can never bake that host into
+    // the link. (GoTrue also validates the redirect against its allowlist —
+    // Supabase Auth URL Configuration must list the same origin.)
+    const site = (() => {
+      const env = process.env.NEXT_PUBLIC_SITE_URL;
+      if (env && /^https?:\/\//.test(env)) return env.replace(/\/+$/, "");
+      return window.location.origin;
+    })();
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: window.location.origin + "/auth/callback?next=/reset-password",
+      redirectTo: site + "/auth/callback?next=/reset-password",
     });
     setBusy(false);
     if (error) {
