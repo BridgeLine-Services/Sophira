@@ -40,6 +40,9 @@ export async function POST(request: Request) {
         // Categorical developer diagnostics: which migration step failed
         // and what class of failure (never raw SQL, never identifiers).
         failedAt: result.ok ? null : (result as { failedAt?: string }).failedAt ?? null,
+        // Deployed-engine marker (developer diagnostics: verifies which
+        // build served the response; not a secret, not user-facing copy).
+        engine: 3,
         failure: result.ok ? null : (result as { failure?: string }).failure ?? null,
       },
       { status: result.ok ? 200 : 409 }

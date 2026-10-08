@@ -183,7 +183,12 @@ function categorizeFailure(err: unknown): MigrationFailure {
   const code = (err as { code?: string })?.code ?? "";
   const message = String((err as { message?: string })?.message ?? "");
   if (code === "42P01" || code === "42704" || /relation .* does not exist/i.test(message)) return "relation-missing";
-  if (code === "42501" || code === "28000" || /permission denied|does not have privilege/i.test(message)) return "permission";
+  if (
+    code === "42501" ||
+    code === "28000" ||
+    code === "28P01" ||
+    /permission denied|does not have privilege|password authentication failed|authentication failed/i.test(message)
+  ) return "permission";
   if (code === "0A000") return "unsupported-feature";
   if (/connect|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|SSL|sslmode|pg_hba|handshake/i.test(message)) return "connection";
   if (code === "42601" || /syntax error/i.test(message)) return "syntax";
