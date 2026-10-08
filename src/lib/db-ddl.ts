@@ -369,7 +369,12 @@ export async function applyMigrationChainDirect(): Promise<{
           /* the server already aborted the transaction */
         }
         await client.end();
-        return { ok: false, applied, failedAt: entry.name, failure: categorizeFailure(err) };
+        // 2026-10-07: the exact driver message for a failed MIGRATION is
+        // safe developer diagnostics (SQL identifiers only - it contains no
+        // credentials, and the connection string is redacted by the shared
+        // sanitizer). Without it, a failing migration is undiagnosable
+        // remotely.
+        return { ok: false, applied, failedAt: entry.name, failure: categorizeFailure(err), detail: sanitizeConnectionError(err) };
       }
     }
     await client.end();
