@@ -7,7 +7,7 @@ import { CloudOff } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { BookOpen, Brain, GraduationCap, Home, Library, LogOut, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText } from "lucide-react";
+import { BookOpen, Brain, GraduationCap, Home, Library, LogOut, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, Wifi } from "lucide-react";
 
 const NAV = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -22,6 +22,7 @@ const NAV = [
   { href: "/learning", label: "Learning / Memory", icon: Brain },
   { href: "/offline", label: "Offline", icon: CloudOff },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/online", label: "Online", icon: Wifi },
 ];
 
 /**

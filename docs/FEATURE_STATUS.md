@@ -3,7 +3,7 @@
 Moved verbatim from README.md on 2026-10-07 (documentation-consistency
 round). "Suite:" numbers inside rows are the historical assertion counts at
 the time each feature landed; the CURRENT full-suite count is what `npm test`
-reports (2764 assertions as of 2026-10-09; `npm test` is authoritative). Per-feature status stays honest: "Implemented +
+reports (2943 assertions as of 2026-10-09; `npm test` is authoritative). Per-feature status stays honest: "Implemented +
 automated tests" means wired end-to-end and covered offline; "requires
 external configuration" means the feature reports honestly and fabricates
 nothing until the owner configures it.

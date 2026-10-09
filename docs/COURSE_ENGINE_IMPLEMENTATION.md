@@ -102,3 +102,50 @@ master pushes.
 Production environment variables, live API credentials, GitHub
 SUPABASE_TEST_* secrets, device/PWA testing, and legal documentation facts
 remain outstanding owner tasks — unchanged by this work.
+
+## Master structure increment (2026-10-09, later the same day)
+
+Audit of the master structure spec found the engine registry counted tools
+inconsistently with the spec. Closed as a pure increment over the existing
+architecture — no new AI backends, no removed features:
+
+- `src/lib/courses/engines.ts` — registry now matches the spec exactly:
+  English 9 tools (Teachers, Essay, Writing, Planning, Grammar & Spelling,
+  Library, Memory, Changes, Typing Calibration); Math 6 tools (Teachers,
+  Scan Math to Solve, Type to Solve, Teach Me How to Solve, Test Preparation,
+  Practice Problems); every other subject (Biology, Chemistry, Physics,
+  Humanities, Programming, General) exactly 8 tools including its
+  subject-specific AI engine and Typing Calibration. Course groups defined:
+  Science (parent: Biology/Chemistry/Physics nested), History / Social
+  Science, Computer Science, Other Subject.
+- New engines over the EXISTING AI service (`aiChat`), all auth-guarded:
+  - `POST /api/writing/plan` + `/writing/planning` — plans and outlines only,
+    never drafts the assignment ("plans only; it never completes the work").
+  - `POST /api/writing/grammar` + `/writing/grammar` — individual
+    accept/reject corrections, server-verified verbatim quotes, voice
+    preserved (no wholesale rewrites).
+  - `POST /api/tutor` + `/tutor` — subject tutor mode (single engine, works
+    for any subject).
+  - `POST /api/math/prepare` + `/math/test-prep` — test/quiz prep.
+  - `POST /api/math/practice` + `/math/practice` — practice problems with
+    attempt-before-reveal and honest attempt checking.
+- `src/app/math/page.tsx` + `src/app/api/math/solve/route.ts` —
+  `?mode=type` opens typed input directly; a Teach-me toggle and
+  `?mode=teach` route explain mode through the SAME verified pipeline
+  (teaching prompt only; no second solver authority, answers unchanged).
+- `src/app/courses/page.tsx` — courses grouped by the spec hierarchy;
+  Science renders as a parent card with Biology/Chemistry/Physics nested.
+- `src/app/online/page.tsx` + nav item — live status page: real
+  connectivity (`navigator.onLine`), live `/api/health` probe, real
+  pending-sync queue count and sync trigger from the existing offline
+  engine. Unknown states reported honestly, never faked.
+- `src/app/proposals/page.tsx` — Changes rebuilt as the chronological,
+  global change history (decided profile updates, learning patterns,
+  memory updates) and, with `?course_id=`, the SUBJECT-scoped view.
+  Reads only real schema columns; subject changes never rewrite another
+  subject's memories.
+- Regression coverage in `tests/course-engine.ts`: engine tool counts,
+  nav destinations, Science parent grouping, Online honesty, Changes
+  subject scoping, new routes auth-guarded, planning never writes the
+  assignment, grammar verbatim-quote verification, practice
+  attempt-before-reveal, math teach/type modes.

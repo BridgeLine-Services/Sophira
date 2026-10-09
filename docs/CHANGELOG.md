@@ -146,3 +146,32 @@ explicit owner decision — it creates schema and the owner account on the live
 database.
 
 Test count at close: **2541** (`npm test`), build PASS, tsc clean.
+
+### Upgrade round 2026-10-09 (later): master structure spec
+
+Landed on master in one increment (no rebuilds — all over the existing
+AI service, math pipeline, and offline engine):
+
+- **Engine registry corrected to the spec** — English exactly 9 tools,
+  Math exactly 6 (incl. Type to Solve, Teach Me How to Solve, Test
+  Preparation, Practice Problems), every other subject exactly 8 tools
+  including Typing Calibration and its subject AI engine.
+- **Five new AI engines over the existing service** — Planning (never
+  writes the assignment), Grammar & Spelling (accept/reject each
+  correction, verbatim-quote server verification, voice preserved),
+  Tutor (any subject), Math Test Prep, Math Practice
+  (attempt-before-reveal, honest checking).
+- **Math modes** — `/math?mode=type` opens typed input; `?mode=teach`
+  and the Teach-me toggle explain the concept through the SAME verified
+  pipeline (no second solver authority).
+- **Courses hierarchy** — Science parent with Biology/Chemistry/Physics
+  nested; History / Social Science, Computer Science, Other Subject
+  groups.
+- **Online status page** (`/online`, nav item) — real connectivity, live
+  health probe, real pending-sync queue; unknown states reported
+  honestly, never faked.
+- **Changes rebuilt** — global chronological change history (profile
+  decisions, learning patterns, memory updates) + subject-scoped view
+  (`?course_id=`); real schema columns only; no cross-subject leaks.
+- Suite grew 2859 → 2943 assertions, all passing; tsc + production build
+  clean.

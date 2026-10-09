@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Input, Label, Spinner, useToast } from "@/components/ui";
 import { preprocessForOcr, detectExpression, toGrayscale, type GrayImage } from "@/lib/math/image";
@@ -26,7 +27,19 @@ interface PipelineResult {
 }
 
 export default function MathScanPage() {
+  // useSearchParams requires a Suspense boundary for prerendering.
+  return (
+    <Suspense fallback={null}>
+      <MathScanInner />
+    </Suspense>
+  );
+}
+
+function MathScanInner() {
   const { toast } = useToast();
+  const urlMode = useSearchParams().get("mode");
+  const [teachMode, setTeachMode] = useState(urlMode === "teach");
+  const [typeOpen, setTypeOpen] = useState(urlMode === "type");
   const fileRef = useRef<HTMLInputElement>(null);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
@@ -91,7 +104,7 @@ export default function MathScanPage() {
       const res = await fetch("/api/math/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_data_url: imageDataUrl, rotation, confirmed_expression: confirmedExpression ?? null }),
+        body: JSON.stringify({ image_data_url: imageDataUrl, rotation, confirmed_expression: confirmedExpression ?? null, mode: teachMode ? "teach" : "solve" }),
       });
       const json = await res.json();
       if (!res.ok || !json.result) {
@@ -118,7 +131,7 @@ export default function MathScanPage() {
       const res = await fetch("/api/math/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expression: confirmedExpr }),
+        body: JSON.stringify({ expression: confirmedExpr, mode: teachMode ? "teach" : "solve" }),
       });
       const json = await res.json();
       if (!res.ok || !json.result) { toast("error", json.error ?? "Failed."); return; }
@@ -163,7 +176,7 @@ export default function MathScanPage() {
             {detect && <p className={`text-xs ${detect.startsWith("Expression detected") ? "text-success" : "text-warn"}`}>{detect}</p>}
             {imageDataUrl && <img src={imageDataUrl} alt="scanned problem" className="max-h-64 rounded border border-ink/10" />}
 
-            <details className="text-sm">
+            <details className="text-sm" open={typeOpen} onToggle={(e) => setTypeOpen((e.target as HTMLDetailsElement).open)}>
               <summary className="cursor-pointer text-ink/60">Or type the problem directly</summary>
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 <div className="flex-1 min-w-56">

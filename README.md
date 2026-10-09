@@ -108,7 +108,7 @@ and no cloud. Architecture: **docs/SELF_HOSTED_AI_ARCHITECTURE.md**.
 
 ## Testing
 
-- `npm test` — 2503 offline assertions (isolation, conditionality,
+- `npm test` — 2943 offline assertions (isolation, conditionality,
   conflicts, injection defense, routing, verification, offline subsystem).
 - `npx tsc --noEmit` and `npm run build` — must pass with zero errors.
 - `RUN_LIVE_MODEL=1 npm test` — additionally verifies real on-device
