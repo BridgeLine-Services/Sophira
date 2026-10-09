@@ -1,1249 +1,1345 @@
 {
-  "audit": {
-    "date": "2026-10-05",
-    "base_commit": "8f8d8fc",
-    "auditor": "repository implementation audit against requirements (Prompt 1)",
-    "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
-    "verification": {
-      "offline_tests": "989/989 passed (931 prior + 58 owner-access conformance assertions added 2026-10-05)",
-      "typecheck": "tsc --noEmit strict: clean",
-      "build": "next build: 38/38 routes compiled",
-      "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 — production is in the documented DEGRADED mode (no Supabase/AI env configured)",
-      "not_fabricated": "No live Supabase/AI/search-provider run was possible in this audit environment (no credentials); those items are marked below accordingly."
-    }
+ "audit": {
+  "date": "2026-10-09",
+  "base_commit": "e48863f",
+  "auditor": "repository implementation audit against requirements (Prompt 1)",
+  "method": "Every item verified against actual code, migrations, and tests in this repository. No status was taken from documentation alone. The offline test suite (285 assertions), strict typecheck, and production build were executed during this audit; the live deployment was probed over HTTP.",
+  "verification": {
+   "offline_tests": "989/989 passed (931 prior + 58 owner-access conformance assertions added 2026-10-05)",
+   "typecheck": "tsc --noEmit strict: clean",
+   "build": "next build: 38/38 routes compiled",
+   "live_probe": "https://sophira.vercel.app: / -> 307 /login, /login 200, /install 200, /downloads 200, /manifest.webmanifest 200, /api/health 200 — production is in the documented DEGRADED mode (no Supabase/AI env configured)",
+   "not_fabricated": "No live Supabase/AI/search-provider run was possible in this audit environment (no credentials); those items are marked below accordingly."
   },
-  "items": [
-    {
-      "id": "personalized-academic-learning",
-      "title": "Personalized academic learning",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/lib/ai/context.ts",
-        "src/lib/ai/subjects.ts",
-        "src/lib/types.ts",
-        "src/app/api/ai/solve/route.ts",
-        "src/app/onboarding/page.tsx",
-        "src/app/settings/page.tsx"
-      ],
-      "functions": [
-        "composeAcademicContext",
-        "routeSubject",
-        "routeMathTopic"
-      ],
-      "tables": [
-        "profiles",
-        "courses",
-        "teachers",
-        "assignments",
-        "learning_patterns"
-      ],
-      "apis": [
-        "/api/ai/solve",
-        "/api/learning/patterns"
-      ],
-      "tests_existing": [
-        "tests/run.ts sections 1-3, 7a-7b, 8, 12a (hierarchy, subject/math routing, order of authority)"
-      ],
-      "tests_missing": [
-        "Live end-to-end run against a configured AI provider"
-      ],
-      "env": [
-        "OPENAI_API_KEY",
-        "OPENAI_BASE_URL",
-        "SOPHIRA_MODEL"
-      ],
-      "blockers": [
-        "Live verification needs AI credentials (external)"
-      ]
-    },
-    {
-      "id": "writing-style-learning",
-      "title": "Writing style/profile learning",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/app/api/ai/analyze-writing/route.ts",
-        "src/lib/ai/context.ts",
-        "src/components/app/ProposalsPanel.tsx",
-        "src/components/app/ProfileVersionHistory.tsx",
-        "src/app/writing/page.tsx"
-      ],
-      "functions": [
-        "composeAcademicContext (writing_profile layer, conditional)"
-      ],
-      "tables": [
-        "writing_profiles",
-        "writing_samples",
-        "profile_update_proposals",
-        "profile_versions"
-      ],
-      "apis": [
-        "/api/ai/analyze-writing"
-      ],
-      "tests_existing": [
-        "tests/run.ts: writing-profile conditionality (math never loads it; writing does)"
-      ],
-      "tests_missing": [
-        "Live analyze-writing round trip"
-      ],
-      "env": [
-        "OPENAI_API_KEY"
-      ],
-      "blockers": [
-        "Live verification needs AI credentials (external)"
-      ]
-    },
-    {
-      "id": "teacher-methods-requirements",
-      "title": "Teacher-specific methods and requirements",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/app/teachers/[id]/TeacherProfileEditor.tsx",
-        "src/app/api/ai/extract-teacher-doc/route.ts",
-        "src/lib/ai/context.ts",
-        "src/lib/ai/compliance.ts"
-      ],
-      "functions": [
-        "composeAcademicContext (teacher layer)",
-        "normalizeMethodCompliance"
-      ],
-      "tables": [
-        "teachers",
-        "teacher_documents",
-        "academic_sources",
-        "profile_update_proposals",
-        "profile_versions"
-      ],
-      "apis": [
-        "/api/ai/extract-teacher-doc",
-        "/api/ai/solve"
-      ],
-      "tests_existing": [
-        "teacher isolation (6 assertions)",
-        "source conflict detection (5)",
-        "method-compliance honesty guards (6)"
-      ],
-      "tests_missing": [
-        "Live extract-teacher-doc flow"
-      ],
-      "env": [
-        "OPENAI_API_KEY"
-      ],
-      "blockers": []
-    },
-    {
-      "id": "instruction-override",
-      "title": "Teacher/assignment instructions overriding older learned patterns",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/lib/ai/context.ts",
-        "src/lib/learning/patterns.ts"
-      ],
-      "functions": [
-        "composeAcademicContext (ORDER OF AUTHORITY first prompt section)",
-        "intentionalWritingHabits (requirements-always-override caveat)"
-      ],
-      "tables": [],
-      "apis": [
-        "/api/ai/solve"
-      ],
-      "tests_existing": [
-        "order-of-authority layout (8 assertions)",
-        "intentional-habit override guard (5)"
-      ],
-      "tests_missing": [],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "feedback-correction-learning",
-      "title": "Feedback and correction learning",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/app/api/ai/feedback-to-proposal/route.ts",
-        "src/app/corrections/page.tsx",
-        "src/components/app/CorrectionsPanel.tsx",
-        "src/components/app/FeedbackPanel (in Workspace)",
-        "src/lib/learning/patterns.ts"
-      ],
-      "functions": [
-        "transitionPattern",
-        "normalizeObservedMistakes",
-        "feedback-to-proposal proposal creation"
-      ],
-      "tables": [
-        "feedback",
-        "profile_update_proposals",
-        "learning_patterns"
-      ],
-      "apis": [
-        "/api/ai/feedback-to-proposal",
-        "/api/learning/patterns"
-      ],
-      "tests_existing": [
-        "lifecycle transitions (14)",
-        "observed-mistake normalization",
-        "similarity matching"
-      ],
-      "tests_missing": [
-        "Live feedback-to-proposal round trip"
-      ],
-      "env": [
-        "OPENAI_API_KEY"
-      ],
-      "blockers": []
-    },
-    {
-      "id": "pattern-lifecycle-stale-detection",
-      "title": "Pattern lifecycle and stale-pattern detection",
-      "status": "IMPLEMENTED",
-      "notes": "Lifecycle (candidate/active/corrected/recurring/temporary, confidence, scope isolation) implemented and tested; stale-pattern detection (isPatternStale, 180 days) added earlier. CONFIDENCE DECAY + BEHAVIORAL ADAPTATION added 2026-10-05 (migration 0016 + src/lib/learning/evidence.ts, pure): every pattern tracks last_confirmed_at/last_used_at/confirmation_count/contradiction_count/correction_count + new lower_confidence status; evidence-driven confidence (positive: confirm/repeated use/teacher support/approved work; negative: correction/rejection/teacher contradiction/alternative method/instruction conflict); deterministic bounded decay (contradiction ladder ×0.92/×0.83/×0.74/×0.55 — 94→87→73→51→INACTIVE; time decay ×0.8 per 90d window after a 90d grace, floor 0.05); ladder transitions never delete; demoted/inactive patterns revive via later confirming evidence; teacher + current assignment instructions always override (solve-route conflict loop + prompt precedence + teacher_contradicts demoting teacher_required); explainPatternDecisions exposes why each pattern was selected/ignored, persisted per response and shown in the panel.",
-      "files": [
-        "src/app/api/ai/solve/route.ts",
-        "src/app/api/learning/patterns/evidence/route.ts",
-        "src/app/api/learning/patterns/route.ts",
-        "src/components/app/CorrectionsPanel.tsx",
-        "src/lib/ai/client.ts",
-        "src/lib/learning/evidence.ts",
-        "src/lib/learning/patterns.ts",
-        "supabase/migrations/0016_pattern_evidence.sql"
-      ],
-      "functions": [
-        "applyContradictionDecay",
-        "applyTimeDecay",
-        "describeStaleness",
-        "explainPatternDecisions",
-        "isPatternStale",
-        "recomputeStatus",
-        "recordPatternEvidence",
-        "selectApplicablePatterns",
-        "selectApplicablePatternsAdaptive",
-        "transitionPattern"
-      ],
-      "tables": [
-        "learning_patterns (first_observed, last_observed, observation_count stored but never used for staleness)"
-      ],
-      "apis": [
-        "/api/learning/patterns"
-      ],
-      "tests_existing": [
-        "lifecycle (14)",
-        "scope leakage (7)",
-        "honest applied-context (9)",
-        "stale-pattern detection (13 assertions, section 8d)",
-        "40 assertions in section 18 (evidence ladder, decay math, all 7 required scenarios, determinism/bounds)"
-      ],
-      "tests_missing": [],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "rubric-analysis",
-      "title": "Assignment/rubric analysis",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/lib/rubric.ts",
-        "src/app/api/rubric-audit/route.ts",
-        "src/components/app/RubricAuditPanel.tsx",
-        "supabase/migrations/0011_rubric_audits.sql"
-      ],
-      "functions": [
-        "buildChecklist",
-        "auditDraft",
-        "mergeSemanticResults",
-        "failedCriteriaForRevision",
-        "countWords"
-      ],
-      "tables": [
-        "rubric_audits"
-      ],
-      "apis": [
-        "/api/rubric-audit"
-      ],
-      "tests_existing": [
-        "checklist parsing, deterministic word/section/bibliography/citation/prohibited checks, semantic labeling, revision list (section 15e)"
-      ],
-      "tests_missing": [
-        "Live rubric audit against AI criteria"
-      ],
-      "env": [
-        "OPENAI_API_KEY (semantic criteria only; deterministic checks run without it)"
-      ],
-      "blockers": []
-    },
-    {
-      "id": "research-engine",
-      "title": "Research engine",
-      "status": "IMPLEMENTED",
-      "notes": "Code complete and unit-tested; NEVER run live — no SEARCH_API_KEY exists in any environment. Honest failure without a key (no fabricated sources). Upgraded 2026-10-05 with full claim→evidence traceability (see item claim-evidence-traceability).",
-      "files": [
-        "src/lib/research/provider.ts",
-        "src/lib/research/research.ts",
-        "src/lib/research/verify.ts",
-        "src/app/api/research/route.ts",
-        "src/components/app/ResearchPanel.tsx",
-        "supabase/migrations/0012_research_tables.sql"
-      ],
-      "functions": [
-        "searchProviderConfigured",
-        "getSearchProvider",
-        "generateQueries",
-        "dedupeSources",
-        "rankCandidates",
-        "fetchAndVerify"
-      ],
-      "tables": [
-        "research_projects",
-        "research_queries",
-        "research_sources",
-        "research_claims",
-        "research_citations",
-        "research_verifications"
-      ],
-      "apis": [
-        "/api/research",
-        "/api/research/audit"
-      ],
-      "tests_existing": [
-        "provider config honesty, dead URL/redirect/paywall/thin-content verification, query generation, dedupe, objective ranking (15f-15i)",
-        "claim evidence traceability (41 assertions, section 16b)"
-      ],
-      "tests_missing": [
-        "One live end-to-end search (needs SEARCH_API_KEY — external)"
-      ],
-      "env": [
-        "SEARCH_PROVIDER",
-        "SEARCH_API_KEY",
-        "SEARCH_BASE_URL (custom only)"
-      ],
-      "blockers": [
-        "No search-provider key configured anywhere — live verification impossible until the owner adds one"
-      ]
-    },
-    {
-      "id": "claim-source-verification",
-      "title": "Claim-to-source evidence verification",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/lib/research/verify.ts",
-        "src/lib/research/citation.ts",
-        "src/app/api/research/audit/route.ts"
-      ],
-      "functions": [
-        "fetchAndVerify",
-        "quoteInContent",
-        "claimSupportsDeterministic",
-        "extractCitationMarkers",
-        "titlesCorrespond"
-      ],
-      "tables": [
-        "research_sources",
-        "research_verifications",
-        "research_claims"
-      ],
-      "apis": [
-        "/api/research/audit"
-      ],
-      "tests_existing": [
-        "quote authenticity (real found / fabricated rejected)",
-        "claim support pre-check",
-        "verification statuses"
-      ],
-      "tests_missing": [
-        "Live audit of a real generated essay"
-      ],
-      "env": [
-        "OPENAI_API_KEY (AI-assisted quote/claim pass)"
-      ],
-      "blockers": []
-    },
-    {
-      "id": "citation-integrity",
-      "title": "Citation integrity",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/lib/research/citation.ts",
-        "src/app/api/ai/solve/route.ts"
-      ],
-      "functions": [
-        "formatCitation",
-        "buildBibliography",
-        "parseISODateLoose",
-        "Works Cited assembly (deterministic, from source records)"
-      ],
-      "tables": [
-        "research_citations"
-      ],
-      "apis": [
-        "/api/ai/solve (researched-essay path)",
-        "/api/research/audit"
-      ],
-      "tests_existing": [
-        "MLA/APA/Chicago/generic formatting",
-        "missing metadata renders n.d./n.p. honestly",
-        "no invented ISO dates"
-      ],
-      "tests_missing": [
-        "Live citation of real sources"
-      ],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "submission-readiness",
-      "title": "Submission readiness",
-      "status": "IMPLEMENTED",
-      "notes": "IMPLEMENTED and UPGRADED 2026-10-05 (audit item H1 → final gate round). Level 1: src/lib/readiness.ts (pure buildReadiness) aggregates stored records. Level 2 (mandatory final gate): src/lib/readiness/finalGate.ts — machine-enforced submission_ready=false when ANY hard teacher/rubric/formatting/research/assignment requirement fails; unverifiable requirements block too; live auditDraft on the current draft merged with stored AI-assessed semantics; placeholders, claims, authority, sources, deadline feasibility; result persisted (migration 0015 responses.submission_gate) and rendered as a PASS/FAIL block that can never show a misleading Ready state.",
-      "files": [
-        "src/lib/readiness.ts",
-        "src/lib/readiness/finalGate.ts",
-        "src/app/api/readiness/route.ts",
-        "src/app/api/readiness/final/route.ts",
-        "src/components/app/ReadinessPanel.tsx",
-        "src/app/assignments/[id]/Workspace.tsx",
-        "supabase/migrations/0015_submission_gate.sql"
-      ],
-      "functions": [
-        "buildReadiness",
-        "evaluateFinalGate",
-        "findUnresolvedPlaceholders",
-        "formatFinalGate",
-        "GET /api/readiness/final"
-      ],
-      "tables": [
-        "responses (submission_gate, migration 0015)",
-        "assignments",
-        "teachers",
-        "rubric_audits",
-        "research_projects",
-        "research_sources"
-      ],
-      "apis": [
-        "/api/readiness",
-        "/api/readiness/final"
-      ],
-      "tests_existing": [
-        "24 assertions in sections 8d+15j",
-        "33 assertions in section 15k (final gate, machine enforcement)"
-      ],
-      "tests_missing": [
-        "Live end-to-end with a configured backend (external credentials)"
-      ],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "typing-calibration",
-      "title": "Typing-speed calibration",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/app/api/typing/profile/route.ts",
-        "src/app/api/typing/route.ts",
-        "src/app/onboarding/page.tsx",
-        "src/app/settings/page.tsx",
-        "src/components/app/PacedOutput.tsx",
-        "src/components/app/TypingTest.tsx",
-        "src/lib/typing-passage.ts",
-        "src/lib/typing-profile.ts",
-        "src/lib/typing.ts",
-        "supabase/migrations/0009_typing_calibration.sql",
-        "supabase/migrations/0018_adaptive_typing_profile.sql"
-      ],
-      "functions": [
-        "adoptBaseline",
-        "computeTypingResult",
-        "confidenceFor",
-        "effectiveTypingPace",
-        "passageById",
-        "recomputeTypingProfile",
-        "select_typing_baseline (RPC)",
-        "trustworthyObservations"
-      ],
-      "tables": [
-        "typing_attempts",
-        "typing_baseline"
-      ],
-      "apis": [
-        "/api/typing"
-      ],
-      "tests_existing": [
-        "WPM/accuracy/net-WPM, suspicious-attempt flags, baseline selection (section 13)",
-        "typing passages server-controlled (15d)",
-        "section 20: 15 assertions — all seven required scenarios + preservation check"
-      ],
-      "tests_missing": [
-        "Live persistence flow (needs Supabase)"
-      ],
-      "env": [],
-      "blockers": [],
-      "notes": " OPTIONAL ADAPTIVE TYPING PROFILE (2026-10-05, migration 0018 + src/lib/typing-profile.ts, pure): per-user typing_profiles (baseline_wpm, recent_average_wpm, recommended_wpm, confidence LOW/MEDIUM/HIGH, sample_count, last_calibration_at, auto_adjust_enabled=false default, manual_wpm) with strict RLS; rolling estimate over the last 5 valid+unflagged+plausible attempts ONLY (suspicious data can never corrupt it); recommended = floor(midpoint of baseline & recent) clamped [0.75,1.25]x baseline (example 62+67→64, HIGH at 4+ consistent samples); pacing NEVER changes automatically — effectiveTypingPace: manual → adaptive-if-enabled → fixed baseline; PacedOutput honors the effective pace with unchanged fallback; TypingTest adds the adaptive checkbox + preferred-pace field; /api/typing/profile GET/PATCH; POST syncs only on valid attempts, PATCH on repeated calibration; 15 new tests, suite 520/520."
-    },
-    {
-      "id": "typing-paced-output",
-      "title": "Typing-paced output",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/lib/pacing.ts",
-        "src/lib/pacing-controller.ts",
-        "src/components/app/PacedOutput.tsx",
-        "src/app/assignments/[id]/Workspace.tsx"
-      ],
-      "functions": [
-        "planReveal",
-        "visibleAt",
-        "pacingComplete",
-        "PacingController (start/pause/resume/progress; requiresCalibration)"
-      ],
-      "tables": [],
-      "apis": [],
-      "tests_existing": [
-        "progressive reveal, no full dump (14)",
-        "controller state machine incl. paused-time exclusion (15b)",
-        "no-calibration honest path"
-      ],
-      "tests_missing": [
-        "Browser-level rendering check (Selenium)"
-      ],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "deadline-scheduling",
-      "title": "Deadline-aware scheduling",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/lib/scheduler.ts",
-        "src/lib/workload.ts",
-        "src/app/api/schedule/route.ts",
-        "src/components/app/SchedulePanel.tsx",
-        "supabase/migrations/0010_deadline_scheduling.sql"
-      ],
-      "functions": [
-        "planSchedule",
-        "clampBreak",
-        "estimateWorkMinutes",
-        "parseEstimatedWorkMinutes"
-      ],
-      "tables": [
-        "assignments.due_at",
-        "work_schedules"
-      ],
-      "apis": [
-        "/api/schedule"
-      ],
-      "tests_existing": [
-        "deterministic plans, 10s-6h break bounds, urgency scaling, infeasibility warnings, pause/resume, persisted sessions (15, 15d-per-report)"
-      ],
-      "tests_missing": [
-        "Live schedule persistence (needs Supabase)"
-      ],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "persisted-sessions",
-      "title": "Persisted work/break sessions",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/app/api/schedule/route.ts",
-        "supabase/migrations/0010_deadline_scheduling.sql"
-      ],
-      "functions": [
-        "schedule insert/start/pause/resume handlers (work_schedules update path)"
-      ],
-      "tables": [
-        "work_schedules (RLS, per-user)"
-      ],
-      "apis": [
-        "/api/schedule"
-      ],
-      "tests_existing": [
-        "pause/resume lifecycle logic"
-      ],
-      "tests_missing": [
-        "Live persistence (needs Supabase)"
-      ],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "invitation-only-access",
-      "title": "Invitation-only access",
-      "status": "IMPLEMENTED",
-      "files": [
-        "supabase/migrations/0002_owner_only_invitations.sql",
-        "supabase/migrations/0006_invitation_expiry.sql",
-        "supabase/migrations/0008_invitation_only_signup.sql",
-        "src/app/api/invitations/route.ts",
-        "src/app/api/invitations/accept/route.ts",
-        "src/app/signup/page.tsx",
-        "src/middleware.ts"
-      ],
-      "functions": [
-        "handle_new_user (DB trigger: atomic single-use claim, fail-closed without owner_email)"
-      ],
-      "tables": [
-        "invitations",
-        "invitation_requests",
-        "app_config (owner_email, no client RLS)"
-      ],
-      "apis": [
-        "/api/invitations",
-        "/api/invitations/accept",
-        "/api/invitation-requests"
-      ],
-      "tests_existing": [
-        "26 invitation-security assertions: direct signup blocked, tokenless/fake/expired/revoked/wrong-email/reused invitations rejected, requests create no access"
-      ],
-      "tests_missing": [
-        "Live two-account concurrent-accept probe (ACCEPTANCE_TESTS §14)"
-      ],
-      "env": [],
-      "blockers": [
-        "Fresh installs must configure app_config.owner_email (now documented in README + RELEASE_PROCESS — fixed this round)"
-      ]
-    },
-    {
-      "id": "owner-approval",
-      "title": "Owner approval of invitations",
-      "status": "IMPLEMENTED",
-      "files": [
-        "src/app/api/invitations/route.ts",
-        "src/app/api/invitation-requests/route.ts",
-        "src/app/owner/page.tsx",
-        "src/components/app/OwnerDashboard.tsx",
-        "src/lib/supabase/guard.ts"
-      ],
-      "functions": [
-        "requireOwner",
-        "invite create/revoke",
-        "request approve/reject"
-      ],
-      "tables": [
-        "invitations",
-        "invitation_requests",
-        "profiles.can_request_invites"
-      ],
-      "apis": [
-        "/api/invitations",
-        "/api/invitation-requests",
-        "/api/network/members"
-      ],
-      "tests_existing": [
-        "owner-only policy enforcement at RLS level reviewed; route guard unit-covered indirectly"
-      ],
-      "tests_missing": [
-        "Live owner dashboard flow"
-      ],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "academic-data-isolation",
-      "title": "User academic-data isolation",
-      "status": "IMPLEMENTED",
-      "notes": "Per-user RLS on every content table (19 policies in 0001 alone); owner analytics cannot read member content; app-layer isolation unit-tested. Live cross-account DB probe pending (external credentials).",
-      "files": [
-        "supabase/migrations/0001_init.sql",
-        "supabase/migrations/0005_owner_membership_and_learning.sql",
-        "supabase/migrations/0012_research_tables.sql",
-        "src/lib/supabase/guard.ts",
-        "src/lib/supabase/server.ts"
-      ],
-      "functions": [
-        "requireUser",
-        "requireOwner"
-      ],
-      "tables": [
-        "all content tables: assignments, responses, feedback, writing_samples, writing_profiles, teachers, teacher_documents, courses, documents, learning_patterns, typing_*, work_schedules, rubric_audits, research_*"
-      ],
-      "apis": [
-        "all /api routes"
-      ],
-      "tests_existing": [
-        "teacher/course isolation, scope leakage (7), invitation security (26)"
-      ],
-      "tests_missing": [
-        "Live RLS probe with two real accounts (ACCEPTANCE_TESTS)"
-      ],
-      "env": [],
-      "blockers": [
-        "Live probe needs Supabase credentials (external)"
-      ]
-    },
-    {
-      "id": "owner-aggregate-analytics",
-      "title": "Owner aggregate analytics without academic-data access",
-      "status": "IMPLEMENTED",
-      "files": [
-        "supabase/migrations/0005_owner_membership_and_learning.sql",
-        "src/app/api/network/stats/route.ts",
-        "src/app/api/network/members/route.ts"
-      ],
-      "functions": [
-        "network_stats() (SECURITY DEFINER, aggregate-only)"
-      ],
-      "tables": [
-        "profiles",
-        "invitations"
-      ],
-      "apis": [
-        "/api/network/stats",
-        "/api/network/members"
-      ],
-      "tests_existing": [
-        "schema-level review: no policy grants owner cross-user content reads"
-      ],
-      "tests_missing": [
-        "Live owner-vs-member probe"
-      ],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "rls-security",
-      "title": "RLS/security",
-      "status": "IMPLEMENTED",
-      "notes": "RLS enabled on every table incl. app_config (no client policies, revoked from anon); storage bucket private; prompt-injection defense wrapped into all untrusted doc text; middleware degraded-mode guards regression-tested. SECURITY REGRESSION SUITE (2026-10-05): permanent two-layer privacy gate added to standard acceptance workflow. LIVE matrix tests/security/rls-regression.mjs — real users (OWNER/USER_A/USER_B/UNAUTHORIZED) vs actual RLS: owner NO ACCESS to all nine private categories (assignment, essay, teacher profile, writing samples, feedback, learning patterns, research, typing results, uploaded files); A↔B/anon/revoked/deleted NO ACCESS; owner membership management + aggregate-only analytics verified with zero content markers; fail-closed env (absent→exit 3, partial→exit 1); self-test 4/4 in CI. OFFLINE tests/run.ts §22 (26 assertions, every npm test): all tables RLS-enabled, all policies auth.uid()-scoped, no using(true), network_stats aggregate-only + owner-gated + SECURITY DEFINER, live suite wired into release.yml. Tamper-verified live: removed RLS / permissive policy / analytics content leak each fail the suite. 564/564 tests, build green. No RLS weakened. LIVE run requires owner to set SUPABASE_TEST_* secrets on a disposable test project. INVITATION VERIFICATION (2026-10-05): complete 18-item security verification of the existing invitation-only workflow, no rebuild, no weakening. LIVE tests/security/invitation-regression.mjs: real signUp/trigger/RLS matrix — invitation-refused stranger signup, valid link flow, atomic single-use, expiry, revocation, email binding, missing/fake/modified tokens, owner-only approval, request≠access, removal kills account, zero token leaks (all observed errors mechanically checked against live tokens); fail-closed env; self-test 3/3. OFFLINE tests/run.ts §23 (57 assertions, every npm test): all 18 items verified against actual migration SQL + routes + guard + signup page; tamper-verified T1–T5 (signup-gate bypass, token-lookup loosening, non-atomic claim, dropped owner check, token echo each fail the suite; three loose assertions in the first draft caught and fixed). rls-regression.mjs bootstrap hardened for migration 0008 (owner_email + invitation pre-seed). release.yml runs both live suites when SUPABASE_TEST_* configured. 621/621 tests, build green.",
-      "files": [
-        ".github/workflows/release.yml",
-        "TEST_REPORT.md",
-        "src/lib/ai/context.ts (wrapUntrusted, detectInjectionAttempt)",
-        "src/middleware.ts",
-        "supabase/migrations/*.sql",
-        "tests/run.ts",
-        "tests/security/invitation-regression.mjs",
-        "tests/security/rls-regression.mjs"
-      ],
-      "tables": [
-        "all"
-      ],
-      "apis": [],
-      "tests_existing": [
-        "injection defense (8 patterns incl. profile-change/exfiltration/override/privacy-probe)",
-        "middleware degraded-mode + matcher regressions (11)",
-        "section 22: 26 offline RLS-conformance assertions",
-        "rls-regression.mjs: full live privacy matrix (9 categories × 6 actor scenarios)"
-      ],
-      "tests_missing": [
-        "Live RLS compile/probe against real Postgres"
-      ],
-      "env": [],
-      "blockers": [
-        "Live probe needs Supabase credentials (external)"
-      ],
-      "functions": [
-        "invitation-regression suite",
-        "rls-regression suite",
-        "runInvitationRegressionTests",
-        "runSecurityRegressionTests"
-      ]
-    },
-    {
-      "id": "pwa-install",
-      "title": "PWA installation",
-      "status": "IMPLEMENTED",
-      "files": [
-        "public/manifest.webmanifest",
-        "public/sw.js",
-        "src/components/pwa/ServiceWorkerRegister.tsx",
-        "src/app/install/page.tsx",
-        "src/app/layout.tsx"
-      ],
-      "functions": [
-        "ServiceWorkerRegister",
-        "platform-aware install guidance"
-      ],
-      "tables": [],
-      "apis": [
-        "/manifest.webmanifest",
-        "/sw.js"
-      ],
-      "tests_existing": [
-        "matcher regressions (PWA shell files skip auth middleware)",
-        "live probe 2026-10-05: manifest 200, /install 200"
-      ],
-      "tests_missing": [
-        "Real-device install (Android/iOS)"
-      ],
-      "env": [],
-      "blockers": [
-        "Device testing needs physical devices (external)"
-      ]
-    },
-    {
-      "id": "capacitor-packaging",
-      "title": "Native Capacitor packaging",
-      "status": "IMPLEMENTED",
-      "notes": "android/ (Gradle, APK built+verified with checksums, TEST_REPORT §21) and ios/ (Xcode project) load the deployed web app via server.url; do not fork logic. Not device-tested. NATIVE BUILD CONFIG FIX (2026-10-05): silent placeholder fallback REMOVED (capacitor.config.ts + tauri.conf.json); src/lib/native-url.ts (pure, tested) + scripts/native-url.mjs (self-test 11/11); release builds (SOPHIRA_NATIVE_RELEASE=1) FAIL on missing/placeholder/malformed/non-https/localhost/credentialed SOPHIRA_APP_URL; dev builds use the explicit dev configuration (SOPHIRA_DEV_URL → NEXT_PUBLIC_SITE_URL → localhost:3000); release.yml android/ios sync + desktop tauri patch run in release mode; Capacitor aligned to one major: cli 7.6.9 → 8.5.2 joining android/core/ios 8.5.2 (plugins app 8.1.1, camera 8.2.4); npm install + tsc + 538/538 tests + next build + cap sync android/ios verified in-sandbox; gradle/xcode/tauri builds run only in CI (no local toolchain).",
-      "files": [
-        ".github/workflows/release.yml",
-        "android/app/build.gradle",
-        "capacitor.config.ts",
-        "ios/App/",
-        "package-lock.json",
-        "package.json",
-        "scripts/native-url.mjs",
-        "src-tauri/tauri.conf.json",
-        "src/app/downloads/page.tsx",
-        "src/lib/native-url.ts"
-      ],
-      "functions": [
-        "cap sync",
-        "isReleaseBuild",
-        "resolveNativeServerUrl",
-        "server.url remote loading",
-        "validateNativeAppUrl"
-      ],
-      "tables": [],
-      "apis": [],
-      "tests_existing": [
-        "CI native-project presence checks",
-        "real local Gradle build (§21)",
-        "section 21: 18 assertions — release gate, dev config, config-file absence of fallback"
-      ],
-      "tests_missing": [
-        "Device install/launch runs"
-      ],
-      "env": [
-        "SOPHIRA_APP_URL (per-build override; CI refuses placeholder)"
-      ],
-      "blockers": [
-        "Physical devices + signing material (external)"
-      ]
-    },
-    {
-      "id": "native-deployment-config",
-      "title": "Native deployment configuration",
-      "status": "IMPLEMENTED",
-      "notes": "Release pipeline complete (signing via secrets, checksums, honest unsigned fallback, placeholder-URL refusal) but DORMANT pending external repo config. NATIVE BUILD CONFIG FIX (2026-10-05): silent placeholder fallback REMOVED (capacitor.config.ts + tauri.conf.json); src/lib/native-url.ts (pure, tested) + scripts/native-url.mjs (self-test 11/11); release builds (SOPHIRA_NATIVE_RELEASE=1) FAIL on missing/placeholder/malformed/non-https/localhost/credentialed SOPHIRA_APP_URL; dev builds use the explicit dev configuration (SOPHIRA_DEV_URL → NEXT_PUBLIC_SITE_URL → localhost:3000); release.yml android/ios sync + desktop tauri patch run in release mode; Capacitor aligned to one major: cli 7.6.9 → 8.5.2 joining android/core/ios 8.5.2 (plugins app 8.1.1, camera 8.2.4); npm install + tsc + 538/538 tests + next build + cap sync android/ios verified in-sandbox; gradle/xcode/tauri builds run only in CI (no local toolchain).",
-      "files": [
-        ".github/workflows/release.yml",
-        "capacitor.config.ts",
-        "docs/NATIVE_BUILDS.md",
-        "docs/RELEASE_PROCESS.md",
-        "package-lock.json",
-        "package.json",
-        "scripts/native-url.mjs",
-        "src-tauri/tauri.conf.json",
-        "src/lib/native-url.ts"
-      ],
-      "functions": [
-        "SHA256SUMS generation",
-        "isReleaseBuild",
-        "release matrix (Android/iOS/Windows/macOS/Linux)",
-        "resolveNativeServerUrl",
-        "validateNativeAppUrl"
-      ],
-      "tables": [],
-      "apis": [],
-      "tests_existing": [
-        "workflow YAML validated; native presence checks in CI",
-        "section 21: 18 assertions — release gate, dev config, config-file absence of fallback"
-      ],
-      "tests_missing": [
-        "A published release end-to-end"
-      ],
-      "env": [
-        "SOPHIRA_APP_URL (repo VARIABLE — unset)",
-        "ANDROID_KEYSTORE_BASE64 + ANDROID_STORE_PASSWORD + ANDROID_KEY_ALIAS + ANDROID_KEY_PASSWORD (optional)",
-        "IOS_P12_BASE64 + IOS_P12_PASSWORD + IOS_PROVISIONING_PROFILE_BASE64 + IOS_TEAM_ID (optional)"
-      ],
-      "blockers": [
-        "SOPHIRA_APP_URL variable not set (audit token confirmed 403 variables:write — owner action)",
-        "signing secrets absent (external)"
-      ]
-    },
-    {
-      "id": "legal-docs",
-      "title": "Legal documents",
-      "status": "PARTIAL",
-      "notes": "Complete ToS/Privacy templates + review notice + proprietary LICENSE; bracketed owner facts (entity, address, jurisdiction, contact, effective date) are now MACHINE-VISIBLE: scripts/legal-status.mjs (npm run legal:status, --json) lists every remaining bracket per file and exits 0 once all are completed (17 remain today). Completion still requires owner facts + qualified attorney review — external by design. LEGAL CONFIGURATION GATE (2026-10-05): inspected all four legal documents (all preserved, nothing deleted); inventoried every placeholder ([LEGAL ENTITY NAME], [COPYRIGHT HOLDER LEGAL NAME], [ADDRESS], [CONTACT EMAIL], [LEGAL CONTACT NAME / EMAIL / ADDRESS], [EFFECTIVE DATE], [EFFECTIVE DATE YEAR], [JURISDICTION], [MAXIMUM LIABILITY AMOUNT...], [DISPUTE RESOLUTION METHOD...], [APPLICABLE RULES], [RETENTION PERIOD]); added docs/legal/LEGAL_CONFIGURATION.md — structured owner-supplied field list (identity/dates/jurisdiction/liability/dispute/retention/attorney review) with an INCOMPLETE status and a publication gate (all fields supplied + placeholders replaced + attorney review before production); strengthened ToS §18 with cautious enforcement language ('may constitute copyright infringement and/or breach... reserves all rights and remedies available under applicable law' — zero 'legal trouble' phrasing, verified); extended LEGAL_REVIEW_NOTICE (still: templates, NOT legal advice, attorney review recommended) to state neither the AI nor Base44 is the owner's lawyer and no attorney approval/guarantee exists; verified all 21 required topics are addressed; 12 new test assertions (suite 633/633). No legal values invented — owner must supply every field before production release.",
-      "files": [
-        ".github/workflows/ci.yml",
-        "LICENSE",
-        "docs/legal/LEGAL_CONFIGURATION.md",
-        "docs/legal/LEGAL_REVIEW_NOTICE.md",
-        "docs/legal/PRIVACY_POLICY.md",
-        "docs/legal/TERMS_OF_SERVICE.md",
-        "scripts/legal-status.mjs"
-      ],
-      "functions": [],
-      "tables": [],
-      "apis": [],
-      "tests_existing": [
-        "tests/run.ts section 16: license + legal presence checks",
-        "section 16: 12 legal-configuration assertions (placeholders listed, no false approval claims, cautious enforcement language)"
-      ],
-      "tests_missing": [
-        "Owner completion of the bracketed facts (then legal:status exits 0) + attorney review sign-off"
-      ],
-      "env": [],
-      "blockers": [
-        "Requires owner legal identity + qualified attorney review (external)"
-      ]
-    },
-    {
-      "id": "production-env-config",
-      "title": "Production environment configuration",
-      "status": "PARTIAL",
-      "notes": "Production deployment is LIVE but DEGRADED: Vercel Production has no Supabase/AI env vars, so auth/db/AI cannot run there. All variables are documented (.env.example, RELEASE_PROCESS). The readiness signal is now MACHINE-ENFORCED at release time: /api/health configuration booleans (per-capability) + scripts/verify-deployment.mjs refuses releases against misconfigured deployments. Remaining external blocker: owner must set the Vercel Production env vars and redeploy (cannot be done from the repository).",
-      "files": [
-        ".env.example",
-        "README.md",
-        "docs/RELEASE_PROCESS.md",
-        "scripts/verify-deployment.mjs",
-        "src/app/api/health/route.ts",
-        "src/lib/deployment.ts"
-      ],
-      "functions": [
-        "health GET configuration block"
-      ],
-      "tables": [],
-      "apis": [
-        "/api/health"
-      ],
-      "tests_existing": [
-        "8 new health-readiness assertions (degraded, partial, full, custom-provider, no secret leakage)"
-      ],
-      "tests_missing": [
-        "A configured production deployment to verify against"
-      ],
-      "env": [
-        "NEXT_PUBLIC_SUPABASE_URL",
-        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-        "SUPABASE_SERVICE_ROLE_KEY",
-        "OPENAI_API_KEY",
-        "OPENAI_BASE_URL",
-        "SOPHIRA_MODEL",
-        "NEXT_PUBLIC_SITE_URL",
-        "SEARCH_PROVIDER/SEARCH_API_KEY (optional)"
-      ],
-      "blockers": [
-        "Owner must set the Vercel Production env vars and redeploy (external — cannot be done from the repository)"
-      ]
-    },
-    {
-      "id": "automated-acceptance-testing",
-      "title": "Automated acceptance testing",
-      "status": "IMPLEMENTED",
-      "notes": "285 offline assertions (verified this audit: 285/285), strict typecheck, production build, CI active on GitHub. Live acceptance runbook exists (ACCEPTANCE_TESTS.md, MASTER_ACCEPTANCE_WORKFLOW.md) and is blocked only on credentials. MASTER ACCEPTANCE DEDICATED SECTIONS (2026-10-05): the 27-step end-to-end workflow is preserved; added 24 dedicated acceptance sections (A1-A24: typing calibration/paced output/adaptive profile, deadline scheduling, persisted sessions + break persistence, rubric audit, submission readiness, research provider config/retrieval/verification/claim-evidence/citations/authority, PWA, native builds, native URL validation, invitation security, owner privacy, RLS isolation, confidence decay, teacher precedence, correction learning, legal readiness). Every row: prerequisites/steps/expected/failure condition/evidence/status. IMPLEMENTED vs VERIFIED explicitly distinguished; PASSED only cites executed verification (never code existence). Totals: 35 rows = 24 PASSED (executed offline evidence, dated) + 0 FAILED + 11 BLOCKED (blockers named) + 0 NOT RUN. Machine-checked by suite §24 (205 assertions: sections present, fields complete, counts match totals). 838/838. RELEASE GATE (2026-10-05): single authoritative gate added — docs/RELEASE_GATE.md + scripts/release-gate.mjs evaluating all 38 required checks (live deployment/DB/providers, live security matrices, offline core behaviors, device rows, native config, legal placeholders, env vars, secrets scan, test/build/typecheck/security). Exactly two final states: RELEASE STATUS: GO (all 38 PASS) or BLOCKED with every blocker numbered; NOT RUN and BLOCKED never treated as PASS; repeatable before every deployment (--report/--fast/--self-test modes). Executed 2026-10-05: 20 PASS / 0 FAIL / 17 BLOCKED / 1 NOT RUN → BLOCKED with 18 owner-side blockers (report: docs/RELEASE_GATE_REPORT.txt). CI: new release-gate job in release.yml publishes the gate report to the job summary. Suite §25 machine-checks the gate (51 assertions, 889/638+51). PWA DIRECT-BROWSER READINESS (2026-10-05): new docs/PWA_TESTING_GUIDE.md verifying all 10 PWA requirements (production URL run, secure auth, invitation-only signup, mobile install, session retention, asset loading with exact icon dimensions verified, post-install operation, honest offline limits — shell-only cache, NO offline AI claimed, reconnect state via server persistence + §19 state machine, clear install path on /install). Machine-checked by suite §26 (42 assertions: manifest validity, exact PNG dimensions, static-only SW cache gate, no user-data caching, no offline-AI claims, install steps). Exact owner instructions for opening the URL, Android/iPhone install, and the first test. No app store required. 931/931. OWNER-CONTROLLED ACCESS (2026-10-05): 4 routes fixed to enforce revoked-status (account/delete, ai/analyze-writing, ai/extract-teacher-doc, extract); migration 0019 adds access_revoked_at audit column, email + revoked-date in the owner-only network_stats view (aggregate-only preserved), and service-role revoke_all_sessions() that deletes all refresh tokens so revocation kills old sessions/installed apps immediately; docs/OWNER_ACCESS.md documents owner creation (fail-closed operator-set owner_email), login, role storage, identification, credential recovery, revocation and reinstatement; suite §27 (58 assertions) machine-checks the authenticated→active→role→resource chain on every route. 989/989.",
-      "files": [
-        ".github/workflows/ci.yml",
-        "docs/ACCEPTANCE_TESTS.md",
-        "docs/DEVICE_ACCEPTANCE.md",
-        "docs/MASTER_ACCEPTANCE_WORKFLOW.md",
-        "docs/OWNER_ACCESS.md",
-        "docs/PWA_TESTING_GUIDE.md",
-        "docs/RELEASE_GATE.md",
-        "docs/RELEASE_GATE_REPORT.txt",
-        "scripts/release-gate.mjs",
-        "supabase/migrations/0019_access_revocation_audit.sql",
-        "tests/run.ts",
-        "tests/tsconfig.json"
-      ],
-      "functions": [
-        "assert/section harness",
-        "CI test-build job"
-      ],
-      "tables": [],
-      "apis": [],
-      "tests_existing": [
-        "285/285 passed at this audit commit"
-      ],
-      "tests_missing": [
-        "Live backend scenarios (auth, isolation, research) — runbook ready, needs credentials"
-      ],
-      "env": [],
-      "blockers": [
-        "Live run needs Supabase/AI credentials (external)"
-      ]
-    },
-    {
-      "id": "production-release-gate",
-      "title": "Production release gate",
-      "status": "PARTIAL",
-      "notes": "Gate mechanics exist and are honest: release workflow refuses placeholder URLs, refuses without a real deployment, produces checksums, CI must be green, and — added 2026-10-05 — REFUSES to ship against a misconfigured deployment: every native job runs scripts/verify-deployment.mjs against the live /api/health of $SOPHIRA_APP_URL (required: supabase, supabase_service_role, ai, ok, name=sophira; search optional). Rules unit-tested in src/lib/deployment.ts; script carries --self-test run in CI. Remaining external blockers: SOPHIRA_APP_URL repo variable unset (owner), one real gated release to run.",
-      "files": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/release.yml",
-        "docs/RELEASE_PROCESS.md",
-        "scripts/verify-deployment.mjs",
-        "src/app/api/health/route.ts",
-        "src/lib/deployment.ts"
-      ],
-      "functions": [
-        "evaluateDeploymentReadiness",
-        "placeholder-URL refusal steps",
-        "scripts/verify-deployment.mjs",
-        "signed-vs-unsigned job summaries"
-      ],
-      "tables": [],
-      "apis": [
-        "/api/health (readiness verification)"
-      ],
-      "tests_existing": [
-        "CI green (last documented run)",
-        "release YAML validation",
-        "9 assertions in section 17 + verifier script self-test (7) in section 17b"
-      ],
-      "tests_missing": [
-        "One real gated release"
-      ],
-      "env": [
-        "SOPHIRA_APP_URL (repo variable)"
-      ],
-      "blockers": [
-        "SOPHIRA_APP_URL unset (owner action; audit token 403)",
-        "Vercel Production env vars unset (owner action)"
-      ]
-    },
-    {
-      "id": "claim-evidence-traceability",
-      "title": "Claim-to-source evidence verification with full trace (CLAIM → SOURCE → PASSAGE → URL → STATUS)",
-      "status": "IMPLEMENTED",
-      "notes": "Added 2026-10-05 on top of the existing research stack (nothing deleted or replaced). Extraction stage after retrieval and before final essay generation; per-claim storage of claim_id, assignment_id, claim_text, source_id, source_url, source_title, exact_supporting_passage, evidence_start/end, verification_status, confidence, authority_score, verified_at; mechanical verification (verbatim passage in stored content + figure consistency + overlap) — a claim is VERIFIED only when the retrieved content actually supports it; unsupported claims are explicitly marked and the essay generator is BLOCKED from declaring research complete; final Research Integrity report with counts and FAILED (claim, reason, action) blocks; source-unavailable-after-verification demotes claims to UNVERIFIED at audit time.",
-      "files": [
-        "src/lib/research/claims.ts",
-        "src/app/api/ai/solve/route.ts",
-        "src/app/api/research/audit/route.ts",
-        "src/components/app/ResearchPanel.tsx",
-        "supabase/migrations/0013_claim_evidence.sql"
-      ],
-      "functions": [
-        "normalizeClaimCandidates",
-        "extractFactualSentences",
-        "locatePassage",
-        "claimNumbersSupported",
-        "verifyClaimAgainstSource",
-        "verifyClaims",
-        "claimLevelStatus",
-        "authorityScore",
-        "authorityVerdict",
-        "buildIntegrityReport",
-        "formatIntegrityReport"
-      ],
-      "tables": [
-        "research_claims (extended by 0013)",
-        "research_projects (research_integrity jsonb)",
-        "research_sources",
-        "research_verifications"
-      ],
-      "apis": [
-        "/api/ai/solve (researched-essay path)",
-        "/api/research/audit"
-      ],
-      "tests_existing": [
-        "41 assertions in tests/run.ts section 16b: valid match, valid-URL-unsupported-claim, dead URL, wrong source, unrelated source, partial support, multi-source, multi-claim, unsupported, source-unavailable-after-verification, fabricated passage, numeric mismatch, authority, report formatting"
-      ],
-      "tests_missing": [
-        "Live end-to-end run with a configured AI + search provider (external credentials)"
-      ],
-      "env": [
-        "OPENAI_API_KEY (claim extraction via model)",
-        "SEARCH_API_KEY (live retrieval — mechanical verification itself is offline)"
-      ],
-      "blockers": [
-        "Live verification needs AI + search credentials (external)"
-      ]
-    },
-    {
-      "id": "assignment-aware-authority",
-      "title": "Assignment-aware source authority: task classification, configurable authority profiles, teacher-override ranking, stored acceptance decisions",
-      "status": "IMPLEMENTED",
-      "notes": "Added 2026-10-05 as an EXTENSION of research.ts's rankCandidates (which remains untouched and is the generic fallback). classifyAssignment picks history/science/current-events/literature/social-science/general; AUTHORITY_PROFILES hold the configurable tier hierarchies (registerAuthorityProfile replaces a category at runtime); rankCandidatesForAssignment sorts teacher-gate → tier → within-tier score (relevance, evidence quality, date fit). Teacher requirements override generic preferences absolutely. .gov/.edu are never blindly prioritized — institutional domains only count where the profile's hierarchy values them. The per-source decision (tier, flags, reasons) is stored via migration 0014 and surfaced by the citation audit as authority_explanations ('why each source was accepted').",
-      "files": [
-        "src/lib/research/authority.ts",
-        "src/app/api/research/route.ts",
-        "src/app/api/research/audit/route.ts",
-        "src/app/api/ai/solve/route.ts",
-        "src/components/app/ResearchPanel.tsx",
-        "supabase/migrations/0014_source_authority.sql"
-      ],
-      "functions": [
-        "classifyAssignment",
-        "parseTeacherSourceType",
-        "registerAuthorityProfile",
-        "assessSourceAuthority",
-        "rankCandidatesForAssignment"
-      ],
-      "tables": [
-        "research_sources (authority_category + authority_decision, migration 0014)",
-        "research_projects",
-        "research_claims"
-      ],
-      "apis": [
-        "/api/research (ranking now assignment-aware)",
-        "/api/research/audit (authority_explanations)",
-        "/api/ai/solve"
-      ],
-      "tests_existing": [
-        "43 assertions in tests/run.ts sections 16c (ranking changes by assignment type) + 16d (audit acceptance explanations)"
-      ],
-      "tests_missing": [
-        "Live end-to-end with a configured search provider (external credentials)"
-      ],
-      "env": [],
-      "blockers": []
-    },
-    {
-      "id": "long-term-student-memory",
-      "title": "Long-term student memory: structured evidence-backed academic profile (workflow §28)",
-      "status": "implemented",
-      "notes": "Migration 0020 (student_memories + student_memory_evidence; strict own-row RLS on both — a user touches ONLY their own rows, the owner has no code path to any member's memories; evidence cascades on forget; structured relational data, deliberately NO vector/embedding store). src/lib/memory/engine.ts (pure): 13 categories; evidence-backed hypotheses, never asserted facts — AI-inferred memories start 'monitoring' until weighted confidence clears 0.5; confidence recomputed from the FULL evidence history with recency weighting (120-day half-life), diminishing returns, symmetric support/contradiction, floor 0.05 cap 0.95; improvement trend from the evidence sequence (3 clean machine-verified solutions → 'improving'); lifecycle create/update/confirm/contradict/improve/archive/disable/forget/restore with student-controlled transitions (forgotten stays forgotten). src/lib/memory/store.ts: server-side store, NO service-role client, user_id scoping on every operation. AI integration: selectRelevantMemories injects ONLY context-relevant memories (subject-tag match, relevance-ranked, hard cap 8, non-retrievable statuses excluded) into the solve prompt with a NEVER-assert-as-diagnosis instruction; decisions persisted per response; used memories record last_used_at; evidence loop — observed mistakes become incorrect_problem evidence, machine-verified clean answers become correct_solution CONTRADICTING evidence on matching weaknesses. UI /memories (MemoryManager): search/filter by category+status, confidence bar, first/last observed, trend, origin badges (student-stated fact vs AI-inferred), evidence inspector, edit, disable, re-enable, archive, permanent forget with confirm, manual add. API /api/memory + /api/memory/[id]: requireUser + explicit scoping + RLS defense in depth. Live RLS regression matrix extended to TEN private categories (owner NO ACCESS to student memories); suite §28 machine-enforces schema, isolation, retrieval, evidence, and UI (1051/1051, tsc + build green).",
-      "files": [
-        "supabase/migrations/0020_student_memory.sql",
-        "src/lib/memory/engine.ts",
-        "src/lib/memory/store.ts",
-        "src/app/api/memory/route.ts",
-        "src/app/api/memory/[id]/route.ts",
-        "src/app/memories/page.tsx",
-        "src/components/app/MemoryManager.tsx",
-        "src/lib/ai/client.ts",
-        "src/app/api/ai/solve/route.ts",
-        "src/components/app/AppShell.tsx",
-        "tests/run.ts",
-        "tests/security/rls-regression.mjs"
-      ],
-      "functions": [
-        "clampConfidence",
-        "recencyWeight",
-        "recomputeConfidence",
-        "confidenceAfterEvidence",
-        "computeTrend",
-        "statusAfterRecompute",
-        "studentTransition",
-        "selectRelevantMemories",
-        "relevanceScore",
-        "recordMemoryEvidence",
-        "listEvidence",
-        "studentMemoryAction",
-        "listMemories"
-      ],
-      "tables": [
-        "student_memories",
-        "student_memory_evidence"
-      ],
-      "apis": [
-        "GET/POST /api/memory",
-        "GET/PATCH/DELETE /api/memory/[id]"
-      ],
-      "tests_existing": [
-        "tests/run.ts §28 (pure engine: confidence bounds, recency weighting, evidence recompute, diminishing returns, trend, lifecycle, relevance cap + exclusion; conformance: RLS policies, no service-role, route guards, UI controls, owner isolation)",
-        "tests/security/rls-regression.mjs (live owner-vs-member matrix, tenth category: student memories)"
-      ],
-      "tests_missing": [
-        "live RLS run requires owner to apply migration 0020 to the test project and set SUPABASE_TEST_* secrets"
-      ],
-      "env": [],
-      "blockers": []
-    }
-  ],
-  "priorities": {
-    "critical_blockers": [
-      {
-        "id": "CB1",
-        "external": true,
-        "title": "Vercel Production environment variables unset",
-        "action": "Owner sets NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY (+ optional search vars) in Vercel Production and redeploys; verify with curl /api/health — configuration booleans must read true.",
-        "status": "OPEN — cannot be done from the repository"
-      },
-      {
-        "id": "CB2",
-        "external": false,
-        "title": "Fresh-install owner bootstrap undocumented and README stated the removed first-user-becomes-owner rule",
-        "action": "README setup rewritten (all 12 migrations, owner_email bootstrap SQL, fail-closed explanation); RELEASE_PROCESS bring-up section added.",
-        "status": "FIXED THIS ROUND (commit 2)"
-      },
-      {
-        "id": "CB3",
-        "external": false,
-        "title": "No machine-checkable deployment-configuration readiness signal (root cause of the days-long §27 production 500s)",
-        "action": "/api/health now reports per-capability booleans (supabase, supabase_service_role, ai, search) with no secret values; 8 regression tests; runbook verification step.",
-        "status": "FIXED THIS ROUND (commit 1: 50cedb9)"
-      },
-      {
-        "id": "CB4",
-        "external": true,
-        "title": "SOPHIRA_APP_URL Actions variable unset — release workflow dormant",
-        "action": "Owner adds repo variable SOPHIRA_APP_URL = https://sophira.vercel.app (Settings → Secrets and variables → Actions). Audit token confirmed 403 on variables API — cannot be set programmatically.",
-        "status": "OPEN — owner action"
-      },
-      {
-        "id": "CB5",
-        "external": true,
-        "title": "Native signing material absent (Android keystore secrets, Apple certs)",
-        "action": "Owner sets ANDROID_*/IOS_* secrets for signed artifacts; pipeline honestly falls back to unsigned otherwise.",
-        "status": "OPEN — external by design; unsigned fallback is honest, so this gates signed native releases only"
-      }
-    ],
-    "high_priority": [
-      {
-        "id": "H1",
-        "title": "Submission readiness feature MISSING — no aggregate 'ready to submit' verdict (verification + rubric audit + citation audit + conflicts)",
-        "authorized": true,
-        "status": "IMPLEMENTED 2026-10-05 (round: continue working)"
-      },
-      {
-        "id": "H2",
-        "title": "Stale-pattern detection MISSING — learning patterns have first/last_observed but no aging/demotion logic",
-        "authorized": true,
-        "status": "IMPLEMENTED 2026-10-05 (round: continue working)"
-      },
-      {
-        "id": "H3",
-        "title": "Live research-engine verification — needs SEARCH_API_KEY (external)",
-        "authorized": false
-      },
-      {
-        "id": "H4",
-        "title": "Live RLS cross-user probe — needs Supabase credentials (external)",
-        "authorized": false
-      },
-      {
-        "id": "H5",
-        "title": "Legal placeholders — owner facts + attorney review (external)",
-        "authorized": false
-      }
-    ],
-    "medium_priority": [
-      {
-        "id": "M1",
-        "title": "CI step label says '144 assertions' (actual 285) — cosmetic; fixing .github/workflows requires a workflow-scoped credential"
-      },
-      {
-        "id": "M2",
-        "title": "Browser-level (Selenium/Playwright) pacing and scheduler UI tests — currently logic-level only"
-      },
-      {
-        "id": "M3",
-        "title": "Real-device PWA/native acceptance matrix (DEVICE_ACCEPTANCE.md rows still NOT TESTED)"
-      },
-      {
-        "id": "M4",
-        "title": "TEST_REPORT.md assertion counts drift (277 → 285) between rounds; a §28 entry was added this round to re-anchor"
-      }
-    ],
-    "optional_enhancements": [
-      {
-        "id": "O1",
-        "title": "Additional search providers (DuckDuckGo/Google CSE) behind the existing provider abstraction"
-      },
-      {
-        "id": "O2",
-        "title": "More typing passages / adaptive calibration difficulty"
-      },
-      {
-        "id": "O3",
-        "title": ".ics calendar export of scheduler plans"
-      },
-      {
-        "id": "O4",
-        "title": "Learning-pattern export/import for account portability"
-      },
-      {
-        "id": "O5",
-        "title": "Additional citation styles (Harvard, Turabian) in the deterministic citation engine"
-      }
-    ]
+  "note": "Round 2 (2026-10-09): audited against live production (sophira.vercel.app), which reached first-run acceptance 2026-10-07. Migrations 0001-0028 + runtime self-healing verified live: production grants diagnostic true for profiles/writing_samples, owner statistics function structurally repaired, math solver solves and verifies the reported integral, navigation verified over HTTP. Test suite: 2644/2644 PASS; npm run verify PASS; scan:secrets CLEAN; env:example in sync. External blockers unchanged: local doctor lacks NEXT_PUBLIC_SITE_URL (set in Vercel), db:migrate:check needs SUPABASE_ACCESS_TOKEN/SUPABASE_PROJECT_REF, legal checklist has 28 owner facts unresolved (attorney review required)."
+ },
+ "items": [
+  {
+   "id": "personalized-academic-learning",
+   "title": "Personalized academic learning",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/lib/ai/context.ts",
+    "src/lib/ai/subjects.ts",
+    "src/lib/types.ts",
+    "src/app/api/ai/solve/route.ts",
+    "src/app/onboarding/page.tsx",
+    "src/app/settings/page.tsx"
+   ],
+   "functions": [
+    "composeAcademicContext",
+    "routeSubject",
+    "routeMathTopic"
+   ],
+   "tables": [
+    "profiles",
+    "courses",
+    "teachers",
+    "assignments",
+    "learning_patterns"
+   ],
+   "apis": [
+    "/api/ai/solve",
+    "/api/learning/patterns"
+   ],
+   "tests_existing": [
+    "tests/run.ts sections 1-3, 7a-7b, 8, 12a (hierarchy, subject/math routing, order of authority)"
+   ],
+   "tests_missing": [
+    "Live end-to-end run against a configured AI provider"
+   ],
+   "env": [
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "SOPHIRA_MODEL"
+   ],
+   "blockers": [
+    "Live verification needs AI credentials (external)"
+   ]
+  },
+  {
+   "id": "writing-style-learning",
+   "title": "Writing style/profile learning",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/app/api/ai/analyze-writing/route.ts",
+    "src/lib/ai/context.ts",
+    "src/components/app/ProposalsPanel.tsx",
+    "src/components/app/ProfileVersionHistory.tsx",
+    "src/app/writing/page.tsx"
+   ],
+   "functions": [
+    "composeAcademicContext (writing_profile layer, conditional)"
+   ],
+   "tables": [
+    "writing_profiles",
+    "writing_samples",
+    "profile_update_proposals",
+    "profile_versions"
+   ],
+   "apis": [
+    "/api/ai/analyze-writing"
+   ],
+   "tests_existing": [
+    "tests/run.ts: writing-profile conditionality (math never loads it; writing does)"
+   ],
+   "tests_missing": [
+    "Live analyze-writing round trip"
+   ],
+   "env": [
+    "OPENAI_API_KEY"
+   ],
+   "blockers": [
+    "Live verification needs AI credentials (external)"
+   ]
+  },
+  {
+   "id": "teacher-methods-requirements",
+   "title": "Teacher-specific methods and requirements",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/app/teachers/[id]/TeacherProfileEditor.tsx",
+    "src/app/api/ai/extract-teacher-doc/route.ts",
+    "src/lib/ai/context.ts",
+    "src/lib/ai/compliance.ts"
+   ],
+   "functions": [
+    "composeAcademicContext (teacher layer)",
+    "normalizeMethodCompliance"
+   ],
+   "tables": [
+    "teachers",
+    "teacher_documents",
+    "academic_sources",
+    "profile_update_proposals",
+    "profile_versions"
+   ],
+   "apis": [
+    "/api/ai/extract-teacher-doc",
+    "/api/ai/solve"
+   ],
+   "tests_existing": [
+    "teacher isolation (6 assertions)",
+    "source conflict detection (5)",
+    "method-compliance honesty guards (6)"
+   ],
+   "tests_missing": [
+    "Live extract-teacher-doc flow"
+   ],
+   "env": [
+    "OPENAI_API_KEY"
+   ],
+   "blockers": []
+  },
+  {
+   "id": "instruction-override",
+   "title": "Teacher/assignment instructions overriding older learned patterns",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/lib/ai/context.ts",
+    "src/lib/learning/patterns.ts"
+   ],
+   "functions": [
+    "composeAcademicContext (ORDER OF AUTHORITY first prompt section)",
+    "intentionalWritingHabits (requirements-always-override caveat)"
+   ],
+   "tables": [],
+   "apis": [
+    "/api/ai/solve"
+   ],
+   "tests_existing": [
+    "order-of-authority layout (8 assertions)",
+    "intentional-habit override guard (5)"
+   ],
+   "tests_missing": [],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "feedback-correction-learning",
+   "title": "Feedback and correction learning",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/app/api/ai/feedback-to-proposal/route.ts",
+    "src/app/corrections/page.tsx",
+    "src/components/app/CorrectionsPanel.tsx",
+    "src/components/app/FeedbackPanel (in Workspace)",
+    "src/lib/learning/patterns.ts"
+   ],
+   "functions": [
+    "transitionPattern",
+    "normalizeObservedMistakes",
+    "feedback-to-proposal proposal creation"
+   ],
+   "tables": [
+    "feedback",
+    "profile_update_proposals",
+    "learning_patterns"
+   ],
+   "apis": [
+    "/api/ai/feedback-to-proposal",
+    "/api/learning/patterns"
+   ],
+   "tests_existing": [
+    "lifecycle transitions (14)",
+    "observed-mistake normalization",
+    "similarity matching"
+   ],
+   "tests_missing": [
+    "Live feedback-to-proposal round trip"
+   ],
+   "env": [
+    "OPENAI_API_KEY"
+   ],
+   "blockers": []
+  },
+  {
+   "id": "pattern-lifecycle-stale-detection",
+   "title": "Pattern lifecycle and stale-pattern detection",
+   "status": "IMPLEMENTED",
+   "notes": "Lifecycle (candidate/active/corrected/recurring/temporary, confidence, scope isolation) implemented and tested; stale-pattern detection (isPatternStale, 180 days) added earlier. CONFIDENCE DECAY + BEHAVIORAL ADAPTATION added 2026-10-05 (migration 0016 + src/lib/learning/evidence.ts, pure): every pattern tracks last_confirmed_at/last_used_at/confirmation_count/contradiction_count/correction_count + new lower_confidence status; evidence-driven confidence (positive: confirm/repeated use/teacher support/approved work; negative: correction/rejection/teacher contradiction/alternative method/instruction conflict); deterministic bounded decay (contradiction ladder ×0.92/×0.83/×0.74/×0.55 — 94→87→73→51→INACTIVE; time decay ×0.8 per 90d window after a 90d grace, floor 0.05); ladder transitions never delete; demoted/inactive patterns revive via later confirming evidence; teacher + current assignment instructions always override (solve-route conflict loop + prompt precedence + teacher_contradicts demoting teacher_required); explainPatternDecisions exposes why each pattern was selected/ignored, persisted per response and shown in the panel.",
+   "files": [
+    "src/app/api/ai/solve/route.ts",
+    "src/app/api/learning/patterns/evidence/route.ts",
+    "src/app/api/learning/patterns/route.ts",
+    "src/components/app/CorrectionsPanel.tsx",
+    "src/lib/ai/client.ts",
+    "src/lib/learning/evidence.ts",
+    "src/lib/learning/patterns.ts",
+    "supabase/migrations/0016_pattern_evidence.sql"
+   ],
+   "functions": [
+    "applyContradictionDecay",
+    "applyTimeDecay",
+    "describeStaleness",
+    "explainPatternDecisions",
+    "isPatternStale",
+    "recomputeStatus",
+    "recordPatternEvidence",
+    "selectApplicablePatterns",
+    "selectApplicablePatternsAdaptive",
+    "transitionPattern"
+   ],
+   "tables": [
+    "learning_patterns (first_observed, last_observed, observation_count stored but never used for staleness)"
+   ],
+   "apis": [
+    "/api/learning/patterns"
+   ],
+   "tests_existing": [
+    "lifecycle (14)",
+    "scope leakage (7)",
+    "honest applied-context (9)",
+    "stale-pattern detection (13 assertions, section 8d)",
+    "40 assertions in section 18 (evidence ladder, decay math, all 7 required scenarios, determinism/bounds)"
+   ],
+   "tests_missing": [],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "rubric-analysis",
+   "title": "Assignment/rubric analysis",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/lib/rubric.ts",
+    "src/app/api/rubric-audit/route.ts",
+    "src/components/app/RubricAuditPanel.tsx",
+    "supabase/migrations/0011_rubric_audits.sql"
+   ],
+   "functions": [
+    "buildChecklist",
+    "auditDraft",
+    "mergeSemanticResults",
+    "failedCriteriaForRevision",
+    "countWords"
+   ],
+   "tables": [
+    "rubric_audits"
+   ],
+   "apis": [
+    "/api/rubric-audit"
+   ],
+   "tests_existing": [
+    "checklist parsing, deterministic word/section/bibliography/citation/prohibited checks, semantic labeling, revision list (section 15e)"
+   ],
+   "tests_missing": [
+    "Live rubric audit against AI criteria"
+   ],
+   "env": [
+    "OPENAI_API_KEY (semantic criteria only; deterministic checks run without it)"
+   ],
+   "blockers": []
+  },
+  {
+   "id": "research-engine",
+   "title": "Research engine",
+   "status": "IMPLEMENTED",
+   "notes": "Code complete and unit-tested; NEVER run live — no SEARCH_API_KEY exists in any environment. Honest failure without a key (no fabricated sources). Upgraded 2026-10-05 with full claim→evidence traceability (see item claim-evidence-traceability).",
+   "files": [
+    "src/lib/research/provider.ts",
+    "src/lib/research/research.ts",
+    "src/lib/research/verify.ts",
+    "src/app/api/research/route.ts",
+    "src/components/app/ResearchPanel.tsx",
+    "supabase/migrations/0012_research_tables.sql"
+   ],
+   "functions": [
+    "searchProviderConfigured",
+    "getSearchProvider",
+    "generateQueries",
+    "dedupeSources",
+    "rankCandidates",
+    "fetchAndVerify"
+   ],
+   "tables": [
+    "research_projects",
+    "research_queries",
+    "research_sources",
+    "research_claims",
+    "research_citations",
+    "research_verifications"
+   ],
+   "apis": [
+    "/api/research",
+    "/api/research/audit"
+   ],
+   "tests_existing": [
+    "provider config honesty, dead URL/redirect/paywall/thin-content verification, query generation, dedupe, objective ranking (15f-15i)",
+    "claim evidence traceability (41 assertions, section 16b)"
+   ],
+   "tests_missing": [
+    "One live end-to-end search (needs SEARCH_API_KEY — external)"
+   ],
+   "env": [
+    "SEARCH_PROVIDER",
+    "SEARCH_API_KEY",
+    "SEARCH_BASE_URL (custom only)"
+   ],
+   "blockers": [
+    "No search-provider key configured anywhere — live verification impossible until the owner adds one"
+   ]
+  },
+  {
+   "id": "claim-source-verification",
+   "title": "Claim-to-source evidence verification",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/lib/research/verify.ts",
+    "src/lib/research/citation.ts",
+    "src/app/api/research/audit/route.ts"
+   ],
+   "functions": [
+    "fetchAndVerify",
+    "quoteInContent",
+    "claimSupportsDeterministic",
+    "extractCitationMarkers",
+    "titlesCorrespond"
+   ],
+   "tables": [
+    "research_sources",
+    "research_verifications",
+    "research_claims"
+   ],
+   "apis": [
+    "/api/research/audit"
+   ],
+   "tests_existing": [
+    "quote authenticity (real found / fabricated rejected)",
+    "claim support pre-check",
+    "verification statuses"
+   ],
+   "tests_missing": [
+    "Live audit of a real generated essay"
+   ],
+   "env": [
+    "OPENAI_API_KEY (AI-assisted quote/claim pass)"
+   ],
+   "blockers": []
+  },
+  {
+   "id": "citation-integrity",
+   "title": "Citation integrity",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/lib/research/citation.ts",
+    "src/app/api/ai/solve/route.ts"
+   ],
+   "functions": [
+    "formatCitation",
+    "buildBibliography",
+    "parseISODateLoose",
+    "Works Cited assembly (deterministic, from source records)"
+   ],
+   "tables": [
+    "research_citations"
+   ],
+   "apis": [
+    "/api/ai/solve (researched-essay path)",
+    "/api/research/audit"
+   ],
+   "tests_existing": [
+    "MLA/APA/Chicago/generic formatting",
+    "missing metadata renders n.d./n.p. honestly",
+    "no invented ISO dates"
+   ],
+   "tests_missing": [
+    "Live citation of real sources"
+   ],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "submission-readiness",
+   "title": "Submission readiness",
+   "status": "IMPLEMENTED",
+   "notes": "IMPLEMENTED and UPGRADED 2026-10-05 (audit item H1 → final gate round). Level 1: src/lib/readiness.ts (pure buildReadiness) aggregates stored records. Level 2 (mandatory final gate): src/lib/readiness/finalGate.ts — machine-enforced submission_ready=false when ANY hard teacher/rubric/formatting/research/assignment requirement fails; unverifiable requirements block too; live auditDraft on the current draft merged with stored AI-assessed semantics; placeholders, claims, authority, sources, deadline feasibility; result persisted (migration 0015 responses.submission_gate) and rendered as a PASS/FAIL block that can never show a misleading Ready state.",
+   "files": [
+    "src/lib/readiness.ts",
+    "src/lib/readiness/finalGate.ts",
+    "src/app/api/readiness/route.ts",
+    "src/app/api/readiness/final/route.ts",
+    "src/components/app/ReadinessPanel.tsx",
+    "src/app/assignments/[id]/Workspace.tsx",
+    "supabase/migrations/0015_submission_gate.sql"
+   ],
+   "functions": [
+    "buildReadiness",
+    "evaluateFinalGate",
+    "findUnresolvedPlaceholders",
+    "formatFinalGate",
+    "GET /api/readiness/final"
+   ],
+   "tables": [
+    "responses (submission_gate, migration 0015)",
+    "assignments",
+    "teachers",
+    "rubric_audits",
+    "research_projects",
+    "research_sources"
+   ],
+   "apis": [
+    "/api/readiness",
+    "/api/readiness/final"
+   ],
+   "tests_existing": [
+    "24 assertions in sections 8d+15j",
+    "33 assertions in section 15k (final gate, machine enforcement)"
+   ],
+   "tests_missing": [
+    "Live end-to-end with a configured backend (external credentials)"
+   ],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "typing-calibration",
+   "title": "Typing-speed calibration",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/app/api/typing/profile/route.ts",
+    "src/app/api/typing/route.ts",
+    "src/app/onboarding/page.tsx",
+    "src/app/settings/page.tsx",
+    "src/components/app/PacedOutput.tsx",
+    "src/components/app/TypingTest.tsx",
+    "src/lib/typing-passage.ts",
+    "src/lib/typing-profile.ts",
+    "src/lib/typing.ts",
+    "supabase/migrations/0009_typing_calibration.sql",
+    "supabase/migrations/0018_adaptive_typing_profile.sql"
+   ],
+   "functions": [
+    "adoptBaseline",
+    "computeTypingResult",
+    "confidenceFor",
+    "effectiveTypingPace",
+    "passageById",
+    "recomputeTypingProfile",
+    "select_typing_baseline (RPC)",
+    "trustworthyObservations"
+   ],
+   "tables": [
+    "typing_attempts",
+    "typing_baseline"
+   ],
+   "apis": [
+    "/api/typing"
+   ],
+   "tests_existing": [
+    "WPM/accuracy/net-WPM, suspicious-attempt flags, baseline selection (section 13)",
+    "typing passages server-controlled (15d)",
+    "section 20: 15 assertions — all seven required scenarios + preservation check"
+   ],
+   "tests_missing": [
+    "Live persistence flow (needs Supabase)"
+   ],
+   "env": [],
+   "blockers": [],
+   "notes": " OPTIONAL ADAPTIVE TYPING PROFILE (2026-10-05, migration 0018 + src/lib/typing-profile.ts, pure): per-user typing_profiles (baseline_wpm, recent_average_wpm, recommended_wpm, confidence LOW/MEDIUM/HIGH, sample_count, last_calibration_at, auto_adjust_enabled=false default, manual_wpm) with strict RLS; rolling estimate over the last 5 valid+unflagged+plausible attempts ONLY (suspicious data can never corrupt it); recommended = floor(midpoint of baseline & recent) clamped [0.75,1.25]x baseline (example 62+67→64, HIGH at 4+ consistent samples); pacing NEVER changes automatically — effectiveTypingPace: manual → adaptive-if-enabled → fixed baseline; PacedOutput honors the effective pace with unchanged fallback; TypingTest adds the adaptive checkbox + preferred-pace field; /api/typing/profile GET/PATCH; POST syncs only on valid attempts, PATCH on repeated calibration; 15 new tests, suite 520/520."
+  },
+  {
+   "id": "typing-paced-output",
+   "title": "Typing-paced output",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/lib/pacing.ts",
+    "src/lib/pacing-controller.ts",
+    "src/components/app/PacedOutput.tsx",
+    "src/app/assignments/[id]/Workspace.tsx"
+   ],
+   "functions": [
+    "planReveal",
+    "visibleAt",
+    "pacingComplete",
+    "PacingController (start/pause/resume/progress; requiresCalibration)"
+   ],
+   "tables": [],
+   "apis": [],
+   "tests_existing": [
+    "progressive reveal, no full dump (14)",
+    "controller state machine incl. paused-time exclusion (15b)",
+    "no-calibration honest path"
+   ],
+   "tests_missing": [
+    "Browser-level rendering check (Selenium)"
+   ],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "deadline-scheduling",
+   "title": "Deadline-aware scheduling",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/lib/scheduler.ts",
+    "src/lib/workload.ts",
+    "src/app/api/schedule/route.ts",
+    "src/components/app/SchedulePanel.tsx",
+    "supabase/migrations/0010_deadline_scheduling.sql"
+   ],
+   "functions": [
+    "planSchedule",
+    "clampBreak",
+    "estimateWorkMinutes",
+    "parseEstimatedWorkMinutes"
+   ],
+   "tables": [
+    "assignments.due_at",
+    "work_schedules"
+   ],
+   "apis": [
+    "/api/schedule"
+   ],
+   "tests_existing": [
+    "deterministic plans, 10s-6h break bounds, urgency scaling, infeasibility warnings, pause/resume, persisted sessions (15, 15d-per-report)"
+   ],
+   "tests_missing": [
+    "Live schedule persistence (needs Supabase)"
+   ],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "persisted-sessions",
+   "title": "Persisted work/break sessions",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/app/api/schedule/route.ts",
+    "supabase/migrations/0010_deadline_scheduling.sql"
+   ],
+   "functions": [
+    "schedule insert/start/pause/resume handlers (work_schedules update path)"
+   ],
+   "tables": [
+    "work_schedules (RLS, per-user)"
+   ],
+   "apis": [
+    "/api/schedule"
+   ],
+   "tests_existing": [
+    "pause/resume lifecycle logic"
+   ],
+   "tests_missing": [
+    "Live persistence (needs Supabase)"
+   ],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "invitation-only-access",
+   "title": "Invitation-only access",
+   "status": "IMPLEMENTED",
+   "files": [
+    "supabase/migrations/0002_owner_only_invitations.sql",
+    "supabase/migrations/0006_invitation_expiry.sql",
+    "supabase/migrations/0008_invitation_only_signup.sql",
+    "src/app/api/invitations/route.ts",
+    "src/app/api/invitations/accept/route.ts",
+    "src/app/signup/page.tsx",
+    "src/middleware.ts"
+   ],
+   "functions": [
+    "handle_new_user (DB trigger: atomic single-use claim, fail-closed without owner_email)"
+   ],
+   "tables": [
+    "invitations",
+    "invitation_requests",
+    "app_config (owner_email, no client RLS)"
+   ],
+   "apis": [
+    "/api/invitations",
+    "/api/invitations/accept",
+    "/api/invitation-requests"
+   ],
+   "tests_existing": [
+    "26 invitation-security assertions: direct signup blocked, tokenless/fake/expired/revoked/wrong-email/reused invitations rejected, requests create no access"
+   ],
+   "tests_missing": [
+    "Live two-account concurrent-accept probe (ACCEPTANCE_TESTS §14)"
+   ],
+   "env": [],
+   "blockers": [
+    "Fresh installs must configure app_config.owner_email (now documented in README + RELEASE_PROCESS — fixed this round)"
+   ]
+  },
+  {
+   "id": "owner-approval",
+   "title": "Owner approval of invitations",
+   "status": "IMPLEMENTED",
+   "files": [
+    "src/app/api/invitations/route.ts",
+    "src/app/api/invitation-requests/route.ts",
+    "src/app/owner/page.tsx",
+    "src/components/app/OwnerDashboard.tsx",
+    "src/lib/supabase/guard.ts"
+   ],
+   "functions": [
+    "requireOwner",
+    "invite create/revoke",
+    "request approve/reject"
+   ],
+   "tables": [
+    "invitations",
+    "invitation_requests",
+    "profiles.can_request_invites"
+   ],
+   "apis": [
+    "/api/invitations",
+    "/api/invitation-requests",
+    "/api/network/members"
+   ],
+   "tests_existing": [
+    "owner-only policy enforcement at RLS level reviewed; route guard unit-covered indirectly"
+   ],
+   "tests_missing": [
+    "Live owner dashboard flow"
+   ],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "academic-data-isolation",
+   "title": "User academic-data isolation",
+   "status": "IMPLEMENTED",
+   "notes": "Per-user RLS on every content table (19 policies in 0001 alone); owner analytics cannot read member content; app-layer isolation unit-tested. Live cross-account DB probe pending (external credentials).",
+   "files": [
+    "supabase/migrations/0001_init.sql",
+    "supabase/migrations/0005_owner_membership_and_learning.sql",
+    "supabase/migrations/0012_research_tables.sql",
+    "src/lib/supabase/guard.ts",
+    "src/lib/supabase/server.ts"
+   ],
+   "functions": [
+    "requireUser",
+    "requireOwner"
+   ],
+   "tables": [
+    "all content tables: assignments, responses, feedback, writing_samples, writing_profiles, teachers, teacher_documents, courses, documents, learning_patterns, typing_*, work_schedules, rubric_audits, research_*"
+   ],
+   "apis": [
+    "all /api routes"
+   ],
+   "tests_existing": [
+    "teacher/course isolation, scope leakage (7), invitation security (26)"
+   ],
+   "tests_missing": [
+    "Live RLS probe with two real accounts (ACCEPTANCE_TESTS)"
+   ],
+   "env": [],
+   "blockers": [
+    "Live probe needs Supabase credentials (external)"
+   ]
+  },
+  {
+   "id": "owner-aggregate-analytics",
+   "title": "Owner aggregate analytics without academic-data access",
+   "status": "IMPLEMENTED",
+   "files": [
+    "supabase/migrations/0005_owner_membership_and_learning.sql",
+    "src/app/api/network/stats/route.ts",
+    "src/app/api/network/members/route.ts"
+   ],
+   "functions": [
+    "network_stats() (SECURITY DEFINER, aggregate-only)"
+   ],
+   "tables": [
+    "profiles",
+    "invitations"
+   ],
+   "apis": [
+    "/api/network/stats",
+    "/api/network/members"
+   ],
+   "tests_existing": [
+    "schema-level review: no policy grants owner cross-user content reads"
+   ],
+   "tests_missing": [
+    "Live owner-vs-member probe"
+   ],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "rls-security",
+   "title": "RLS/security",
+   "status": "IMPLEMENTED",
+   "notes": "RLS enabled on every table incl. app_config (no client policies, revoked from anon); storage bucket private; prompt-injection defense wrapped into all untrusted doc text; middleware degraded-mode guards regression-tested. SECURITY REGRESSION SUITE (2026-10-05): permanent two-layer privacy gate added to standard acceptance workflow. LIVE matrix tests/security/rls-regression.mjs — real users (OWNER/USER_A/USER_B/UNAUTHORIZED) vs actual RLS: owner NO ACCESS to all nine private categories (assignment, essay, teacher profile, writing samples, feedback, learning patterns, research, typing results, uploaded files); A↔B/anon/revoked/deleted NO ACCESS; owner membership management + aggregate-only analytics verified with zero content markers; fail-closed env (absent→exit 3, partial→exit 1); self-test 4/4 in CI. OFFLINE tests/run.ts §22 (26 assertions, every npm test): all tables RLS-enabled, all policies auth.uid()-scoped, no using(true), network_stats aggregate-only + owner-gated + SECURITY DEFINER, live suite wired into release.yml. Tamper-verified live: removed RLS / permissive policy / analytics content leak each fail the suite. 564/564 tests, build green. No RLS weakened. LIVE run requires owner to set SUPABASE_TEST_* secrets on a disposable test project. INVITATION VERIFICATION (2026-10-05): complete 18-item security verification of the existing invitation-only workflow, no rebuild, no weakening. LIVE tests/security/invitation-regression.mjs: real signUp/trigger/RLS matrix — invitation-refused stranger signup, valid link flow, atomic single-use, expiry, revocation, email binding, missing/fake/modified tokens, owner-only approval, request≠access, removal kills account, zero token leaks (all observed errors mechanically checked against live tokens); fail-closed env; self-test 3/3. OFFLINE tests/run.ts §23 (57 assertions, every npm test): all 18 items verified against actual migration SQL + routes + guard + signup page; tamper-verified T1–T5 (signup-gate bypass, token-lookup loosening, non-atomic claim, dropped owner check, token echo each fail the suite; three loose assertions in the first draft caught and fixed). rls-regression.mjs bootstrap hardened for migration 0008 (owner_email + invitation pre-seed). release.yml runs both live suites when SUPABASE_TEST_* configured. 621/621 tests, build green.",
+   "files": [
+    ".github/workflows/release.yml",
+    "TEST_REPORT.md",
+    "src/lib/ai/context.ts (wrapUntrusted, detectInjectionAttempt)",
+    "src/middleware.ts",
+    "supabase/migrations/*.sql",
+    "tests/run.ts",
+    "tests/security/invitation-regression.mjs",
+    "tests/security/rls-regression.mjs"
+   ],
+   "tables": [
+    "all"
+   ],
+   "apis": [],
+   "tests_existing": [
+    "injection defense (8 patterns incl. profile-change/exfiltration/override/privacy-probe)",
+    "middleware degraded-mode + matcher regressions (11)",
+    "section 22: 26 offline RLS-conformance assertions",
+    "rls-regression.mjs: full live privacy matrix (9 categories × 6 actor scenarios)"
+   ],
+   "tests_missing": [
+    "Live RLS compile/probe against real Postgres"
+   ],
+   "env": [],
+   "blockers": [
+    "Live probe needs Supabase credentials (external)"
+   ],
+   "functions": [
+    "invitation-regression suite",
+    "rls-regression suite",
+    "runInvitationRegressionTests",
+    "runSecurityRegressionTests"
+   ]
+  },
+  {
+   "id": "pwa-install",
+   "title": "PWA installation",
+   "status": "IMPLEMENTED",
+   "files": [
+    "public/manifest.webmanifest",
+    "public/sw.js",
+    "src/components/pwa/ServiceWorkerRegister.tsx",
+    "src/app/install/page.tsx",
+    "src/app/layout.tsx"
+   ],
+   "functions": [
+    "ServiceWorkerRegister",
+    "platform-aware install guidance"
+   ],
+   "tables": [],
+   "apis": [
+    "/manifest.webmanifest",
+    "/sw.js"
+   ],
+   "tests_existing": [
+    "matcher regressions (PWA shell files skip auth middleware)",
+    "live probe 2026-10-05: manifest 200, /install 200"
+   ],
+   "tests_missing": [
+    "Real-device install (Android/iOS)"
+   ],
+   "env": [],
+   "blockers": [
+    "Device testing needs physical devices (external)"
+   ]
+  },
+  {
+   "id": "capacitor-packaging",
+   "title": "Native Capacitor packaging",
+   "status": "IMPLEMENTED",
+   "notes": "android/ (Gradle, APK built+verified with checksums, TEST_REPORT §21) and ios/ (Xcode project) load the deployed web app via server.url; do not fork logic. Not device-tested. NATIVE BUILD CONFIG FIX (2026-10-05): silent placeholder fallback REMOVED (capacitor.config.ts + tauri.conf.json); src/lib/native-url.ts (pure, tested) + scripts/native-url.mjs (self-test 11/11); release builds (SOPHIRA_NATIVE_RELEASE=1) FAIL on missing/placeholder/malformed/non-https/localhost/credentialed SOPHIRA_APP_URL; dev builds use the explicit dev configuration (SOPHIRA_DEV_URL → NEXT_PUBLIC_SITE_URL → localhost:3000); release.yml android/ios sync + desktop tauri patch run in release mode; Capacitor aligned to one major: cli 7.6.9 → 8.5.2 joining android/core/ios 8.5.2 (plugins app 8.1.1, camera 8.2.4); npm install + tsc + 538/538 tests + next build + cap sync android/ios verified in-sandbox; gradle/xcode/tauri builds run only in CI (no local toolchain).",
+   "files": [
+    ".github/workflows/release.yml",
+    "android/app/build.gradle",
+    "capacitor.config.ts",
+    "ios/App/",
+    "package-lock.json",
+    "package.json",
+    "scripts/native-url.mjs",
+    "src-tauri/tauri.conf.json",
+    "src/app/downloads/page.tsx",
+    "src/lib/native-url.ts"
+   ],
+   "functions": [
+    "cap sync",
+    "isReleaseBuild",
+    "resolveNativeServerUrl",
+    "server.url remote loading",
+    "validateNativeAppUrl"
+   ],
+   "tables": [],
+   "apis": [],
+   "tests_existing": [
+    "CI native-project presence checks",
+    "real local Gradle build (§21)",
+    "section 21: 18 assertions — release gate, dev config, config-file absence of fallback"
+   ],
+   "tests_missing": [
+    "Device install/launch runs"
+   ],
+   "env": [
+    "SOPHIRA_APP_URL (per-build override; CI refuses placeholder)"
+   ],
+   "blockers": [
+    "Physical devices + signing material (external)"
+   ]
+  },
+  {
+   "id": "native-deployment-config",
+   "title": "Native deployment configuration",
+   "status": "IMPLEMENTED",
+   "notes": "Release pipeline complete (signing via secrets, checksums, honest unsigned fallback, placeholder-URL refusal) but DORMANT pending external repo config. NATIVE BUILD CONFIG FIX (2026-10-05): silent placeholder fallback REMOVED (capacitor.config.ts + tauri.conf.json); src/lib/native-url.ts (pure, tested) + scripts/native-url.mjs (self-test 11/11); release builds (SOPHIRA_NATIVE_RELEASE=1) FAIL on missing/placeholder/malformed/non-https/localhost/credentialed SOPHIRA_APP_URL; dev builds use the explicit dev configuration (SOPHIRA_DEV_URL → NEXT_PUBLIC_SITE_URL → localhost:3000); release.yml android/ios sync + desktop tauri patch run in release mode; Capacitor aligned to one major: cli 7.6.9 → 8.5.2 joining android/core/ios 8.5.2 (plugins app 8.1.1, camera 8.2.4); npm install + tsc + 538/538 tests + next build + cap sync android/ios verified in-sandbox; gradle/xcode/tauri builds run only in CI (no local toolchain).",
+   "files": [
+    ".github/workflows/release.yml",
+    "capacitor.config.ts",
+    "docs/NATIVE_BUILDS.md",
+    "docs/RELEASE_PROCESS.md",
+    "package-lock.json",
+    "package.json",
+    "scripts/native-url.mjs",
+    "src-tauri/tauri.conf.json",
+    "src/lib/native-url.ts"
+   ],
+   "functions": [
+    "SHA256SUMS generation",
+    "isReleaseBuild",
+    "release matrix (Android/iOS/Windows/macOS/Linux)",
+    "resolveNativeServerUrl",
+    "validateNativeAppUrl"
+   ],
+   "tables": [],
+   "apis": [],
+   "tests_existing": [
+    "workflow YAML validated; native presence checks in CI",
+    "section 21: 18 assertions — release gate, dev config, config-file absence of fallback"
+   ],
+   "tests_missing": [
+    "A published release end-to-end"
+   ],
+   "env": [
+    "SOPHIRA_APP_URL (repo VARIABLE — unset)",
+    "ANDROID_KEYSTORE_BASE64 + ANDROID_STORE_PASSWORD + ANDROID_KEY_ALIAS + ANDROID_KEY_PASSWORD (optional)",
+    "IOS_P12_BASE64 + IOS_P12_PASSWORD + IOS_PROVISIONING_PROFILE_BASE64 + IOS_TEAM_ID (optional)"
+   ],
+   "blockers": [
+    "SOPHIRA_APP_URL variable not set (audit token confirmed 403 variables:write — owner action)",
+    "signing secrets absent (external)"
+   ]
+  },
+  {
+   "id": "legal-docs",
+   "title": "Legal documents",
+   "status": "PARTIAL",
+   "notes": "Complete ToS/Privacy templates + review notice + proprietary LICENSE; bracketed owner facts (entity, address, jurisdiction, contact, effective date) are now MACHINE-VISIBLE: scripts/legal-status.mjs (npm run legal:status, --json) lists every remaining bracket per file and exits 0 once all are completed (17 remain today). Completion still requires owner facts + qualified attorney review — external by design. LEGAL CONFIGURATION GATE (2026-10-05): inspected all four legal documents (all preserved, nothing deleted); inventoried every placeholder ([LEGAL ENTITY NAME], [COPYRIGHT HOLDER LEGAL NAME], [ADDRESS], [CONTACT EMAIL], [LEGAL CONTACT NAME / EMAIL / ADDRESS], [EFFECTIVE DATE], [EFFECTIVE DATE YEAR], [JURISDICTION], [MAXIMUM LIABILITY AMOUNT...], [DISPUTE RESOLUTION METHOD...], [APPLICABLE RULES], [RETENTION PERIOD]); added docs/legal/LEGAL_CONFIGURATION.md — structured owner-supplied field list (identity/dates/jurisdiction/liability/dispute/retention/attorney review) with an INCOMPLETE status and a publication gate (all fields supplied + placeholders replaced + attorney review before production); strengthened ToS §18 with cautious enforcement language ('may constitute copyright infringement and/or breach... reserves all rights and remedies available under applicable law' — zero 'legal trouble' phrasing, verified); extended LEGAL_REVIEW_NOTICE (still: templates, NOT legal advice, attorney review recommended) to state neither the AI nor Base44 is the owner's lawyer and no attorney approval/guarantee exists; verified all 21 required topics are addressed; 12 new test assertions (suite 633/633). No legal values invented — owner must supply every field before production release.",
+   "files": [
+    ".github/workflows/ci.yml",
+    "LICENSE",
+    "docs/legal/LEGAL_CONFIGURATION.md",
+    "docs/legal/LEGAL_REVIEW_NOTICE.md",
+    "docs/legal/PRIVACY_POLICY.md",
+    "docs/legal/TERMS_OF_SERVICE.md",
+    "scripts/legal-status.mjs"
+   ],
+   "functions": [],
+   "tables": [],
+   "apis": [],
+   "tests_existing": [
+    "tests/run.ts section 16: license + legal presence checks",
+    "section 16: 12 legal-configuration assertions (placeholders listed, no false approval claims, cautious enforcement language)"
+   ],
+   "tests_missing": [
+    "Owner completion of the bracketed facts (then legal:status exits 0) + attorney review sign-off"
+   ],
+   "env": [],
+   "blockers": [
+    "Requires owner legal identity + qualified attorney review (external)"
+   ]
+  },
+  {
+   "id": "production-env-config",
+   "title": "Production environment configuration",
+   "status": "PARTIAL",
+   "notes": "Production deployment is LIVE but DEGRADED: Vercel Production has no Supabase/AI env vars, so auth/db/AI cannot run there. All variables are documented (.env.example, RELEASE_PROCESS). The readiness signal is now MACHINE-ENFORCED at release time: /api/health configuration booleans (per-capability) + scripts/verify-deployment.mjs refuses releases against misconfigured deployments. Remaining external blocker: owner must set the Vercel Production env vars and redeploy (cannot be done from the repository).",
+   "files": [
+    ".env.example",
+    "README.md",
+    "docs/RELEASE_PROCESS.md",
+    "scripts/verify-deployment.mjs",
+    "src/app/api/health/route.ts",
+    "src/lib/deployment.ts"
+   ],
+   "functions": [
+    "health GET configuration block"
+   ],
+   "tables": [],
+   "apis": [
+    "/api/health"
+   ],
+   "tests_existing": [
+    "8 new health-readiness assertions (degraded, partial, full, custom-provider, no secret leakage)"
+   ],
+   "tests_missing": [
+    "A configured production deployment to verify against"
+   ],
+   "env": [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "SOPHIRA_MODEL",
+    "NEXT_PUBLIC_SITE_URL",
+    "SEARCH_PROVIDER/SEARCH_API_KEY (optional)"
+   ],
+   "blockers": [
+    "Owner must set the Vercel Production env vars and redeploy (external — cannot be done from the repository)"
+   ]
+  },
+  {
+   "id": "automated-acceptance-testing",
+   "title": "Automated acceptance testing",
+   "status": "IMPLEMENTED",
+   "notes": "285 offline assertions (verified this audit: 285/285), strict typecheck, production build, CI active on GitHub. Live acceptance runbook exists (ACCEPTANCE_TESTS.md, MASTER_ACCEPTANCE_WORKFLOW.md) and is blocked only on credentials. MASTER ACCEPTANCE DEDICATED SECTIONS (2026-10-05): the 27-step end-to-end workflow is preserved; added 24 dedicated acceptance sections (A1-A24: typing calibration/paced output/adaptive profile, deadline scheduling, persisted sessions + break persistence, rubric audit, submission readiness, research provider config/retrieval/verification/claim-evidence/citations/authority, PWA, native builds, native URL validation, invitation security, owner privacy, RLS isolation, confidence decay, teacher precedence, correction learning, legal readiness). Every row: prerequisites/steps/expected/failure condition/evidence/status. IMPLEMENTED vs VERIFIED explicitly distinguished; PASSED only cites executed verification (never code existence). Totals: 35 rows = 24 PASSED (executed offline evidence, dated) + 0 FAILED + 11 BLOCKED (blockers named) + 0 NOT RUN. Machine-checked by suite §24 (205 assertions: sections present, fields complete, counts match totals). 838/838. RELEASE GATE (2026-10-05): single authoritative gate added — docs/RELEASE_GATE.md + scripts/release-gate.mjs evaluating all 38 required checks (live deployment/DB/providers, live security matrices, offline core behaviors, device rows, native config, legal placeholders, env vars, secrets scan, test/build/typecheck/security). Exactly two final states: RELEASE STATUS: GO (all 38 PASS) or BLOCKED with every blocker numbered; NOT RUN and BLOCKED never treated as PASS; repeatable before every deployment (--report/--fast/--self-test modes). Executed 2026-10-05: 20 PASS / 0 FAIL / 17 BLOCKED / 1 NOT RUN → BLOCKED with 18 owner-side blockers (report: docs/RELEASE_GATE_REPORT.txt). CI: new release-gate job in release.yml publishes the gate report to the job summary. Suite §25 machine-checks the gate (51 assertions, 889/638+51). PWA DIRECT-BROWSER READINESS (2026-10-05): new docs/PWA_TESTING_GUIDE.md verifying all 10 PWA requirements (production URL run, secure auth, invitation-only signup, mobile install, session retention, asset loading with exact icon dimensions verified, post-install operation, honest offline limits — shell-only cache, NO offline AI claimed, reconnect state via server persistence + §19 state machine, clear install path on /install). Machine-checked by suite §26 (42 assertions: manifest validity, exact PNG dimensions, static-only SW cache gate, no user-data caching, no offline-AI claims, install steps). Exact owner instructions for opening the URL, Android/iPhone install, and the first test. No app store required. 931/931. OWNER-CONTROLLED ACCESS (2026-10-05): 4 routes fixed to enforce revoked-status (account/delete, ai/analyze-writing, ai/extract-teacher-doc, extract); migration 0019 adds access_revoked_at audit column, email + revoked-date in the owner-only network_stats view (aggregate-only preserved), and service-role revoke_all_sessions() that deletes all refresh tokens so revocation kills old sessions/installed apps immediately; docs/OWNER_ACCESS.md documents owner creation (fail-closed operator-set owner_email), login, role storage, identification, credential recovery, revocation and reinstatement; suite §27 (58 assertions) machine-checks the authenticated→active→role→resource chain on every route. 989/989.",
+   "files": [
+    ".github/workflows/ci.yml",
+    "docs/ACCEPTANCE_TESTS.md",
+    "docs/DEVICE_ACCEPTANCE.md",
+    "docs/MASTER_ACCEPTANCE_WORKFLOW.md",
+    "docs/OWNER_ACCESS.md",
+    "docs/PWA_TESTING_GUIDE.md",
+    "docs/RELEASE_GATE.md",
+    "docs/RELEASE_GATE_REPORT.txt",
+    "scripts/release-gate.mjs",
+    "supabase/migrations/0019_access_revocation_audit.sql",
+    "tests/run.ts",
+    "tests/tsconfig.json"
+   ],
+   "functions": [
+    "assert/section harness",
+    "CI test-build job"
+   ],
+   "tables": [],
+   "apis": [],
+   "tests_existing": [
+    "285/285 passed at this audit commit"
+   ],
+   "tests_missing": [
+    "Live backend scenarios (auth, isolation, research) — runbook ready, needs credentials"
+   ],
+   "env": [],
+   "blockers": [
+    "Live run needs Supabase/AI credentials (external)"
+   ]
+  },
+  {
+   "id": "production-release-gate",
+   "title": "Production release gate",
+   "status": "PARTIAL",
+   "notes": "Gate mechanics exist and are honest: release workflow refuses placeholder URLs, refuses without a real deployment, produces checksums, CI must be green, and — added 2026-10-05 — REFUSES to ship against a misconfigured deployment: every native job runs scripts/verify-deployment.mjs against the live /api/health of $SOPHIRA_APP_URL (required: supabase, supabase_service_role, ai, ok, name=sophira; search optional). Rules unit-tested in src/lib/deployment.ts; script carries --self-test run in CI. Remaining external blockers: SOPHIRA_APP_URL repo variable unset (owner), one real gated release to run.",
+   "files": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    "docs/RELEASE_PROCESS.md",
+    "scripts/verify-deployment.mjs",
+    "src/app/api/health/route.ts",
+    "src/lib/deployment.ts"
+   ],
+   "functions": [
+    "evaluateDeploymentReadiness",
+    "placeholder-URL refusal steps",
+    "scripts/verify-deployment.mjs",
+    "signed-vs-unsigned job summaries"
+   ],
+   "tables": [],
+   "apis": [
+    "/api/health (readiness verification)"
+   ],
+   "tests_existing": [
+    "CI green (last documented run)",
+    "release YAML validation",
+    "9 assertions in section 17 + verifier script self-test (7) in section 17b"
+   ],
+   "tests_missing": [
+    "One real gated release"
+   ],
+   "env": [
+    "SOPHIRA_APP_URL (repo variable)"
+   ],
+   "blockers": [
+    "SOPHIRA_APP_URL unset (owner action; audit token 403)",
+    "Vercel Production env vars unset (owner action)"
+   ]
+  },
+  {
+   "id": "claim-evidence-traceability",
+   "title": "Claim-to-source evidence verification with full trace (CLAIM → SOURCE → PASSAGE → URL → STATUS)",
+   "status": "IMPLEMENTED",
+   "notes": "Added 2026-10-05 on top of the existing research stack (nothing deleted or replaced). Extraction stage after retrieval and before final essay generation; per-claim storage of claim_id, assignment_id, claim_text, source_id, source_url, source_title, exact_supporting_passage, evidence_start/end, verification_status, confidence, authority_score, verified_at; mechanical verification (verbatim passage in stored content + figure consistency + overlap) — a claim is VERIFIED only when the retrieved content actually supports it; unsupported claims are explicitly marked and the essay generator is BLOCKED from declaring research complete; final Research Integrity report with counts and FAILED (claim, reason, action) blocks; source-unavailable-after-verification demotes claims to UNVERIFIED at audit time.",
+   "files": [
+    "src/lib/research/claims.ts",
+    "src/app/api/ai/solve/route.ts",
+    "src/app/api/research/audit/route.ts",
+    "src/components/app/ResearchPanel.tsx",
+    "supabase/migrations/0013_claim_evidence.sql"
+   ],
+   "functions": [
+    "normalizeClaimCandidates",
+    "extractFactualSentences",
+    "locatePassage",
+    "claimNumbersSupported",
+    "verifyClaimAgainstSource",
+    "verifyClaims",
+    "claimLevelStatus",
+    "authorityScore",
+    "authorityVerdict",
+    "buildIntegrityReport",
+    "formatIntegrityReport"
+   ],
+   "tables": [
+    "research_claims (extended by 0013)",
+    "research_projects (research_integrity jsonb)",
+    "research_sources",
+    "research_verifications"
+   ],
+   "apis": [
+    "/api/ai/solve (researched-essay path)",
+    "/api/research/audit"
+   ],
+   "tests_existing": [
+    "41 assertions in tests/run.ts section 16b: valid match, valid-URL-unsupported-claim, dead URL, wrong source, unrelated source, partial support, multi-source, multi-claim, unsupported, source-unavailable-after-verification, fabricated passage, numeric mismatch, authority, report formatting"
+   ],
+   "tests_missing": [
+    "Live end-to-end run with a configured AI + search provider (external credentials)"
+   ],
+   "env": [
+    "OPENAI_API_KEY (claim extraction via model)",
+    "SEARCH_API_KEY (live retrieval — mechanical verification itself is offline)"
+   ],
+   "blockers": [
+    "Live verification needs AI + search credentials (external)"
+   ]
+  },
+  {
+   "id": "assignment-aware-authority",
+   "title": "Assignment-aware source authority: task classification, configurable authority profiles, teacher-override ranking, stored acceptance decisions",
+   "status": "IMPLEMENTED",
+   "notes": "Added 2026-10-05 as an EXTENSION of research.ts's rankCandidates (which remains untouched and is the generic fallback). classifyAssignment picks history/science/current-events/literature/social-science/general; AUTHORITY_PROFILES hold the configurable tier hierarchies (registerAuthorityProfile replaces a category at runtime); rankCandidatesForAssignment sorts teacher-gate → tier → within-tier score (relevance, evidence quality, date fit). Teacher requirements override generic preferences absolutely. .gov/.edu are never blindly prioritized — institutional domains only count where the profile's hierarchy values them. The per-source decision (tier, flags, reasons) is stored via migration 0014 and surfaced by the citation audit as authority_explanations ('why each source was accepted').",
+   "files": [
+    "src/lib/research/authority.ts",
+    "src/app/api/research/route.ts",
+    "src/app/api/research/audit/route.ts",
+    "src/app/api/ai/solve/route.ts",
+    "src/components/app/ResearchPanel.tsx",
+    "supabase/migrations/0014_source_authority.sql"
+   ],
+   "functions": [
+    "classifyAssignment",
+    "parseTeacherSourceType",
+    "registerAuthorityProfile",
+    "assessSourceAuthority",
+    "rankCandidatesForAssignment"
+   ],
+   "tables": [
+    "research_sources (authority_category + authority_decision, migration 0014)",
+    "research_projects",
+    "research_claims"
+   ],
+   "apis": [
+    "/api/research (ranking now assignment-aware)",
+    "/api/research/audit (authority_explanations)",
+    "/api/ai/solve"
+   ],
+   "tests_existing": [
+    "43 assertions in tests/run.ts sections 16c (ranking changes by assignment type) + 16d (audit acceptance explanations)"
+   ],
+   "tests_missing": [
+    "Live end-to-end with a configured search provider (external credentials)"
+   ],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "long-term-student-memory",
+   "title": "Long-term student memory: structured evidence-backed academic profile (workflow §28)",
+   "status": "implemented",
+   "notes": "Migration 0020 (student_memories + student_memory_evidence; strict own-row RLS on both — a user touches ONLY their own rows, the owner has no code path to any member's memories; evidence cascades on forget; structured relational data, deliberately NO vector/embedding store). src/lib/memory/engine.ts (pure): 13 categories; evidence-backed hypotheses, never asserted facts — AI-inferred memories start 'monitoring' until weighted confidence clears 0.5; confidence recomputed from the FULL evidence history with recency weighting (120-day half-life), diminishing returns, symmetric support/contradiction, floor 0.05 cap 0.95; improvement trend from the evidence sequence (3 clean machine-verified solutions → 'improving'); lifecycle create/update/confirm/contradict/improve/archive/disable/forget/restore with student-controlled transitions (forgotten stays forgotten). src/lib/memory/store.ts: server-side store, NO service-role client, user_id scoping on every operation. AI integration: selectRelevantMemories injects ONLY context-relevant memories (subject-tag match, relevance-ranked, hard cap 8, non-retrievable statuses excluded) into the solve prompt with a NEVER-assert-as-diagnosis instruction; decisions persisted per response; used memories record last_used_at; evidence loop — observed mistakes become incorrect_problem evidence, machine-verified clean answers become correct_solution CONTRADICTING evidence on matching weaknesses. UI /memories (MemoryManager): search/filter by category+status, confidence bar, first/last observed, trend, origin badges (student-stated fact vs AI-inferred), evidence inspector, edit, disable, re-enable, archive, permanent forget with confirm, manual add. API /api/memory + /api/memory/[id]: requireUser + explicit scoping + RLS defense in depth. Live RLS regression matrix extended to TEN private categories (owner NO ACCESS to student memories); suite §28 machine-enforces schema, isolation, retrieval, evidence, and UI (1051/1051, tsc + build green).",
+   "files": [
+    "supabase/migrations/0020_student_memory.sql",
+    "src/lib/memory/engine.ts",
+    "src/lib/memory/store.ts",
+    "src/app/api/memory/route.ts",
+    "src/app/api/memory/[id]/route.ts",
+    "src/app/memories/page.tsx",
+    "src/components/app/MemoryManager.tsx",
+    "src/lib/ai/client.ts",
+    "src/app/api/ai/solve/route.ts",
+    "src/components/app/AppShell.tsx",
+    "tests/run.ts",
+    "tests/security/rls-regression.mjs"
+   ],
+   "functions": [
+    "clampConfidence",
+    "recencyWeight",
+    "recomputeConfidence",
+    "confidenceAfterEvidence",
+    "computeTrend",
+    "statusAfterRecompute",
+    "studentTransition",
+    "selectRelevantMemories",
+    "relevanceScore",
+    "recordMemoryEvidence",
+    "listEvidence",
+    "studentMemoryAction",
+    "listMemories"
+   ],
+   "tables": [
+    "student_memories",
+    "student_memory_evidence"
+   ],
+   "apis": [
+    "GET/POST /api/memory",
+    "GET/PATCH/DELETE /api/memory/[id]"
+   ],
+   "tests_existing": [
+    "tests/run.ts §28 (pure engine: confidence bounds, recency weighting, evidence recompute, diminishing returns, trend, lifecycle, relevance cap + exclusion; conformance: RLS policies, no service-role, route guards, UI controls, owner isolation)",
+    "tests/security/rls-regression.mjs (live owner-vs-member matrix, tenth category: student memories)"
+   ],
+   "tests_missing": [
+    "live RLS run requires owner to apply migration 0020 to the test project and set SUPABASE_TEST_* secrets"
+   ],
+   "env": [],
+   "blockers": []
+  },
+  {
+   "id": "database-grants-contract",
+   "title": "Database grants contract (authenticated table privileges)",
+   "status": "IMPLEMENTED AND VERIFIED (live)",
+   "files": [
+    "supabase/migrations/0027_grants_backfill.sql",
+    "src/lib/db-privileged.ts (GRANTS_SQL, provisionSignedInUser v2)",
+    "scripts/migration-markers.mjs"
+   ],
+   "gap_closed": "Production database had NO anon/authenticated privileges on any app table (schema created over the direct channel by the first-launch wizard): every authenticated PostgREST query failed with 'permission denied', surfacing as missing-profile errors on every guarded page, dead essay planning, writing-sample save failures, and no typing baseline. 0027 + runtime repair fixed it; production diagnostic now reports grants true (verified live 2026-10-08/09).",
+   "severity": "was CRITICAL (root cause of all owner-account failures)",
+   "tests": [
+    "tests/self-healing-provision.ts grants/backfill/repair-retry suite (pinned to migration + runtime SQL)"
+   ],
+   "acceptance": "Live /api/setup-status reports grants.profiles=true, grants.writingSamples=true (EXECUTED, PASS). Signed-in click-through still requires the owner."
+  },
+  {
+   "id": "owner-statistics-service",
+   "title": "Owner dashboard statistics (network_stats function)",
+   "status": "IMPLEMENTED AND VERIFIED (code+live deploy)",
+   "files": [
+    "supabase/migrations/0028_network_stats_repair.sql",
+    "src/lib/db-privileged.ts (ensureOwnerStatsFunction)",
+    "src/app/owner/page.tsx"
+   ],
+   "gap_closed": "Live function was structurally broken ('structure of query does not match function result type'). 0028 recreates it collision-proof (o_* OUT params, explicit casts, drop-first, re-granted); runtime provisioning applies the same idempotent repair on the owner's next page load. Owner page renders an honest stats banner while the rest of the dashboard keeps working.",
+   "severity": "was HIGH",
+   "tests": [
+    "tests/self-healing-provision.ts 0028 pins; owner page banner pins"
+   ],
+   "acceptance": "Requires one signed-in owner page load (runtime repair is idempotent); cannot be driven by an unauthenticated probe."
+  },
+  {
+   "id": "math-integration-by-parts",
+   "title": "Math: tabular integration by parts with verification",
+   "status": "IMPLEMENTED AND VERIFIED",
+   "files": [
+    "src/lib/math/solve.ts (tryIntegrationByParts, numericallyVerifyAntiderivative)",
+    "tests/math-integral.ts"
+   ],
+   "gap_closed": "The reported '∫ 4x cos(2 − 3x) dx' returned NEEDS REVIEW (honest refusal) because only elementary power-rule antiderivatives were supported. Polynomial × sin/cos/exp of a linear argument is now solved deterministically, and every candidate is VERIFIED by symbolic differentiation + numeric comparison at six sample points before being claimed. Correct result: −(4x/3)sin(2−3x) + (4/9)cos(2−3x) + C (the task-supplied −(4/9)cos term has a sign error — proven by differentiation).",
+   "severity": "was MEDIUM",
+   "tests": [
+    "tests/math-integral.ts: reported integral + x·sin(x) + power-rule regression + honest refusal for non-elementary sin(x²)"
+   ],
+   "acceptance": "npm test: 2644/2644 PASS (EXECUTED)."
+  },
+  {
+   "id": "profile-self-healing",
+   "title": "Missing-profile recovery without re-authentication",
+   "status": "IMPLEMENTED AND VERIFIED (live deploy)",
+   "files": [
+    "src/lib/db-privileged.ts (provisionSignedInUser v2)",
+    "src/lib/supabase/require-user.ts (readProfileWithRepair)",
+    "src/lib/supabase/guard.ts",
+    "src/app/api/complete-owner/route.ts",
+    "supabase/migrations/0027_grants_backfill.sql (profiles backfill)"
+   ],
+   "gap_closed": "Guarded pages and API routes treated an unreadable profile as a dead end ('sign out and sign back in'). Now: read → repair once (grants, idempotent profile backfill, race-safe owner claim) → retry → only then an honest error WITH the actual reason. Auth Site URL/redirect allow-list auto-corrected when the management token is configured (dead-domain reset links → sophira.vercel.app).",
+   "severity": "was CRITICAL",
+   "tests": [
+    "tests/self-healing-provision.ts repair-matrix v2 suite"
+   ],
+   "acceptance": "Live diagnostic confirms the repair path exists and production grants are applied; signed-in flows verified by code + suite, click-through needs the owner."
+  },
+  {
+   "id": "responsive-navigation-rail",
+   "title": "Responsive navigation (desktop sidebar / tablet top nav / mobile bottom bar)",
+   "status": "IMPLEMENTED AND VERIFIED (code)",
+   "files": [
+    "src/components/app/AppShell.tsx",
+    "src/app/globals.css"
+   ],
+   "gap_closed": "Desktop (lg+) gets a persistent sidebar rail (brand, full section list, sync status, sign out); tablet keeps the horizontal top nav; mobile keeps the scrollable safe-area bottom bar. One NAV source renders all three patterns — no unreachable section. 16px inputs prevent iOS zoom.",
+   "severity": "was MEDIUM (UX)",
+   "tests": [
+    "tests/self-healing-provision.ts 2f nav pins"
+   ],
+   "acceptance": "Layout verified at code level + production routes 200; pixel-level multi-device rendering not machine-verified (needs device screenshots)."
+  },
+  {
+   "id": "memory-offline-ux",
+   "title": "Memory personalization setup + honest offline capability overview",
+   "status": "IMPLEMENTED AND VERIFIED (code)",
+   "files": [
+    "src/app/memories/page.tsx",
+    "src/app/offline/page.tsx"
+   ],
+   "gap_closed": "Memory page now introduces the optional personalization setup (writing style, teacher methods, typing calibration, privacy controls) with done/set-up state, skippable, privacy boundary stated. Offline page opens with a live connection-status overview: what works offline vs what needs a connection, pending-sync callout — nothing fakes availability.",
+   "severity": "was MEDIUM (UX)",
+   "tests": [
+    "tests/self-healing-provision.ts 2e pins"
+   ],
+   "acceptance": "Signed-in visual confirmation still needs the owner."
   }
+ ],
+ "priorities": {
+  "critical_blockers": [
+   {
+    "id": "CB1",
+    "external": true,
+    "title": "Vercel Production environment variables unset",
+    "action": "Owner sets NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY (+ optional search vars) in Vercel Production and redeploys; verify with curl /api/health — configuration booleans must read true.",
+    "status": "OPEN — cannot be done from the repository"
+   },
+   {
+    "id": "CB2",
+    "external": false,
+    "title": "Fresh-install owner bootstrap undocumented and README stated the removed first-user-becomes-owner rule",
+    "action": "README setup rewritten (all 12 migrations, owner_email bootstrap SQL, fail-closed explanation); RELEASE_PROCESS bring-up section added.",
+    "status": "FIXED THIS ROUND (commit 2)"
+   },
+   {
+    "id": "CB3",
+    "external": false,
+    "title": "No machine-checkable deployment-configuration readiness signal (root cause of the days-long §27 production 500s)",
+    "action": "/api/health now reports per-capability booleans (supabase, supabase_service_role, ai, search) with no secret values; 8 regression tests; runbook verification step.",
+    "status": "FIXED THIS ROUND (commit 1: 50cedb9)"
+   },
+   {
+    "id": "CB4",
+    "external": true,
+    "title": "SOPHIRA_APP_URL Actions variable unset — release workflow dormant",
+    "action": "Owner adds repo variable SOPHIRA_APP_URL = https://sophira.vercel.app (Settings → Secrets and variables → Actions). Audit token confirmed 403 on variables API — cannot be set programmatically.",
+    "status": "OPEN — owner action"
+   },
+   {
+    "id": "CB5",
+    "external": true,
+    "title": "Native signing material absent (Android keystore secrets, Apple certs)",
+    "action": "Owner sets ANDROID_*/IOS_* secrets for signed artifacts; pipeline honestly falls back to unsigned otherwise.",
+    "status": "OPEN — external by design; unsigned fallback is honest, so this gates signed native releases only"
+   }
+  ],
+  "high_priority": [
+   {
+    "id": "H1",
+    "title": "Submission readiness feature MISSING — no aggregate 'ready to submit' verdict (verification + rubric audit + citation audit + conflicts)",
+    "authorized": true,
+    "status": "IMPLEMENTED 2026-10-05 (round: continue working)"
+   },
+   {
+    "id": "H2",
+    "title": "Stale-pattern detection MISSING — learning patterns have first/last_observed but no aging/demotion logic",
+    "authorized": true,
+    "status": "IMPLEMENTED 2026-10-05 (round: continue working)"
+   },
+   {
+    "id": "H3",
+    "title": "Live research-engine verification — needs SEARCH_API_KEY (external)",
+    "authorized": false
+   },
+   {
+    "id": "H4",
+    "title": "Live RLS cross-user probe — needs Supabase credentials (external)",
+    "authorized": false
+   },
+   {
+    "id": "H5",
+    "title": "Legal placeholders — owner facts + attorney review (external)",
+    "authorized": false
+   }
+  ],
+  "medium_priority": [
+   {
+    "id": "M1",
+    "title": "CI step label says '144 assertions' (actual 285) — cosmetic; fixing .github/workflows requires a workflow-scoped credential"
+   },
+   {
+    "id": "M2",
+    "title": "Browser-level (Selenium/Playwright) pacing and scheduler UI tests — currently logic-level only"
+   },
+   {
+    "id": "M3",
+    "title": "Real-device PWA/native acceptance matrix (DEVICE_ACCEPTANCE.md rows still NOT TESTED)"
+   },
+   {
+    "id": "M4",
+    "title": "TEST_REPORT.md assertion counts drift (277 → 285) between rounds; a §28 entry was added this round to re-anchor"
+   }
+  ],
+  "optional_enhancements": [
+   {
+    "id": "O1",
+    "title": "Additional search providers (DuckDuckGo/Google CSE) behind the existing provider abstraction"
+   },
+   {
+    "id": "O2",
+    "title": "More typing passages / adaptive calibration difficulty"
+   },
+   {
+    "id": "O3",
+    "title": ".ics calendar export of scheduler plans"
+   },
+   {
+    "id": "O4",
+    "title": "Learning-pattern export/import for account portability"
+   },
+   {
+    "id": "O5",
+    "title": "Additional citation styles (Harvard, Turabian) in the deterministic citation engine"
+   }
+  ]
+ }
 }

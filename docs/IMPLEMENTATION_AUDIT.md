@@ -264,3 +264,59 @@ implemented this round. No other category was touched.
   the owner-side blockers (env vars, migrations, device tests, legal
   placeholders) — unchanged and honestly BLOCKED in the release gate.
 
+
+
+---
+
+# Implementation Audit — Round 2 (first testing release)
+
+**Date:** 2026-10-09 · **Base commit:** `e48863f` · **Machine-readable version:** `docs/implementation-checklist.json` (36 items)
+
+Round 1 audited the code against requirements. Round 2 audits the **live
+production system** (https://sophira.vercel.app), which reached first-run
+acceptance on 2026-10-07 (empty Supabase initialized via /setup,
+migrations 0001-0026 applied, owner claimed, OWNER_EXISTS), then received
+the repairs below after real production failures were diagnosed live.
+
+## Verified during this round (actually executed)
+
+- `npm test` — **2644/2644 PASS** (offline suite; no embedded Postgres).
+- `npx tsc --noEmit` — clean.
+- `npm run build` — production build compiles.
+- `npm run verify` — **PASS** (Node, deps, env manifest, secret scan, build).
+- `npm run scan:secrets` — **CLEAN** (client bundles contain no secrets).
+- `npm run env:example` — `.env.example` in sync with the manifest.
+- Live HTTP probes: `/login` 200, `/api/health` 200, guarded routes
+  307 → `/login?next=…` (single hop), `/api/setup-status` reports
+  **grants.profiles=true, grants.writingSamples=true** on the production
+  database.
+
+## Repairs made between rounds (all traced to root cause)
+
+| Former failure | Root cause | Fix | Status |
+|---|---|---|---|
+| "permission denied for table writing_samples"; every guarded page claimed the profile was missing; essay planning dead; no typing baseline | Production database had **no anon/authenticated privileges on any app table** — the schema was created over the direct Postgres channel by the first-launch wizard, and no migration granted table privileges. RLS was never even reached. | Migration **0027** (grants contract + idempotent profiles backfill + default privileges) and the same grants applied at runtime by the sign-in repair | **VERIFIED LIVE** (production grants diagnostic now true) |
+| Owner dashboard: "structure of query does not match function result type" | The deployed `network_stats()` was structurally broken at runtime; OUT-parameter names collided with real column names | Migration **0028** (collision-proof `o_*` params, explicit casts, drop-first, re-granted) + idempotent runtime application at the owner's next page load; owner page renders an honest banner while the rest of the dashboard keeps working | **IMPLEMENTED** (live click-through needs the owner) |
+| "Could not save: permission denied"; "Your profile is missing. Sign out and back in" | Same grants root cause; guards treated unreadable profiles as dead ends | Guard now does read → repair once → retry → honest error with the actual reason; reset links auto-corrected to sophira.vercel.app | **VERIFIED LIVE** (grants) |
+| `∫ 4x cos(2 − 3x) dx` returned NEEDS REVIEW | The solver only handled elementary power-rule antiderivatives (the refusal itself was honest and is preserved) | Deterministic **tabular integration by parts** (polynomial × sin/cos/exp of a linear argument), every candidate verified by symbolic differentiation + numeric comparison before being claimed | **VERIFIED** (regression test suite; note: the task-supplied expected answer had a sign error — the verified correct form is −(4x/3)sin(2−3x) **+ (4/9)**cos(2−3x) + C) |
+| Login redirect loop / blank dashboard (pre-acceptance) | Middleware/page guard conflict over stale sessions; broken provision closed with a 409 | Server-verified session handling, loop-proof account guards, provisioning repaired idempotently at sign-in | **VERIFIED LIVE** |
+
+## Remaining gaps (honest register)
+
+1. **Signed-in owner click-through** — the final human acceptance pass
+   (dashboard, math scan camera on a real device, essay planning with a
+   live AI provider, owner statistics after 0028's runtime repair).
+   Needs the owner's account; no synthetic credentials exist for production.
+2. **db:migrate:check against production** — requires
+   `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF`; not available here.
+   Run `npm run db:migrate:check` from a machine with those variables.
+3. **AI provider** — planning/drafting need `OPENAI_API_KEY` (or the
+   Gemini free tier) configured in Vercel; without it the routes return
+   honest configuration errors (verified in code) instead of working.
+4. **Legal readiness** — `npm run legal:status` reports **28 owner facts
+   unresolved** (identity, jurisdiction, liability, retention…). Attorney
+   review is REQUIRED before production publication. No facts were invented.
+5. **Local `npm run doctor`** — fails only on `NEXT_PUBLIC_SITE_URL`,
+   which IS set in the Vercel project; the check runs in local context here.
+6. **Physical device testing** (camera/OCR, iPad layout, touch) — not
+   machine-verifiable from this environment; see docs/DEVICE_ACCEPTANCE.md.
