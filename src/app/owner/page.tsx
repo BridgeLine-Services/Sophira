@@ -61,15 +61,14 @@ export default async function OwnerPage() {
     supabase.from("invitations").select("*").order("created_at", { ascending: false }),
     supabase.from("invitation_requests").select("*").order("created_at", { ascending: false }),
   ]);
-  if (mErr || !members) {
-    return (
-      <AppShell title="Owner Dashboard">
-        <p className="text-sm text-ink-soft">
-          Statistics are unavailable: {mErr?.message || "unknown error"}. Run migration 0005 in Supabase.
-        </p>
-      </AppShell>
-    );
-  }
+  // 2026-10-08: a statistics failure must NOT take down the whole owner
+  // dashboard. The membership table renders empty WITH an explicit,
+  // honest banner (never fabricated zeros); invitations, requests, and
+  // every management action keep working; the banner names the actual
+  // database reason and offers reload as the retry.
+  const statsError = mErr || !members
+    ? `Membership statistics could not be loaded (${(mErr?.message || "no data returned").replace(/[\n\r]/g, " ").slice(0, 160)}). The member list below may be incomplete — invitations and access management still work. Reload to retry.`
+    : null;
 
   const hdrs = await headers();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${hdrs.get("x-forwarded-proto") || "http"}://${hdrs.get("host")}`;
@@ -93,8 +92,13 @@ export default async function OwnerPage() {
       <NoUnexpectedChargesCard />
       <CapabilityRegistryCard />
       <ProviderDiagnosticsCard />
+      {statsError && (
+        <div className="mb-4 rounded-card border border-danger/30 bg-danger/5 p-3" role="alert">
+          <p className="text-sm font-medium text-danger">{statsError}</p>
+        </div>
+      )}
       <OwnerDashboard
-        initialMembers={members as NetworkMemberStats[]}
+        initialMembers={(members || []) as NetworkMemberStats[]}
         initialInvitations={(invitations || []) as Invitation[]}
         initialRequests={(requests || []) as InvitationRequest[]}
         siteUrl={siteUrl}

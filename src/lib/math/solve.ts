@@ -279,19 +279,121 @@ export function solveIntegral(expr: string): SolveResult {
   const body = m[1].trim();
   const v = m[2];
   const anti = elementaryAntiderivative(body, v);
-  if (anti == null) {
-    return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: `no elementary antiderivative found for "${body}" — needs review (never guessed)` };
+  if (anti != null) {
+    const steps: SolveStep[] = [
+      { text: "Apply the power rule ∫xⁿ dx = xⁿ⁺¹/(n+1) term by term (deterministic)", expr: `∫${body} d${v} = ${anti} + C` },
+    ];
+    return {
+      kind: "integral",
+      solved: true,
+      finalAnswer: `${anti} + C`,
+      steps,
+      checks: [{ kind: "derivative" as const, label: " (verify by differentiation)", expr: anti, expected: body, var: v }],
+    };
   }
-  const steps: SolveStep[] = [
-    { text: "Apply the power rule ∫xⁿ dx = xⁿ⁺¹/(n+1) term by term (deterministic)", expr: `∫${body} d${v} = ${anti} + C` },
-  ];
-  return {
-    kind: "integral",
-    solved: true,
-    finalAnswer: `${anti} + C`,
-    steps,
-    checks: [{ kind: "simplify_equal", label: `verify by differentiating: d/d${v}[${anti}] must equal ${body}`, expr: anti, expected: body, var: v }],
-  };
+  // 2026-10-08: TABULAR INTEGRATION BY PARTS — polynomial × sin/cos/exp of
+  // a LINEAR argument. Deterministic, and verified by numerically
+  // differentiating the result before it is ever claimed as solved.
+  const parts = tryIntegrationByParts(body, v);
+  if (parts) {
+    if (!numericallyVerifyAntiderivative(parts.anti, body, v)) {
+      return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: "integration by parts produced a candidate that failed verification — needs review (never guessed)" };
+    }
+    return {
+      kind: "integral",
+      solved: true,
+      finalAnswer: `${parts.anti} + C`,
+      steps: parts.steps,
+      checks: [{ kind: "derivative" as const, label: " (verify by differentiating the antiderivative)", expr: parts.anti, expected: body, var: v }],
+    };
+  }
+  return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: `no elementary antiderivative found for "${body}" — needs review (never guessed)` };
+}
+
+/* ---------------- integration by parts (tabular) ---------------- */
+
+/** ∫ P(v)·f(a·v+b) dv for f ∈ {sin, cos, exp} and polynomial P.
+ *  Deterministic tabular integration by parts. Returns null for anything
+ *  else — the caller keeps the honest NEEDS REVIEW path; never guesses. */
+function tryIntegrationByParts(body: string, v: string): { anti: string; steps: SolveStep[] } | null {
+  try {
+    const simplified = String(math.simplify(body));
+    // P(v) * f(arg)
+    // implicit multiplication is legal in mathjs output ("4 x cos(...)"),
+    // so the separator star is optional; an empty P means the constant 1.
+    const m = simplified.match(/^(.*?)\s*\*?\s*(sin|cos|exp)\s*\((.+)\)\s*$/);
+    if (!m) return null;
+    const pPart = m[1].trim() || "1";
+    const fn = m[2] as "sin" | "cos" | "exp";
+    const arg = m[3].trim();
+    if (!arg.includes(v)) return null;
+    // The argument must be linear in v: a·v + b with CONSTANT a, b.
+    const dArg = String(math.derivative(arg, v));
+    const aVal = Number(math.evaluate(dArg, {}));
+    const bVal = Number(math.evaluate(arg, { [v]: 0 }));
+    if (!Number.isFinite(aVal) || aVal === 0 || !Number.isFinite(bVal)) return null;
+    // Coefficients and symbolic derivatives of P (degree-bounded).
+    let cur = pPart;
+    const pDerivs: string[] = [];
+    const coeffs: number[] = [];
+    for (let k = 0; k < 9; k++) {
+      const valAt0 = Number(math.evaluate(cur, { [v]: 0 }));
+      if (!Number.isFinite(valAt0)) return null;
+      pDerivs.push(cur);
+      coeffs.push(valAt0);
+      const next = String(math.derivative(cur, v));
+      // When the derivative is constant it is the LAST row of the table —
+      // push it too (its term contributes) and stop.
+      if (!next.includes(v)) { pDerivs.push(next); break; }
+      cur = next;
+    }
+    if (pDerivs.length < 1 || pDerivs[pDerivs.length - 1].includes(v)) return null; // degree > 8 → give up honestly
+    // Tabular: term_k = (−1)^k · P⁽ᵏ⁾(v) · I_{k+1}(a·v+b)
+    const argText = `(${arg})`;
+    const integralOf = (j: number): string => {
+      // j-th antiderivative of fn(a·v+b), j ≥ 1
+      const f = (name: string) => `${name}${argText}`;
+      if (fn === "exp") return `exp${argText}`;
+      const cycle = fn === "cos"
+        ? [f("sin"), `-cos${argText}`, `-sin${argText}`, f("cos")]
+        : [`-cos${argText}`, `-sin${argText}`, f("cos"), f("sin")];
+      return cycle[(j - 1) % 4];
+    };
+    const terms: string[] = [];
+    for (let k = 0; k < pDerivs.length; k++) {
+      const sign = k % 2 === 0 ? "" : "-";
+      const aPow = Math.pow(aVal, k + 1);
+      terms.push(`${sign}(${pDerivs[k]}) * (1 / ${aPow}) * ${integralOf(k + 1)}`);
+    }
+    const raw = terms.join(" + ").replace("\+ -", "- ");
+    const anti = String(math.simplify(raw));
+    if (!anti || anti === "0") return null;
+    const steps: SolveStep[] = [
+      { text: "Recognized a polynomial times a sin/cos/exp of a linear argument — solved deterministically by TABULAR INTEGRATION BY PARTS (differentiate the polynomial repeatedly, integrate the trig/exponential term repeatedly).", expr: `∫${body} d${v}` },
+      { text: "Integrate by parts term by term; each row of the table contributes one piece of the antiderivative.", expr: `= ${anti} + C` },
+      { text: "VERIFIED by differentiating the result: d/d" + v + "[" + anti + "] reproduces the integrand numerically (independent check).", expr: `d/d${v}[${anti}] = ${body}` },
+    ];
+    return { anti, steps };
+  } catch {
+    return null;
+  }
+}
+
+/** Independent NUMERIC verification: differentiate the candidate
+ *  antiderivative symbolically and compare with the integrand at several
+ *  sample points. The result is only claimed when this passes. */
+function numericallyVerifyAntiderivative(anti: string, body: string, v: string): boolean {
+  try {
+    const dAnti = String(math.derivative(anti, v));
+    const diff = math.parse(`(${dAnti}) - (${body})`).compile();
+    for (const t of [0.31, 0.73, 1.27, 2.11, -0.42, 3.7]) {
+      const d = Number(diff.evaluate({ [v]: t }));
+      if (!Number.isFinite(d) || Math.abs(d) > 1e-6) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Polynomial + 1/x + e^x + constant antiderivatives. Returns null when

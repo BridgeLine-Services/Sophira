@@ -66,6 +66,21 @@ export function runSelfHealingProvisionTests(assert: (c: boolean, n: string) => 
       `repair: ${page} attempts the repair, retries, and shows the failing reason`);
   }
 
+  // 2d. OWNER STATISTICS STRUCTURAL REPAIR (0028) — the live "structure of
+  // query does not match function result type" failure is fixed by a
+  // collision-proof function definition, and a stats failure can no longer
+  // take down the whole owner dashboard.
+  const mig28 = readFileSync("supabase/migrations/0028_network_stats_repair.sql", "utf8");
+  const ownerPage = readFileSync("src/app/owner/page.tsx", "utf8");
+  assert(mig28.includes("o_user_id") && mig28.includes("drop function if exists public.network_stats()"),
+    "stats: 0028 recreates network_stats with collision-proof OUT parameter names (drop-first)");
+  assert(mig28.includes("::timestamptz") && mig28.includes("::jsonb") && mig28.includes("grant execute on function public.network_stats() to authenticated"),
+    "stats: every returned column is explicitly cast and execute is re-granted");
+  assert(generated.includes("0028_network_stats_repair.sql"),
+    "stats: 0028 is embedded in the runtime chain (existing databases get it on repair)");
+  assert(ownerPage.includes("statsError") && ownerPage.includes("Membership statistics could not be loaded") && !ownerPage.includes("Run migration 0005 in Supabase"),
+    "stats: the owner page renders an honest banner and KEEPS the dashboard functional — no misleading 'run migration' dead end");
+
   // 2c. AUTH REDIRECT FIX — reset links point at the live domain
   assert(dbPriv.includes("ensureAuthRedirectConfig") && dbPriv.includes("site_url") && dbPriv.includes("redirect_urls"),
     "auth-redirect: the Supabase Auth Site URL + redirect allow-list are corrected automatically when misconfigured");

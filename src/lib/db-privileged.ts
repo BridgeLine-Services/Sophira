@@ -173,6 +173,87 @@ export async function checkAuthenticatedGrants(): Promise<{ profiles: boolean | 
 }
 
 /**
+ * OWNER STATS FUNCTION REPAIR (2026-10-08): the live owner dashboard fails
+ * with "structure of query does not match function result type" — the
+ * deployed network_stats() is structurally broken at runtime. Migration
+ * 0028 recreates it collision-proof; the wizard chain applies it to new
+ * databases, and THIS idempotent check applies it to the LIVE database at
+ * the owner's next authenticated page load (only the owner can trigger
+ * provisioning here, and the function is owner-only anyway). The SQL is
+ * pinned to the migration file by the offline suite.
+ */
+const OWNER_STATS_SQL = `drop function if exists public.network_stats();
+
+create or replace function public.network_stats()
+returns table (
+  o_user_id uuid,
+  o_display_name text,
+  o_email text,
+  o_role text,
+  o_status text,
+  o_access_revoked_at timestamptz,
+  o_onboarded boolean,
+  o_can_request_invites boolean,
+  o_created_at timestamptz,
+  o_last_active_at timestamptz,
+  o_assignment_count bigint,
+  o_response_count bigint,
+  o_subject_usage jsonb
+)
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not exists (select 1 from public.profiles p
+                 where p.id = auth.uid() and p.role = 'owner') then
+    raise exception 'network_stats is owner-only' using errcode = '42501';
+  end if;
+
+  return query
+  select
+    p.id                                   ::uuid,
+    p.display_name                         ::text,
+    au.email                               ::text,
+    p.role                                 ::text,
+    p.status                               ::text,
+    p.access_revoked_at                    ::timestamptz,
+    p.onboarded                            ::boolean,
+    p.can_request_invites                  ::boolean,
+    p.created_at                           ::timestamptz,
+    p.last_active_at                       ::timestamptz,
+    (select count(*) from public.assignments a
+      where a.user_id = p.id)              ::bigint,
+    (select count(*) from public.responses r
+      where r.user_id = p.id)              ::bigint,
+    coalesce((
+      select jsonb_agg(jsonb_build_object('subject', s.subject, 'count', s.c))
+      from (
+        select a.subject, count(*) as c
+        from public.assignments a
+        where a.user_id = p.id and a.subject is not null
+        group by a.subject
+        order by c desc
+      ) s
+    ), '[]'::jsonb)                        ::jsonb
+  from public.profiles p
+  join auth.users au on au.id = p.id;
+end;
+$$;
+
+revoke all on function public.network_stats() from anon, authenticated;
+grant execute on function public.network_stats() to authenticated;
+`;
+
+async function ensureOwnerStatsFunction(client: { query: (q: string, p?: unknown[]) => Promise<{ rows: unknown[] }> }): Promise<void> {
+  const r = await client.query(
+    "select 1 as one from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'network_stats' and n.nspname = 'public' and p.proargnames is not null and p.proargnames[1] = 'o_user_id' limit 1"
+  );
+  if (r.rows.length === 0) {
+    await client.query(OWNER_STATS_SQL);
+  }
+}
+
+/**
  * SELF-HEALING PROVISIONING v2 for a signed-in user (2026-10-08).
  *
  * Runs on first authenticated load whenever a profile read fails, and at
@@ -200,6 +281,10 @@ export async function provisionSignedInUser(userId: string): Promise<
   const r = await withClient(async (client) => {
     // A. THE GRANTS CONTRACT — fixes permission-denied reads on every table.
     await client.query(GRANTS_SQL);
+
+    // A2. Owner statistics service repair (idempotent; applies 0028's
+    // function when the deployed one is structurally broken).
+    await ensureOwnerStatsFunction(client);
 
     // B. Does this account already have its profile row?
     const own = await client.query("select role from public.profiles where id = $1 limit 1", [userId]);
