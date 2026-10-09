@@ -121,6 +121,15 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(essayPage.includes("Back to the course"),
     "essay: the course workspace provides an easy route back to the course");
 
+  // ---- 9b. Memory view honors the course boundary -----------------------------
+  const managerSrc = readFileSync("src/components/app/MemoryManager.tsx", "utf8");
+  assert(managerSrc.includes("subjectFilter"),
+    "memory: the memory list supports a course-subject filter (subject + global memories only)");
+  assert(learningPage.includes("searchParams?.course_id") && learningPage.includes("subjectFilter"),
+    "memory: /learning?course_id= narrows the memories section to the course's subject via an RLS-scoped course read");
+  assert(ENGINE_TOOLS.general.some((t) => t.path === "/learning"),
+    "memory: the engine Memory tool routes to the unified Learning / Memory destination with course context");
+
   // ---- 10. Owner routes and authorization untouched ---------------------------
   const ownerPage = readFileSync("src/app/owner/page.tsx", "utf8");
   assert(ownerPage.length > 0, "owner: the Owner Dashboard route still exists");

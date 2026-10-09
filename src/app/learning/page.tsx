@@ -21,9 +21,26 @@ export const dynamic = "force-dynamic";
  * pattern's scope column governs where it applies (a calculus correction
  * never influences biology writing).
  */
-export default async function LearningPage() {
+export default async function LearningPage({
+  searchParams,
+}: {
+  searchParams?: { course_id?: string };
+}) {
   const supabase = createClient();
   const user = await requireUser(supabase);
+
+  // Course workspace context: narrow the memories section to the course's
+  // subject (plus global memories). RLS still governs every row; this only
+  // narrows the signed-in student's own view.
+  let course: { name: string; subject: string | null } | null = null;
+  if (searchParams?.course_id) {
+    const { data } = await supabase
+      .from("courses")
+      .select("name, subject")
+      .eq("id", searchParams.course_id)
+      .single();
+    course = (data as { name: string; subject: string | null } | null) ?? null;
+  }
 
   const { profile, reason: profileReason } = await readProfileWithRepair(supabase, user.id);
   if (!profile) {
@@ -158,7 +175,16 @@ export default async function LearningPage() {
           scoped by subject and course. Inspect the evidence behind any AI-inferred memory,
           disable it, or permanently forget it.
         </p>
-        <MemoryManager initialMemories={(memories || []) as StudentMemory[]} />
+        {course && (
+          <p className="mb-2 text-xs text-ink-soft" role="note">
+            Course workspace view: memories narrowed to {course.subject || "this course's subject"} plus
+            global ones. <Link href="/learning" className="font-medium text-accent underline">All memories</Link>
+          </p>
+        )}
+        <MemoryManager
+          initialMemories={(memories || []) as StudentMemory[]}
+          subjectFilter={course?.subject ?? null}
+        />
       </section>
 
       {/* Section 3: history */}

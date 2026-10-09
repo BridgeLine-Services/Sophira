@@ -33,7 +33,14 @@ interface MemoryWithCount extends StudentMemory {
   evidence_count?: number;
 }
 
-export function MemoryManager({ initialMemories }: { initialMemories: MemoryWithCount[] }) {
+export function MemoryManager({
+  initialMemories,
+  subjectFilter,
+}: {
+  initialMemories: MemoryWithCount[];
+  /** When set (course workspace), the list narrows to this subject + global memories. */
+  subjectFilter?: string | null;
+}) {
   const [memories, setMemories] = useState(initialMemories);
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
@@ -132,7 +139,15 @@ export function MemoryManager({ initialMemories }: { initialMemories: MemoryWith
     if (res.ok) void refresh();
   }
 
-  const filtered = useMemo(() => memories, [memories]);
+  const filtered = useMemo(() => {
+    if (!subjectFilter) return memories;
+    // Course workspace: keep this subject's memories plus explicitly global ones.
+    const want = subjectFilter.toLowerCase();
+    return memories.filter((m) => {
+      const subj = (m.subject ?? "").toLowerCase();
+      return !subj || subj.includes(want) || want.includes(subj);
+    });
+  }, [memories, subjectFilter]);
 
   return (
     <div className="space-y-4">
