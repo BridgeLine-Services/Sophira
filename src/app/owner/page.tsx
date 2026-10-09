@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/supabase/require-user";
+import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user";
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { OwnerDashboard } from "@/components/app/OwnerDashboard";
@@ -25,7 +25,7 @@ export default async function OwnerPage() {
   // cleared ONCE and sent to /login — it can never bounce back.
   const user = await requireUser(supabase);
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+  const { profile, reason: profileReason } = await readProfileWithRepair(supabase, user.id);
   if (!profile) {
     // LOOP-PROOF (fix #2, 2026-10-08): a VALID session with an unresolvable
     // profile previously redirected to /login — which the middleware
@@ -43,6 +43,11 @@ export default async function OwnerPage() {
             sign back in; if it persists, the account needs the operator&apos;s
             attention.
           </p>
+          {profileReason && (
+            <p className="text-xs text-ink-soft" role="note">
+              Reason: {profileReason}
+            </p>
+          )}
           <SignOutButton />
         </div>
       </AppShell>

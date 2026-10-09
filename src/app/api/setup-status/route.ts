@@ -1,6 +1,7 @@
 import { evaluateOwnerSetup, probeOwnerSetup } from "@/lib/owner-setup";
 import { supabaseConfigStatus } from "@/lib/supabase-config";
 import { countStaleAuthUsers } from "@/lib/db-bootstrap";
+import { checkAuthenticatedGrants } from "@/lib/db-privileged";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,9 @@ export async function GET() {
   const probe = await probeOwnerSetup();
   const status = evaluateOwnerSetup(probe);
   const stale = await countStaleAuthUsers(probe);
+  // Grants contract diagnostic (2026-10-08 root cause: tables created by
+  // the wizard had NO anon/authenticated grants — categorical only.
+  const grants = await checkAuthenticatedGrants();
   return Response.json({
     ok: true,
     name: "sophira-setup",
@@ -55,6 +59,7 @@ export async function GET() {
     },
     repair: { available: status.repair.available, action: status.repair.action, reason: status.repair.reason },
     staleAuthUsers: stale,
+    grants,
     guidance: status.guidance,
     ownerCreation: status.ownerCreation,
   });

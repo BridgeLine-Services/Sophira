@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/supabase/require-user";
+import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user";
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { MemoryManager } from "@/components/app/MemoryManager";
@@ -20,7 +20,7 @@ export default async function MemoriesPage() {
   // redirect loop); the user sees one explicit account-problem screen.
   const user = await requireUser(supabase);
 
-  const { data: profile } = await supabase.from("profiles").select("status, onboarded").eq("id", user.id).single();
+  const { profile, reason: profileReason } = await readProfileWithRepair(supabase, user.id);
   if (!profile) {
     return (
       <AppShell title="Account problem">
@@ -30,6 +30,11 @@ export default async function MemoriesPage() {
             You are signed in, but your profile record could not be read. Sign out and sign back in;
             if it persists, the account needs the operator&apos;s attention.
           </p>
+          {profileReason && (
+            <p className="text-xs text-ink-soft" role="note">
+              Reason: {profileReason}
+            </p>
+          )}
           <SignOutButton />
         </div>
       </AppShell>

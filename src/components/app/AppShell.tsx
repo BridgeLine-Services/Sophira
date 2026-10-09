@@ -150,13 +150,13 @@ export function AppShell({ title, backHref, actions, children }: {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         aria-label="Main"
       >
-        <div className="grid h-16 grid-cols-5">
+        <div className="flex h-16 items-stretch gap-1 overflow-x-auto px-2" style={{ scrollbarWidth: "none" }}>
           {NAV.filter((n) => n.href !== "/settings").map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 text-[11px] font-medium",
+                "flex min-w-[64px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-medium",
                 pathname === href || pathname.startsWith(href + "/") ? "text-accent" : "text-ink-soft"
               )}
             >

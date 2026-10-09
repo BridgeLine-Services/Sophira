@@ -41,3 +41,42 @@ export async function requireUser(supabase: SupabaseClient): Promise<User> {
   }
   redirect("/login");
 }
+
+export interface ProfileRow {
+  id: string;
+  role: string;
+  status?: string | null;
+  onboarded?: boolean | null;
+  display_name?: string | null;
+  [key: string]: unknown;
+}
+/**
+ * SELF-HEALING PROFILE READ (2026-10-08): the guarded pages read the
+ * profile directly; a failed read (permission denied from the missing
+ * grants contract, or a genuinely absent row) previously dead-ended the
+ * user on an error card. Per the recovery contract: read once, REPAIR
+ * once (grants + idempotent row backfill over the verified direct
+ * channel), read again — and only then report failure WITH the actual
+ * reason. Never asks the user to sign out and back in.
+ */
+export async function readProfileWithRepair(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{ profile: ProfileRow | null; reason: string | null }> {
+  const first = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+  if (first.data) return { profile: first.data as ProfileRow, reason: null };
+  const failure = first.error ? first.error.message : "profile row not found";
+  try {
+    const { provisionSignedInUser } = await import("@/lib/db-privileged");
+    const repair = await provisionSignedInUser(userId);
+    if (repair.ok) {
+      const retry = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+      if (retry.data) return { profile: retry.data as ProfileRow, reason: null };
+      return { profile: null, reason: retry.error?.message ?? failure };
+    }
+  } catch {
+    // direct channel unavailable: report the original failing reason
+  }
+  return { profile: null, reason: failure };
+}
+

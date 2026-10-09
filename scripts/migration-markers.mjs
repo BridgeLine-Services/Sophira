@@ -20,4 +20,6 @@ export const MARKERS = {
   "0025_first_owner_bootstrap.sql": "to_regclass('public.owner_bootstrap') is not null",
   "0026_first_owner_recovery.sql":
     "exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname='complete_first_owner' and n.nspname='public')",
+  "0027_grants_backfill.sql":
+    "exists (select 1 from information_schema.role_table_grants where table_schema = 'public' and table_name = 'profiles' and grantee = 'authenticated' and privilege_type = 'SELECT')",
 };

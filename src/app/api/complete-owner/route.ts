@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { publicSupabaseUrl, serviceRoleKey } from "../../../lib/supabase-config";
 import { createClient } from "../../../lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { callDbFunction, privilegedChannelConfigured, provisionSignedInUser } from "../../../lib/db-privileged";
+import { callDbFunction, privilegedChannelConfigured, provisionSignedInUser, ensureAuthRedirectConfig } from "../../../lib/db-privileged";
 
 export const dynamic = "force-dynamic";
 
@@ -98,17 +98,17 @@ export async function POST(request: NextRequest) {
   // The user id is the SERVER-verified session id; the repair runs over
   // the verified direct channel, never from browser input.
   if (privilegedChannelConfigured()) {
+    // PASSWORD-RESET LINK FIX (fire-and-forget): corrects the Supabase Auth
+    // Site URL / redirect allow-list when they point at a dead domain.
+    void ensureAuthRedirectConfig();
     const res = await provisionSignedInUser(user.id);
     if (res.ok) {
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
       return NextResponse.json({ completed: true, hasProfile: !!profile, role: profile?.role ?? null, action: res.action });
     }
-    if (res.reason === "owner_elsewhere") {
-      return NextResponse.json(
-        { error: "The owner account is attached to a different email address. Sign in with the owner's email, or ask the owner to invite you." },
-        { status: 409 }
-      );
-    }
+    // v2 (2026-10-08): the repair matrix now backfills the profile for
+    // EVERY legitimate signed-in account, so the only remaining failure is
+    // an unavailable database channel — honest 503, never a fake success.
     return NextResponse.json(
       { error: "Sophira cannot reach its database right now. Please try again later." },
       { status: 503 }

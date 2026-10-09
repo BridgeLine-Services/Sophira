@@ -56,12 +56,35 @@ async function requireUserInner(
   if (!user) {
     return { ok: false, response: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) };
   }
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+  // SELF-HEALING READ (2026-10-08): a failed profile read (permission
+  // denied from the missing grants contract, or a genuinely absent row)
+  // triggers ONE idempotent repair over the verified direct channel and a
+  // retry. Only a still-failing read returns an error — and it now names
+  // the ACTUAL failing reason instead of a dead-end "sign out and back in".
+  const { data: profile, error: profileError } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (!profile) {
+    let repaired = false;
+    let reason = profileError?.message ?? "profile record not found";
+    try {
+      const { provisionSignedInUser } = await import("@/lib/db-privileged");
+      const repair = await provisionSignedInUser(user.id);
+      if (repair.ok) {
+        const retry = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        if (retry.data) {
+          return { ok: true, data: { user, profile: retry.data as unknown as Profile } };
+        }
+        reason = retry.error?.message ?? reason;
+      } else {
+        reason = "the server's database channel is unavailable right now";
+      }
+    } catch {
+      // direct channel unavailable — report the original reason below
+    }
+    void repaired;
     return {
       ok: false,
       response: NextResponse.json(
-        { error: "Your profile is missing. Please sign out and sign back in." },
+        { error: `Your profile record could not be read (${reason}). Please try again in a moment; if it persists, contact the operator.` },
         { status: 403 }
       ),
     };
