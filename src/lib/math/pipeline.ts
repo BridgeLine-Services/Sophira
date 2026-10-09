@@ -25,6 +25,7 @@
 import { normalizeMathText } from "./normalize";
 import { solveProblem, type SolveResult, type SolveStep } from "./solve";
 import { runMachineChecks, type MachineCheckResult } from "../ai/mathverify";
+import { classifyMathProblem, type Classification } from "./orchestrator";
 
 /* ------------------------------------------------------------------ */
 /* Types — the four separately-tracked sections                         */
@@ -86,6 +87,9 @@ export type PipelineStatus =
   | "NEEDS REVIEW";            // verification failed / solver refused — shown, never hidden
 
 export interface MathPipelineResult {
+  /** Universal math engine classification (2026-10-09): field, engine
+   *  tier, verification level, and honest limits actually available. */
+  classification?: Classification;
   status: PipelineStatus;
   stageReached: PipelineStage;
   stepsCompleted: PipelineStage[];
@@ -237,6 +241,12 @@ export async function runMathPipeline(image: { width: number; height: number; gr
   // steps 4-5: detect + OCR
   const ocrResult = await deps.ocr(image);
   stepsCompleted.push("detect", "ocr");
+  // Universal math engine (2026-10-09): classify the ORIGINAL problem text
+  // against the capability registry — field, engine tier, verification
+  // level, honest limits. Attached to every result so the UI and AI
+  // explanation can state exactly what is verified and what is not.
+  const classification = classifyMathProblem(ocrResult.text, null);
+
   if (!ocrResult.text.trim()) {
     const recognized: RecognizedInput = { rawText: "", expression: "", expressions: [], confidence: 0, ambiguity: ["no mathematical expression was detected in the image"], ocrEngine: ocrResult.engine };
     return {
@@ -248,6 +258,7 @@ export async function runMathPipeline(image: { width: number; height: number; gr
       solution: { solved: false, kind: "evaluate", finalAnswer: "", steps: [] },
       explanation: { text: "", source: "deterministic-template", honestNote: "nothing to explain yet — no expression was recognized" },
       verification: { status: "NEEDS REVIEW", checks: [], note: "no expression recognized — nothing solved, nothing verified" },
+      classification,
       teacherMethod: null,
     };
   }
@@ -256,6 +267,8 @@ export async function runMathPipeline(image: { width: number; height: number; gr
   const norm = normalizeMathText(ocrResult.text);
   const expressions = norm.expressions.length > 0 ? norm.expressions : [ocrResult.text];
   stepsCompleted.push("reconstruct");
+
+
 
   // confidence: engine confidence × deterministic ambiguity penalties
   let confidence = Math.max(0, Math.min(1, ocrResult.confidence));
@@ -288,6 +301,7 @@ export async function runMathPipeline(image: { width: number; height: number; gr
       solution: { solved: false, kind: "evaluate", finalAnswer: "", steps: [] },
       explanation: { text: "", source: "deterministic-template", honestNote: "waiting for your confirmation of the recognized expression" },
       verification: { status: "NEEDS REVIEW", checks: [], note: `not verified yet — confirm the recognized expression first${confidence < CONFIRM_THRESHOLD ? ` (OCR confidence ${(confidence * 100).toFixed(0)}% is below the ${(CONFIRM_THRESHOLD * 100).toFixed(0)}% threshold)` : ""}` },
+      classification,
       teacherMethod: null,
     };
   }
@@ -362,6 +376,7 @@ export async function runMathPipeline(image: { width: number; height: number; gr
     explanation,
     verification,
     teacherMethod,
+    classification,
   };
 }
 
