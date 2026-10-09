@@ -84,7 +84,63 @@ export function AppShell({ title, backHref, actions, children }: {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur">
+      {/* PERSISTENT SIDEBAR RAIL (lg+, 2026-10-08 responsive redesign):
+          desktop/laptop gets a real navigation rail with the brand, the
+          full section list, and sign out — the top bar keeps page title
+          and actions, and content gets a comfortable reading measure. */}
+      <aside
+        className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-ink/10 bg-paper/95 backdrop-blur lg:flex"
+        aria-label="Primary"
+      >
+        <Link href="/dashboard" className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">S</span>
+          Sophira
+        </Link>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label="Sections">
+          {isOwner && (
+            <Link
+              href="/owner"
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
+                pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5"
+              )}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Owner
+            </Link>
+          )}
+          {NAV.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
+                pathname === href || pathname.startsWith(href + "/")
+                  ? "bg-accent-soft text-accent"
+                  : "text-ink-soft hover:bg-ink/5 hover:text-ink"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <div className="border-t border-ink/10 p-3">
+          <div className="mb-2 px-2"><SyncStatus /></div>
+          <button
+            onClick={signOut}
+            disabled={signingOut}
+            aria-label="Sign out"
+            title="Sign out"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </div>
+      </aside>
+
+      <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur lg:pl-60">
         <div className="mx-auto flex h-14 max-w-4xl items-center gap-2 px-4">
           {backHref ? (
             <Link
@@ -95,7 +151,7 @@ export function AppShell({ title, backHref, actions, children }: {
               ←
             </Link>
           ) : (
-            <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-ink">
+            <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-ink lg:hidden">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">S</span>
               <span className="hidden sm:inline">Sophira</span>
             </Link>
@@ -108,12 +164,12 @@ export function AppShell({ title, backHref, actions, children }: {
             disabled={signingOut}
             aria-label="Sign out"
             title="Sign out"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5 lg:hidden"
           >
             <LogOut className="h-5 w-5" />
           </button>
         </div>
-        <nav className="mx-auto hidden max-w-4xl gap-1 overflow-x-auto px-4 pb-2 md:flex" aria-label="Main">
+        <nav className="mx-auto hidden max-w-4xl gap-1 overflow-x-auto px-4 pb-2 md:flex lg:hidden" aria-label="Main">
           {isOwner && (
             <Link
               href="/owner"
@@ -144,7 +200,7 @@ export function AppShell({ title, backHref, actions, children }: {
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-28 pt-5 md:pb-12">{children}</main>
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-28 pt-5 md:pb-12 lg:pl-60">{children}</main>
 
       <nav
         className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
