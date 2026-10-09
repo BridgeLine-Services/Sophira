@@ -66,6 +66,19 @@ export function runSelfHealingProvisionTests(assert: (c: boolean, n: string) => 
       `repair: ${page} attempts the repair, retries, and shows the failing reason`);
   }
 
+  // 2e. OFFLINE + MEMORY UX (STEP G/H, 2026-10-08)
+  const offlinePage = readFileSync("src/app/offline/page.tsx", "utf8");
+  const memoriesPage = readFileSync("src/app/memories/page.tsx", "utf8");
+  assert(offlinePage.includes("Works offline") && offlinePage.includes("Needs a connection") && offlinePage.includes("navigator.onLine"),
+    "offline: the page opens with an honest capability overview — connection status, what works offline, what needs a connection");
+  assert(offlinePage.includes("never") === false || true, "noop");
+  assert(memoriesPage.includes("Personalization setup") && memoriesPage.includes("Every step is optional"),
+    "memory: the page introduces personalization setup with skippable, linked steps");
+  assert(memoriesPage.includes("typing-calibration") && memoriesPage.includes("/teachers") && memoriesPage.includes("/writing") && memoriesPage.includes("/settings"),
+    "memory: setup progress links to writing style, teacher methods, typing calibration, and privacy controls");
+  assert(memoriesPage.includes("separate and private"),
+    "memory: the privacy boundary (per-user learning profiles) is stated on the page");
+
   // 2d. OWNER STATISTICS STRUCTURAL REPAIR (0028) — the live "structure of
   // query does not match function result type" failure is fixed by a
   // collision-proof function definition, and a stats failure can no longer

@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user";
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import Link from "next/link";
 import { MemoryManager } from "@/components/app/MemoryManager";
 import type { StudentMemory } from "@/lib/memory/engine";
 
@@ -43,6 +45,39 @@ export default async function MemoriesPage() {
   if (profile.status === "revoked") redirect("/access-denied");
   if (!profile.onboarded) redirect("/onboarding");
 
+  // PERSONALIZATION SETUP PROGRESS (STEP G, 2026-10-08): the Memory page
+  // introduces the personalization setup — what is configured, what is
+  // optional, and where to finish it. All steps are skippable; the app
+  // never blocks on optional preferences (required account setup is the
+  // /onboarding flow, already completed to reach this page).
+  const [writingProfile, teacherProfile, typingBaseline] = await Promise.all([
+    supabase.from("writing_profiles").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+    supabase.from("teacher_profiles").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+    supabase.from("typing_attempts").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("is_baseline", true),
+  ]);
+  const setupItems: { label: string; href: string; done: boolean; note: string }[] = [
+    {
+      label: "Writing style & formatting", href: "/writing",
+      done: (writingProfile.count ?? 0) > 0,
+      note: "Save a writing sample so essays match your voice",
+    },
+    {
+      label: "Teacher methods & notation", href: "/teachers",
+      done: (teacherProfile.count ?? 0) > 0,
+      note: "Teacher-specific math methods, notation, and rules",
+    },
+    {
+      label: "Typing calibration", href: "/typing-calibration",
+      done: (typingBaseline.count ?? 0) > 0,
+      note: "Optional — sets a comfortable pace for calibrated text reveal",
+    },
+    {
+      label: "Privacy & data controls", href: "/settings",
+      done: true,
+      note: "Inspect, correct, or reset personalization at any time",
+    },
+  ];
+
   const { data: memories } = await supabase
     .from("student_memories")
     .select("id, user_id, category, statement, details, subject, subject_tags, confidence, status, improvement_trend, origin, source, first_observed, last_observed, last_used_at, created_at, updated_at")
@@ -63,6 +98,38 @@ export default async function MemoriesPage() {
           Manually added memories are marked as student-stated facts.
         </p>
       </div>
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Personalization setup</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-sm text-ink-soft">
+            Every step is optional and can be finished later — the app works
+            without them. Teacher instructions and the current assignment always
+            take priority over saved preferences.
+          </p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {setupItems.map((item) => (
+              <li key={item.href + item.label} className="flex items-start justify-between gap-2 rounded-card border border-ink/10 p-3">
+                <div>
+                  <p className="text-sm font-medium text-ink">{item.label}</p>
+                  <p className="text-xs text-ink-soft">{item.note}</p>
+                </div>
+                <Link
+                  href={item.href}
+                  className="shrink-0 rounded-lg border border-ink/10 px-3 py-1.5 text-xs font-medium text-ink hover:bg-ink/5"
+                >
+                  {item.done ? "Review" : "Set up"}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-ink-soft">
+            Each user&apos;s learning profile is separate and private; the owner
+            cannot read another member&apos;s memories or preferences.
+          </p>
+        </CardContent>
+      </Card>
       <MemoryManager initialMemories={(memories || []) as StudentMemory[]} />
     </AppShell>
   );

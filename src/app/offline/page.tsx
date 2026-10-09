@@ -24,7 +24,7 @@ import { ONLINE_ONLY_TASKS } from "@/lib/offline/offline-tasks";
 import type { ConflictRecord } from "@/lib/offline/conflicts";
 import type { AiProvenance } from "@/lib/offline/local-engine";
 import type { SyncReport } from "@/lib/offline/sync";
-import { CloudOff, Cpu, Download, HardDrive, RefreshCw } from "lucide-react";
+import { CloudOff, Cpu, Download, HardDrive, RefreshCw, Wifi, WifiOff } from "lucide-react";
 
 export default function OfflinePage() {
   const stack = offlineStack();
@@ -42,6 +42,19 @@ export default function OfflinePage() {
   const [report, setReport] = useState<SyncReport | null>(null);
   const [conflicts, setConflicts] = useState<ConflictRecord[]>([]);
   const [queueCount, setQueueCount] = useState(0);
+  const [online, setOnline] = useState(true);
+
+  // Connection status (STEP H overview, 2026-10-08): honest at-a-glance state.
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -137,6 +150,42 @@ export default function OfflinePage() {
     <AppShell title="Offline">
       <div className="space-y-6">
         {!ready && <Spinner />}
+
+        {/* CAPABILITY OVERVIEW (2026-10-08): an honest summary before the
+            detail sections — what works offline, what needs a connection,
+            and the current sync state. Nothing here fakes availability. */}
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              {online ? <Wifi className="h-4 w-4 text-emerald-600" /> : <WifiOff className="h-4 w-4 text-ink-soft" />}
+              {online ? "Connected — everything is available" : "Offline — local data only"}
+            </CardTitle>
+            <Badge tone={online ? "success" : "neutral"}>{online ? "online" : "offline"}</Badge>
+          </CardHeader>
+          <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
+            <div>
+              <p className="mb-1 font-medium text-ink">Works offline</p>
+              <ul className="list-disc space-y-1 pl-4 text-ink-soft">
+                <li>Saved notebooks, assignments, and downloaded material</li>
+                <li>Offline AI tasks with a downloaded local model (below)</li>
+                <li>Queued changes — kept locally until you reconnect</li>
+              </ul>
+            </div>
+            <div>
+              <p className="mb-1 font-medium text-ink">Needs a connection</p>
+              <ul className="list-disc space-y-1 pl-4 text-ink-soft">
+                <li>Syncing queued changes to the server</li>
+                <li>Remote AI models (full quality) and research</li>
+                <li>Sign-in, invitations, and anything in your library</li>
+              </ul>
+              {queueCount > 0 && (
+                <p className="mt-2 rounded-card border border-accent/30 bg-accent/5 p-2 text-xs text-ink">
+                  {queueCount} change(s) are waiting to sync — they are safe locally and will upload automatically when the connection returns.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="flex items-center justify-between">
