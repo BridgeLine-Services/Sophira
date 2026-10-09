@@ -10,8 +10,7 @@ import {
 } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { InvitationRequest, Profile } from "@/lib/types";
-import { ShieldCheck, Smartphone, Download, Gauge } from "lucide-react";
-import { TypingTest } from "@/components/app/TypingTest";
+import { ShieldCheck, Smartphone, Download } from "lucide-react";
 
 const LEVELS = ["Kindergarten/Elementary", "Middle school", "High school", "College/Undergraduate", "Graduate/Master's", "PhD", "Other"];
 const EXPLANATION = ["Simple", "Standard", "Advanced"];
@@ -252,22 +251,6 @@ export default function SettingsPage() {
               </div>
               <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
             </form>
-          </CardContent>
-        </Card>
-
-        {/* Typing calibration */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Gauge className="h-4 w-4 text-accent" /> Typing calibration</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-ink-soft">
-              Paced writing reveals text at a speed calibrated to you. Take the test, then choose
-              which valid attempt becomes your baseline — only your choice sets it, and you can
-              retake or replace it any time. Your attempts are private (row-level security) and the
-              typed text itself is never stored.
-            </p>
-            <TypingTest />
           </CardContent>
         </Card>
 

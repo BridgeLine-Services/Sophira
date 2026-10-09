@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Input, Label, Select, Spinner, Textarea, useToast } from "@/components/ui";
 import { PacingController } from "@/lib/pacing-controller";
@@ -27,6 +29,17 @@ interface SessionData {
 const TICK_MS = 250;
 
 export default function EssayPage() {
+  // useSearchParams requires a Suspense boundary for prerendering.
+  return (
+    <Suspense fallback={null}>
+      <EssayPageInner />
+    </Suspense>
+  );
+}
+
+function EssayPageInner() {
+  const searchParams = useSearchParams();
+  const courseId = searchParams.get("course_id");
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -82,6 +95,7 @@ export default function EssayPage() {
           deadline: form.deadline || null,
           break_preference_seconds: form.breakSeconds ? Number(form.breakSeconds) : null,
           output_mode: form.outputMode, custom_wpm: form.outputMode === "custom" ? Number(form.customWpm) : null,
+          ...(courseId ? { course_id: courseId } : {}),
         }),
       });
       const json = await res.json();
@@ -129,8 +143,14 @@ export default function EssayPage() {
   }
 
   return (
-    <AppShell title="Essay workflow">
+    <AppShell title="Essay workflow" backHref={courseId ? `/courses/${courseId}` : undefined}>
       <div className="mx-auto max-w-3xl space-y-4">
+        {courseId && (
+          <p className="text-sm text-ink-soft">
+            Working in a course workspace.{" "}
+            <Link href={`/courses/${courseId}`} className="font-medium text-accent underline">Back to the course</Link>
+          </p>
+        )}
         {!session && (
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> Start an essay (staged, never opaque)</CardTitle></CardHeader>

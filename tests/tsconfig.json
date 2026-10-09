@@ -20,6 +20,7 @@
   "include": [
     "./**/*.ts",
     "../src/lib/ai/context.ts",
+    "../src/lib/courses/engines.ts",
     "../src/lib/ai/subjects.ts",
     "../src/lib/ai/mathverify.ts",
     "../src/lib/ai/compliance.ts",

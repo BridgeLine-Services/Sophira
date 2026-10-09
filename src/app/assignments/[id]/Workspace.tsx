@@ -389,7 +389,7 @@ export function Workspace({
                       `${contextApplied.learning.methods_applied.length} learned method${contextApplied.learning.methods_applied.length === 1 ? "" : "s"}`}
                     {(contextApplied.learning.writing_habits_applied?.length ?? 0) > 0 &&
                       ` · ${(contextApplied.learning.writing_habits_applied!.length)} preserved writing habit${contextApplied.learning.writing_habits_applied!.length === 1 ? "" : "s"}`}
-                    {" "}(<Link href="/corrections" className="text-accent hover:underline">review what I know</Link>)
+                    {" "}(<Link href="/learning" className="text-accent hover:underline">review what I know</Link>)
                   </span>
                 </span>
               )}

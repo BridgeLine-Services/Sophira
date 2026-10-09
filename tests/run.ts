@@ -97,6 +97,7 @@ import { runEssayPipelineTests } from "./essay-pipeline";
 import { runHostileAuditTests } from "./hostile-audit";
 import { runResetPasswordTests } from "./reset-password";
 import { runAccountExportTests } from "./account-export";
+import { runCourseEngineTests } from "./course-engine";
 import { runAuthRedirectLoopTests } from "./auth-redirect-loop";
 import { runSelfHealingProvisionTests } from "./self-healing-provision";
 import { runMathIntegralTests } from "./math-integral";
@@ -3357,7 +3358,7 @@ async function runMemoryTests(): Promise<void> {
     const store = fs.readFileSync(path.join(process.cwd(), "src", "lib", "memory", "store.ts"), "utf8");
     const engine = fs.readFileSync(path.join(process.cwd(), "src", "lib", "memory", "engine.ts"), "utf8");
     const manager = fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "MemoryManager.tsx"), "utf8");
-    const memoriesPage = fs.readFileSync(path.join(process.cwd(), "src", "app", "memories", "page.tsx"), "utf8");
+    const memoriesPage = fs.readFileSync(path.join(process.cwd(), "src", "app", "learning", "page.tsx"), "utf8");
     const appShell = fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "AppShell.tsx"), "utf8");
 
     // ---- 9. Schema: structured relational data, RLS own-row --------------
@@ -3425,8 +3426,8 @@ async function runMemoryTests(): Promise<void> {
       "memory: evidence recording recomputes confidence, trend, and status from the full weighted history");
 
     // ---- 13. Student controls ---------------------------------------------
-    assert(fs.existsSync(path.join(process.cwd(), "src", "app", "memories", "page.tsx")),
-      "memory: the Memory Management page exists at /memories");
+    assert(fs.existsSync(path.join(process.cwd(), "src", "app", "learning", "page.tsx")),
+      "memory: the Memory Management page exists at /learning (Learning / Memory consolidated destination, 2026-10-09)");
     assert(memoriesPage.includes("eq(\"user_id\", user.id)") && memoriesPage.includes("neq(\"status\", \"forgotten\")"),
       "memory: the page reads only the signed-in student's own rows (RLS + explicit scoping)");
     assert(manager.includes("student-stated fact") && manager.includes("AI-inferred"),
@@ -3440,8 +3441,8 @@ async function runMemoryTests(): Promise<void> {
     assert(manager.includes("confidence {Math.round(m.confidence * 100)}%") ||
       manager.includes("confidence") && manager.includes("first observed") && manager.includes("last observed"),
       "memory: each memory displays confidence, first observed, and last observed");
-    assert(appShell.includes("/memories"),
-      "memory: Memory Management is reachable from the app navigation");
+    assert(appShell.includes("/learning") && readFileSync(path.join(process.cwd(), "src", "app", "memories", "page.tsx"), "utf8").includes('redirect("/learning")'),
+      "memory: Memory Management is reachable from the app navigation (/learning; /memories remains a redirect)");
 
     // ---- 14. Owner cannot see another student's memories ------------------
     const statsRoute = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "network", "stats", "route.ts"), "utf8");
@@ -3615,4 +3616,4 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section))
-    .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
+    .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

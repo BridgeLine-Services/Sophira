@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/app/AppShell";
 import {
@@ -25,7 +27,19 @@ const CATEGORIES: { value: string; label: string }[] = [
 ];
 
 export default function LibraryPage() {
+  // useSearchParams requires a Suspense boundary for prerendering.
+  return (
+    <Suspense fallback={null}>
+      <LibraryPageInner />
+    </Suspense>
+  );
+}
+
+function LibraryPageInner() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const courseId = searchParams.get("course_id");
+  const [courseName, setCourseName] = useState<string | null>(null);
   const { toast } = useToast();
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -39,6 +53,50 @@ export default function LibraryPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (courseId) {
+      // Course library: materials scoped server-side to this course
+      // (course_id), its assignments, plus intentionally-global materials.
+      // Every query runs through the RLS client — user scope is enforced
+      // by the database policy, course scope by the query.
+      (async () => {
+        const { data: course } = await supabase
+          .from("courses")
+          .select("name")
+          .eq("id", courseId)
+          .single();
+        setCourseName(course?.name ?? null);
+
+        const { data: courseMaterials } = await supabase
+          .from("study_materials")
+          .select("*")
+          .eq("course_id", courseId);
+        const { data: assignmentIds } = await supabase
+          .from("assignments")
+          .select("id")
+          .eq("course_id", courseId);
+        let assignmentMaterials: StudyMaterial[] = [];
+        if (assignmentIds?.length) {
+          const { data } = await supabase
+            .from("study_materials")
+            .select("*")
+            .in("assignment_id", assignmentIds.map((a) => a.id));
+          assignmentMaterials = (data as StudyMaterial[]) ?? [];
+        }
+        const { data: globalMaterials } = await supabase
+          .from("study_materials")
+          .select("*")
+          .is("course_id", null)
+          .is("assignment_id", null);
+
+        const byId = new Map<string, StudyMaterial>();
+        for (const m of [...(courseMaterials ?? []), ...assignmentMaterials, ...(globalMaterials ?? [])] as StudyMaterial[]) {
+          byId.set(m.id, m);
+        }
+        setMaterials(Array.from(byId.values()).sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")));
+        setLoaded(true);
+      })();
+      return;
+    }
     supabase
       .from("study_materials")
       .select("*")
@@ -47,7 +105,7 @@ export default function LibraryPage() {
         setMaterials((data as StudyMaterial[]) ?? []);
         setLoaded(true);
       });
-  }, [supabase]);
+  }, [supabase, courseId]);
 
   const visible = useMemo(() => {
     let list = materials;
@@ -92,6 +150,7 @@ export default function LibraryPage() {
         title: noteTitle.trim(),
         content: noteContent,
         tags: [],
+        ...(courseId ? { course_id: courseId } : {}),
       })
       .select("*")
       .single();
@@ -109,12 +168,20 @@ export default function LibraryPage() {
 
   return (
     <AppShell
-      title="Library"
+      title={courseId ? (courseName ? `Library — ${courseName}` : "Course library") : "Library"}
+      backHref={courseId ? `/courses/${courseId}` : undefined}
       actions={
         <Button size="sm" onClick={() => setShowNoteForm((s) => !s)}>+ New note</Button>
       }
     >
       <div className="space-y-4">
+        {courseId && (
+          <p className="text-sm text-ink-soft">
+            Materials for this course: saved with this course, attached to its assignments, or
+            intentionally global. New notes saved here are attached to this course.{" "}
+            <Link href="/library" className="font-medium text-accent underline">Full library</Link>
+          </p>
+        )}
         {showNoteForm && (
           <form onSubmit={saveNote} className="space-y-3 rounded-card border border-ink/10 bg-white p-4">
             <div>

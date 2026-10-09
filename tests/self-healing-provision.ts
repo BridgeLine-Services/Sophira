@@ -60,7 +60,7 @@ export function runSelfHealingProvisionTests(assert: (c: boolean, n: string) => 
     "guard: /math, /essay, /writing API failures now repair once, retry, and report the ACTUAL reason — no 'sign out and sign back in'");
   assert(requireUserLib.includes("readProfileWithRepair") && requireUserLib.includes("provisionSignedInUser(userId)"),
     "guard: guarded pages read the profile with repair-then-retry before showing any error");
-  for (const page of ["src/app/dashboard/page.tsx", "src/app/owner/page.tsx", "src/app/corrections/page.tsx", "src/app/memories/page.tsx"]) {
+  for (const page of ["src/app/dashboard/page.tsx", "src/app/owner/page.tsx", "src/app/learning/page.tsx"]) {
     const src = readFileSync(page, "utf8");
     assert(src.includes("readProfileWithRepair(supabase, user.id)") && src.includes("Reason: {profileReason}"),
       `repair: ${page} attempts the repair, retries, and shows the failing reason`);
@@ -68,14 +68,14 @@ export function runSelfHealingProvisionTests(assert: (c: boolean, n: string) => 
 
   // 2e. OFFLINE + MEMORY UX (STEP G/H, 2026-10-08)
   const offlinePage = readFileSync("src/app/offline/page.tsx", "utf8");
-  const memoriesPage = readFileSync("src/app/memories/page.tsx", "utf8");
+  const memoriesPage = readFileSync("src/app/learning/page.tsx", "utf8");
   assert(offlinePage.includes("Works offline") && offlinePage.includes("Needs a connection") && offlinePage.includes("navigator.onLine"),
     "offline: the page opens with an honest capability overview — connection status, what works offline, what needs a connection");
   assert(offlinePage.includes("never") === false || true, "noop");
   assert(memoriesPage.includes("Personalization setup") && memoriesPage.includes("Every step is optional"),
     "memory: the page introduces personalization setup with skippable, linked steps");
-  assert(memoriesPage.includes("typing-calibration") && memoriesPage.includes("/teachers") && memoriesPage.includes("/writing") && memoriesPage.includes("/settings"),
-    "memory: setup progress links to writing style, teacher methods, typing calibration, and privacy controls");
+  assert(memoriesPage.includes("/writing/typing") && memoriesPage.includes("/teachers") && memoriesPage.includes("/writing") && memoriesPage.includes("/settings"),
+    "memory: setup progress links to writing style, teacher methods, typing calibration (relocated to /writing/typing), and privacy controls");
   assert(memoriesPage.includes("separate and private"),
     "memory: the privacy boundary (per-user learning profiles) is stated on the page");
 
@@ -123,7 +123,7 @@ export function runSelfHealingProvisionTests(assert: (c: boolean, n: string) => 
     "login: the dead-end 'see the setup status' sentence now opens the panel instead");
 
   // 4. LOOP-PROOF GUARDED PAGES — Learning (/corrections) and Memory (/memories)
-  for (const page of ["src/app/corrections/page.tsx", "src/app/memories/page.tsx"]) {
+  for (const page of ["src/app/learning/page.tsx", "src/app/writing/typing/page.tsx"]) {
     const src = readFileSync(page, "utf8");
     assert(src.includes("requireUser(supabase)"),
       `provision: ${page} validates the session through the shared requireUser`);

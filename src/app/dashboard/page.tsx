@@ -128,7 +128,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             ? <>your <Link href="/writing" className="text-accent hover:underline">approved Writing Profile</Link>, and</>
             : <>no <Link href="/writing" className="text-accent hover:underline">Writing Profile</Link> yet, and</>}{" "}
           <strong className="text-ink">{activePatterns ?? 0} learned pattern{(activePatterns ?? 0) === 1 ? "" : "s"}</strong>{" "}
-          (<Link href="/corrections" className="text-accent hover:underline">corrections &amp; methods</Link>).
+          (<Link href="/learning" className="text-accent hover:underline">corrections &amp; methods</Link>).
         </p>
 
         {/* Pending profile changes */}
@@ -153,7 +153,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         {/* Learning & corrections shortcut */}
         {(activePatterns ?? 0) > 0 && (
-          <Link href="/corrections" className="block">
+          <Link href="/learning" className="block">
             <Card className="transition hover:border-accent/40">
               <CardContent className="flex items-center gap-3 p-4">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink/5 text-accent">

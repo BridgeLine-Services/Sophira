@@ -5,6 +5,8 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, Button } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { CourseEditor } from "./CourseEditor";
+import { classifyEngine, ENGINES, ENGINE_TOOLS, toolUrl } from "@/lib/courses/engines";
+import { Wrench } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +30,47 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
       .order("updated_at", { ascending: false }),
   ]);
 
+  const engineId = classifyEngine(course.subject);
+  const engine = ENGINES[engineId];
+  const tools = ENGINE_TOOLS[engineId];
+
   return (
     <AppShell title={course.name} backHref="/courses">
       <div className="space-y-6">
+        {/* Course workspace header: name, subject, selected teacher, engine */}
+        <div className="flex flex-wrap items-center gap-2">
+          {course.subject ? (
+            <Badge tone="neutral">{course.subject}</Badge>
+          ) : (
+            <Badge tone="neutral">No subject set</Badge>
+          )}
+          <Badge tone="accent">{engine.label}</Badge>
+        </div>
+
+        {/* Course workspace: subject-appropriate tools */}
+        <section aria-label="Course workspace">
+          <h2 className="mb-1 flex items-center gap-2 text-base font-semibold text-ink"><Wrench className="h-4 w-4 text-accent" /> {engine.label}</h2>
+          <p className="mb-3 text-sm text-ink-soft">{engine.description}</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {tools.map((tool) => (
+              <Link
+                key={tool.label}
+                href={toolUrl(tool, course.id)}
+                className="group rounded-card border border-ink/10 bg-white p-4 transition hover:border-accent/40 hover:bg-accent/[0.03]"
+              >
+                <p className="font-medium text-ink group-hover:text-accent">{tool.label}</p>
+                <p className="mt-1 text-xs text-ink-soft">{tool.description}</p>
+              </Link>
+            ))}
+          </div>
+          {!teacher && (
+            <p className="mt-3 text-xs text-ink-soft" role="note">
+              No teacher selected for this course yet. Teacher-specific instructions will apply
+              automatically once you choose one — nothing is invented before that.
+            </p>
+          )}
+        </section>
+
         {teacher && (
           <Card>
             <CardContent className="flex items-center justify-between p-4">
@@ -54,6 +94,7 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
 
         <section>
           <h2 className="mb-3 text-base font-semibold text-ink">Assignments in this course</h2>
+          <p className="sr-only">Assignments opened from this course keep its course and teacher context attached.</p>
           {assignments?.length ? (
             <div className="divide-y divide-ink/5 rounded-card border border-ink/10 bg-white">
               {assignments.map((a) => (
