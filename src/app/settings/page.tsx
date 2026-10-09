@@ -38,6 +38,9 @@ export default function SettingsPage() {
   const [pwConfirm, setPwConfirm] = useState("");
   const [pwBusy, setPwBusy] = useState(false);
 
+  // Data export (download every user-owned record as JSON)
+  const [exporting, setExporting] = useState(false);
+
   // Account deletion
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteText, setDeleteText] = useState("");
@@ -150,6 +153,31 @@ export default function SettingsPage() {
     await supabase.auth.signOut();
     toast("success", "Password changed. Please sign in with your new password.");
     router.replace("/login");
+  }
+
+  async function downloadMyData() {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/account/export");
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        toast("error", (json && json.error) || "Could not prepare the export.");
+        return;
+      }
+      const blob = await res.blob();
+      const filename = res.headers.get("content-disposition")?.match(/filename="?([^";]+)"?/)?.[1] ?? "sophira-data-export.json";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("success", "Downloaded. Your data is yours.");
+    } catch {
+      toast("error", "Could not reach the server.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   async function deleteAccount() {
@@ -381,6 +409,21 @@ export default function SettingsPage() {
               </div>
               <Button type="submit" disabled={pwBusy}>{pwBusy ? "Changing…" : "Change password"}</Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Data export (privacy: user control over personal data) */}
+        <Card>
+          <CardHeader><CardTitle>Your data</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-ink-soft">
+              Download every record you own — courses, assignments, essays, research, learning
+              patterns, memories, typing history, schedules — as a single JSON file. Uploaded
+              file contents are listed by record but the bytes stay in private storage.
+            </p>
+            <Button variant="secondary" disabled={exporting} onClick={downloadMyData}>
+              <Download className="h-4 w-4" /> {exporting ? "Preparing…" : "Download my data (JSON)"}
+            </Button>
           </CardContent>
         </Card>
 

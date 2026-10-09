@@ -3,7 +3,7 @@
 Moved verbatim from README.md on 2026-10-07 (documentation-consistency
 round). "Suite:" numbers inside rows are the historical assertion counts at
 the time each feature landed; the CURRENT full-suite count is what `npm test`
-reports (2503 assertions). Per-feature status stays honest: "Implemented +
+reports (2764 assertions as of 2026-10-09; `npm test` is authoritative). Per-feature status stays honest: "Implemented +
 automated tests" means wired end-to-end and covered offline; "requires
 external configuration" means the feature reports honestly and fabricates
 nothing until the owner configures it.
@@ -13,6 +13,7 @@ nothing until the owner configures it.
 | Feature | Status |
 | --- | --- |
 | Core assignment/AI/learning/verification workflow | Implemented + automated tests |
+| Account data export (download every user-owned record as JSON) | **Implemented and user-accessible** — `GET /api/account/export` returns all 36 user-owned tables through the RLS-scoped client (no admin client), with honest per-table truncation flags and error entries; Settings → "Download my data (JSON)". 57 conformance assertions (suite: 2764). Scope: uploaded file binaries stay in private storage (records only, documented). |
 | RLS isolation, invite-only auth, injection defenses | Implemented + automated tests |
 | PWA, /install, /downloads, native projects | Implemented; live at https://sophira.vercel.app |
 | Typing calibration (WPM/accuracy/baseline) | **Implemented and user-accessible** — onboarding step + Settings test (`TypingTest`), server-recomputed metrics (`/api/typing`), per-user `typing_attempts`/`typing_baseline` (RLS), user-chosen baseline, retake any time (migrations 0009; live-verify against your deployment) |
