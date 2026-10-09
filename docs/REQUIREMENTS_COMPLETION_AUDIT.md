@@ -188,3 +188,30 @@ Zero code-side failures. Report persisted at `docs/RELEASE_GATE_REPORT.txt`.
 **Counts:** VERIFIED_COMPLETE 7 areas · IMPLEMENTED_NOT_FULLY_VERIFIED 1 (device/live UX) ·
 BLOCKED_BY_EXTERNAL_CONFIGURATION 5 (live matrices, search provider, production config,
 legal, device) · PARTIALLY_IMPLEMENTED 0 · MISSING 0.
+
+## Addendum — master structure increment (2026-10-09, commit 3b4e515)
+
+Same-day audit of the master structure spec closed the last registry-level
+gaps without touching any architecture:
+
+- Engine registry now matches the spec exactly: English 9 tools, Math 6
+  (Type to Solve, Teach Me How to Solve, Test Preparation, Practice
+  Problems route through the SINGLE verified math pipeline), every other
+  subject 8 tools including Typing Calibration and its subject AI engine.
+- Five new AI engines built over the existing aiChat service (planning —
+  never writes the assignment; grammar — accept/reject with server-side
+  verbatim quote verification; tutor; math test-prep; math practice —
+  attempt-before-reveal with honest checking). All auth-guarded.
+- Science renders as a parent course with Biology/Chemistry/Physics
+  nested on /courses; History/Social Science, Computer Science and Other
+  Subject are distinct groups.
+- New /online status page (real connectivity, live health probe, real
+  sync queue; unknown states never faked) and nav item.
+- /proposals rebuilt as the global chronological change history with a
+  subject-scoped ?course_id= view, reading only real schema columns.
+- Validation: `npm test` 2943/2943, `npx tsc --noEmit` clean, `npm run
+  build` clean, `npm run scan:secrets` clean, CI green on the pushed
+  commit. No new migrations (chain remains 0001–0020).
+- Statuses unchanged: 0 PARTIALLY_IMPLEMENTED, 0 MISSING; the 5
+  BLOCKED_BY_EXTERNAL_CONFIGURATION areas remain owner-side (live
+  matrices, search provider, production config, legal facts, devices).
