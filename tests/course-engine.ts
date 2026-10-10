@@ -247,6 +247,12 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(memoryManagerSrc.includes("string | string[]"),
     "memory: the manager accepts a subject SET for subject-workspace scoping (global stays distinct)");
 
+  // Global Changes merged into the Learning / Memory destination (spec §3.4).
+  assert(learningPageScoped.includes("profile_update_proposals") && learningPageScoped.includes("decided_at"),
+    "memory: the global change history is IN the Learning / Memory page (real records, real timestamps)");
+  assert(learningPageScoped.includes("nothing is invented") && learningPageScoped.includes("Subject-specific changes stay in each subject workspace"),
+    "memory: the merged global section keeps global vs subject-specific changes distinct");
+
   // Courses hierarchy: Science is a parent with Biology/Chemistry/Physics nested.
   const coursesPage = readFileSync("src/app/courses/page.tsx", "utf8");
   assert(coursesPage.includes("COURSE_GROUPS"), "courses: the page renders the parent/nested course hierarchy");

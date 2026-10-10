@@ -8,6 +8,33 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: navigation hierarchy + subject workspaces (2026-10-10)
+
+- Exact navigation hierarchy (spec): expandable Courses group with per-user
+  persisted expansion state, auto-expand for direct nested routes, separate
+  chevron expansion controls (aria-expanded), nested Science
+  (Biology/Chemistry/Physics beneath Science only), subjects in spec order:
+  English, Math, Science, History / Social Science, Foreign Language,
+  Health Education, Other Subject (Computer Science classified under Other).
+- Subject workspaces at /courses/<subject> (+ /courses/science/<child>):
+  each lists its spec-exact tools and the user's own courses for the subject.
+- Tool registry per spec: English 9, Math 10 (Scan/Type/Teach Me to Solve,
+  Test Prep, Practice, Library, Memory, Changes, Calibration), Foreign
+  Language 8 (Language Selector first), all other subjects exactly 7.
+- Foreign Language: functioning selector (target/explanation language,
+  proficiency) persisted per user (migration 0030, owner-only RLS) through
+  the auth-guarded /api/preferences/foreign-language API.
+- Global nav reduced to spec items (Home, Courses, Notebooks,
+  Learning / Memory, Offline, Settings); Online is a real connectivity
+  status chip linking /online; global Changes merged INTO the
+  Learning / Memory page; mobile slide-out drawer (menu button, Escape,
+  backdrop, focus management, modal semantics) alongside the rail (lg+),
+  tablet row (md), and bottom bar.
+- Real ?subject= scoping: /learning, /proposals, and /library honor the
+  subject workspace context, narrowed to the user's own courses in the
+  subject group plus intentionally global records. RLS unchanged.
+- Suite: 3000/3000 green; tsc + production build clean; CI verified.
+
 ### Upgrade round 2: academic engines (2026-09-24, later)
 
 - **Fine-grained math workflows** (`routeMathTopic`) — 15 sub-workflows

@@ -81,7 +81,7 @@ export default async function LearningPage({
   if (profile.status === "revoked") redirect("/access-denied");
   if (!profile.onboarded) redirect("/onboarding");
 
-  const [{ data: patterns, error: patternsError }, { data: memories }] = await Promise.all([
+  const [{ data: patterns, error: patternsError }, { data: memories }, { data: changeHistory }] = await Promise.all([
     supabase
       .from("learning_patterns")
       .select("*")
@@ -93,6 +93,14 @@ export default async function LearningPage({
       .eq("user_id", user.id)
       .neq("status", "forgotten")
       .order("last_observed", { ascending: false }),
+    // GLOBAL CHANGES (merged destination, spec §3.4): the real decided
+    // change history — nothing invented, ownership and timestamps preserved.
+    supabase
+      .from("profile_update_proposals")
+      .select("id, target_type, change_summary, status, created_at, decided_at")
+      .neq("status", "pending")
+      .order("decided_at", { ascending: false })
+      .limit(10),
   ]);
 
   const [writingProfile, teacherProfile, typingBaseline] = await Promise.all([
@@ -211,13 +219,35 @@ export default async function LearningPage({
         />
       </section>
 
-      {/* Section 3: history */}
+      {/* Section 3: history + GLOBAL CHANGES (merged destination, spec §3.4) */}
       <section aria-label="Profile and version history">
-        <h2 className="mb-2 text-base font-semibold text-ink">History &amp; versions</h2>
-        <p className="text-sm text-ink-soft">
-          Academic-profile change history and version records live in{" "}
-          <Link href="/proposals" className="font-medium text-accent underline">Changes</Link> — every
-          proposed correction, its reason, and its approval status, with rollback where supported.
+        <h2 className="mb-2 text-base font-semibold text-ink">Changes &amp; versions</h2>
+        <p className="mb-3 text-sm text-ink-soft">
+          Your global change history: decided profile updates, recorded corrections, and
+          configuration changes. Subject-specific changes stay in each subject workspace.
+        </p>
+        {(changeHistory ?? []).length === 0 ? (
+          <p className="rounded-lg border border-ink/10 bg-paper p-3 text-sm text-ink-soft">
+            No decided changes yet. When you approve a proposed correction or profile update,
+            it is recorded here with its reason and timestamp — nothing is invented.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {(changeHistory ?? []).map((d: { id: string; target_type: string | null; change_summary: string | null; status: string | null; decided_at: string | null }) => (
+              <li key={d.id} className="rounded-lg border border-ink/10 bg-paper p-3">
+                <p className="text-sm font-medium text-ink">{d.change_summary ?? "Profile update"}</p>
+                <p className="text-xs text-ink-soft">
+                  {d.target_type ? `${d.target_type} · ` : ""}{d.status ?? "decided"}
+                  {d.decided_at ? ` · ${new Date(d.decided_at).toLocaleDateString()}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-3 text-sm text-ink-soft">
+          Every proposed correction, its reason, and its approval status — with rollback where
+          supported — in{" "}
+          <Link href="/proposals" className="font-medium text-accent underline">the full Changes history</Link>.
         </p>
       </section>
     </AppShell>
