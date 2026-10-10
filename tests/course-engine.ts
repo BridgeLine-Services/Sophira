@@ -71,7 +71,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // Subject tool links carry the subject scope where the destination honors it.
   assert(subjectToolUrl({ label: "Library", description: "", path: "/library" }, "math") === "/library?subject=math",
     "nav: subject-scoped tools carry ?subject= (Library)");
-  assert(subjectToolUrl({ label: "Teachers", description: "", path: "/teachers" }, "math") === "/teachers",
+  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "math") === "/math",
     "nav: non-scoped tools keep their plain route");
 
   // ---- 4. Tool URLs carry the course context --------------------------------
@@ -252,6 +252,65 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "memory: the global change history is IN the Learning / Memory page (real records, real timestamps)");
   assert(learningPageScoped.includes("nothing is invented") && learningPageScoped.includes("Subject-specific changes stay in each subject workspace"),
     "memory: the merged global section keeps global vs subject-specific changes distinct");
+
+  // ============================================================
+  // GAP-CLOSURE AUDIT (2026-10-10): subject context, tablet nav,
+  // drawer a11y, offline navigation.
+  // ============================================================
+
+  // ---- Gap 1: shared tools RECEIVE and USE the subject context ------
+  const grammarRoute = readFileSync("src/app/api/writing/grammar/route.ts", "utf8");
+  assert(grammarRoute.includes("subject?: string | null") && grammarRoute.includes("subjectPromptContext"),
+    "subject: grammar API accepts ?subject= and injects subject context (a Biology check never runs unscoped)");
+  const writingPlanRoute = readFileSync("src/app/api/writing/plan/route.ts", "utf8");
+  assert(writingPlanRoute.includes("subject?: string | null") && writingPlanRoute.includes("subjectPromptContext"),
+    "subject: planning API accepts ?subject= and injects subject context");
+  const essayPlanRoute = readFileSync("src/app/api/essay/plan/route.ts", "utf8");
+  assert(essayPlanRoute.includes("subject?: string | null") && essayPlanRoute.includes("subjectContext"),
+    "subject: essay planning accepts ?subject= and carries the subject into the outline prompt");
+  const subjectContextHelper = readFileSync("src/lib/courses/subject-context.ts", "utf8");
+  assert(subjectContextHelper.includes("subjectBySlug") && subjectContextHelper.includes("target_language"),
+    "subject: the context helper resolves real subjects only (invalid slugs -> empty) and applies the saved Foreign Language setup");
+  for (const f of [
+    "src/app/essay/page.tsx", "src/app/writing/grammar/page.tsx", "src/app/writing/planning/page.tsx",
+  ]) {
+    const page = readFileSync(f, "utf8");
+    assert(page.includes('searchParams.get("subject")'),
+      `subject: ${f} forwards the subject context to its AI route`);
+  }
+  const teachersScoped = readFileSync("src/app/teachers/page.tsx", "utf8");
+  assert(teachersScoped.includes('get("subject")') && teachersScoped.includes("classifyEngine") && teachersScoped.includes("No teacher is hidden"),
+    "subject: /teachers honors ?subject= — subject teachers are TAGGED from real course links, never fabricated and never hiding profiles");
+  assert(subjectToolUrl({ label: "Essay", description: "", path: "/essay" }, "biology") === "/essay?subject=biology",
+    "subject: subject workspace Essay/Writing/Teachers links now carry ?subject= (not silently generic)");
+  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "biology") === "/math",
+    "subject: non-shared tools keep their plain route");
+
+  // ---- Gap 3/4: tablet navigation + drawer accessibility ----------
+  const shell2 = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  assert(shell2.includes('className="fixed inset-0 z-50 lg:hidden" role="dialog"'),
+    "tablet: the drawer is reachable below lg — nested course navigation is NOT desktop-only");
+  assert(shell2.includes("hover:bg-ink/5 lg:hidden") && shell2.includes("Open menu"),
+    "tablet: the menu button is visible on tablets and phones (lg:hidden)");
+  assert(shell2.includes("FOCUS TRAP") && shell2.includes("focusables[focusables.length - 1]"),
+    "drawer: Tab focus is trapped inside the modal drawer (wraps first/last)");
+  assert(shell2.includes("Escape") && shell2.includes("menuBtnRef.current?.focus()"),
+    "drawer: Escape closes and focus is restored to the menu button");
+  assert(shell2.includes("onDrawerTouchStart") && shell2.includes("onDrawerTouchEnd") && shell2.includes("swipeStart"),
+    "drawer: a leftward swipe closes the drawer (touch gesture support)");
+  assert(shell2.includes("h-11 w-11 shrink-0"),
+    "drawer: expansion chevrons meet the 44px touch-target minimum");
+  assert(shell2.includes("pt-[env(safe-area-inset-top)]") && shell2.includes("pb-[env(safe-area-inset-bottom)]"),
+    "drawer: safe-area insets respected at top and bottom");
+
+  // ---- Gap 5: offline navigation stays honest and private ----------
+  const sw = readFileSync("public/sw.js", "utf8");
+  assert(sw.includes('event.request.mode !== "navigate"') && sw.includes("no-store"),
+    "offline: a failed navigation while offline gets an honest static fallback (never a cached private page)");
+  assert(sw.includes("never caches private pages") && sw.includes("cannot work offline"),
+    "offline: the fallback states plainly that remote AI needs internet — never a false offline claim");
+  assert(sw.includes("Never cache HTML/API responses"),
+    "offline: the conservative cache policy (no private HTML/API caching) is preserved");
 
   // Courses hierarchy: Science is a parent with Biology/Chemistry/Physics nested.
   const coursesPage = readFileSync("src/app/courses/page.tsx", "utf8");

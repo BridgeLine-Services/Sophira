@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { subjectPromptContext } from "@/lib/courses/subject-context";
 import { requireUser } from "@/lib/supabase/guard";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { text?: string; course_id?: string | null } = {};
+  let body: { text?: string; course_id?: string | null; subject?: string | null } = {};
   try { body = await request.json(); } catch { /* empty */ }
   const text = (body.text ?? "").trim();
   if (!text) return NextResponse.json({ error: "Paste or type the text you want checked." }, { status: 400 });
@@ -35,6 +36,11 @@ export async function POST(request: NextRequest) {
   if (body.course_id) {
     const { data: course } = await supabase.from("courses").select("name, subject, academic_level, instructions").eq("id", body.course_id).single();
     if (course) courseContext = `\nCourse: ${course.name} (${course.subject ?? "unspecified subject"}, ${course.academic_level ?? "unspecified level"}).`;
+  }
+  // Subject workspace context: a Biology check must not run as an unscoped
+  // generic check. Only applies when no specific course was selected.
+  if (!body.course_id) {
+    courseContext += await subjectPromptContext(supabase, user.id, body.subject);
   }
 
   const { data: profile } = await supabase.from("profiles").select("explanation_level").eq("id", user.id).single();

@@ -92,7 +92,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
       onClick={() => toggle(label)}
       aria-expanded={expanded}
       aria-label={expanded ? `Collapse ${label.replace(/:/g, " ")}` : `Expand ${label.replace(/:/g, " ")}`}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-soft hover:bg-ink/5"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-soft hover:bg-ink/5"
     >
       <ChevronDown aria-hidden className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")} />
     </button>
@@ -109,7 +109,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
               key={tool.label}
               href={subjectToolUrl(tool, slug)}
               onClick={onNavigate}
-              className={cn("block rounded-md px-2.5 py-1.5 text-[13px]",
+              className={cn("block rounded-md px-2.5 py-2.5 text-[13px]",
                 active ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
             >
               {tool.label}
@@ -239,7 +239,27 @@ export function AppShell({ title, backHref, actions, children }: {
   // into the dialog and returns to the menu button on close.
   useEffect(() => {
     if (!drawerOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawerOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setDrawerOpen(false); return; }
+      // FOCUS TRAP: while the modal drawer is open, Tab cannot reach the page
+      // behind it — focus wraps between the drawer's first/last focusable.
+      if (e.key === "Tab" && drawerRef.current) {
+        const focusables = drawerRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), select, input, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (!e.shiftKey && (active === last || !drawerRef.current.contains(active))) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && (active === first || !drawerRef.current.contains(active))) {
+          e.preventDefault();
+          last.focus();
+        }
+      }
+    };
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -253,6 +273,19 @@ export function AppShell({ title, backHref, actions, children }: {
   function closeDrawer() {
     setDrawerOpen(false);
     menuBtnRef.current?.focus();
+  }
+
+  // Swipe-to-close: track the gesture on the drawer panel; a leftward swipe
+  // (the natural "push the drawer away" motion) closes it.
+  const swipeStart = useRef<number | null>(null);
+  function onDrawerTouchStart(e: React.TouchEvent) {
+    swipeStart.current = e.touches[0]?.clientX ?? null;
+  }
+  function onDrawerTouchEnd(e: React.TouchEvent) {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    const end = e.changedTouches[0]?.clientX;
+    if (start != null && end != null && start - end > 60) closeDrawer();
   }
 
   async function signOut() {
@@ -355,7 +388,7 @@ export function AppShell({ title, backHref, actions, children }: {
             onClick={() => setDrawerOpen(true)}
             aria-label="Open menu"
             aria-expanded={drawerOpen}
-            className="-ml-2 flex h-11 w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5 md:hidden"
+            className="-ml-2 flex h-11 w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5 lg:hidden"
           >
             <Menu className="h-5 w-5" aria-hidden />
           </button>
@@ -422,7 +455,7 @@ export function AppShell({ title, backHref, actions, children }: {
       {/* MOBILE SLIDE-OUT DRAWER: the full navigation hierarchy on phones.
           Escape, backdrop tap, and navigation close it; focus is managed. */}
       {drawerOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Main menu">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Main menu">
           <button
             type="button"
             aria-label="Close menu"
@@ -433,7 +466,9 @@ export function AppShell({ title, backHref, actions, children }: {
           <div
             ref={drawerRef}
             tabIndex={-1}
-            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-ink/10 bg-paper pb-[env(safe-area-inset-bottom)] shadow-xl outline-none"
+            onTouchStart={onDrawerTouchStart}
+            onTouchEnd={onDrawerTouchEnd}
+            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-ink/10 bg-paper pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-xl outline-none"
           >
             <div className="flex items-center justify-between px-5 py-4">
               <span className="flex items-center gap-2 font-semibold text-ink">

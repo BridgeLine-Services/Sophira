@@ -40,6 +40,7 @@ export default function EssayPage() {
 function EssayPageInner() {
   const searchParams = useSearchParams();
   const courseId = searchParams.get("course_id");
+  const subjectSlug = searchParams.get("subject");
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -96,6 +97,7 @@ function EssayPageInner() {
           break_preference_seconds: form.breakSeconds ? Number(form.breakSeconds) : null,
           output_mode: form.outputMode, custom_wpm: form.outputMode === "custom" ? Number(form.customWpm) : null,
           ...(courseId ? { course_id: courseId } : {}),
+          ...(subjectSlug ? { subject: subjectSlug } : {}),
         }),
       });
       const json = await res.json();

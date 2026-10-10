@@ -12,7 +12,9 @@ export default function PlanningPage() {
 }
 
 function PlanningInner() {
-  const courseId = useSearchParams().get("course_id");
+  const searchParams = useSearchParams();
+  const courseId = searchParams.get("course_id");
+  const subjectSlug = searchParams.get("subject");
   const { toast } = useToast();
   const [instructions, setInstructions] = useState("");
   const [topic, setTopic] = useState("");
@@ -27,7 +29,7 @@ function PlanningInner() {
     try {
       const res = await fetch("/api/writing/plan", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instructions, topic, deadline: deadline || null, course_id: courseId }),
+        body: JSON.stringify({ instructions, topic, deadline: deadline || null, course_id: courseId, ...(courseId ? {} : subjectSlug ? { subject: subjectSlug } : {}) }),
       });
       const json = await res.json();
       if (!res.ok) { toast("error", json.error ?? "Planning failed."); return; }

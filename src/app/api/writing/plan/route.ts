@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { subjectPromptContext } from "@/lib/courses/subject-context";
 import { requireUser } from "@/lib/supabase/guard";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { instructions?: string; topic?: string; deadline?: string | null; course_id?: string | null } = {};
+  let body: { instructions?: string; topic?: string; deadline?: string | null; course_id?: string | null; subject?: string | null } = {};
   try { body = await request.json(); } catch { /* empty */ }
   const instructions = (body.instructions ?? "").trim();
   const topic = (body.topic ?? "").trim();
@@ -43,6 +44,11 @@ export async function POST(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(3);
     if (docs?.length) materials = `\nRelevant saved materials the student provided: ${docs.map((d) => (d.title || "untitled").slice(0, 80)).join(", ")}.`;
+  }
+  // Subject workspace context: planning must honor the selected subject,
+  // not silently run as a generic planner (only when no course is selected).
+  if (!body.course_id) {
+    courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject);
   }
 
   try {

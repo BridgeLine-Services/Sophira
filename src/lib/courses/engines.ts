@@ -189,7 +189,10 @@ export const ENGINE_TOOLS: Record<EngineId, EngineTool[]> = {
 };
 
 /** Tools that honor a subject scope (?subject=) at the destination page. */
-const SUBJECT_SCOPED_PATHS = new Set(["/library", "/learning", "/proposals"]);
+const SUBJECT_SCOPED_PATHS = new Set([
+  "/library", "/learning", "/proposals",
+  "/essay", "/writing", "/writing/planning", "/writing/grammar", "/teachers",
+]);
 
 /** Attach the course context to a tool link (course workspaces). */
 export function toolUrl(tool: EngineTool, courseId: string | null | undefined): string {
@@ -200,7 +203,8 @@ export function toolUrl(tool: EngineTool, courseId: string | null | undefined): 
 
 /** Attach the subject scope to a tool link (subject workspaces). */
 export function subjectToolUrl(tool: EngineTool, slug: string): string {
-  if (!SUBJECT_SCOPED_PATHS.has(tool.path.split("?")[0])) return tool.path;
+  const base = tool.path.split("?")[0];
+  if (!SUBJECT_SCOPED_PATHS.has(base)) return tool.path;
   const sep = tool.path.includes("?") ? "&" : "?";
   return `${tool.path}${sep}subject=${slug}`;
 }

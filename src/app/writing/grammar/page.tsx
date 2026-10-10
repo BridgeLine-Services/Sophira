@@ -12,7 +12,9 @@ export default function GrammarPage() {
 }
 
 function GrammarInner() {
-  const courseId = useSearchParams().get("course_id");
+  const searchParams = useSearchParams();
+  const courseId = searchParams.get("course_id");
+  const subjectSlug = searchParams.get("subject");
   const { toast } = useToast();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -26,7 +28,7 @@ function GrammarInner() {
     try {
       const res = await fetch("/api/writing/grammar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, course_id: courseId }),
+        body: JSON.stringify({ text, course_id: courseId, ...(courseId ? {} : subjectSlug ? { subject: subjectSlug } : {}) }),
       });
       const json = await res.json();
       if (!res.ok) { toast("error", json.error ?? "The check failed."); return; }
