@@ -57,6 +57,7 @@ const USER_TABLES = [
   "notebook_evidence",
   "notebook_artifacts",
   "student_memories",
+  "subject_preferences",
   "student_memory_evidence",
 ] as const;
 

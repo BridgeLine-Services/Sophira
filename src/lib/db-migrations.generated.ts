@@ -159,5 +159,10 @@ export const MIGRATIONS: MigrationEntry[] = [
     "name": "0029_study_materials_course.sql",
     "marker": null,
     "sql": "-- =====================================================================\n-- SOPHIRA migration 0029: course-scoped Library (2026-10-09)\n--\n-- The course-engine workspace exposes a per-course Library view. The\n-- existing study_materials schema could not scope a material to a course\n-- (only assignment_id existed), so this adds an optional course_id.\n--\n-- PRIVACY: no RLS policy changes — \"study_materials_own\" (user_id =\n-- auth.uid()) continues to govern every row. course_id only narrows the\n-- user's OWN material set; it can never widen access to another user's\n-- data. A null course_id + null assignment_id keeps a material global.\n-- =====================================================================\n\nalter table public.study_materials\n  add column if not exists course_id uuid\n  references public.courses(id) on delete set null;\n\ncreate index if not exists idx_study_materials_course\n  on public.study_materials (user_id, course_id)\n  where course_id is not null;\n"
+  },
+  {
+    "name": "0030_subject_preferences.sql",
+    "marker": null,
+    "sql": "-- 0030: subject-level preferences (Foreign Language selector and any future\n-- per-subject settings). Owned strictly by the authenticated user via RLS.\ncreate table if not exists public.subject_preferences (\n  id uuid primary key default gen_random_uuid(),\n  user_id uuid not null references auth.users(id) on delete cascade,\n  subject text not null,\n  target_language text,\n  explanation_language text,\n  proficiency text,\n  created_at timestamptz not null default now(),\n  updated_at timestamptz not null default now(),\n  unique (user_id, subject)\n);\n\nalter table public.subject_preferences enable row level security;\n\ncreate policy \"subject_preferences_own_all\"\n  on public.subject_preferences\n  for all to authenticated\n  using (user_id = auth.uid())\n  with check (user_id = auth.uid());\n\ngrant select, insert, update, delete on public.subject_preferences to authenticated;\n"
   }
 ];

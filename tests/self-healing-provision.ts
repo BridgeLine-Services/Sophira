@@ -92,8 +92,10 @@ export function runSelfHealingProvisionTests(assert: (c: boolean, n: string) => 
   assert(appShell.includes("md:hidden") && appShell.includes("pb-[env(safe-area-inset-bottom)]"),
     "nav: the mobile bottom bar with safe-area insets is preserved");
   const navRenders = (appShell.split("NAV.map").length - 1) + (appShell.split("NAV.filter").length - 1);
-  assert(navRenders >= 3 && appShell.includes('"/math"') && appShell.includes('"/essay"'),
-    "nav: the single NAV source renders in every navigation pattern (sidebar, tablet top row, mobile bottom bar) — no section is unreachable on any device");
+  assert(navRenders >= 3,
+    "nav: the single NAV source renders in every navigation pattern (sidebar, tablet top row, mobile drawer/bar) — no section is unreachable on any device");
+  assert(appShell.includes("CourseTree") && appShell.includes("subjectToolUrl"),
+    "nav: the subject tool hierarchy (math, essay, writing, and all subject tools) renders from the shared engine registry — reachable on every device");
 
   // 2d. OWNER STATISTICS STRUCTURAL REPAIR (0028) — the live "structure of
   // query does not match function result type" failure is fixed by a

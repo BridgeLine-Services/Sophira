@@ -4,9 +4,9 @@
  * Writing Engine; Learning + Memory consolidated into one destination;
  * Library scoped by course with server-enforced filtering.
  */
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import {
-  classifyEngine, ENGINES, ENGINE_TOOLS, toolUrl, COURSE_GROUPS,
+  classifyEngine, ENGINES, ENGINE_TOOLS, toolUrl, subjectToolUrl, COURSE_GROUPS, SUBJECT_TREE,
 } from "../src/lib/courses/engines";
 
 export function runCourseEngineTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
@@ -26,8 +26,8 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // ---- 2. English exposes exactly the nine specified tools ------------------
   const writingLabels = ENGINE_TOOLS.writing.map((t) => t.label);
   for (const required of [
-    "Teachers", "Essay Typing Engine", "Writing Engine", "Planning Engine",
-    "Grammar & Spelling Engine", "Library", "Memory", "Changes", "Typing Calibration",
+    "Teachers", "Essay Writing Engine", "Short Writing Engine", "Planning Engine",
+    "Grammar and Spelling Engine", "Library", "Memory", "Changes", "Typing and Writing Calibration",
   ]) {
     assert(writingLabels.includes(required), `engine: English exposes ${required}`);
   }
@@ -36,25 +36,43 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // ---- 3. Math exposes exactly the six specified tools -----------------------
   const mathLabels = ENGINE_TOOLS.math.map((t) => t.label);
   for (const required of [
-    "Teachers", "Scan Math to Solve", "Type to Solve", "Teach Me How to Solve",
-    "Test Preparation", "Practice Problems",
+    "Teachers", "Scan to Solve", "Type to Solve", "Teach Me How to Solve",
+    "Test Preparation", "Practice Problems", "Library", "Memory", "Changes",
+    "Typing and Writing Calibration",
   ]) {
     assert(mathLabels.includes(required), `engine: Math exposes ${required}`);
   }
-  assert(ENGINE_TOOLS.math.length === 6, "engine: Math exposes exactly the 6 specified tools (no duplicated solver logic — one pipeline)");
+  assert(ENGINE_TOOLS.math.length === 10, "engine: Math exposes exactly the 10 specified tools (one pipeline — no duplicated solver logic)");
   assert(ENGINE_TOOLS.math.some((t) => t.path === "/math?mode=teach") && ENGINE_TOOLS.math.some((t) => t.path === "/math?mode=type"),
     "engine: Type-to-Solve and Teach-Me route into the single verified math pipeline with explicit modes");
 
-  // ---- 4. Science subjects + Humanities + CS + Other: 8 tools each ----------
-  for (const id of ["biology", "chemistry", "physics", "humanities", "programming", "general"] as const) {
+  // ---- 4. Subject engines: exactly the 7 tools each (nav spec 2026-10-09) ----
+  for (const id of ["biology", "chemistry", "physics", "humanities", "health", "programming", "general"] as const) {
     const labels = ENGINE_TOOLS[id].map((t) => t.label);
-    for (const required of ["Teachers", "Essay", "Writing", "Library", "Memory", "Changes", "Typing Calibration"]) {
+    for (const required of ["Teachers", "Essay", "Writing", "Library", "Memory", "Changes", "Typing and Writing Calibration"]) {
       assert(labels.includes(required), `engine: ${ENGINES[id].label} exposes ${required}`);
     }
-    assert(labels.some((l) => l.endsWith("Engine") && l !== "Writing Engine"), `engine: ${ENGINES[id].label} exposes its subject-specific AI engine`);
-    assert(ENGINE_TOOLS[id].length === 8, `engine: ${ENGINES[id].label} exposes exactly the 8 specified tools`);
-    assert(!labels.includes("Scan Math"), `engine: ${ENGINES[id].label} keeps the math pipeline out of its primary workflow`);
+    assert(ENGINE_TOOLS[id].length === 7, `engine: ${ENGINES[id].label} exposes exactly the 7 specified tools`);
+    assert(!labels.some((l) => l.startsWith("Scan")), `engine: ${ENGINES[id].label} keeps the math pipeline out of its primary workflow`);
   }
+
+  // Foreign Language: 8 tools, led by the functioning language selector.
+  const foreignLabels = ENGINE_TOOLS.foreign_language.map((t) => t.label);
+  assert(foreignLabels[0] === "Language Selector", "engine: Foreign Language leads with the Language Selector");
+  assert(ENGINE_TOOLS.foreign_language.length === 8, "engine: Foreign Language exposes exactly the 8 specified tools");
+  for (const required of ["Teachers", "Essay", "Writing", "Library", "Memory", "Changes", "Typing and Writing Calibration"]) {
+    assert(foreignLabels.includes(required), `engine: Foreign Language exposes ${required}`);
+  }
+
+  // Classification routes new subjects to their engines.
+  assert(classifyEngine("Spanish II") === "foreign_language", "engine: Spanish routes to the Foreign Language Engine");
+  assert(classifyEngine("Health Education") === "health", "engine: Health Education routes to the Health Engine");
+
+  // Subject tool links carry the subject scope where the destination honors it.
+  assert(subjectToolUrl({ label: "Library", description: "", path: "/library" }, "math") === "/library?subject=math",
+    "nav: subject-scoped tools carry ?subject= (Library)");
+  assert(subjectToolUrl({ label: "Teachers", description: "", path: "/teachers" }, "math") === "/teachers",
+    "nav: non-scoped tools keep their plain route");
 
   // ---- 4. Tool URLs carry the course context --------------------------------
   assert(toolUrl(ENGINE_TOOLS.writing[0], "abc-123") === "/teachers?course_id=abc-123",
@@ -163,12 +181,57 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
   for (const required of [
     '/dashboard", label: "Home"', '/courses", label: "Courses"', '/notebooks", label: "Notebooks"',
-    '/learning", label: "Learning / Memory"', '/proposals", label: "Changes"', '/offline", label: "Offline"',
-    '/settings", label: "Settings"', '/online", label: "Online"',
+    '/learning", label: "Learning / Memory"', '/offline", label: "Offline"',
+    '/settings", label: "Settings"',
   ]) {
     assert(shell.includes(required), `nav: primary navigation includes ${required}`);
   }
+  assert(!shell.includes('/proposals", label: "Changes"') && !shell.includes('/online", label: "Online"'),
+    "nav: global Changes and Online are NOT separate top-level items (Changes merges into Learning / Memory; Online is a status chip)");
   assert(shell.includes("Sign out"), "nav: the shell exposes a functional Sign out action");
+
+  // Hierarchical Courses navigation: expandable group, nested Science, subject tools.
+  assert(shell.includes("CourseTree") && shell.includes("SUBJECT_TREE"),
+    "nav: the Courses group is a real expandable hierarchy rendered from the subject tree");
+  assert(shell.includes('aria-expanded={!!open.courses}') && shell.includes('aria-controls="nav-courses-children"'),
+    "nav: the Courses expansion control exposes accessible expanded state");
+  assert(shell.includes("sophira:nav-expanded"),
+    "nav: expansion state persists per authenticated user (localStorage, gracefully degraded)");
+  assert(shell.includes("drawerOpen") && shell.includes("Open menu") && shell.includes("Close menu") && shell.includes('aria-modal="true"'),
+    "nav: mobile gets a slide-out drawer with a menu button, close button, and modal semantics");
+  assert(shell.includes("Escape") && shell.includes("menuBtnRef.current?.focus()"),
+    "nav: the drawer closes on Escape and restores focus to the menu button");
+  assert(shell.includes("navigator.onLine") && shell.includes('href="/online"'),
+    "nav: a real connectivity status chip links to /online (never a fabricated state)");
+
+  // Every subject workspace route exists as a real page (no dead links).
+  for (const route of [
+    "src/app/courses/english/page.tsx", "src/app/courses/math/page.tsx",
+    "src/app/courses/science/page.tsx", "src/app/courses/science/biology/page.tsx",
+    "src/app/courses/science/chemistry/page.tsx", "src/app/courses/science/physics/page.tsx",
+    "src/app/courses/history-social-science/page.tsx", "src/app/courses/foreign-language/page.tsx",
+    "src/app/courses/health-education/page.tsx", "src/app/courses/other-subject/page.tsx",
+    "src/app/courses/foreign-language/language-selector/page.tsx",
+  ]) {
+    assert(existsSync(route), `nav: subject route ${route} exists`);
+  }
+  const scienceLanding = readFileSync("src/app/courses/science/page.tsx", "utf8");
+  const scienceWorkspace = readFileSync("src/components/courses/SubjectWorkspace.tsx", "utf8");
+  assert(scienceLanding.includes("SubjectWorkspace") && scienceWorkspace.includes("node.children"),
+    "nav: Science opens a landing page and its three children open their own workspaces beneath it");
+
+  // Foreign Language selector: a real control persisted to real storage.
+  const langSelector = readFileSync("src/app/courses/foreign-language/language-selector/page.tsx", "utf8");
+  assert(langSelector.includes("subject_preferences") && langSelector.includes("LanguageSelector"),
+    "language: the selector page loads the user's saved preference from real storage");
+  const langApi = readFileSync("src/app/api/preferences/foreign-language/route.ts", "utf8");
+  assert(langApi.includes("requireUser") && langApi.includes("onConflict"),
+    "language: the preference API is auth-guarded and upserts per user");
+  const langMigration = readFileSync("supabase/migrations/0030_subject_preferences.sql", "utf8");
+  assert(langMigration.includes("create table if not exists public.subject_preferences") &&
+    langMigration.includes("enable row level security") &&
+    langMigration.includes("using (user_id = auth.uid())"),
+    "language: migration 0030 creates the preference table with owner-only RLS");
 
   // Courses hierarchy: Science is a parent with Biology/Chemistry/Physics nested.
   const coursesPage = readFileSync("src/app/courses/page.tsx", "utf8");
@@ -181,8 +244,13 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "courses: Science contains exactly Biology, Chemistry, Physics nested beneath it"
   );
   assert(
-    ["History / Social Science", "Computer Science", "Other Subject"].every((label) => groups.some((g) => g.label === label)),
-    "courses: History / Social Science, Computer Science, and Other Subject are distinct groups");
+    ["History / Social Science", "Foreign Language", "Health Education", "Other Subject"].every((label) => groups.some((g) => g.label === label)),
+    "courses: History / Social Science, Foreign Language, Health Education, and Other Subject are distinct groups");
+  assert(!groups.some((g) => g.label === "Computer Science"),
+    "courses: Computer Science is no longer a top-level group — it lives under Other Subject");
+  const otherGroup = groups.find((g) => g.key === "other");
+  assert(!!otherGroup && otherGroup.engines.includes("programming") && otherGroup.engines.includes("general"),
+    "courses: the Other Subject group covers both general and programming courses");
   assert(coursesPage.includes("parent course — subjects nested below"), "courses: Science is visually distinguished as the parent");
 
   // The Online page reports honest status and never claims a false state.
