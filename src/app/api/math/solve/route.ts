@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { subjectBySlug } from "@/lib/courses/engines";
 import { requireUser } from "@/lib/supabase/guard";
 import { runMathPipeline, type MathPipelineResult } from "@/lib/math/pipeline";
 import { aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
   if (!guard.ok) return guard.response;
   const { user } = guard.data;
 
-  let body: { image_data_url?: string; rotation?: number; confirmed_expression?: string | null; expression?: string; mode?: string };
+  let body: { image_data_url?: string; rotation?: number; confirmed_expression?: string | null; expression?: string; mode?: string; subject?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -71,6 +72,11 @@ export async function POST(request: NextRequest) {
     teacherProfile = tp?.method_compliance ?? null;
   } catch { teacherProfile = null; }
 
+  // Science context (2026-10-10 audit): a calculation from a Chemistry or
+  // Physics workspace is explained in its scientific setting — the same
+  // deterministic solver and the same AI; no separate science backend.
+  const subjectLabel = body.subject ? (subjectBySlug(body.subject)?.label ?? null) : null;
+
   try {
     if (body.expression) {
       // typed/confirmed path — the user already corrected it (step 8 done)
@@ -78,7 +84,7 @@ export async function POST(request: NextRequest) {
         ocr: async () => ({ text: body.expression!, confidence: 1, engine: "deterministic", notes: ["typed by the user (or confirmed by the user)"] }),
         alreadyConfirmed: true,
         preprocess: { cropped: false, rotationDegrees: 0, deskewDegrees: 0, method: "none" },
-        explain: aiConfigured() ? (sol, rec) => explainWithAi(sol, rec, body.mode) : undefined,
+        explain: aiConfigured() ? (sol, rec) => explainWithAi(sol, rec, body.mode, subjectLabel) : undefined,
         applyTeacherMethod: applyTeacherMethod(teacherProfile),
       });
       return NextResponse.json({ result });
@@ -101,7 +107,7 @@ export async function POST(request: NextRequest) {
         ocr: async () => ({ text: ocr.text, confidence: ocr.confidence, engine: "vision-llm", notes: ocr.notes }),
         confirmedExpression: body.confirmed_expression ?? null,
         preprocess: { cropped: true, rotationDegrees: rotation, deskewDegrees: 0, method: "canvas" },
-        explain: aiConfigured() ? (sol, rec) => explainWithAi(sol, rec, body.mode) : undefined,
+        explain: aiConfigured() ? (sol, rec) => explainWithAi(sol, rec, body.mode, subjectLabel) : undefined,
         applyTeacherMethod: applyTeacherMethod(teacherProfile),
       }
     );
@@ -115,7 +121,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function explainWithAi(solution: { kind: string; finalAnswer: string; steps: { text: string; expr?: string }[] }, recognized: { expression: string }, mode?: string): Promise<string> {
+async function explainWithAi(solution: { kind: string; finalAnswer: string; steps: { text: string; expr?: string }[] }, recognized: { expression: string }, mode?: string, subjectLabel?: string | null): Promise<string> {
   const teachMode = mode === "teach";
   const stepList = solution.steps.map((s, i) => `${i + 1}. ${s.text}${s.expr ? ` — ${s.expr}` : ""}`).join("\n");
   const raw = await aiChat(
@@ -126,6 +132,9 @@ async function explainWithAi(solution: { kind: string; finalAnswer: string; step
           "You explain mathematics to a student.",
           "The solution steps and the final answer are ALREADY computed and verified by a deterministic engine — they are given to you and are final. You must not change, recompute, or contradict any number in them.",
           "Explain WHY each step works, in friendly plain language, at high-school level.",
+          subjectLabel
+            ? `The student is working in a ${subjectLabel} context: interpret the mathematics in that scientific setting — attend to units, scientific notation, and physical meaning. The computed steps and final answer remain final.`
+            : "",
           teachMode
             ? "TEACH MODE: this student asked to be TAUGHT, not just shown. Identify the underlying concept and method by name, explain WHY the method works (not just the steps), and end with a section called 'Try it yourself next time' with two short hints for recognizing when to use this method — without giving away any new answer."
             : "",

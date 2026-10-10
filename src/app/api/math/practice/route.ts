@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
+import { subjectPromptContext } from "@/lib/courses/subject-context";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
@@ -27,6 +28,7 @@ export async function POST(request: NextRequest) {
     count?: number;
     material_ids?: string[];
     course_id?: string | null;
+    subject?: string | null;
     problem?: string;
     student_answer?: string;
     past_problems?: string[];
@@ -65,6 +67,10 @@ export async function POST(request: NextRequest) {
   if (body.course_id) {
     const { data: course } = await supabase.from("courses").select("name, subject, academic_level").eq("id", body.course_id).single();
     if (course) courseContext = ` Course: ${course.name} (${course.subject ?? "math"}, ${course.academic_level ?? "unspecified level"}).`;
+  }
+  // Subject workspace context: practice honors the selected subject.
+  if (!body.course_id) {
+    courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject);
   }
 
   try {

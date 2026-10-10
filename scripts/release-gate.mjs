@@ -197,7 +197,7 @@ function runGate() {
     const url = env("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
     const key = env("SUPABASE_SERVICE_ROLE_KEY");
     if (!url || !key) return { status: "BLOCKED", detail: "database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate" };
-    // Probe the newest migration's function (0028 network_stats repair). 404/400 = migrations missing.
+    // Probe the newest migration's table (0030 subject_preferences). 404/400 = migrations missing.
     return (async () => ({ status: "async" }))() && { status: "NOT RUN", detail: "" }; // replaced below by async gate
   });
 
@@ -405,17 +405,19 @@ async function dbMigrations() {
   if (!target) return;
   if (!url || !key) {
     target.status = "BLOCKED";
-    target.detail = "database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — verify migrations 0001-0028 on the production database";
+    target.detail = "database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — verify migrations 0001-0030 on the production database";
     return;
   }
   try {
-    const res = await fetch(`${url.value.replace(/\/$/, "")}/rest/v1/rpc/network_stats`, {
-      method: "POST",
-      headers: { apikey: key.value, Authorization: `Bearer ${key.value}`, "content-type": "application/json" },
-      body: JSON.stringify({}),
+    // Probe the NEWEST migration (0030 subject_preferences): a select via the
+    // production REST API returns 200 when the table exists (empty result is
+    // fine — RLS keeps service-role reads minimal and nothing is stored).
+    const res = await fetch(`${url.value.replace(/\/$/, "")}/rest/v1/subject_preferences?select=id&limit=1`, {
+      method: "GET",
+      headers: { apikey: key.value, Authorization: `Bearer ${key.value}` },
       signal: AbortSignal.timeout(20000),
     });
-    if (res.ok) { target.status = "PASS"; target.detail = "migration 0028 function (network_stats) callable via the production REST API (migrations appear applied)"; return; }
+    if (res.ok) { target.status = "PASS"; target.detail = "migration 0030 (subject_preferences) reachable via the production REST API (migrations 0001-0030 appear applied)"; return; }
     target.status = "FAIL";
     target.detail = `production database rejected the migration probe (HTTP ${res.status}) — migrations may be missing`;
   } catch (e) {

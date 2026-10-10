@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
-import { subjectBySlug, ENGINE_TOOLS, classifyEngine, subjectToolUrl } from "@/lib/courses/engines";
+import { subjectBySlug, subjectTools, classifyEngine, subjectToolUrl } from "@/lib/courses/engines";
 import { Wrench, ChevronRight } from "lucide-react";
 
 /**
@@ -70,7 +70,9 @@ export async function SubjectWorkspace({ slug }: { slug: string }) {
     );
   }
 
-  const tools = ENGINE_TOOLS[node.engines[0]];
+  // Union across the node's engines: the Science parent shows the combined
+  // Biology + Chemistry + Physics tools (incl. Scientific Calculations).
+  const tools = subjectTools(node.engines);
 
   return (
     <AppShell title={node.label} backHref="/courses">

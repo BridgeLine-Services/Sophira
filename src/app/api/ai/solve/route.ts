@@ -21,6 +21,7 @@ import {
 } from "@/lib/ai/client";
 import { composeAcademicContext, wrapUntrusted, detectInjectionAttempt } from "@/lib/ai/context";
 import { routeSubject, routeMathTopic } from "@/lib/ai/subjects";
+import { subjectBySlug } from "@/lib/courses/engines";
 import { normalizeMethodCompliance } from "@/lib/ai/compliance";
 import { runMachineChecks } from "@/lib/ai/mathverify";
 import { MODE_MAP } from "@/lib/modes";
@@ -51,6 +52,7 @@ interface SolveBody {
   question?: string;
   title?: string;
   course_id?: string | null;
+  subject?: string | null;
   teacher_id?: string | null;
   output_type?: string | null;
   custom_instructions?: string;
@@ -220,7 +222,14 @@ export async function POST(request: NextRequest) {
   }
 
   // --- Stage 3: solve + self-verification in one call -------------------------
-  const workflow = routeSubject(classification?.subject ?? course?.subject, classification?.task_type);
+  // Subject workspace context (2026-10-10 audit): when the student works
+  // inside a declared subject workspace (no course record), the declared
+  // subject seeds the workflow routing — the Science parent and its
+  // children get their real scientific-reasoning workflows (with mathjs
+  // numeric verification for chemistry/physics). AI classification still
+  // wins when it identifies a more specific subject from the question.
+  const declaredSubject = body.subject ? (subjectBySlug(body.subject)?.label ?? null) : null;
+  const workflow = routeSubject(classification?.subject ?? course?.subject ?? declaredSubject, classification?.task_type);
   const mathTopicSystem = workflow.id === "mathematics"
     ? routeMathTopic(question, classification?.subject ?? course?.subject).extraSystem
     : null;

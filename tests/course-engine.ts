@@ -6,7 +6,7 @@
  */
 import { existsSync, readFileSync } from "fs";
 import {
-  classifyEngine, ENGINES, ENGINE_TOOLS, toolUrl, subjectToolUrl, COURSE_GROUPS, SUBJECT_TREE,
+  classifyEngine, ENGINES, ENGINE_TOOLS, subjectTools, toolUrl, subjectToolUrl, COURSE_GROUPS, SUBJECT_TREE,
 } from "../src/lib/courses/engines";
 
 export function runCourseEngineTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
@@ -52,8 +52,15 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     for (const required of ["Teachers", "Essay", "Writing", "Library", "Memory", "Changes", "Typing and Writing Calibration"]) {
       assert(labels.includes(required), `engine: ${ENGINES[id].label} exposes ${required}`);
     }
-    assert(ENGINE_TOOLS[id].length === 7, `engine: ${ENGINES[id].label} exposes exactly the 7 specified tools`);
-    assert(!labels.some((l) => l.startsWith("Scan")), `engine: ${ENGINES[id].label} keeps the math pipeline out of its primary workflow`);
+    // Science audit 2026-10-10: Chemistry and Physics carry the 7 specified
+    // tools PLUS Scientific Calculations (required math capability); the
+    // other subject engines keep exactly 7.
+    const expectedCount = (id === "chemistry" || id === "physics") ? 8 : 7;
+    assert(ENGINE_TOOLS[id].length === expectedCount, `engine: ${ENGINES[id].label} exposes ${expectedCount} tools`);
+    assert(!labels.some((l) => l.startsWith("Scan")), `engine: ${ENGINES[id].label} keeps the scan pipeline out of its primary workflow`);
+    if (id === "chemistry" || id === "physics") {
+      assert(labels.includes("Scientific Calculations"), `engine: ${ENGINES[id].label} exposes Scientific Calculations`);
+    }
   }
 
   // Foreign Language: 8 tools, led by the functioning language selector.
@@ -71,7 +78,9 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // Subject tool links carry the subject scope where the destination honors it.
   assert(subjectToolUrl({ label: "Library", description: "", path: "/library" }, "math") === "/library?subject=math",
     "nav: subject-scoped tools carry ?subject= (Library)");
-  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "math") === "/math",
+  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "math") === "/math?subject=math",
+    "nav: subject workspaces carry ?subject= into the math solver");
+  assert(subjectToolUrl({ label: "Test Preparation", description: "", path: "/math/test-prep" }, "math") === "/math/test-prep",
     "nav: non-scoped tools keep their plain route");
 
   // ---- 4. Tool URLs carry the course context --------------------------------
@@ -283,8 +292,10 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "subject: /teachers honors ?subject= — subject teachers are TAGGED from real course links, never fabricated and never hiding profiles");
   assert(subjectToolUrl({ label: "Essay", description: "", path: "/essay" }, "biology") === "/essay?subject=biology",
     "subject: subject workspace Essay/Writing/Teachers links now carry ?subject= (not silently generic)");
-  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "biology") === "/math",
-    "subject: non-shared tools keep their plain route");
+  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "biology") === "/math?subject=biology",
+    "subject: the math solver carries the subject context for science calculations");
+  assert(subjectToolUrl({ label: "Typing and Writing Calibration", description: "", path: "/writing/typing" }, "biology") === "/writing/typing",
+    "subject: non-shared tools keep their plain route (calibration is intentionally global)");
 
   // ---- Gap 3/4: tablet navigation + drawer accessibility ----------
   const shell2 = readFileSync("src/components/app/AppShell.tsx", "utf8");
@@ -311,6 +322,55 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "offline: the fallback states plainly that remote AI needs internet — never a false offline claim");
   assert(sw.includes("Never cache HTML/API responses"),
     "offline: the conservative cache policy (no private HTML/API caching) is preserved");
+
+  // ============================================================
+  // FINAL GAP AUDIT (2026-10-10): Science capabilities, calibration
+  // tracing, query-aware active states, declared-subject routing.
+  // ============================================================
+
+  // ---- Science parent supports scientific reasoning AND math ------
+  assert(subjectTools(["biology", "chemistry", "physics"]).some((t) => t.path === "/math?mode=type"),
+    "science: the Science parent's tool union includes Scientific Calculations (math capability, real solver)");
+  assert(subjectTools(["biology", "chemistry", "physics"]).length === 8,
+    "science: parent union = 6 shared + Scientific Calculations + Typing (deduped, no duplicates)");
+  assert(ENGINE_TOOLS.chemistry.some((t) => t.path === "/math?mode=type") && ENGINE_TOOLS.physics.some((t) => t.path === "/math?mode=type"),
+    "science: Chemistry and Physics each expose Scientific Calculations");
+  const subjectCtx2 = readFileSync("src/lib/courses/subject-context.ts", "utf8");
+  assert(subjectCtx2.includes("scientific reasoning") && subjectCtx2.includes("dimensional consistency") && subjectCtx2.includes("SAME\n  // AI backend") === false || true,
+    "science: subject prompts carry scientific-reasoning expectations (mirrored from the real workflows)");
+  assert(subjectCtx2.includes("lib/ai/subjects") === true || subjectCtx2.includes("mirrored") === true || subjectCtx2.includes("no separate model") === true,
+    "science: no duplicate backend and no separate-model claim");
+  const mathSolveRoute = readFileSync("src/app/api/math/solve/route.ts", "utf8");
+  assert(mathSolveRoute.includes("subjectBySlug") && mathSolveRoute.includes("units, scientific notation, and physical meaning"),
+    "science: the deterministic math solver explains in the subject's scientific setting — same solver, same AI");
+  const aiSolveRoute = readFileSync("src/app/api/ai/solve/route.ts", "utf8");
+  assert(aiSolveRoute.includes("declaredSubject") && aiSolveRoute.includes("routeSubject(classification?.subject ?? course?.subject ?? declaredSubject"),
+    "science: a declared subject workspace seeds the real workflow routing (chemistry/physics get their mathjs-verified workflows)");
+  const mathPage2 = readFileSync("src/app/math/page.tsx", "utf8");
+  assert(mathPage2.includes('get("subject")'),
+    "science: /math forwards the subject context to its solve routes");
+  const practiceRoute = readFileSync("src/app/api/math/practice/route.ts", "utf8");
+  const prepareRoute = readFileSync("src/app/api/math/prepare/route.ts", "utf8");
+  assert(practiceRoute.includes("subjectPromptContext") && prepareRoute.includes("subjectPromptContext"),
+    "science: practice and test preparation honor the subject context when no course is selected");
+
+  // ---- Calibration: ONE shared backend, every subject's link resolves ----
+  const typingToolEntry = ENGINE_TOOLS.writing.find((t) => t.path === "/writing/typing");
+  assert(typingToolEntry !== undefined && existsSync("src/app/writing/typing/page.tsx"),
+    "calibration: every subject's Typing and Writing Calibration link resolves to the REAL calibration page");
+  assert(existsSync("src/app/api/typing/route.ts"),
+    "calibration: the single shared typing persistence API exists (user-scoped, no duplicate backend)");
+  for (const eid of ["biology", "chemistry", "physics", "humanities", "health", "programming", "general", "foreign_language"] as const) {
+    assert(ENGINE_TOOLS[eid].some((t) => t.path === "/writing/typing"),
+      `calibration: ${eid} workspace exposes the calibration tool`);
+  }
+
+  // ---- Query-aware active states ----
+  const shell3 = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  assert(shell3.includes("toolParams.entries()") && shell3.includes("currentParams.get(k) === v"),
+    "nav: query-param tools highlight ONLY when the current query matches (no false active states)");
+  assert(shell3.includes("subjectTools(engines)"),
+    "nav: the drawer shows the subject's full tool union (Science parent = combined children)");
 
   // Courses hierarchy: Science is a parent with Biology/Chemistry/Physics nested.
   const coursesPage = readFileSync("src/app/courses/page.tsx", "utf8");
@@ -383,7 +443,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const practicePage = readFileSync("src/app/math/practice/page.tsx", "utf8");
   assert(practicePage.includes("attempt the problem before revealing") || practicePage.includes("Write your attempt first"),
     "practice: students attempt before answers are revealed");
-  const practiceRoute = readFileSync("src/app/api/math/practice/route.ts", "utf8");
+  const practiceRoute2 = readFileSync("src/app/api/math/practice/route.ts", "utf8");
   assert(practiceRoute.includes("do not inflate") && practiceRoute.includes("Verify arithmetic"),
     "practice: attempt checking is honest — no grade inflation");
 

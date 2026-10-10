@@ -38,6 +38,7 @@ export default function MathScanPage() {
 function MathScanInner() {
   const { toast } = useToast();
   const urlMode = useSearchParams().get("mode");
+  const subjectSlug = useSearchParams().get("subject");
   const [teachMode, setTeachMode] = useState(urlMode === "teach");
   const [typeOpen, setTypeOpen] = useState(urlMode === "type");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -104,7 +105,7 @@ function MathScanInner() {
       const res = await fetch("/api/math/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_data_url: imageDataUrl, rotation, confirmed_expression: confirmedExpression ?? null, mode: teachMode ? "teach" : "solve" }),
+        body: JSON.stringify({ image_data_url: imageDataUrl, rotation, confirmed_expression: confirmedExpression ?? null, mode: teachMode ? "teach" : "solve", ...(subjectSlug ? { subject: subjectSlug } : {}) }),
       });
       const json = await res.json();
       if (!res.ok || !json.result) {
@@ -131,7 +132,7 @@ function MathScanInner() {
       const res = await fetch("/api/math/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expression: confirmedExpr, mode: teachMode ? "teach" : "solve" }),
+        body: JSON.stringify({ expression: confirmedExpr, mode: teachMode ? "teach" : "solve", ...(subjectSlug ? { subject: subjectSlug } : {}) }),
       });
       const json = await res.json();
       if (!res.ok || !json.result) { toast("error", json.error ?? "Failed."); return; }

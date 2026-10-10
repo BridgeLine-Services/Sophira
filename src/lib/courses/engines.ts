@@ -141,6 +141,18 @@ const typingTool: EngineTool = {
   path: "/writing/typing",
 };
 
+/**
+ * Scientific Calculations (Science audit 2026-10-10): solves/verifies the
+ * math inside chemistry and physics work — equations, substitutions, units.
+ * Routes into the EXISTING deterministic math solver + AI explainer with a
+ * subject hint; there is no separate science backend.
+ */
+const scientificCalculationsTool: EngineTool = {
+  label: "Scientific Calculations",
+  description: "Solve and verify this subject's equations and calculations — substitutions, units, step-by-step.",
+  path: "/math?mode=type",
+};
+
 export const ENGINE_TOOLS: Record<EngineId, EngineTool[]> = {
   // English: exactly the 9 tools from the spec.
   writing: [
@@ -180,8 +192,12 @@ export const ENGINE_TOOLS: Record<EngineId, EngineTool[]> = {
   ],
   // Science subjects, History, Health, CS, and Other: 7 tools each.
   biology: [...commonTools, typingTool],
-  chemistry: [...commonTools, typingTool],
-  physics: [...commonTools, typingTool],
+  // Science audit 2026-10-10: Chemistry and Physics must support
+  // appropriate MATHEMATICAL capabilities from their own workspaces — the
+  // same deterministic math solver and AI explainer, not a duplicate
+  // backend and not a separate model.
+  chemistry: [...commonTools, scientificCalculationsTool, typingTool],
+  physics: [...commonTools, scientificCalculationsTool, typingTool],
   humanities: [...commonTools, typingTool],
   health: [...commonTools, typingTool],
   programming: [...commonTools, typingTool],
@@ -192,6 +208,7 @@ export const ENGINE_TOOLS: Record<EngineId, EngineTool[]> = {
 const SUBJECT_SCOPED_PATHS = new Set([
   "/library", "/learning", "/proposals",
   "/essay", "/writing", "/writing/planning", "/writing/grammar", "/teachers",
+  "/math",
 ]);
 
 /** Attach the course context to a tool link (course workspaces). */
@@ -207,4 +224,20 @@ export function subjectToolUrl(tool: EngineTool, slug: string): string {
   if (!SUBJECT_SCOPED_PATHS.has(base)) return tool.path;
   const sep = tool.path.includes("?") ? "&" : "?";
   return `${tool.path}${sep}subject=${slug}`;
+}
+
+/**
+ * Union of tools across a subject node's engines, deduped by path — the
+ * Science parent shows the combined Biology + Chemistry + Physics tools
+ * (including Scientific Calculations), not just the first engine's list.
+ */
+export function subjectTools(engines: EngineId[]): EngineTool[] {
+  const seen = new Set<string>();
+  const out: EngineTool[] = [];
+  for (const e of engines) {
+    for (const t of ENGINE_TOOLS[e]) {
+      if (!seen.has(t.path)) { seen.add(t.path); out.push(t); }
+    }
+  }
+  return out;
 }

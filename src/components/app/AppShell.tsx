@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { BookOpen, Brain, ChevronDown, GraduationCap, Home, Library, LogOut, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, Wifi, X } from "lucide-react";
-import { SUBJECT_TREE, ENGINE_TOOLS, subjectToolUrl } from "@/lib/courses/engines";
+import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 
 const NAV = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -80,6 +80,14 @@ function CourseTree({ userId, pathname, onNavigate }: {
     });
   }
 
+  // Query-aware active states: tools with query params (/math?mode=type,
+  // /math?mode=teach) must highlight ONLY when the current query matches —
+  // read client-side to avoid the useSearchParams/Suspense prerender trap.
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    try { setSearch(window.location.search); } catch { setSearch(""); }
+  }, [pathname]);
+
   const linkActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
   const subjectActive = (slug: string) => linkActive(`/courses/${slug}`);
   const rowCls = (active: boolean) =>
@@ -101,9 +109,13 @@ function CourseTree({ userId, pathname, onNavigate }: {
   const toolRows = (slug: string, engines: (typeof SUBJECT_TREE)[number]["engines"], id: string) => (
     open[id] && (
       <div className="ml-8 space-y-0.5 border-l border-ink/10 pl-1">
-        {ENGINE_TOOLS[engines[0]].map((tool) => {
+        {subjectTools(engines).map((tool) => {
           const base = tool.path.split("?")[0];
-          const active = !tool.path.includes("?") && linkActive(base);
+          const toolParams = new URLSearchParams(tool.path.split("?")[1] ?? "");
+          const currentParams = new URLSearchParams(search);
+          const active =
+            linkActive(base) &&
+            Array.from(toolParams.entries()).every(([k, v]) => currentParams.get(k) === v);
           return (
             <Link
               key={tool.label}

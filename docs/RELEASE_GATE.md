@@ -63,7 +63,7 @@ code inspection.
 | # | Check | How it is evaluated |
 |---|---|---|
 | 1 | Production URL works | `SOPHIRA_APP_URL` resolved + `scripts/verify-deployment.mjs` live check (health endpoint, configuration readiness) |
-| 2 | Database migrations applied | production DB probe of the newest migration's table (0018 `typing_profiles`) via the REST API with service-role credentials |
+| 2 | Database migrations applied | production DB probe of the newest migration's table (0030 `subject_preferences`) via the REST API with service-role credentials — verifies the 0001-0030 chain |
 | 3 | AI provider configured | free-first architecture: `GEMINI_API_KEY` (Gemini free tier, server-side only) — or `OPENAI_API_KEY` counting ONLY when paid use is explicitly allowed (`ALLOW_PAID_AI=true` / `MONTHLY_AI_BUDGET_USD>0`); zero-billing defaults reject a paid key |
 | 4 | Search provider configured | `SEARCH_API_KEY` (+ custom `SEARCH_BASE_URL`) present |
 | 5 | Search provider live test passes | real search request when `RUN_LIVE_TESTS=1`; otherwise NOT RUN |

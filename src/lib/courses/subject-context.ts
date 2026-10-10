@@ -18,6 +18,16 @@ export async function subjectPromptContext(
   const node = subjectBySlug(slug);
   if (!node) return "";
   let context = `\nSubject: ${node.label} — work is for this subject's coursework.`;
+  // SCIENCE REASONING (2026-10-10 audit): the Science parent and its
+  // children carry explicit scientific-reasoning expectations, mirrored
+  // from the real workflow definitions in lib/ai/subjects.ts — the SAME
+  // AI backend, no separate model is claimed or used.
+  if (slug === "science" || slug.startsWith("science/")) {
+    context += ` Apply scientific reasoning: identify knowns/unknowns and assumptions, use correct scientific terminology and units, distinguish established fact from inference, and never fabricate observations, data, or sources.`;
+    if (slug === "science/physics" || slug === "science/chemistry") {
+      context += ` Show substitutions with units and check dimensional consistency; sanity-check magnitudes.`;
+    }
+  }
   if (slug === "foreign-language") {
     const { data: pref } = await supabase
       .from("subject_preferences")
