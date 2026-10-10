@@ -6,6 +6,7 @@ import { ProposalsPanel } from "@/components/app/ProposalsPanel";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState } from "@/components/ui";
 import { ClipboardCheck } from "lucide-react";
 import { fmtDate } from "@/lib/format";
+import { subjectBySlug, classifyEngine } from "@/lib/courses/engines";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function ProposalsPage({
   searchParams,
 }: {
-  searchParams?: { course_id?: string };
+  searchParams?: { course_id?: string; subject?: string };
 }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -36,6 +37,23 @@ export default async function ProposalsPage({
     course = (data as { id: string; name: string; subject: string | null } | null) ?? null;
   }
   const subject = course?.subject ?? null;
+
+  // Subject workspace context (?subject=<slug>): the Changes view narrowed
+  // to the user's own courses in that subject group. A change in one subject
+  // never appears in another subject's view.
+  let subjectScope: { label: string; slug: string; subjects: string[] } | null = null;
+  if (!course && searchParams?.subject) {
+    const node = subjectBySlug(searchParams.subject);
+    if (node) {
+      const { data: groupCourses } = await supabase.from("courses").select("subject").order("name");
+      const subjects = Array.from(new Set(
+        (groupCourses ?? [])
+          .filter((c: { subject: string | null }) => c.subject && node.engines.includes(classifyEngine(c.subject)))
+          .map((c: { subject: string | null }) => (c.subject as string).toLowerCase())
+      ));
+      subjectScope = { label: node.label, slug: node.slug, subjects };
+    }
+  }
 
   const [{ data: pending }, { data: decisions }, { data: patterns }, { data: memories }] =
     await Promise.all([
@@ -59,22 +77,31 @@ export default async function ProposalsPage({
         .limit(30),
     ]);
 
-  const inScope = (item: { subject: string | null }) =>
-    !subject || (item.subject ?? "").toLowerCase().includes(subject.toLowerCase()) || !item.subject;
+  const inScope = (item: { subject: string | null }) => {
+    if (subject) return !item.subject || (item.subject ?? "").toLowerCase().includes(subject.toLowerCase());
+    if (subjectScope) return !item.subject || subjectScope.subjects.includes((item.subject ?? "").toLowerCase());
+    return true;
+  };
 
   // Profile-update proposals target teacher/writing profiles and carry their
   // course context in `context`; in a subject view only show the ones that
   // belong to that course (honest scoping — never guess).
   const scopedDecisions = (decisions ?? []).filter((d) => {
-    if (!course) return true;
-    const ctx = (d as { context?: Record<string, unknown> | null }).context ?? {};
-    return ctx.course_id === course.id || ctx.subject === subject;
+    if (course) {
+      const ctx = (d as { context?: Record<string, unknown> | null }).context ?? {};
+      return ctx.course_id === course.id || ctx.subject === subject;
+    }
+    if (subjectScope) {
+      const ctx = (d as { context?: Record<string, unknown> | null }).context ?? {};
+      return subjectScope.subjects.includes(String(ctx.subject ?? "").toLowerCase());
+    }
+    return true;
   });
   const scopedPatterns = (patterns ?? []).filter((p) => inScope(p));
   const scopedMemories = (memories ?? []).filter((m) => inScope(m));
 
   return (
-    <AppShell title={course ? `Changes — ${course.name}` : "Changes"} backHref={course ? `/courses/${course.id}` : "/dashboard"}>
+    <AppShell title={course ? `Changes — ${course.name}` : subjectScope ? `Changes — ${subjectScope.label}` : "Changes"} backHref={course ? `/courses/${course.id}` : subjectScope ? `/courses/${subjectScope.slug}` : "/dashboard"}>
       <div className="mb-4 space-y-1">
         <p className="text-sm text-ink-soft">
           A chronological record of meaningful changes to your learning profile — proposed updates,

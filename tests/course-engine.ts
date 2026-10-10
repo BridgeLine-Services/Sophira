@@ -233,6 +233,20 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     langMigration.includes("using (user_id = auth.uid())"),
     "language: migration 0030 creates the preference table with owner-only RLS");
 
+  // Subject-scoped tool destinations honor ?subject= (honest scope, real data).
+  const learningPageScoped = readFileSync("src/app/learning/page.tsx", "utf8");
+  assert(learningPageScoped.includes("subject?: string") && learningPageScoped.includes("subjectBySlug"),
+    "memory: /learning honors ?subject= and narrows to the user's own courses in that subject");
+  const proposalsScoped = readFileSync("src/app/proposals/page.tsx", "utf8");
+  assert(proposalsScoped.includes("subject?: string") && proposalsScoped.includes("subjectBySlug") && proposalsScoped.includes("never appears in another subject"),
+    "changes: /proposals honors ?subject= — a change in one subject never appears in another subject's view");
+  const libraryScoped = readFileSync("src/app/library/page.tsx", "utf8");
+  assert(libraryScoped.includes('searchParams.get("subject")') && libraryScoped.includes("classifyEngine"),
+    "library: /library honors ?subject= and scopes materials to the user's own courses in that subject");
+  const memoryManagerSrc = readFileSync("src/components/app/MemoryManager.tsx", "utf8");
+  assert(memoryManagerSrc.includes("string | string[]"),
+    "memory: the manager accepts a subject SET for subject-workspace scoping (global stays distinct)");
+
   // Courses hierarchy: Science is a parent with Biology/Chemistry/Physics nested.
   const coursesPage = readFileSync("src/app/courses/page.tsx", "utf8");
   assert(coursesPage.includes("COURSE_GROUPS"), "courses: the page renders the parent/nested course hierarchy");

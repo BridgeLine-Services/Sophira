@@ -9,6 +9,7 @@ import { CorrectionsPanel } from "@/components/app/CorrectionsPanel";
 import { MemoryManager } from "@/components/app/MemoryManager";
 import type { LearningPattern } from "@/lib/learning/patterns";
 import type { StudentMemory } from "@/lib/memory/engine";
+import { subjectBySlug, classifyEngine } from "@/lib/courses/engines";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export const dynamic = "force-dynamic";
 export default async function LearningPage({
   searchParams,
 }: {
-  searchParams?: { course_id?: string };
+  searchParams?: { course_id?: string; subject?: string };
 }) {
   const supabase = createClient();
   const user = await requireUser(supabase);
@@ -40,6 +41,23 @@ export default async function LearningPage({
       .eq("id", searchParams.course_id)
       .single();
     course = (data as { name: string; subject: string | null } | null) ?? null;
+  }
+
+  // Subject workspace context (?subject=<slug>): narrow the memories to the
+  // user's own courses in that subject group plus intentionally global
+  // memories. RLS governs every row; this only narrows the owner of the data.
+  let subjectScope: { label: string; subjects: string[] } | null = null;
+  if (!searchParams?.course_id && searchParams?.subject) {
+    const node = subjectBySlug(searchParams.subject);
+    if (node) {
+      const { data: groupCourses } = await supabase.from("courses").select("subject").order("name");
+      const subjects = Array.from(new Set(
+        (groupCourses ?? [])
+          .filter((c: { subject: string | null }) => c.subject && node.engines.includes(classifyEngine(c.subject)))
+          .map((c: { subject: string | null }) => (c.subject as string).toLowerCase())
+      ));
+      subjectScope = { label: node.label, subjects };
+    }
   }
 
   const { profile, reason: profileReason } = await readProfileWithRepair(supabase, user.id);
@@ -112,7 +130,7 @@ export default async function LearningPage({
   ];
 
   return (
-    <AppShell title="Learning / Memory">
+    <AppShell title={subjectScope ? `Learning / Memory — ${subjectScope.label}` : "Learning / Memory"}>
       <div className="mb-4 space-y-1">
         <p className="text-sm text-ink-soft">
           Everything Sophira has learned about how you work academically — in one place: global
@@ -175,6 +193,12 @@ export default async function LearningPage({
           scoped by subject and course. Inspect the evidence behind any AI-inferred memory,
           disable it, or permanently forget it.
         </p>
+        {subjectScope && (
+          <p className="rounded-lg border border-ink/10 bg-paper p-3 text-sm text-ink-soft">
+            Subject workspace view: memories narrowed to {subjectScope.label} plus intentionally
+            global memories. <Link href="/learning" className="text-accent underline">View all memories</Link>
+          </p>
+        )}
         {course && (
           <p className="mb-2 text-xs text-ink-soft" role="note">
             Course workspace view: memories narrowed to {course.subject || "this course's subject"} plus
@@ -183,7 +207,7 @@ export default async function LearningPage({
         )}
         <MemoryManager
           initialMemories={(memories || []) as StudentMemory[]}
-          subjectFilter={course?.subject ?? null}
+          subjectFilter={course ? course.subject : subjectScope ? subjectScope.subjects : null}
         />
       </section>
 

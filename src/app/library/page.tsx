@@ -3,6 +3,7 @@ import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { subjectBySlug, classifyEngine } from "@/lib/courses/engines";
 import { AppShell } from "@/components/app/AppShell";
 import {
   Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Label, Select, Textarea, useToast,
@@ -39,6 +40,7 @@ function LibraryPageInner() {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const courseId = searchParams.get("course_id");
+  const subjectSlug = searchParams.get("subject");
   const [courseName, setCourseName] = useState<string | null>(null);
   const { toast } = useToast();
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
@@ -97,6 +99,55 @@ function LibraryPageInner() {
       })();
       return;
     }
+    if (subjectSlug) {
+      // Subject library: materials from the user's own courses in this
+      // subject group, plus intentionally-global materials. RLS governs
+      // every row; this only narrows the owner of the data.
+      (async () => {
+        const node = subjectBySlug(subjectSlug);
+        if (!node) {
+          setLoaded(true);
+          return;
+        }
+        setCourseName(node.label);
+        const { data: groupCourses } = await supabase
+          .from("courses")
+          .select("id, subject")
+          .order("name");
+        const ids = (groupCourses ?? [])
+          .filter((c: { id: string; subject: string | null }) => c.subject && node.engines.includes(classifyEngine(c.subject)))
+          .map((c: { id: string }) => c.id);
+        const byId = new Map<string, StudyMaterial>();
+        if (ids.length) {
+          const { data: courseMaterials } = await supabase
+            .from("study_materials")
+            .select("*")
+            .in("course_id", ids);
+          for (const m of (courseMaterials ?? []) as StudyMaterial[]) byId.set(m.id, m);
+          const { data: assignmentIds } = await supabase
+            .from("assignments")
+            .select("id")
+            .in("course_id", ids);
+          const aIds = (assignmentIds ?? []).map((a: { id: string }) => a.id);
+          if (aIds.length) {
+            const { data } = await supabase
+              .from("study_materials")
+              .select("*")
+              .in("assignment_id", aIds);
+            for (const m of (data ?? []) as StudyMaterial[]) byId.set(m.id, m);
+          }
+        }
+        const { data: globalMaterials } = await supabase
+          .from("study_materials")
+          .select("*")
+          .is("course_id", null)
+          .is("assignment_id", null);
+        for (const m of (globalMaterials ?? []) as StudyMaterial[]) byId.set(m.id, m);
+        setMaterials(Array.from(byId.values()).sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")));
+        setLoaded(true);
+      })();
+      return;
+    }
     supabase
       .from("study_materials")
       .select("*")
@@ -105,7 +156,7 @@ function LibraryPageInner() {
         setMaterials((data as StudyMaterial[]) ?? []);
         setLoaded(true);
       });
-  }, [supabase, courseId]);
+  }, [supabase, courseId, subjectSlug]);
 
   const visible = useMemo(() => {
     let list = materials;

@@ -39,7 +39,7 @@ export function MemoryManager({
 }: {
   initialMemories: MemoryWithCount[];
   /** When set (course workspace), the list narrows to this subject + global memories. */
-  subjectFilter?: string | null;
+  subjectFilter?: string | string[] | null;
 }) {
   const [memories, setMemories] = useState(initialMemories);
   const [q, setQ] = useState("");
@@ -141,11 +141,12 @@ export function MemoryManager({
 
   const filtered = useMemo(() => {
     if (!subjectFilter) return memories;
-    // Course workspace: keep this subject's memories plus explicitly global ones.
-    const want = subjectFilter.toLowerCase();
+    // Course/subject workspace: keep these subjects' memories plus
+    // explicitly global ones (subjectFilter may be one subject or a set).
+    const wants = (Array.isArray(subjectFilter) ? subjectFilter : [subjectFilter]).map((w) => w.toLowerCase());
     return memories.filter((m) => {
       const subj = (m.subject ?? "").toLowerCase();
-      return !subj || subj.includes(want) || want.includes(subj);
+      return !subj || wants.some((w) => subj.includes(w) || w.includes(subj));
     });
   }, [memories, subjectFilter]);
 
