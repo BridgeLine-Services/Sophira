@@ -215,3 +215,95 @@ gaps without touching any architecture:
 - Statuses unchanged: 0 PARTIALLY_IMPLEMENTED, 0 MISSING; the 5
   BLOCKED_BY_EXTERNAL_CONFIGURATION areas remain owner-side (live
   matrices, search provider, production config, legal facts, devices).
+
+## Addendum — dashboard/workspace separation + shared memory + document workflow (2026-10-11, commits e9091d7..6397938)
+
+Audit of the 2026-10-11 requirements round (owner dashboard separation,
+subject navigation, shared course-aware memory, document workflow,
+assignment continuity). All statuses below carry executed evidence.
+
+### 1. Owner Dashboard / workspace separation — VERIFIED_COMPLETE
+
+- AppShell has two navigation layouts (`variant: "workspace" | "owner"`).
+  For the owner, the Sophira logo opens `/owner`; workspace users keep
+  `/dashboard`. `OWNER_NAV` lists only owner views plus a single
+  intentional exit labeled "My Workspace" (`/dashboard?view=workspace`).
+- Home inside the workspace opens the WORKSPACE home even for the owner
+  (no silent reset); owner back-navigation from tool pages returns to the
+  workspace. Returning to the Owner Dashboard is an explicit action.
+- Auth, roles, and admin capabilities unchanged. Tested in
+  tests/course-engine.ts (owner section, assertions on OWNER_NAV,
+  variant layouts, logo routing, workspace-home routing).
+
+### 2. Subject expand/collapse — VERIFIED_COMPLETE
+
+- Courses group and nested Science / Biology / Chemistry / Physics use
+  independent toggle keys — expanding Science can never collapse
+  Biology (no shared state). Chevrons expose aria-expanded + accessible
+  labels and meet the 44px touch minimum. Toggle clicks do not trigger
+  route changes; expanded state is persisted (sophira:nav-expanded).
+  Tested in tests/course-engine.ts (STAGE 2 section).
+
+### 3. Shared course-aware memory — VERIFIED_COMPLETE
+
+- ONE memory system: `student_memories` (migrations 0001-0031),
+  including migration 0031's explicit `course_id`. Subject scoping via
+  `subject_tags`; dedupe via `findMatchingMemory`; status lifecycle
+  (monitoring -> active -> forgotten) with confidence recomputation.
+  No parallel memory stores were created.
+- Teachers, Essay, Short Writing, Grammar, Planning, Library, Memory,
+  Changes, and Typing Calibration all read/write the SAME store with
+  the active course passed into the shared memory context (asserted
+  across every engine route in tests/course-engine.ts STAGE 3).
+- Scoping is identifier-based (course_id/subject slug), never display
+  names. RLS + explicit user_id filters enforced twice (store layer and
+  database); no service-role path to student memory exists.
+- Changes record meaning-level state (suggested/accepted/rejected,
+  temporary vs persistent): an APPROVED preference enters shared memory
+  as persistent; temporary instructions do not. Calibration writes go to
+  the same store as single updated rows. (STAGE 5 assertions.)
+
+### 4. Course-aware engines — VERIFIED_COMPLETE
+
+- Engine tool links attach course_id so context travels with every tool;
+  essay plan persists course_id + teacher_id on the session; subject
+  context threads through /api/ai/solve with subject-hinted scientific
+  workflows for Chemistry/Physics (mathjs-verified, no duplicate
+  backend). Typing Calibration remains the intentional shared backend.
+  (STAGE 4 + prior science round assertions.)
+
+### 5-6. Local document workflow — VERIFIED_COMPLETE
+
+- Import -> edit -> export verified end to end: deterministic DOCX/PDF
+  builders (identical bytes -> identical SHA-256), provenance block
+  always embedded, export built FROM THE STORED artifact row (never
+  regenerated at export time), user-scoped, digest returned in
+  X-Sophira-Digest. Export buttons in Notebook Artifacts; unknown
+  formats refused. Tested in tests/document-export.ts (STAGE 6).
+
+### 7. Google Docs / Microsoft Word direct integrations — BLOCKED_BY_EXTERNAL_CONFIGURATION
+
+- Direct provider integrations require owner-provided OAuth
+  credentials (Google + Microsoft). No code path fakes their presence;
+  the local document workflow (area 5-6) is the working fallback and is
+  complete.
+
+### 8. Assignment continuity / resumable work — VERIFIED_COMPLETE
+
+- Deadline scheduler with server-side timestamp persistence (session
+  restoration after refresh), research runs resumable through the
+  shared execution core (stored sources never duplicated; live-run
+  409 guard; honest provider-missing failure). Tested in
+  tests/research-resume.ts + schedule tests. Honest scope: this is
+  server-persisted resumability, not background processing.
+
+### Validation battery (executed 2026-10-11, all green)
+
+`npm test` -> 3122/3122 assertions · `npx tsc --noEmit` clean ·
+`npm run build` clean · `npm run scan:secrets` clean · release gate
+21 PASS / 0 FAIL / 17 BLOCKED (all owner-side) / 1 NOT RUN (APK) ·
+CI green on pushed commit 6397938. Migration chain 0001-0031.
+
+**Counts:** VERIFIED_COMPLETE 8 areas · BLOCKED_BY_EXTERNAL_CONFIGURATION 1
+(external docs OAuth) · PARTIALLY_IMPLEMENTED 0 · MISSING 0. Live-device
+verification and live-credential matrices remain owner-side.
