@@ -479,9 +479,10 @@ production URL and no physical devices available to the agent
 **Steps:** run the Gradle release build; inspect the produced APK.
 **Expected result:** a valid, signed-or-honestly-unsigned APK is produced.
 **Evidence required:** build log, checksum (recorded in TEST_REPORT §20).
-**Status: PASSED (VERIFIED)** — the Android project genuinely builds and
-produces a valid APK in the sandbox (build verification; recorded in
-TEST_REPORT §20). Device installation remains device-blocked (A15.2).
+**Status: PASSED (VERIFIED offline)** — Android APK build executed 2026-10-05;
+the project genuinely builds and produces a valid APK in the sandbox (build
+verification; recorded in TEST_REPORT §20). Device installation remains
+device-blocked (A15.2).
 
 **A16.2 iOS build**
 **Prerequisites:** Mac with Xcode; Apple Developer certificate and
