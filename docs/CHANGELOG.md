@@ -8,6 +8,34 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: verified document export + resumable research (2026-10-11, commits a03edf7 + 1773e7c)
+
+- Verified DOCX/PDF export of stored notebook artifacts (stage 6 of the
+  document workflow): deterministic builders (valid minimal OOXML DOCX,
+  PDF 1.4) so the same stored artifact always yields identical bytes and
+  an identical SHA-256 digest; the provenance block is ALWAYS embedded —
+  an export can never silently drop its sources. New
+  POST /api/notebooks/:id/export builds the file FROM THE STORED
+  ARTIFACT ROW (never regenerated at export time), scoped to the user's
+  own notebook, and returns the exact-bytes digest in X-Sophira-Digest.
+  Notebook Artifacts gained Export DOCX / Export PDF buttons; unknown
+  formats are refused, never silently faked. Import -> edit -> export is
+  now verified end to end.
+- Resumable research runs (stage 8): the search+verify pass extracted
+  into lib/research/run.ts as the ONE shared execution core; new
+  POST /api/research/resume completes a run that died mid-request
+  (stale 'searching' >= 5 min) or retries a 'failed' project once a
+  provider is configured. Queries are re-searched for real; sources
+  already stored are never duplicated or re-verified (progress = stored
+  sources); sufficiency counts prior VERIFIED + newly verified only.
+  Guard rails tested: live runs refused (409), unknown statuses refused,
+  no provider fails honestly. ResearchPanel gained 'Resume interrupted
+  run' / 'Retry research' (only in those states). Honest scope: this is
+  server-persisted resumability, not background processing.
+- RELEASE_GATE_REPORT.txt regenerated against current master
+  (21 PASS / 0 FAIL / 17 BLOCKED / 1 NOT RUN, all blockers owner-side;
+  migration text now reads 0001-0031). Suite: 3122.
+
 ### Upgrade round: science gap-closure + final navigation audit (2026-10-10, commit bdfa339)
 
 - Science audit vs the master nav spec: Chemistry and Physics now expose
