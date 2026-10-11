@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { buildDocx, buildPdf, digestOf, exportFilename, type ExportArtifact } from "@/lib/documents/export";
+import { buildPptx } from "@/lib/documents/pptx";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,8 +34,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const artifactId = (body.artifact_id || "").trim();
   const format = (body.format || "").trim().toLowerCase();
   if (!artifactId) return NextResponse.json({ error: "Missing artifact id." }, { status: 400 });
-  if (format !== "docx" && format !== "pdf") {
-    return NextResponse.json({ error: "format must be 'docx' or 'pdf'." }, { status: 400 });
+  if (format !== "docx" && format !== "pdf" && format !== "pptx") {
+    return NextResponse.json({ error: "format must be 'docx', 'pdf', or 'pptx'." }, { status: 400 });
   }
 
   // The STORED artifact row — the notebook and artifact both belong to this
@@ -62,7 +63,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     createdAt: row.created_at,
   };
 
-  const bytes = format === "docx" ? await buildDocx(artifact) : buildPdf(artifact);
+  let bytes: Buffer;
+  try {
+    bytes = format === "docx" ? await buildDocx(artifact) : format === "pptx" ? await buildPptx(artifact) : buildPdf(artifact);
+  } catch (e) {
+    // e.g. an artifact with no title or sections cannot become a presentation.
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Export failed." }, { status: 400 });
+  }
   const digest = digestOf(bytes);
   const filename = exportFilename(artifact, format);
 
@@ -72,7 +79,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       "Content-Type":
         format === "docx"
           ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          : "application/pdf",
+          : format === "pptx"
+            ? "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            : "application/pdf",
       "Content-Disposition": `attachment; filename="${filename}"`,
       // Verification: digest of the EXACT bytes + the stored artifact identity.
       "X-Sophira-Digest": digest,

@@ -606,7 +606,7 @@ function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
-  const doExport = async (format: "docx" | "pdf") => {
+  const doExport = async (format: "docx" | "pdf" | "pptx") => {
     setBusy(format);
     setNote(null);
     try {
@@ -652,6 +652,14 @@ function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
         className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
       >
         {busy === "pdf" ? "Exporting…" : "Export PDF"}
+      </button>
+      <button
+        type="button"
+        onClick={() => doExport("pptx")}
+        disabled={busy !== null}
+        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+      >
+        {busy === "pptx" ? "Exporting…" : "Export PPTX"}
       </button>
       {note && <span className="text-[11px] text-ink/50">{note}</span>}
     </div>

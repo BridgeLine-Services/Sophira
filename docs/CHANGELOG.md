@@ -8,6 +8,28 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: REAL PowerPoint (.pptx) generation (2026-10-11)
+
+- Sophira can now generate genuine .pptx presentation files from stored
+  notebook artifacts, mirroring the deterministic DOCX/PDF export stage.
+  pptxgenjs 4.0.1 (MIT, maintained, pure TypeScript-compatible JS) was
+  chosen after inspecting the existing architecture: JSZip is already a
+  dependency, the export pipeline already builds from stored artifact
+  rows under RLS, and the repository already ships an INDEPENDENT PPTX
+  reader (lib/extract/documents.ts) used here to validate round-trips.
+- Pipeline: title slide -> agenda -> one slide per section (stored
+  bullets, per-slide source labels, shrink-to-fit readability) ->
+  References & provenance slide (always; an export can never silently
+  drop its sources). Oversized artifacts cap at 40 content slides with
+  the cap disclosed on the References slide. Unicode is preserved.
+- POST /api/notebooks/:id/export now accepts format "pptx" through the
+  SAME authenticated, RLS-guarded, SHA-256-digest-verified pipeline;
+  invalid artifacts return an honest 400, never a false success.
+- Honest limitation: byte-level determinism is NOT claimed (pptxgenjs
+  stamps file metadata); STRUCTURAL determinism is asserted instead
+  (same artifact -> identical slides, text, order).
+- 14 new real-file assertions (tests/pptx-export.ts).
+
 ### Upgrade round: System Health shows the REAL Actions result + owner-authorized dispatch (priority 3) (2026-10-11)
 
 - The deployed System Health page no longer dead-ends at the local-gate

@@ -495,7 +495,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "export: the file is built from the STORED row — never regenerated or re-AI-composed at export time");
   assert(exportRoute.includes("X-Sophira-Digest"),
     "export: the response carries the digest so the downloaded file can be verified against the stored artifact");
-  assert(exportRoute.includes("format must be 'docx' or 'pdf'"),
+  assert(exportRoute.includes("format must be 'docx', 'pdf', or 'pptx'"),
     "export: unknown formats are refused — never a silent fallback");
 
   const typingRoute = readFileSync("src/app/api/typing/profile/route.ts", "utf8");
