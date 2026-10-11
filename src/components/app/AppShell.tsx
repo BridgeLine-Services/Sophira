@@ -38,7 +38,6 @@ const OWNER_NAV = [
   { href: "/owner#requests", label: "Invitation requests", icon: MailQuestion },
   { href: "/owner#invite", label: "Invite someone", icon: UserPlus },
   { href: "/owner#members", label: "Members", icon: Users },
-  { href: "/online", label: "Online status", icon: Wifi },
 ];
 
 /**

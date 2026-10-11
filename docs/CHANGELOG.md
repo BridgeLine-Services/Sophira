@@ -8,6 +8,18 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: dedupe the owner Online entries (2026-10-11)
+
+- Reported: the owner section showed two entries, "Online status" and
+  "Online", both opening /online. Root cause: the previous production-fix
+  round added an /online entry to OWNER_NAV while the sidebar's real-time
+  connectivity indicator (rendered in every layout, sidebar and drawer)
+  already links to /online. The redundant OWNER_NAV entry was removed;
+  exactly one entry remains (the connectivity indicator, which also shows
+  live Online/Offline state and highlights only on /online).
+- Regression pinned in tests/prod-fixes.ts: exactly ONE href="/online" in
+  the shell, and no "Online status" owner-nav label. Suite: 3187.
+
 ### Upgrade round: production fixes - owner nav, IndexedDB keys, System Health honesty (2026-10-11)
 
 - Owner navigation (reported: Invitation requests / Invite someone /

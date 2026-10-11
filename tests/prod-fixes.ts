@@ -15,8 +15,10 @@ export function runProdFixTests(assert: (c: boolean, n: string) => void, section
     assert(shell.includes(`{ href: "${href}",`),
       `nav: ${href} navigates to the Owner Dashboard route FIRST, then applies the hash`);
   }
-  assert(shell.includes('{ href: "/online", label: "Online status", icon: Wifi }'),
-    "nav: the Online link opens the real /online page from the owner navigation");
+  assert(!shell.includes('label: "Online status"'),
+    "nav: no redundant owner-nav Online entry remains (the sidebar connectivity indicator already links to /online; two entries to the same page was the reported defect)");
+  assert((shell.match(/href="\/online"/g) ?? []).length === 1,
+    "nav: exactly ONE /online entry exists in the shell (the real-time connectivity indicator), opening the real Online page");
   assert(shell.includes('href.includes("#")'),
     "nav: active styling is route-aware; a section link is never marked active from another page");
 
