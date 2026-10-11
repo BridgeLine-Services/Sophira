@@ -8,6 +8,20 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: What I Need to Do Next (phase 15 deliverable) (2026-10-11)
+
+- docs/WHAT_I_NEED_TO_DO_NEXT.md: the beginner guide the owner asked for,
+  listing ONLY the actions that truly need the owner (database connection,
+  app web address, AI key, search key, one-time test environment, phone
+  testing, legal facts + attorney review). Real variable names and real
+  document paths only; no invented facts; teaches the secret-handling
+  golden rule (keys only ever go into the hosting provider's secure
+  settings, never into chat or files).
+- System Health now opens with "What you can do next": the unresolved
+  prerequisite groups with their exact owner actions, derived from the
+  REAL gate data (completed work is never re-asked).
+- 11 new assertions (tests/owner-next-step.ts). Suite: 3170.
+
 ### Upgrade round: ongoing scheduled health (phase 7) (2026-10-11)
 
 - .github/workflows/health.yml: a hands-off weekly verification that reuses

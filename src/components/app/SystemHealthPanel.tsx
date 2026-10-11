@@ -143,6 +143,32 @@ export function SystemHealthPanel() {
             )}
           </div>
 
+          {(() => {
+            const open = Array.from(groups.entries()).filter(
+              ([g, list]) => g !== "Completed checks" && list.some((c) => c.displayState !== "Ready"),
+            );
+            if (open.length === 0) return null;
+            return (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-6">
+                <h2 className="text-base font-semibold text-ink">What you can do next</h2>
+                <ol className="mt-2 space-y-2">
+                  {open.map(([g, list]) => {
+                    const action = list.find((c) => c.ownerAction)?.ownerAction ?? "";
+                    return (
+                      <li key={g} className="text-sm text-ink">
+                        <span className="font-medium">{g}:</span>{" "}
+                        {action || "See the checks below for the technical detail."}
+                      </li>
+                    );
+                  })}
+                </ol>
+                <p className="mt-2 text-xs text-ink-soft">
+                  A plain-English version of this list also lives in docs/WHAT_I_NEED_TO_DO_NEXT.md.
+                </p>
+              </div>
+            );
+          })()}
+
           {Array.from(groups.entries()).map(([group, list]) => (
             <div key={group} className="rounded-lg border p-6">
               <h2 className="text-base font-semibold text-ink">{group}</h2>
