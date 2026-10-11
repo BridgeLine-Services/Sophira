@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recordApprovedPreference } from "@/lib/memory/store";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { effectiveTypingPace, PLAUSIBLE_MAX_WPM } from "@/lib/typing-profile";
@@ -123,5 +124,23 @@ export async function PATCH(request: NextRequest) {
     auto_adjust_enabled: updated.auto_adjust_enabled,
     manual_wpm: updated.manual_wpm === null ? null : Number(updated.manual_wpm),
   });
-  return NextResponse.json({ data: { profile: updated, effective_pace: pace } });
+  // STUDENT-SET CALIBRATION → SHARED MEMORY (2026-10-11): an explicitly set
+    // typing preference is a student-approved fact — persistent ('active',
+    // origin 'student_supplied'). Repeated approvals update the SAME memory
+    // instead of duplicating rows.
+    if (body.auto_adjust_enabled !== undefined || body.manual_wpm !== undefined) {
+      const paceDetail = body.manual_wpm != null
+        ? `The student sets their own pace: ${Number(body.manual_wpm)} WPM.`
+        : "The student uses the adaptive pace from the 5 most recent valid attempts.";
+      const adaptive = body.auto_adjust_enabled === undefined
+        ? ""
+        : ` Adaptive adjustment is ${body.auto_adjust_enabled ? "enabled" : "disabled"}.`;
+      await recordApprovedPreference(supabase, guard.data.user.id, {
+        category: "learning_preference",
+        statement: "Typing pace preference (student-approved)",
+        details: `${paceDetail}${adaptive}`,
+        source: "typing_calibration",
+      });
+    }
+    return NextResponse.json({ data: { profile: updated, effective_pace: pace } });
 }

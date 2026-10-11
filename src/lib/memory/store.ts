@@ -242,3 +242,71 @@ export async function listMemories(
   const { data } = await query.order("last_observed", { ascending: false });
   return (data ?? []) as StudentMemory[];
 }
+
+/**
+ * APPROVED-PREFERENCE MEMORY (changes + calibration round 2026-10-11):
+ * when the student ACCEPTS a change proposal or explicitly sets a typing
+ * calibration preference, the approved preference enters the SHARED memory
+ * system so every engine (Essay, Writing, Grammar, Planning, Math) sees it.
+ *
+ * State mapping (accept/reject/temporary/persistent):
+ *   pending proposal  → nothing recorded (the student has not decided)
+ *   APPROVED          → persistent: status 'active', origin
+ *                       'student_supplied' (a student-approved fact),
+ *                       confidence 1.0
+ *   rejected          → NEVER recorded (the existing honest toast stands)
+ *   AI-observed       → stays 'monitoring' (temporary, never asserted) via
+ *                       the existing recordMemoryEvidence path
+ * A repeated approval UPDATES the existing memory instead of duplicating it.
+ */
+export async function recordApprovedPreference(
+  supabase: SupabaseClient,
+  userId: string,
+  args: {
+    category: StudentMemory["category"];
+    statement: string;
+    details?: string;
+    subject?: string | null;
+    course_id?: string | null;
+    source?: string;
+  },
+): Promise<{ memory: StudentMemory; created: boolean } | { error: string }> {
+  const existing = await findMatchingMemory(supabase, userId, args.statement);
+  const nowISO = new Date().toISOString();
+  if (existing) {
+    const { data: updated, error } = await supabase
+      .from("student_memories")
+      .update({
+        details: args.details ?? existing.details,
+        status: "active", // student-approved → persistent
+        origin: "student_supplied", // approval makes it a stated fact
+        last_observed: nowISO,
+      })
+      .eq("id", existing.id)
+      .select(RETRIEVAL_COLUMNS)
+      .single();
+    if (error) return { error: error.message };
+    return { memory: updated as StudentMemory, created: false };
+  }
+  const { data: inserted, error } = await supabase
+    .from("student_memories")
+    .insert({
+      user_id: userId,
+      category: args.category,
+      statement: args.statement,
+      details: args.details ?? "",
+      subject: args.subject ?? null,
+      course_id: args.course_id ?? null,
+      subject_tags: tagsFor(args.subject),
+      confidence: 1.0, // student-approved fact
+      status: "active",
+      origin: "student_supplied",
+      source: args.source ?? "",
+      first_observed: nowISO,
+      last_observed: nowISO,
+    })
+    .select(RETRIEVAL_COLUMNS)
+    .single();
+  if (error) return { error: error.message };
+  return { memory: inserted as StudentMemory, created: true };
+}

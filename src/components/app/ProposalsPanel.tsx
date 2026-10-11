@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { recordApprovedPreference } from "@/lib/memory/store";
 import { createClient } from "@/lib/supabase/client";
 import type { ProfileUpdateProposal } from "@/lib/types";
 import Link from "next/link";
@@ -167,6 +168,26 @@ export function ProposalsPanel({ targetType, targetId }: { targetType?: "teacher
         .update({ status: approve ? "approved" : "rejected", decided_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw new Error(error.message);
+
+      // APPROVED → persistent shared memory (rejections record NOTHING —
+      // the existing honest toast "nothing was changed" stays true).
+      if (approve) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const changes = proposal.proposed_changes as Record<string, unknown>;
+          const guidance = typeof changes.guidance === "string"
+            ? changes.guidance
+            : typeof changes.notes === "string"
+              ? changes.notes
+              : "";
+          await recordApprovedPreference(supabase, user.id, {
+            category: "learning_preference",
+            statement: `${proposal.target_type === "writing" ? "Writing guidance approved" : "Teacher guidance approved"}: ${proposal.change_summary}`,
+            details: guidance,
+            source: "changes_approval",
+          });
+        }
+      }
 
       toast(approve ? "success" : "info", approve ? "Profile updated." : "Proposal dismissed — nothing was changed.");
       setProposals((ps) => ps.filter((p) => p.id !== id));

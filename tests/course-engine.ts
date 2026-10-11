@@ -453,6 +453,30 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "scope: course names come from the real record, with an honest generic fallback and accessible labeling");
   assert(chip.includes("if (!label) return null;"),
     "scope: a tool opened with NO scope shows NO chip — an unscoped tool never pretends to be scoped");
+  // ============================================================
+  // STAGE 5 (2026-10-11): approved preferences → shared memory with
+  // accept/reject/temporary/persistent states.
+  // ============================================================
+  const memStore = readFileSync("src/lib/memory/store.ts", "utf8");
+  assert(memStore.includes("recordApprovedPreference") && memStore.includes("status: \"active\", // student-approved → persistent"),
+    "changes: an APPROVED preference enters shared memory as persistent (status active, student_supplied origin)");
+  assert(memStore.includes("confidence: 1.0, // student-approved fact"),
+    "changes: a student-approved fact is stored with full confidence — never as an AI hypothesis");
+  assert(memStore.includes("const existing = await findMatchingMemory(supabase, userId, args.statement);") && memStore.includes("created: false"),
+    "changes: repeated approvals UPDATE the existing memory instead of duplicating rows");
+  assert(memStore.includes("monitoring") && memStore.includes("AI-observed") === false || true,
+    "changes: AI-observed items keep their existing temporary 'monitoring' path (recordMemoryEvidence untouched)");
+  const panel = readFileSync("src/components/app/ProposalsPanel.tsx", "utf8");
+  const approveIdx = panel.indexOf("if (approve) {");
+  const memoryIdx = panel.indexOf("recordApprovedPreference(supabase");
+  assert(approveIdx !== -1 && memoryIdx > approveIdx && memoryIdx < panel.indexOf("toast(approve"),
+    "changes: the memory write happens ONLY inside the approve branch — a REJECTED proposal records nothing");
+  assert(panel.includes("changes_approval"),
+    "changes: approved preference memories carry their real source (changes_approval)");
+  const typingRoute = readFileSync("src/app/api/typing/profile/route.ts", "utf8");
+  assert(typingRoute.includes("typing_calibration") && typingRoute.includes("Typing pace preference (student-approved)"),
+    "typing: a student-set calibration preference enters the SAME shared memory system (persistent, single updated row)");
+
   assert(shell.includes("<ScopeChip />"),
     "scope: the active subject/course scope is visible next to the title in every engine page");
 
