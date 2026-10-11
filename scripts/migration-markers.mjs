@@ -24,4 +24,5 @@ export const MARKERS = {
     "exists (select 1 from information_schema.role_table_grants where table_schema = 'public' and table_name = 'profiles' and grantee = 'authenticated' and privilege_type = 'SELECT')",
   "0028_network_stats_repair.sql":
     "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'network_stats' and n.nspname = 'public' and p.proargnames is not null and p.proargnames[1] = 'o_user_id')",
+  "0032_provider_connections.sql": "to_regclass('public.provider_connections') is not null",
 };

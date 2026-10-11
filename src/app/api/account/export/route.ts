@@ -39,6 +39,7 @@ const USER_TABLES = [
   "typing_attempts",
   "typing_profiles",
   "work_schedules",
+  "provider_connections",
   "schedule_executions",
   "work_sessions",
   "rubric_audits",
@@ -81,7 +82,11 @@ export async function GET() {
   let truncated_any = false;
 
   for (const table of USER_TABLES) {
-    const { data, error } = await supabase.from(table).select("*").limit(ROW_CAP);
+    // provider_connections is exported as METADATA ONLY (provider, label,
+    // timestamps) — OAuth access/refresh tokens are credentials and are
+    // NEVER included in a data export.
+    const select = table === "provider_connections" ? "provider, account_label, created_at, updated_at" : "*";
+    const { data, error } = await supabase.from(table).select(select).limit(ROW_CAP);
     if (error) {
       // A read failure must be reported honestly, never silently omitted.
       tables[table] = { error: `Could not read this table: ${error.message}` };

@@ -1,14 +1,17 @@
 # Microsoft Word and Google Docs Setup (Owner Guide)
 
-Status: **NOT YET IMPLEMENTED IN CODE — this guide prepares the exact steps
-you will take when the integration ships (next stage).** No OAuth apps exist
-yet, and no credentials are configured. This document is written now so you
-can see exactly what will be required; do not complete these steps until the
-integration code is merged and the callback URLs are live.
+Status: **CODE IMPLEMENTED AND TESTED OFFLINE (2026-10-11) — live connections
+are BLOCKED until you complete this guide.** The OAuth flows, secure token
+storage, real document saves, and the Settings → Integrations page are
+merged; the moment these credentials exist in your deployment, the
+Connect buttons go live. The exact redirect URIs required are:
+
+- Microsoft: https://sophira.vercel.app/api/integrations/microsoft/callback
+- Google: https://sophira.vercel.app/api/integrations/google/callback
 
 ## Why this is blocked
 
-Direct Word and Google Docs editing means Sophira writes to documents in
+Direct Word and Google Docs saving means Sophira writes to documents in
 YOUR Microsoft 365 and Google accounts, using YOUR authorization. That
 requires app registrations owned by you and consent granted by you. No one
 can (or should) create these for you, and credentials must never be pasted

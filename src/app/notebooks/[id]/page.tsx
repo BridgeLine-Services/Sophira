@@ -635,6 +635,33 @@ function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
     }
   };
 
+  const saveToProvider = async (provider: "microsoft" | "google") => {
+    setBusy(provider);
+    setNote(null);
+    try {
+      const notebookId = artifact.notebook_id || window.location.pathname.split("/").pop() || "";
+      const res = await fetch(`/api/integrations/${provider}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artifact_id: artifact.id, notebook_id: notebookId }),
+      });
+      const json = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+      if (json.ok && json.url) {
+        setNote(`Saved to ${provider === "microsoft" ? "OneDrive" : "Google Docs"}: ${json.url}`);
+      } else if (res.status === 401) {
+        setNote(`Connect your ${provider === "microsoft" ? "Microsoft" : "Google"} account first (Settings → Integrations).`);
+      } else if (res.status === 503) {
+        setNote(`${provider === "microsoft" ? "Microsoft" : "Google"} is not configured on this deployment yet — see docs/WORD_GOOGLE_DOCS_SETUP.md.`);
+      } else {
+        setNote(json.error ?? "The save failed — try again.");
+      }
+    } catch {
+      setNote("The save failed — try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div className="flex flex-wrap items-center gap-2 pt-1">
       <button
@@ -660,6 +687,22 @@ function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
         className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
       >
         {busy === "pptx" ? "Exporting…" : "Export PPTX"}
+      </button>
+      <button
+        type="button"
+        onClick={() => void saveToProvider("microsoft")}
+        disabled={busy !== null}
+        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+      >
+        {busy === "microsoft" ? "Saving…" : "Save to Word"}
+      </button>
+      <button
+        type="button"
+        onClick={() => void saveToProvider("google")}
+        disabled={busy !== null}
+        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+      >
+        {busy === "google" ? "Saving…" : "Save to Google Docs"}
       </button>
       {note && <span className="text-[11px] text-ink/50">{note}</span>}
     </div>

@@ -8,6 +8,35 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: Microsoft Word + Google Docs integrations (code complete; live consent pending) (2026-10-11)
+
+- Direct document-provider integration, implemented end to end and tested
+  offline; live consent flows remain honestly BLOCKED until the owner
+  registers the OAuth apps (docs/WORD_GOOGLE_DOCS_SETUP.md, updated with
+  the EXACT redirect URIs).
+- Migration 0032 provider_connections: OAuth tokens stored per user with
+  RLS enabled and NO client policies — tokens are service-role-only and
+  can never be read from the browser. The account export includes
+  connection METADATA only; tokens are never exported. The release gate
+  now probes 0032 as the newest migration.
+- OAuth: authorization-code flow with an httpOnly state cookie (CSRF),
+  constant-time state verification, minimal scopes only (Microsoft
+  Files.ReadWrite + offline_access; Google drive.file — never the whole
+  Drive), server-side token exchange/refresh, honest error states, and
+  per-user storage scoped on every query.
+- Real operations: status is verified by a LIVE provider call (never by a
+  configured variable); Microsoft saves a real DOCX to OneDrive with
+  conflict=fail (no silent overwrite; explicit overwrite needs the flag
+  AND the item id); Google creates a real Doc via the Docs API with the
+  artifact's full content and provenance and returns the real URL.
+- New pages: Settings → Integrations (honest per-provider states,
+  connect/disconnect); the notebook export row gains "Save to Word" and
+  "Save to Google Docs" next to the always-working local DOCX/PDF/PPTX
+  downloads.
+- ~30 new assertions (tests/provider-integrations.ts), behavioral where
+  possible; live provider tests remain BLOCKED by design until
+  credentials exist.
+
 ### Upgrade round: REAL PowerPoint (.pptx) generation (2026-10-11)
 
 - Sophira can now generate genuine .pptx presentation files from stored
