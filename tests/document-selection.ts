@@ -123,4 +123,32 @@ export async function runDocumentSelectionTests(assert: (cond: boolean, label: s
   const browser = readFileSync("src/components/app/DocumentBrowser.tsx", "utf8");
   assert(browser.includes("scope_description") && browser.includes("only ever works for you"),
     "ui: the user confirms the workload scope before a selection is saved, with the boundary stated in plain language");
+
+  // ---- Objective 5 round 1: revision-guarded, section-scoped write-back ----
+  const { buildGuardedInsertRequest, locateSectionInsertion } = await import("../src/lib/integrations/google");
+  const guarded = buildGuardedInsertRequest("Draft line.\r\nSecond line.", 5, "rev-42");
+  assert(guarded.writeControl.requiredRevisionId === "rev-42" && guarded.requests[0].insertText.location.index === 5,
+    "write-back: every Docs write carries writeControl.requiredRevisionId — there is no blind overwrite path");
+  assert(guarded.requests[0].insertText.text.includes("Draft line.\nSecond line."),
+    "write-back: draft text is newline-normalized before insertion");
+  const blocks = [{ text: "Introduction", endIndex: 14 }, { text: "Section A", endIndex: 24 }, { text: "old content", endIndex: 38 }];
+  assert(locateSectionInsertion(blocks, " section a ") === 24,
+    "write-back: the user's heading is located verbatim (case/whitespace-insensitive) and the write lands directly under it");
+  assert(locateSectionInsertion(blocks, "Section Z") === null && locateSectionInsertion(blocks, "  ") === null,
+    "write-back: an ABSENT heading yields null — never a write at a guessed location");
+  const gLib = readFileSync("src/lib/integrations/google.ts", "utf8");
+  assert(gLib.includes("res.status === 409") && gLib.includes("conflict: true") && gLib.includes("Your draft is preserved"),
+    "write-back: a collaborator edit mid-flight (409) is an honest conflict — nothing written, draft preserved");
+  const updRoute = readFileSync("src/app/api/integrations/google/doc-update/route.ts", "utf8");
+  assert(updRoute.includes("locateSectionInsertion") && updRoute.includes("was not found in that document, so nothing was written"),
+    "write-back: an unfound section heading produces NO write and preserves the draft");
+  assert(updRoute.includes("preserved_draft: text"),
+    "write-back: failures and conflicts return the draft — unsaved work is never discarded");
+  assert(updRoute.includes("access_state: \"write\""),
+    "write-back: access_state is set to write ONLY after Google confirms the write — never assumed from a read");
+  assert(!gLib.match(/auth\/drive($| |")/) && gLib.includes("drive.file"),
+    "write-back: the Docs write uses the existing least-privilege scope — no full-Drive access was added");
+  const msRoutes = readFileSync("src/lib/integrations/microsoft.ts", "utf8");
+  assert(!msRoutes.includes("doc-update"),
+    "honesty: Word write-back-to-existing is NOT implemented — Word stays draft-download-only until a bounded, eTag-guarded path exists");
 }

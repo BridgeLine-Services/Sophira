@@ -8,6 +8,21 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: revision-guarded, section-scoped Google Docs write-back (2026-10-12)
+
+- Objective 5 round 1: a member can write their draft into their
+  SELECTED Google Doc, bounded to their stated section heading or
+  appended at the end — never a whole-document replacement.
+- Every write carries writeControl.requiredRevisionId: if a
+  collaborator changed the document since Sophira read it, Google
+  refuses the write (409). The conflict is reported honestly, nothing
+  is written, and the draft is returned so no work is lost.
+- An unfound section heading produces NO write at a guessed location.
+- access_state becomes "write" only after Google confirms the write.
+- Word remains draft-download-only (documented, never hidden) until a
+  bounded, eTag-guarded Word path exists.
+- 11 new assertions. Battery: 3343/3343 green; tsc clean.
+
 ### Upgrade round: document access, workload selections, honest shared-file states (2026-10-12)
 
 - Migration 0034: workload_selections — the personal-AI-workload

@@ -249,3 +249,96 @@ export async function readGoogleFileText(accessToken: string, fileId: string, mi
   }
   return { ok: false, text: null, error: "this file type cannot be read as text yet — a downloadable draft is offered instead" };
 }
+
+// ---------------------------------------------------------------------------
+// REVISION-GUARDED, SECTION-SCOPED WRITE-BACK (2026-10-12, Objective 5).
+// Google's Docs API batchUpdate supports writeControl.requiredRevisionId:
+// if ANYONE changed the document since the revision Sophira read, Google
+// refuses the write (409) instead of silently overwriting a collaborator's
+// edit. Sophira ALWAYS sends the requiredRevisionId — there is no blind
+// write path — and a conflict preserves the draft so no work is lost.
+// Microsoft Word remains draft-download-only until a bounded, eTag-guarded
+// Word write-back exists; that limit is documented, never hidden.
+// ---------------------------------------------------------------------------
+
+export interface DocBlock { text: string; endIndex: number }
+export interface DocSnapshot { ok: boolean; revisionId: string | null; blocks: DocBlock[]; endIndex: number | null; error: string | null; }
+export interface DocWriteResult { ok: boolean; conflict: boolean; revisionId: string | null; error: string | null; }
+
+/** Fetch the CURRENT revision + paragraph texts of an existing Google Doc. */
+export async function getGoogleDocSnapshot(accessToken: string, docId: string): Promise<DocSnapshot> {
+  const res = await fetch(`${GOOGLE_DOCS_API}/documents/${encodeURIComponent(docId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) {
+    return { ok: false, revisionId: null, blocks: [], endIndex: null,
+      error: res.status === 403 ? "Google says this account is not permitted to read that document"
+        : res.status === 404 ? "that document no longer exists or the id is wrong" : `Google returned HTTP ${res.status}` };
+  }
+  const doc = (await res.json()) as {
+    revisionId?: string;
+    body?: { content?: Array<{ paragraph?: { elements?: Array<{ textRun?: { content?: string } }> }; endIndex?: number }> };
+  };
+  const blocks: DocBlock[] = [];
+  for (const el of doc.body?.content ?? []) {
+    const text = (el.paragraph?.elements ?? []).map((e) => e.textRun?.content ?? "").join("");
+    if (text.trim() !== "" && typeof el.endIndex === "number") blocks.push({ text, endIndex: el.endIndex as number });
+  }
+  const last = doc.body?.content ?? [];
+  let endIndex: number | null = null;
+  for (let i = last.length - 1; i >= 0; i--) { if (typeof last[i]?.endIndex === "number") { endIndex = last[i].endIndex as number; break; } }
+  return { ok: true, revisionId: doc.revisionId ?? null, blocks, endIndex, error: null };
+}
+
+/**
+ * PURE: locate the insertion point for a user's assigned section. The
+ * heading must be found VERBATIM in a paragraph — the write stays inside
+ * the user's stated section, never the whole document. Returns null when
+ * the heading is absent so NO write happens at a guessed location.
+ */
+export function locateSectionInsertion(blocks: DocBlock[], heading: string): number | null {
+  const target = heading.trim().toLowerCase();
+  if (target === "") return null;
+  const hit = blocks.find((b) => b.text.trim().toLowerCase() === target);
+  // Insert directly under the heading block (existing content is shifted,
+  // never deleted) — the write stays inside the user's stated section.
+  return hit ? hit.endIndex : null;
+}
+
+/**
+ * PURE: build the revision-guarded insert request. requiredRevisionId is
+ * ALWAYS present — Google then refuses the write (409) if the document
+ * changed since the snapshot, instead of overwriting a collaborator.
+ */
+export function buildGuardedInsertRequest(text: string, insertIndex: number, requiredRevisionId: string): {
+  requests: { insertText: { location: { index: number }; text: string } }[];
+  writeControl: { requiredRevisionId: string };
+} {
+  return {
+    requests: [{ insertText: { location: { index: Math.max(1, Math.floor(insertIndex)) }, text: `${text.replace(/\r\n/g, "\n")}\n` } }],
+    writeControl: { requiredRevisionId },
+  };
+}
+
+/** Apply the guarded write; map 409 to an honest conflict result. */
+export async function applyGoogleDocUpdate(accessToken: string, docId: string, payload: { requests: { insertText: { location: { index: number }; text: string } }[]; writeControl: { requiredRevisionId: string } }): Promise<DocWriteResult> {
+  const res = await fetch(`${GOOGLE_DOCS_API}/documents/${encodeURIComponent(docId)}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+    signal: AbortSignal.timeout(30000),
+  });
+  if (res.status === 409) {
+    return { ok: false, conflict: true, revisionId: null,
+      error: "The document changed while Sophira was preparing the update. Nothing was written. Your draft is preserved below — review the newer version and try again." };
+  }
+  if (!res.ok) {
+    return { ok: false, conflict: false, revisionId: null,
+      error: res.status === 403 ? "Google says this account is not permitted to write that document. A downloadable draft is available instead."
+        : res.status === 400 ? "Google rejected the update (the document may have been restructured). Nothing was written."
+        : `Google returned HTTP ${res.status}. Nothing was written.` };
+  }
+  const json = (await res.json()) as { document?: { revisionId?: string } };
+  return { ok: true, conflict: false, revisionId: json.document?.revisionId ?? null, error: null };
+}
