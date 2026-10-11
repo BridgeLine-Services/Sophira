@@ -438,6 +438,24 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const memApi = readFileSync("src/app/api/memory/route.ts", "utf8");
   assert(memApi.includes("course_id") && memApi.includes("course_id,"),
     "memory: the memory API records course-scoped memories with explicit course identifiers");
+  // ============================================================
+  // STAGE 4 (2026-10-11): course-aware engines — visible scope.
+  // ============================================================
+  const coursesApi = readFileSync("src/app/api/courses/route.ts", "utf8");
+  assert(coursesApi.includes(".eq(\"user_id\", guard.data.user.id)") && coursesApi.includes("maybeSingle"),
+    "scope: the course lookup API returns only the signed-in user's OWN course (user_id scope + RLS, never another user's)");
+  assert(coursesApi.includes("id, name, subject, academic_level") && !coursesApi.includes("service"),
+    "scope: the course API returns the real record fields — no service-role bypass, no invented names");
+  const chip = readFileSync("src/components/app/ScopeChip.tsx", "utf8");
+  assert(chip.includes("course_id") && chip.includes("subject") && chip.includes("subjectBySlug"),
+    "scope: the chip resolves identity from the course_id / subject slug, never from display names");
+  assert(chip.includes("/api/courses?id=") && chip.includes("Course work") && chip.includes("aria-label"),
+    "scope: course names come from the real record, with an honest generic fallback and accessible labeling");
+  assert(chip.includes("if (!label) return null;"),
+    "scope: a tool opened with NO scope shows NO chip — an unscoped tool never pretends to be scoped");
+  assert(shell.includes("<ScopeChip />"),
+    "scope: the active subject/course scope is visible next to the title in every engine page");
+
   const gateScript = readFileSync("scripts/release-gate.mjs", "utf8");
   assert(gateScript.includes("0001-0031"),
     "gate: migration range reflects 0031");

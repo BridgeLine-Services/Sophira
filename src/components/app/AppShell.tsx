@@ -9,7 +9,10 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { BookOpen, Brain, Briefcase, ChevronDown, Gauge, GraduationCap, Home, Library, LogOut, MailQuestion, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, UserPlus, Users, Wifi, X } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
+import { ScopeChip } from "@/components/app/ScopeChip";
 
+// Active subject/course scope indicator (course-aware engines round):
+// shows the real subject or course this engine is working within.
 const NAV = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/courses", label: "Courses", icon: BookOpen },
@@ -465,6 +468,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             </Link>
           )}
           <h1 className="flex-1 truncate text-[17px] font-semibold text-ink">{title}</h1>
+          <ScopeChip />
           <span className="mr-1 hidden sm:inline-flex"><SyncStatus /></span>
           {actions}
           <button
