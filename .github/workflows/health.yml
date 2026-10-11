@@ -1,0 +1,87 @@
+name: Scheduled health check
+
+# Ongoing health (phase 7, 2026-10-11): a hands-off weekly verification that
+# reuses the SINGLE authoritative release gate. Results come only from the
+# gate's own report; nothing is marked PASS without a real run. Owner
+# notification is ONE pinned GitHub issue (opened or updated on regressions,
+# closed automatically when everything genuinely passes). No credential
+# values are ever written to logs.
+
+on:
+  schedule:
+    # Every Monday 06:00 UTC, outside typical schoolwork hours.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Run the single authoritative release gate (full battery)
+        run: node scripts/release-gate.mjs --report | tee gate-report.txt
+      - name: Summarize the result
+        id: gate
+        run: |
+          SUMMARY=$(grep -E "^TOTAL:" gate-report.txt | tail -1)
+          echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
+          if echo "$SUMMARY" | grep -q "FAIL: 0" && echo "$SUMMARY" | grep -q "BLOCKED: 0" && echo "$SUMMARY" | grep -q "NOT RUN: 0"; then
+            echo "all-pass=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "all-pass=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Preserve the full report as evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-report
+          path: gate-report.txt
+          retention-days: 90
+      - name: Notify the owner through one pinned issue
+        uses: actions/github-script@v7
+        env:
+          ALL_PASS: ${{ steps.gate.outputs.all-pass }}
+          SUMMARY: ${{ steps.gate.outputs.summary }}
+        with:
+          script: |
+            const title = "Sophira health check needs your attention";
+            const { data: open } = await github.rest.issues.listForIssues({
+              owner: context.repo.owner, repo: context.repo.repo, state: "open", per_page: 100,
+            });
+            const existing = open.find((i) => i.title === title);
+            if (process.env.ALL_PASS === "true") {
+              if (existing) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number,
+                  body: `The latest scheduled health check passed everything: ${process.env.SUMMARY}\n\nClosing this issue automatically. Nothing is needed from you.`,
+                });
+                await github.rest.issues.update({
+                  owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, state: "closed",
+                });
+              }
+              return;
+            }
+            const body = [
+              "Sophira's scheduled health check found items that are not ready yet.",
+              "",
+              "Result: " + process.env.SUMMARY,
+              "",
+              "This is the same check you can see inside the app under Owner Dashboard, then System Health. The full technical report is attached to this workflow run as an artifact (gate-report).",
+              "",
+              "Most blockers need one-time owner setup (database connection, AI, search, test environment, device testing, or legal facts). The System Health page explains each one in plain English, with the exact action.",
+            ].join("\n");
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo, title, body,
+              });
+            }

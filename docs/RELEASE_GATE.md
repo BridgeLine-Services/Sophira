@@ -147,3 +147,24 @@ verdict is READY FOR RELEASE only when all checks genuinely passed,
 and an honest NOT READY (with counts) otherwise. If the gate cannot
 run in the deployment environment, the view reports the real failure
 instead of inventing a result. See also: phase-6 changelog entry.
+
+## Ongoing health (scheduled)
+
+Since 2026-10-11 the gate also runs hands-off (`.github/workflows/health.yml`):
+
+- **When:** every Monday at 06:00 UTC, plus a manual "Run workflow" button on the
+  repository's Actions page.
+- **What runs:** the single authoritative release gate in FULL mode, meaning the
+  complete automated suite, the strict type check, the production build, secret
+  scans, and every gate check.
+- **Evidence:** the complete report is attached to each run as an artifact
+  (kept 90 days). The pass/fail decision is read only from the gate's own TOTAL
+  line, never from the mere existence of a run.
+- **Notification:** one pinned GitHub issue, "Sophira health check needs your
+  attention". It is created or commented on when items are blocked or fail, and
+  it closes automatically the first time everything genuinely passes. It never
+  duplicates (the workflow searches for the open issue first).
+- **What it cannot verify:** live-service checks (database, AI, search) stay
+  BLOCKED until the owner connects those credentials, and device and legal items
+  always require owner action. The workflow uses read-only code access and can
+  only write that one issue; no credential values are ever written to logs.

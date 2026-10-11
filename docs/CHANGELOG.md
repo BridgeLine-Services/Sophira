@@ -8,6 +8,24 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: ongoing scheduled health (phase 7) (2026-10-11)
+
+- .github/workflows/health.yml: a hands-off weekly verification that reuses
+  the SINGLE authoritative release gate in FULL mode (complete suite, type
+  check, production build, secret scans, every gate check), plus a manual
+  Run-workflow button. Scheduled Mondays 06:00 UTC.
+- The pass/fail decision is read only from the gate's own TOTAL line. The
+  full report is kept as a workflow artifact (90 days).
+- Owner notification: ONE pinned GitHub issue ("Sophira health check needs
+  your attention"), searched before creation so it can never duplicate;
+  commented on regressions, closed automatically when everything genuinely
+  passes. Least-privilege permissions (code read, issue write only); no
+  credential values are ever written to logs.
+- The System Health page now points the owner to the Checks page for the
+  scheduled results; RELEASE_GATE.md documents how the checks run, how
+  often, and what they can and cannot verify.
+- 12 new assertions (tests/scheduled-health.ts). Suite: 3157.
+
 ### Upgrade round: owner System Health — the release gate in plain English (2026-10-11)
 
 - Phase 6 of the owner-experience round: the 17 BLOCKED + 1 NOT RUN

@@ -87,6 +87,21 @@ export function SystemHealthPanel() {
           This page runs Sophira&apos;s real release checks and explains the result in plain English.
           Nothing is marked ready unless it was genuinely verified.
         </p>
+        <p className="mt-2 text-xs text-ink-soft">
+          A complete checkup (every test, the production build, and all release checks) also runs
+          automatically once a week, and you can start one yourself: open{" "}
+          <a
+            className="underline"
+            href="https://github.com/BridgeLine-Services/Sophira/actions"
+            target="_blank"
+            rel="noreferrer"
+          >
+            the project&apos;s Checks page
+          </a>{" "}
+          and choose &quot;Scheduled health check&quot;, then &quot;Run workflow&quot;. If something needs your
+          attention, a single issue named &quot;Sophira health check needs your attention&quot; appears on the
+          repository.
+        </p>
         <div className="mt-4">
           <Button size="sm" variant="secondary" onClick={() => void run()} disabled={busy}>
             <RefreshCw className={`mr-1 h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
