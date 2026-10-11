@@ -134,3 +134,16 @@ offline security conformance are verifiable now and pass.
 
 This is intentional: the gate exists precisely so a release cannot be
 claimed ready while those prerequisites are missing.
+
+## Owner System Health view (2026-10-11)
+
+The gate output now reaches the nontechnical owner inside the app: the
+Owner Dashboard navigation includes System Health (/owner/health,
+owner-only), which runs this same gate in fast report mode via
+scripts/health-json.mjs and displays every check in plain English with
+its prerequisite group, the exact owner action, and the last
+verification timestamp. The view can never soften a status: the
+verdict is READY FOR RELEASE only when all checks genuinely passed,
+and an honest NOT READY (with counts) otherwise. If the gate cannot
+run in the deployment environment, the view reports the real failure
+instead of inventing a result. See also: phase-6 changelog entry.

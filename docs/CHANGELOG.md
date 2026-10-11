@@ -8,6 +8,36 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: owner System Health — the release gate in plain English (2026-10-11)
+
+- Phase 6 of the owner-experience round: the 17 BLOCKED + 1 NOT RUN
+  release-gate items are now explained to the nontechnical owner inside
+  the app, with zero terminal work.
+- New /owner/health (owner-only, on the owner navigation as System
+  Health) runs the SINGLE authoritative release gate in fast report
+  mode and shows every check with: a plain-English meaning, why it
+  matters, its prerequisite GROUP (several blockers share one owner
+  action, e.g. the one-time test environment unlocks several security
+  checks), the exact owner action, the technical detail behind a
+  disclosure, the last verification timestamp, and a Check-again retry
+  button.
+- src/lib/owner/gate-translate.ts (pure, fully unit-tested): statuses
+  are NEVER altered — BLOCKED stays BLOCKED; the verdict is READY FOR
+  RELEASE only when every single check genuinely passed, and carries an
+  explicit disclaimer that it is not a legal-compliance or security
+  guarantee. Zero evidence is never READY.
+- scripts/health-json.mjs: thin adapter that runs the real gate and
+  converts its self-test-pinned report text to JSON; it cross-checks
+  its parse against the report's own TOTAL line and refuses to invent
+  a result if they disagree.
+- /api/owner/system-health: server-side owner-only (requireUser shared
+  guard + role check, satisfying the route access test); if the gate
+  cannot run in the deployment environment it returns an honest 503 —
+  never a fabricated PASS.
+- Suite: +23 assertions incl. a LIVE adapter run inside npm test (the
+  gate report is parsed end to end and must yield its real statuses).
+  3145/3145 green; tsc clean; build clean; secret scan clean.
+
 ### Upgrade round: verified document export + resumable research (2026-10-11, commits a03edf7 + 1773e7c)
 
 - Verified DOCX/PDF export of stored notebook artifacts (stage 6 of the

@@ -7,7 +7,8 @@ import { CloudOff } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { BookOpen, Brain, Briefcase, ChevronDown, Gauge, GraduationCap, Home, Library, LogOut, MailQuestion, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, UserPlus, Users, Wifi, X } from "lucide-react";
+import { BookOpen, Brain, Briefcase, ChevronDown, GraduationCap, Home, Library, LogOut, MailQuestion, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, UserPlus, Users, Wifi, X } from "lucide-react";
+import { Gauge } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
 
@@ -31,6 +32,7 @@ const NAV = [
  * Dashboard entry and the brand logo.
  */
 const OWNER_NAV = [
+  { href: "/owner/health", label: "System Health", icon: Gauge },
   { href: "/dashboard?view=workspace", label: "My Workspace", icon: Briefcase },
   { href: "#overview", label: "Overview", icon: Gauge },
   { href: "#requests", label: "Invitation requests", icon: MailQuestion },
