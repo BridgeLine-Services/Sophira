@@ -16,12 +16,12 @@ const migrationTables = (): string[] => {
   const tables = new Set<string>();
   for (const file of files) {
     const sql = readFileSync(join(dir, file), "utf8");
-    const matches = sql.matchAll(/^create\s+table\s+(?:if\s+not\s+exists\s+)?public\.(\w+)/gm);
+    const matches = Array.from(sql.matchAll(/^create\s+table\s+(?:if\s+not\s+exists\s+)?public\.(\w+)/gm));
     for (const match of matches) {
       tables.add(match[1]);
     }
   }
-  return [...tables].sort();
+  return Array.from(tables).sort();
 };
 
 export function runAccountExportTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {

@@ -26,7 +26,7 @@ const files = readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort();
 const entries = files.map((f) => ({
   name: f,
   marker: MARKERS[f] || null,
-  sql: readFileSync(path.join(DIR, f), "utf8"),
+  sql: readFileSync(path.join(DIR, f), "utf8").replace(/\r\n/g, "\n"),
 }));
 
 const body = `/**

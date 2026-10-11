@@ -157,7 +157,7 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   assert(genSrc.includes(`export const MIGRATIONS: MigrationEntry[] =`) && genSrc.split('"name": "').length - 1 === migrationFiles.length,
     "wizard: the embedded chain covers EXACTLY the migration files (a new migration requires regenerating)");
   for (const f of migrationFiles) {
-    const fileSql = readFileSync(join("supabase/migrations", f), "utf8");
+    const fileSql = readFileSync(join("supabase/migrations", f), "utf8").replace(/\r\n/g, "\n");
     assert(genSrc.includes(JSON.stringify(fileSql).slice(1, -1)),
       `wizard: embedded SQL for ${f} is byte-identical to the repository file`);
   }
