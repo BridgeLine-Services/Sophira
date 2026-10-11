@@ -5,6 +5,7 @@
  * swallowed into fake success. Tokens are passed in, never logged.
  */
 import { MICROSOFT_TOKEN_URL, MICROSOFT_GRAPH } from "./oauth-state";
+import { summarizeMicrosoftItems, type DiscoveredDocument } from "./files";
 
 export interface ProviderTokens {
   access_token: string;
@@ -151,4 +152,57 @@ export async function uploadDocx(
   bytes: Buffer,
 ): Promise<{ saved: true; id: string; url: string }> {
   return uploadOfficeFile(accessToken, filename, bytes, "docx");
+}
+
+// ---------------------------------------------------------------------------
+// DOCUMENT DISCOVERY + READ (2026-10-12) — read-only assistance.
+// Files.ReadWrite covers reading files the signed-in user can access; some
+// organizational tenants restrict sharedWithMe — every such failure is
+// returned HONESTLY (never a silent empty list), and no broader scope
+// (no tenant-wide Files scopes) is ever requested to work around it.
+// ---------------------------------------------------------------------------
+
+export interface DriveListing { ok: boolean; files: DiscoveredDocument[]; note: string | null; }
+
+export async function listDriveFiles(accessToken: string): Promise<DriveListing> {
+  const [own, shared] = await Promise.all([
+    fetch(`${MICROSOFT_GRAPH}/me/drive/root/children?$top=200&$select=id,name,file,webUrl,remoteItem`, {
+      headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(20000),
+    }),
+    fetch(`${MICROSOFT_GRAPH}/me/drive/sharedWithMe?$top=200&$select=id,name,file,webUrl,remoteItem`, {
+      headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(20000),
+    }),
+  ]);
+  if (!own.ok) {
+    const detail = own.status === 401 ? "the connection needs to be re-established" : own.status === 403 ? "your account or tenant restricts listing files" : `Microsoft returned HTTP ${own.status}`;
+    return { ok: false, files: [], note: `Could not list your own files: ${detail}. Nothing is shown as accessible.` };
+  }
+  const ownJson = (await own.json()) as { value?: unknown[] };
+  const files = summarizeMicrosoftItems(ownJson.value as unknown as Array<Record<string, unknown>>);
+  let note: string | null = null;
+  if (shared.ok) {
+    const sharedJson = (await shared.json()) as { value?: unknown[] };
+    files.push(...summarizeMicrosoftItems(sharedJson.value as unknown as Array<Record<string, unknown>>));
+  } else {
+    note = shared.status === 403
+      ? "Explicitly shared files could not be listed (your account or tenant restricts that). Your own files are shown; a specific shared file can still be read if you open it from Sophira with its item id."
+      : `Shared-file listing failed (HTTP ${shared.status}); your own files are shown.`;
+  }
+  return { ok: true, files, note };
+}
+
+export async function downloadDriveItem(accessToken: string, itemId: string, driveId?: string | null): Promise<{ ok: boolean; bytes: Buffer | null; mime: string | null; error: string | null }> {
+  const base = driveId ? `${MICROSOFT_GRAPH}/drives/${encodeURIComponent(driveId)}` : `${MICROSOFT_GRAPH}/me/drive`;
+  const res = await fetch(`${base}/items/${encodeURIComponent(itemId)}/content`, {
+    headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) {
+    const error = res.status === 403 ? "Microsoft says this account is not permitted to read that file"
+      : res.status === 404 ? "that file no longer exists or the id is wrong"
+      : res.status === 401 ? "the connection needs to be re-established"
+      : `Microsoft returned HTTP ${res.status}`;
+    return { ok: false, bytes: null, mime: null, error };
+  }
+  const bytes = Buffer.from(await res.arrayBuffer());
+  return { ok: true, bytes, mime: res.headers.get("content-type"), error: null };
 }

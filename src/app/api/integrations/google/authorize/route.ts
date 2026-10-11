@@ -31,7 +31,12 @@ export async function POST(request: NextRequest) {
   }
   const state = createState();
   const redirectUri = new URL(request.url).origin + "/api/integrations/google/callback";
-  const url = googleAuthorizeUrl(process.env.GOOGLE_CLIENT_ID!, redirectUri, state);
+  // Incremental consent (2026-10-12): ONLY when the user explicitly enables
+  // Drive browsing does the flow request the additional read-only scope.
+  // The default flow stays at the least-privilege drive.file.
+  const intent = new URL(request.url).searchParams.get("intent");
+  const extraScopes = intent === "browse" ? ["https://www.googleapis.com/auth/drive.readonly"] : [];
+  const url = googleAuthorizeUrl(process.env.GOOGLE_CLIENT_ID!, redirectUri, state, extraScopes);
   const res = NextResponse.json({ ok: true, url });
   res.cookies.set(STATE_COOKIE, state, {
     httpOnly: true,

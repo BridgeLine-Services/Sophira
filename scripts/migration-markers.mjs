@@ -27,4 +27,6 @@ export const MARKERS = {
   "0032_provider_connections.sql": "to_regclass('public.provider_connections') is not null",
   "0033_provider_connection_metadata.sql":
     "exists(select 1 from information_schema.columns where table_schema='public' and table_name='provider_connections' and column_name='granted_scopes')",
+  "0034_workload_selections.sql":
+    "to_regclass('public.workload_selections') is not null",
 };

@@ -7,6 +7,7 @@
  * configured variable alone NEVER shows as connected.
  */
 import { useCallback, useEffect, useState } from "react";
+import DocumentBrowser from "./DocumentBrowser";
 
 type Status = {
   configured: boolean;
@@ -123,6 +124,7 @@ export function IntegrationsPanel() {
     <div className="mt-4 space-y-3">
       <ProviderCard name="microsoft" status={ms} busy={busy} onConnect={connect} onDisconnect={disconnect} />
       <ProviderCard name="google" status={gg} busy={busy} onConnect={connect} onDisconnect={disconnect} />
+        <DocumentBrowser />
     </div>
   );
 }

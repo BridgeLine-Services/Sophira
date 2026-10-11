@@ -9,6 +9,31 @@ Connect buttons go live. The exact redirect URIs required are:
 - Microsoft: https://sophira.vercel.app/api/integrations/microsoft/callback
 - Google: https://sophira.vercel.app/api/integrations/google/callback
 
+## Browsing, selecting, and reading documents (2026-10-12)
+
+- Microsoft: Settings -> Integrations -> "Browse Microsoft files" lists
+  your own OneDrive documents plus files explicitly shared with your
+  account (where your tenant permits that listing). Selecting a file
+  reads its text for read-only assistance through YOUR connection.
+  Some school/workplace tenants restrict shared-file listing or
+  per-file reads; every refusal is shown honestly, and Sophira never
+  requests tenant-wide scopes (no Files.*.All) to work around it.
+  Where a tenant blocks the operation, the owner action is an Entra
+  admin-consent / tenant-policy review — a decision for the school or
+  workplace, never a silent scope expansion by Sophira.
+- Google: by default Sophira lists ONLY files it created (the
+  least-privilege drive.file scope). "Enable Drive browsing" adds the
+  OPTIONAL read-only consent (drive.readonly) through incremental
+  consent, so documents shared with your account become browsable.
+  Google Docs export as text for read-only assistance; presentations
+  and spreadsheets are honestly not-yet-readable and offer the
+  downloadable export instead.
+- Every selected document is stored as a WORKLOAD SELECTION with the
+  scope you state (section, questions, deliverables). Reading a shared
+  document never makes its other sections your work, and Sophira never
+  creates profiles or memories for people who do not have Sophira
+  accounts.
+
 ## What each integration saves (all four products)
 
 - Microsoft connection: Word documents (.docx) AND PowerPoint files

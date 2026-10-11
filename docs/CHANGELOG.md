@@ -8,6 +8,27 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: document access, workload selections, honest shared-file states (2026-10-12)
+
+- Migration 0034: workload_selections — the personal-AI-workload
+  boundary record (owner-bound rows, RLS owner-only policies, one per
+  user+provider+document; included in the account export).
+- Microsoft: browse own + explicitly-shared files (tenant restrictions
+  surface as honest notes); read .docx text through the user's own
+  connection (real mammoth extraction, round-trip tested); tenant-wide
+  scopes are never requested to work around sharing limits.
+- Google: browse defaults to drive.file (app-created only); an
+  explicit "Enable Drive browsing" consent (drive.readonly) is offered
+  via incremental consent — never silently broadened. Google Docs read
+  as text for read-only assistance; unsupported types are honest.
+- Workload selections API: create/list/revise/remove, user id taken
+  from the session only, RLS as defense in depth; scope is always
+  user-stated and revisable.
+- New DocumentBrowser UI in Settings -> Integrations: browse, select,
+  state scope, manage selections.
+- 53 new assertions (tests/document-selection.ts). Battery: 3332/3332
+  green; tsc clean; build clean; scan clean.
+
 ### Upgrade round: live runtime environment detection in System Health (2026-10-11)
 
 - New owner capability: when System Health shows the GitHub Actions

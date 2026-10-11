@@ -40,6 +40,7 @@ const USER_TABLES = [
   "typing_profiles",
   "work_schedules",
   "provider_connections",
+  "workload_selections",
   "schedule_executions",
   "work_sessions",
   "rubric_audits",

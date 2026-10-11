@@ -56,12 +56,12 @@ export function microsoftAuthorizeUrl(clientId: string, redirectUri: string, sta
   return u.toString();
 }
 
-export function googleAuthorizeUrl(clientId: string, redirectUri: string, state: string): string {
+export function googleAuthorizeUrl(clientId: string, redirectUri: string, state: string, extraScopes: string[] = []): string {
   const u = new URL(GOOGLE_AUTHORIZE_URL);
   u.searchParams.set("client_id", clientId);
   u.searchParams.set("response_type", "code");
   u.searchParams.set("redirect_uri", redirectUri);
-  u.searchParams.set("scope", GOOGLE_SCOPE);
+  u.searchParams.set("scope", [...GOOGLE_SCOPE.split(" "), ...extraScopes].join(" "));
   u.searchParams.set("access_type", "offline");
   u.searchParams.set("prompt", "consent");
   u.searchParams.set("state", state);

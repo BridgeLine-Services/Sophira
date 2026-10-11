@@ -6,6 +6,7 @@
  * whole Drive. Errors are honest; tokens are never logged.
  */
 import { GOOGLE_TOKEN_URL, GOOGLE_DOCS_API, GOOGLE_DRIVE_API } from "./oauth-state";
+import { summarizeGoogleFiles, type DiscoveredDocument } from "./files";
 import type { ExportArtifact } from "@/lib/documents/export";
 
 export interface ProviderTokens {
@@ -183,4 +184,68 @@ export async function uploadPptxAsSlides(
   const { id } = (await res.json()) as { id?: string };
   if (!id) throw new Error("Google Drive's response was missing the presentation id. Nothing was claimed as saved.");
   return { saved: true as const, url: `https://docs.google.com/presentation/d/${id}/edit` };
+}
+
+// ---------------------------------------------------------------------------
+// DOCUMENT DISCOVERY + READ (2026-10-12) — honest about what drive.file
+// permits. drive.file sees ONLY files this app created; it does NOT make
+// every file shared with the user discoverable. Browsing all accessible
+// files requires the OPTIONAL drive.readonly consent, requested ONLY via
+// incremental consent when the user explicitly enables Drive browsing.
+// ---------------------------------------------------------------------------
+
+export interface GoogleListing { ok: boolean; files: DiscoveredDocument[]; note: string | null; browse_consent: boolean; }
+
+export async function listAppCreatedFiles(accessToken: string): Promise<GoogleListing> {
+  const res = await fetch(
+    "https://www.googleapis.com/drive/v3/files?pageSize=200&fields=files(id,name,mimeType,webViewLink,owners,shared)&q=trashed=false",
+    { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(20000) },
+  );
+  if (!res.ok) {
+    const error = res.status === 401 ? "the connection needs to be re-established" : `Google returned HTTP ${res.status}`;
+    return { ok: false, files: [], note: `Could not list files: ${error}. Nothing is shown as accessible.`, browse_consent: false };
+  }
+  const json = (await res.json()) as { files?: unknown[] };
+  return {
+    ok: true,
+    files: summarizeGoogleFiles(json.files as unknown as Array<Record<string, unknown>>),
+    note: "With the least-privilege drive.file scope, Google shows only files created through Sophira. To browse everything your account can access (including documents shared with you), enable Drive browsing — it requests the additional read-only consent.",
+    browse_consent: false,
+  };
+}
+
+export async function listAllAccessibleFiles(accessToken: string): Promise<GoogleListing> {
+  const res = await fetch(
+    "https://www.googleapis.com/drive/v3/files?pageSize=200&fields=files(id,name,mimeType,webViewLink,owners,shared)&q=trashed=false&supportsAllDrives=true&includeItemsFromAllDrives=true",
+    { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(20000) },
+  );
+  if (!res.ok) {
+    if (res.status === 403) {
+      return { ok: false, files: [], note: "Google says the Drive browsing consent has not been granted (drive.readonly). Use the Enable-Drive-browsing consent, then browse again.", browse_consent: true };
+    }
+    return { ok: false, files: [], note: `Google returned HTTP ${res.status}. Nothing is shown as accessible.`, browse_consent: false };
+  }
+  const json = (await res.json()) as { files?: unknown[] };
+  return { ok: true, files: summarizeGoogleFiles(json.files as unknown as Array<Record<string, unknown>>), note: null, browse_consent: true };
+}
+
+/** Read a Google Doc (or plain-text file) as text for read-only assistance. */
+export async function readGoogleFileText(accessToken: string, fileId: string, mime: string): Promise<{ ok: boolean; text: string | null; error: string | null }> {
+  if (mime === "application/vnd.google-apps.document") {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/markdown`,
+      { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(30000) },
+    );
+    if (!res.ok) return { ok: false, text: null, error: res.status === 403 ? "Google says this account is not permitted to read that document" : res.status === 404 ? "that document no longer exists or the id is wrong" : `Google returned HTTP ${res.status}` };
+    return { ok: true, text: await res.text(), error: null };
+  }
+  if (mime === "text/plain" || mime === "text/markdown" || mime === "text/csv") {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+      { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(30000) },
+    );
+    if (!res.ok) return { ok: false, text: null, error: res.status === 403 ? "Google says this account is not permitted to read that file" : `Google returned HTTP ${res.status}` };
+    return { ok: true, text: await res.text(), error: null };
+  }
+  return { ok: false, text: null, error: "this file type cannot be read as text yet — a downloadable draft is offered instead" };
 }
