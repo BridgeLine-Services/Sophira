@@ -53,7 +53,7 @@ interface SourceRow {
 interface NoteRow { id: string; content: string; source_id: string | null; created_at: string }
 interface QuestionRow { id: string; question: string; answer: { statements?: { text: string; label: AnswerLabel; reason: string; citations: { marker: string; sourceId: string; quote?: string; locator: { page?: number; url?: string; retrievedAt?: string; section?: string; paragraph?: number; charsStart?: number; charsEnd?: number } }[] }[]; notes?: string[]; groundedIn?: string }; created_at: string }
 interface EvidenceRow { id: string; source_id: string; quote: string; label: string; page: number | null; section: string | null; chars_start: number | null; chars_end: number | null; created_at: string }
-interface ArtifactRow { id: string; artifact_type: string; title: string; content: { sections?: { heading: string; items: string[]; sources: string[] }[]; honestNote?: string }; provenance: { sources?: { sourceLabel: string; title: string; locator: string }[] }; created_at: string }
+interface ArtifactRow { id: string; notebook_id?: string; artifact_type: string; title: string; content: { sections?: { heading: string; items: string[]; sources: string[] }[]; honestNote?: string }; provenance: { sources?: { sourceLabel: string; title: string; locator: string }[] }; created_at: string }
 interface CandidateRow {
   url: string; title: string; domain: string; published: string | null; retrieved: boolean;
   contentChars: number; verificationStatus: string; whySelected: { authority?: string; relevance?: string; date?: string | null; sourceType?: string; why?: string };
@@ -596,6 +596,64 @@ function ArtifactView({ artifact }: { artifact: ArtifactRow }) {
         </details>
       )}
       {artifact.content?.honestNote && <p className="text-xs italic text-ink/40">{artifact.content.honestNote}</p>}
+      <ExportButtons artifact={artifact} />
+    </div>
+  );
+}
+
+/** Export the STORED artifact (never regenerated) with a verification digest. */
+function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const doExport = async (format: "docx" | "pdf") => {
+    setBusy(format);
+    setNote(null);
+    try {
+      const notebookId = artifact.notebook_id || window.location.pathname.split("/").pop() || "";
+      const res = await fetch(`/api/notebooks/${notebookId}/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artifact_id: artifact.id, format }),
+      });
+      if (!res.ok) throw new Error("Export failed.");
+      const digest = res.headers.get("X-Sophira-Digest") ?? "";
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${artifact.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60) || "artifact"}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setNote(`Exported — digest ${digest.slice(0, 12)} (built from the stored artifact; provenance included).`);
+    } catch {
+      setNote("Export failed — try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-1">
+      <button
+        type="button"
+        onClick={() => doExport("docx")}
+        disabled={busy !== null}
+        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+      >
+        {busy === "docx" ? "Exporting…" : "Export DOCX"}
+      </button>
+      <button
+        type="button"
+        onClick={() => doExport("pdf")}
+        disabled={busy !== null}
+        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+      >
+        {busy === "pdf" ? "Exporting…" : "Export PDF"}
+      </button>
+      {note && <span className="text-[11px] text-ink/50">{note}</span>}
     </div>
   );
 }

@@ -473,6 +473,26 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "changes: the memory write happens ONLY inside the approve branch — a REJECTED proposal records nothing");
   assert(panel.includes("changes_approval"),
     "changes: approved preference memories carry their real source (changes_approval)");
+  // ============================================================
+  // STAGE 6 (2026-10-11): document workflow — export verification.
+  // ============================================================
+  const exportLib = readFileSync("src/lib/documents/export.ts", "utf8");
+  assert(exportLib.includes("digestOf") && exportLib.includes("sha256"),
+    "export: every export carries a SHA-256 digest for verification against the stored artifact");
+  assert(exportLib.includes("provenance block is always included") && exportLib.includes("drop their sources"),
+    "export: the provenance block is always embedded — exports can never silently drop their sources");
+  assert(exportLib.includes("deterministic") && !exportLib.includes("Math.random") && !exportLib.includes("toISOString().slice(0, 10)"),
+    "export: builders are deterministic — same stored artifact → identical bytes → identical digest");
+  const exportRoute = readFileSync("src/app/api/notebooks/[id]/export/route.ts", "utf8");
+  assert(exportRoute.includes('.eq("notebook_id", id)') && exportRoute.includes("requireUser"),
+    "export: the export loads the STORED artifact row scoped to this user's notebook (RLS + explicit match, 404 on mismatch)");
+  assert(!exportRoute.includes("buildArtifact"),
+    "export: the file is built from the STORED row — never regenerated or re-AI-composed at export time");
+  assert(exportRoute.includes("X-Sophira-Digest"),
+    "export: the response carries the digest so the downloaded file can be verified against the stored artifact");
+  assert(exportRoute.includes("format must be 'docx' or 'pdf'"),
+    "export: unknown formats are refused — never a silent fallback");
+
   const typingRoute = readFileSync("src/app/api/typing/profile/route.ts", "utf8");
   assert(typingRoute.includes("typing_calibration") && typingRoute.includes("Typing pace preference (student-approved)"),
     "typing: a student-set calibration preference enters the SAME shared memory system (persistent, single updated row)");
