@@ -1,4 +1,4 @@
-# Google ADK Architecture Review
+# ADK Architecture Review
 
 Reviewed: 2026-10-11, against the current Sophira commit (master, 03ac117+),
 for the purpose of adopting genuinely useful patterns from Google's Agent
