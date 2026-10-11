@@ -7,6 +7,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildDocx, exportFilename, type ExportArtifact } from "@/lib/documents/export";
+import { buildPptx } from "@/lib/documents/pptx";
 
 export async function loadArtifact(
   supabase: SupabaseClient,
@@ -40,5 +41,12 @@ export async function loadArtifact(
 export async function artifactAsDocx(a: ExportArtifact): Promise<{ bytes: Buffer; baseName: string }> {
   const bytes = await buildDocx(a);
   const baseName = exportFilename(a, "docx").replace(/\.docx$/, "");
+  return { bytes, baseName };
+}
+
+/** The PPTX bytes + base filename for provider uploads (same builder as local export). */
+export async function artifactAsPptx(a: ExportArtifact): Promise<{ bytes: Buffer; baseName: string }> {
+  const bytes = await buildPptx(a);
+  const baseName = exportFilename(a, "pptx").replace(/\.pptx$/, "");
   return { bytes, baseName };
 }

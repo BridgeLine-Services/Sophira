@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       expires_at: tokens.expires_at,
+      granted_scopes: tokens.granted_scopes,
     });
     return back("connected");
   } catch {

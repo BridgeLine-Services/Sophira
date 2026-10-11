@@ -506,8 +506,8 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "scope: the active subject/course scope is visible next to the title in every engine page");
 
   const gateScript = readFileSync("scripts/release-gate.mjs", "utf8");
-  assert(gateScript.includes("0001-0032"),
-    "gate: migration range reflects 0032 (provider_connections)");
+  assert(gateScript.includes("0001-0033"),
+    "gate: migration range reflects 0033 (provider connection metadata)");
 
   const ownerDash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
   assert(ownerDash.includes('id="overview"') && ownerDash.includes('id="requests"') && ownerDash.includes('id="invite"') && ownerDash.includes('id="members"'),

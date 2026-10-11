@@ -13,6 +13,8 @@ export type Provider = "microsoft" | "google";
 export interface StoredConnection {
   provider: Provider;
   account_label: string | null;
+  provider_account_id: string | null;
+  granted_scopes: string | null;
   access_token: string;
   refresh_token: string | null;
   expires_at: string | null;
@@ -22,7 +24,7 @@ export async function getConnection(userId: string, provider: Provider): Promise
   const admin = createAdminClient();
   const { data } = await admin
     .from("provider_connections")
-    .select("provider, account_label, access_token, refresh_token, expires_at")
+    .select("provider, account_label, provider_account_id, granted_scopes, access_token, refresh_token, expires_at")
     .eq("user_id", userId)
     .eq("provider", provider)
     .maybeSingle();
@@ -33,7 +35,7 @@ export async function getConnection(userId: string, provider: Provider): Promise
 export async function upsertConnection(
   userId: string,
   provider: Provider,
-  tokens: { access_token: string; refresh_token: string | null; expires_at: string | null; account_label?: string | null },
+  tokens: { access_token: string; refresh_token: string | null; expires_at: string | null; granted_scopes?: string | null },
 ): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin
@@ -42,10 +44,10 @@ export async function upsertConnection(
       {
         user_id: userId,
         provider,
-        account_label: tokens.account_label ?? null,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expires_at: tokens.expires_at,
+        granted_scopes: tokens.granted_scopes ?? null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,provider" },
@@ -67,4 +69,23 @@ export async function deleteConnection(userId: string, provider: Provider): Prom
   const admin = createAdminClient();
   const { error } = await admin.from("provider_connections").delete().eq("user_id", userId).eq("provider", provider);
   if (error) throw new Error("Could not remove the connection.");
+}
+
+/**
+ * Persist the provider-side account identity (captured from a verified
+ * provider response — never client-supplied) so every future operation is
+ * auditable against the exact account the user connected.
+ */
+export async function saveConnectionMeta(
+  userId: string,
+  provider: Provider,
+  meta: { account_label?: string | null; provider_account_id?: string | null },
+): Promise<void> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("provider_connections")
+    .update({ ...meta, updated_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("provider", provider);
+  if (error) throw new Error("Could not update the connection metadata.");
 }

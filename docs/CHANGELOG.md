@@ -8,6 +8,30 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: multi-user identity + PowerPoint/Google Slides saves (2026-10-11)
+
+- Migration 0033: provider_connections gains provider_account_id +
+  granted_scopes — every operation is now auditable against the exact
+  connected account and the scopes the user actually granted. Tokens
+  remain service-role-only (unchanged 0032 posture).
+- Account identity capture: Microsoft stores the verified drive owner
+  identity + stable drive id from a REAL Graph call; Google with the
+  least-privilege drive.file scope honestly cannot read the account
+  name, and Sophira does NOT request broader scopes just to show one.
+- PowerPoint and Google Slides: the Microsoft route now uploads real
+  .pptx files to OneDrive (same conflictBehavior=fail); the Google
+  route converts Sophira's .pptx into a real Google Slides
+  presentation via the Drive API and returns its real URL.
+- Live security suites hardened: both live regressions (RLS +
+  invitation-only) now SAFETY-ABORT if SUPABASE_TEST_URL appears to
+  point at the production project, and never fall back to production
+  credentials (partial config already failed closed; verified by
+  --self-test runs).
+- Multi-user model reaffirmed: connections are per Sophira user
+  (unique user_id+provider), every token operation is user-scoped,
+  and there is no owner-proxy path — the release-gate probe now
+  verifies migration 0033 (range 0001-0033).
+
 ### Upgrade round: Microsoft Word + Google Docs integrations (code complete; live consent pending) (2026-10-11)
 
 - Direct document-provider integration, implemented end to end and tested

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   if (!microsoftConfigured()) {
     return NextResponse.json({ ok: false, error: "Microsoft is not configured for this deployment yet (see docs/WORD_GOOGLE_DOCS_SETUP.md)." }, { status: 503 });
   }
-  let body: { artifact_id?: string; notebook_id?: string; overwrite?: boolean; item_id?: string };
+  let body: { artifact_id?: string; notebook_id?: string; overwrite?: boolean; item_id?: string; format?: string };
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -51,7 +51,9 @@ export async function POST(request: NextRequest) {
       const result = await overwriteDocx(accessToken, body.item_id, bytes);
       return NextResponse.json({ ok: true, saved: true, replaced: true, url: result.url });
     }
-    const result = await uploadDocx(accessToken, baseName, bytes);
+    const kind = body.format === "pptx" ? "pptx" : "docx";
+    const { uploadOfficeFile } = await import("@/lib/integrations/microsoft");
+    const result = await uploadOfficeFile(accessToken, baseName, bytes, kind);
     return NextResponse.json({ ok: true, saved: true, created: true, id: result.id, url: result.url });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "The save failed." }, { status: 502 });

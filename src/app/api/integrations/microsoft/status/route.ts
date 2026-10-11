@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 import { needsRefresh } from "@/lib/integrations/oauth-state";
 import { microsoftConfigured, verifyDrive, refreshAccessToken } from "@/lib/integrations/microsoft";
-import { getConnection, updateTokens } from "@/lib/integrations/connections";
+import { getConnection, updateTokens, saveConnectionMeta } from "@/lib/integrations/connections";
 
 /**
  * GET /api/integrations/microsoft/status — honest connection state for the
@@ -37,6 +37,9 @@ export async function GET() {
       return NextResponse.json({ ok: true, configured: true, connected: true, verified: false, expired: true });
     }
   }
-  const { ok: verified, label } = await verifyDrive(accessToken);
-  return NextResponse.json({ ok: true, configured: true, connected: true, verified, expired: !verified && !needsRefresh(conn.expires_at, Date.now()), account: label });
+  const { ok: verified, label, accountId } = await verifyDrive(accessToken);
+  if (verified && (label || accountId)) {
+    try { await saveConnectionMeta(guard.data.user.id, "microsoft", { account_label: label, provider_account_id: accountId }); } catch { /* metadata is best-effort; status stays honest */ }
+  }
+  return NextResponse.json({ ok: true, configured: true, connected: true, verified, expired: !verified && !needsRefresh(conn.expires_at, Date.now()), account: label, account_id: undefined });
 }

@@ -9,6 +9,28 @@ Connect buttons go live. The exact redirect URIs required are:
 - Microsoft: https://sophira.vercel.app/api/integrations/microsoft/callback
 - Google: https://sophira.vercel.app/api/integrations/google/callback
 
+## What each integration saves (all four products)
+
+- Microsoft connection: Word documents (.docx) AND PowerPoint files
+  (.pptx) to your OneDrive root (never overwriting an existing file
+  silently).
+- Google connection: Google Docs (created with full content +
+  provenance) AND Google Slides presentations (converted from
+  Sophira's .pptx via Google's Drive API).
+
+## Account types (documented, not yet live-verified)
+
+- Microsoft: the app uses the "common" tenant endpoint, which accepts
+  personal Microsoft accounts and work/school accounts; organizational
+  tenants may require admin consent for the Files.ReadWrite delegated
+  permission. This is the provider's behavior, verified only by live
+  tests once credentials exist.
+- Google: personal accounts and Workspace accounts both work with
+  drive.file; while the OAuth consent screen is in Testing status,
+  only designated test users can consent, and broader availability may
+  require Google verification for the scopes used. Do not assume all
+  account types are verified until live tests confirm it.
+
 ## Why this is blocked
 
 Direct Word and Google Docs saving means Sophira writes to documents in

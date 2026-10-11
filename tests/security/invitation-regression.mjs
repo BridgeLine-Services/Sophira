@@ -115,6 +115,12 @@ if (configured === 0) {
     "  Set SUPABASE_TEST_URL + SUPABASE_TEST_ANON_KEY + SUPABASE_TEST_SERVICE_ROLE_KEY (DISPOSABLE test project).");
   process.exit(3);
 }
+const PROD_URL_ = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "").trim();
+if (URL_ && PROD_URL_ && URL_.replace(/\/$/, "") === PROD_URL_.replace(/\/$/, "")) {
+  console.error("[invitation-security] SAFETY ABORT: SUPABASE_TEST_URL points at the PRODUCTION project. Live invitation tests never run against production.");
+  process.exit(2);
+}
+
 if (configured !== 3) {
   console.error("[invitation-security] PARTIAL configuration — refusing to run. Provide ALL three SUPABASE_TEST_* variables or none.");
   process.exit(1);

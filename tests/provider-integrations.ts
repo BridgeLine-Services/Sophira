@@ -86,8 +86,8 @@ export function runProviderIntegrationTests(assert: (c: boolean, n: string) => v
   assert(markers.includes('"0032_provider_connections.sql"'),
     "db: the 0032 marker is registered (CI + runtime wizard agree)");
   const gate = readFileSync("scripts/release-gate.mjs", "utf8");
-  assert(gate.includes("provider_connections") && gate.includes("0001-0032"),
-    "gate: the migration probe now verifies the NEWEST migration (0032)");
+  assert(gate.includes("provider_connections") && gate.includes("0001-0033"),
+    "gate: the migration probe now verifies the NEWEST migration (0033)");
 
   const connections = readFileSync("src/lib/integrations/connections.ts", "utf8");
   assert(connections.includes("createAdminClient"), "tokens: connection storage uses the service-role client only");

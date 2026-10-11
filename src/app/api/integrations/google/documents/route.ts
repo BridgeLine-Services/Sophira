@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   if (!googleConfigured()) {
     return NextResponse.json({ ok: false, error: "Google is not configured for this deployment yet (see docs/WORD_GOOGLE_DOCS_SETUP.md)." }, { status: 503 });
   }
-  let body: { artifact_id?: string; notebook_id?: string };
+  let body: { artifact_id?: string; notebook_id?: string; format?: string };
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -45,6 +45,13 @@ export async function POST(request: NextRequest) {
   const artifact = await loadArtifact(supabase, artifactId, body.notebook_id);
   if (!artifact) return NextResponse.json({ error: "Artifact not found." }, { status: 404 });
   try {
+    if (body.format === "pptx") {
+      const { artifactAsPptx } = await import("@/lib/integrations/artifact-loader");
+      const { bytes, baseName } = await artifactAsPptx(artifact);
+      const { uploadPptxAsSlides } = await import("@/lib/integrations/google");
+      const slides = await uploadPptxAsSlides(accessToken, baseName, bytes);
+      return NextResponse.json({ ok: true, saved: true, created: true, kind: "slides", url: slides.url });
+    }
     const result = await createDocFromArtifact(accessToken, artifact);
     return NextResponse.json({ ok: true, saved: true, created: true, url: result.url });
   } catch (e) {

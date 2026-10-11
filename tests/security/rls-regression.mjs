@@ -115,6 +115,14 @@ if (process.argv.includes("--self-test")) await selfTest();
 
 // ---- live prerequisites (fail-closed) ------------------------------------
 const URL_ = (process.env.SUPABASE_TEST_URL ?? "").trim();
+const PROD_URL_ = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "").trim();
+if (URL_ && PROD_URL_ && URL_.replace(/\/$/, "") === PROD_URL_.replace(/\/$/, "")) {
+  console.error("SAFETY ABORT: SUPABASE_TEST_URL points at the PRODUCTION project. Live security tests never run against production.");
+  process.exit(2);
+}
+// Never fall back from SUPABASE_TEST_* to production credentials: there is no
+// fallback path anywhere in this suite; partial config is a failure (exit 3).
+
 const ANON = (process.env.SUPABASE_TEST_ANON_KEY ?? "").trim();
 const SERVICE = (process.env.SUPABASE_TEST_SERVICE_ROLE_KEY ?? "").trim();
 const configured = [URL_, ANON, SERVICE].filter((v) => v !== "").length;
