@@ -634,4 +634,26 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "ai: an invalid subject slug resolves to null — never treated as a real subject");
   }
 
+
+  // ==== Section 6 belt-and-suspenders: course-independent lifecycle ====
+  section("course-independent lifecycle (save, list, reopen, resume)");
+  {
+    const dash = readFileSync("src/app/dashboard/page.tsx", "utf8");
+    assert(dash.includes('from("assignments").select("id, title, mode, status, updated_at")') &&
+      !dash.includes('.eq("course_id"'),
+      "my-work: the dashboard lists assignments with NO course filter — course-free work surfaces next to course-associated work");
+    const newPage = readFileSync("src/app/assignments/new/page.tsx", "utf8");
+    assert(newPage.includes("course_id: courseId || null"),
+      "save: assignment creation persists a REAL null when no course is selected — no placeholder course is ever created");
+    const wsPage = readFileSync("src/app/assignments/[id]/page.tsx", "utf8");
+    assert(wsPage.includes("assignment.course_id") && wsPage.includes("Promise.resolve({ data: null })") &&
+      wsPage.includes("?? null"),
+      "reopen: the assignment workspace loads the course ONLY when one exists — a course-free assignment opens and resumes cleanly");
+    assert(wsPage.includes('from("work_sessions"') && wsPage.includes('from("responses"'),
+      "resume: the saved work session and responses are loaded by assignment id alone — resume never depends on a course");
+    const sc = readFileSync("src/lib/courses/subject-context.ts", "utf8");
+    assert(sc.includes("opts: { courseId?: string | null } = {}"),
+      "ai: courseId is OPTIONAL in the subject context builder — subject-aware help works with no course at all");
+  }
+
 }

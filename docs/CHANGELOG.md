@@ -8,6 +8,16 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Audit round: course-independent lifecycle pins (2026-10-12)
+
+- Section 6 belt-and-suspenders: pinned that the dashboard lists ALL
+  assignments with no course filter (course-free work surfaces next to
+  course-associated work), creation persists a real null course_id
+  (never a placeholder course), the workspace loads the course ONLY
+  when one exists, resume loads session/responses by assignment id
+  alone, and courseId is optional in the shared subject context
+  builder. 5 new assertions. Battery: 3360/3360 green.
+
 ### Fix round: subject propagation audit — the three silently-unscoped routes (2026-10-12)
 
 - /math/practice, /math/test-prep, and /courses/foreign-language/
