@@ -27,6 +27,11 @@ interface TranslatedCheck {
 interface HealthData {
   ok: boolean;
   source: string;
+  run_state?: string;
+  run_url?: string | null;
+  run_updated_at?: string | null;
+  gate_summary?: string | null;
+  note?: string;
   generated_at?: string;
   verdict?: string;
   reason?: string;
@@ -47,6 +52,7 @@ export function SystemHealthPanel() {
   const [data, setData] = useState<HealthData | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [startMsg, setStartMsg] = useState<string | null>(null);
 
   const run = useCallback(async () => {
     setBusy(true);
@@ -68,6 +74,25 @@ export function SystemHealthPanel() {
     }
   }, []);
 
+
+  const startCheck = useCallback(async () => {
+    setStartMsg("Requesting a fresh full check...");
+    try {
+      const res = await fetch("/api/owner/system-health", { method: "POST" });
+      const json = (await res.json()) as { ok: boolean; accepted?: boolean; error?: string; note?: string };
+      if (json.accepted) {
+        setStartMsg(
+          json.note ??
+            "GitHub accepted the run. Accepted is not a pass - the real result appears when it finishes.",
+        );
+        setTimeout(() => void run(), 20000);
+      } else {
+        setStartMsg(json.error ?? "The check could not be started.");
+      }
+    } catch {
+      setStartMsg("Sophira could not reach the server to start the check.");
+    }
+  }, [run]);
   useEffect(() => {
     void run();
   }, [run]);
@@ -103,10 +128,16 @@ export function SystemHealthPanel() {
           repository.
         </p>
         <div className="mt-4">
-          <Button size="sm" variant="secondary" onClick={() => void run()} disabled={busy}>
-            <RefreshCw className={`mr-1 h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
-            {busy ? "Checking..." : "Check again"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={() => void run()} disabled={busy}>
+              <RefreshCw className={`mr-1 h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
+              {busy ? "Checking..." : "Check again"}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => void startCheck()} disabled={busy}>
+              Start a fresh full check
+            </Button>
+          </div>
+          {startMsg && <p className="mt-2 text-xs text-ink-soft">{startMsg}</p>}
         </div>
       </div>
 
@@ -122,6 +153,44 @@ export function SystemHealthPanel() {
             the project&apos;s checkup page
           </a>{" "}
           and choose &quot;Run workflow&quot;. The weekly automatic checkup posts its results there too. </div>
+      )}
+
+      {data?.source === "github-actions" && (
+        <div className="rounded-lg border p-6">
+          <p className="text-xs uppercase tracking-wide text-ink-soft">Latest full checkup (GitHub Actions)</p>
+          <p className="mt-1 text-lg font-semibold text-ink">
+            {data.run_state === "completed" && "Completed successfully"}
+            {data.run_state === "failed" && "Failed"}
+            {data.run_state === "running" && "Running right now"}
+            {data.run_state === "stale" && "Last result is stale (over a week old)"}
+            {data.run_state === "never-run" && "Never run"}
+            {data.run_state === "unknown" && "Unknown"}
+          </p>
+          {data.gate_summary && (
+            <p className="mt-2 text-sm font-medium text-ink">Gate result: {data.gate_summary}</p>
+          )}
+          {!data.gate_summary && (
+            <p className="mt-2 text-sm text-ink-soft">
+              The gate summary is not available yet; it appears once the checkup posts its results.
+            </p>
+          )}
+          {data.run_updated_at && (
+            <p className="mt-1 text-xs text-ink-soft">
+              Last finished: {new Date(data.run_updated_at).toLocaleString()}
+            </p>
+          )}
+          {data.run_url && (
+            <a
+              className="mt-2 inline-block underline text-sm"
+              href={data.run_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open the run on GitHub
+            </a>
+          )}
+          <p className="mt-2 text-xs text-ink-soft">{data.note}</p>
+        </div>
       )}
 
       {data && (

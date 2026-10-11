@@ -8,6 +8,25 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: System Health shows the REAL Actions result + owner-authorized dispatch (priority 3) (2026-10-11)
+
+- The deployed System Health page no longer dead-ends at the local-gate
+  limitation. When the app host cannot run the full suite, GET now
+  retrieves the REAL latest health-workflow run (status, conclusion,
+  timestamps, run link) and recovers the gate's own TOTAL line from the
+  pinned issue. A queued, in-progress, failed, or missing run is never
+  a pass; a successful run means the checks RAN, and the verdict stays
+  the honest TOTAL line (stale results are flagged).
+- POST /api/owner/system-health (owner-only) starts the single health
+  workflow via the documented dispatch API, using a server-side
+  GITHUB_HEALTH_TOKEN. Without the token it reports the exact missing
+  prerequisite plus the manual Run-workflow link. Acceptance is always
+  reported as acceptance, never as a passed check.
+- src/lib/owner/health-actions.ts: pure, behaviorally tested
+  classification (never-run / running / completed / failed / stale /
+  unknown) and TOTAL-line recovery.
+- 17 new assertions (tests/system-health-actions.ts).
+
 ### Upgrade round: health workflow notify fix (verified by a REAL dispatch) (2026-10-11)
 
 - First real execution of the scheduled health check (manual dispatch of

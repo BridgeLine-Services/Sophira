@@ -70,3 +70,13 @@ OpenAI — and the paid fallback stays inert until explicitly allowed.
 Vercel deployment and environment sync (including the Supabase
 Integration and `vercel env pull`) are documented in
 **docs/VERCEL_DEPLOYMENT.md**.
+
+## GITHUB_HEALTH_TOKEN (optional, server-side only)
+
+Lets the Owner Dashboard's "Start a fresh full check" button start the
+single scheduled health workflow (nothing else) through the documented
+GitHub workflow-dispatch API. Create a fine-grained GitHub token with
+Actions: write, limited to this repository only, and set it in your
+hosting provider's environment settings - never in chat, files, or
+client code. Reading the latest results needs no token at all; without
+this token the page shows the exact manual Run-workflow link instead.
