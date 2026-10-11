@@ -27,35 +27,34 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const writingLabels = ENGINE_TOOLS.writing.map((t) => t.label);
   for (const required of [
     "Teachers", "Essay Writing Engine", "Short Writing Engine", "Planning Engine",
-    "Grammar and Spelling Engine", "Library", "Memory", "Changes", "Typing and Writing Calibration",
+    "Grammar and Spelling Engine", "Library", "Memory", "Changes",
   ]) {
     assert(writingLabels.includes(required), `engine: English exposes ${required}`);
   }
-  assert(ENGINE_TOOLS.writing.length === 9, "engine: English exposes exactly the 9 specified tools");
+  assert(ENGINE_TOOLS.writing.length === 8, "engine: English exposes exactly the 8 specified tools (typing calibration is the ONE centralized section)");
 
   // ---- 3. Math exposes exactly the six specified tools -----------------------
   const mathLabels = ENGINE_TOOLS.math.map((t) => t.label);
   for (const required of [
     "Teachers", "Scan to Solve", "Type to Solve", "Teach Me How to Solve",
     "Test Preparation", "Practice Problems", "Library", "Memory", "Changes",
-    "Typing and Writing Calibration",
   ]) {
     assert(mathLabels.includes(required), `engine: Math exposes ${required}`);
   }
-  assert(ENGINE_TOOLS.math.length === 10, "engine: Math exposes exactly the 10 specified tools (one pipeline — no duplicated solver logic)");
+  assert(ENGINE_TOOLS.math.length === 9, "engine: Math exposes exactly the 9 specified tools (one pipeline — no duplicated solver logic, typing centralized)");
   assert(ENGINE_TOOLS.math.some((t) => t.path === "/math?mode=teach") && ENGINE_TOOLS.math.some((t) => t.path === "/math?mode=type"),
     "engine: Type-to-Solve and Teach-Me route into the single verified math pipeline with explicit modes");
 
   // ---- 4. Subject engines: exactly the 7 tools each (nav spec 2026-10-09) ----
   for (const id of ["biology", "chemistry", "physics", "humanities", "health", "programming", "general"] as const) {
     const labels = ENGINE_TOOLS[id].map((t) => t.label);
-    for (const required of ["Teachers", "Essay", "Writing", "Library", "Memory", "Changes", "Typing and Writing Calibration"]) {
+    for (const required of ["Teachers", "Essay", "Writing", "Library", "Memory", "Changes"]) {
       assert(labels.includes(required), `engine: ${ENGINES[id].label} exposes ${required}`);
     }
-    // Science audit 2026-10-10: Chemistry and Physics carry the 7 specified
+    // Science audit 2026-10-10: Chemistry and Physics carry the 6 shared
     // tools PLUS Scientific Calculations (required math capability); the
     // other subject engines keep exactly 7.
-    const expectedCount = (id === "chemistry" || id === "physics") ? 8 : 7;
+    const expectedCount = (id === "chemistry" || id === "physics") ? 7 : 6;
     assert(ENGINE_TOOLS[id].length === expectedCount, `engine: ${ENGINES[id].label} exposes ${expectedCount} tools`);
     assert(!labels.some((l) => l.startsWith("Scan")), `engine: ${ENGINES[id].label} keeps the scan pipeline out of its primary workflow`);
     if (id === "chemistry" || id === "physics") {
@@ -66,8 +65,8 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // Foreign Language: 8 tools, led by the functioning language selector.
   const foreignLabels = ENGINE_TOOLS.foreign_language.map((t) => t.label);
   assert(foreignLabels[0] === "Language Selector", "engine: Foreign Language leads with the Language Selector");
-  assert(ENGINE_TOOLS.foreign_language.length === 8, "engine: Foreign Language exposes exactly the 8 specified tools");
-  for (const required of ["Teachers", "Essay", "Writing", "Library", "Memory", "Changes", "Typing and Writing Calibration"]) {
+  assert(ENGINE_TOOLS.foreign_language.length === 7, "engine: Foreign Language exposes exactly the 7 specified tools (typing centralized)");
+  for (const required of ["Teachers", "Essay", "Writing", "Library", "Memory", "Changes"]) {
     assert(foreignLabels.includes(required), `engine: Foreign Language exposes ${required}`);
   }
 
@@ -107,6 +106,16 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const typingPage = readFileSync("src/app/writing/typing/page.tsx", "utf8");
   assert(typingPage.includes("TypingTest"), "typing: /writing/typing hosts the SAME TypingTest component (history and baseline untouched)");
   assert(typingPage.includes("requireUser"), "typing: /writing/typing enforces the same session guard as every protected page");
+  // Typing Calibration is ONE centralized user-level section (phase 4,
+  // 2026-10-11): not a tool card repeated under every course.
+  assert(!readFileSync("src/lib/courses/engines.ts", "utf8").includes("typingTool"),
+    "typing: NO subject workspace lists a typing tool card; the feature is centralized, not repeated under every course");
+  {
+    const navShell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+    const typingEntries = (navShell.match(/\/writing\/typing/g) ?? []).length;
+    assert(typingEntries === 1 && navShell.includes('label: "Typing Calibration"'),
+      "typing: exactly ONE dedicated Typing Calibration entry in the user side panel, labeled and centralized");
+  }
   assert(!readFileSync("src/app/api/typing/route.ts", "utf8").includes("course_id"),
     "typing: the /api/typing backend is unchanged — no recalibration, no schema change");
 
@@ -331,7 +340,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // ---- Science parent supports scientific reasoning AND math ------
   assert(subjectTools(["biology", "chemistry", "physics"]).some((t) => t.path === "/math?mode=type"),
     "science: the Science parent's tool union includes Scientific Calculations (math capability, real solver)");
-  assert(subjectTools(["biology", "chemistry", "physics"]).length === 8,
+  assert(subjectTools(["biology", "chemistry", "physics"]).length === 7,
     "science: parent union = 6 shared + Scientific Calculations + Typing (deduped, no duplicates)");
   assert(ENGINE_TOOLS.chemistry.some((t) => t.path === "/math?mode=type") && ENGINE_TOOLS.physics.some((t) => t.path === "/math?mode=type"),
     "science: Chemistry and Physics each expose Scientific Calculations");
@@ -354,18 +363,14 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(practiceRoute.includes("subjectPromptContext") && prepareRoute.includes("subjectPromptContext"),
     "science: practice and test preparation honor the subject context when no course is selected");
 
-  // ---- Calibration: ONE shared backend, every subject's link resolves ----
-  const typingToolEntry = ENGINE_TOOLS.writing.find((t) => t.path === "/writing/typing");
-  assert(typingToolEntry !== undefined && existsSync("src/app/writing/typing/page.tsx"),
-    "calibration: every subject's Typing and Writing Calibration link resolves to the REAL calibration page");
-  assert(existsSync("src/app/api/typing/route.ts"),
-    "calibration: the single shared typing persistence API exists (user-scoped, no duplicate backend)");
-  for (const eid of ["biology", "chemistry", "physics", "humanities", "health", "programming", "general", "foreign_language"] as const) {
-    assert(ENGINE_TOOLS[eid].some((t) => t.path === "/writing/typing"),
-      `calibration: ${eid} workspace exposes the calibration tool`);
+  // ---- Calibration: ONE centralized user-level section (phase 4) ----
+  assert(existsSync("src/app/writing/typing/page.tsx") && existsSync("src/app/api/typing/route.ts"),
+    "calibration: the REAL calibration page and the single shared user-scoped typing API exist (no duplicate backend)");
+  for (const eid of ["writing", "math", "foreign_language", "biology", "chemistry", "physics", "humanities", "health", "programming", "general"] as const) {
+    assert(!ENGINE_TOOLS[eid].some((t) => t.path === "/writing/typing"),
+      `calibration: ${eid} does NOT list a typing tool card; Typing Calibration is ONE centralized side-panel section, never repeated under a course`);
   }
-
-  // ---- Query-aware active states ----
+// ---- Query-aware active states ----
   const shell3 = readFileSync("src/components/app/AppShell.tsx", "utf8");
   assert(shell3.includes("toolParams.entries()") && shell3.includes("currentParams.get(k) === v"),
     "nav: query-param tools highlight ONLY when the current query matches (no false active states)");

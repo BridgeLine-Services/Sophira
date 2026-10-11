@@ -8,6 +8,23 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: ONE centralized Typing Calibration section (phase 4) (2026-10-11)
+
+- Reported: typing calibration was missing as a user-facing section and
+  appeared as a tool card under every course. Both were true: the
+  dedicated page existed (/writing/typing) but the side panel had no
+  entry, while every subject workspace listed a "Typing and Writing
+  Calibration" tool card.
+- Fix: the side panel now has exactly ONE dedicated "Typing Calibration"
+  section (next to the other user-level navigation items), and the
+  per-subject typing tool card was removed from every course workspace
+  (English, Math, Foreign Language, Biology, Chemistry, Physics,
+  History, Health, CS, Other). The shared page, assessment, baseline
+  history, pacing preferences, and user-scoped API are unchanged - no
+  second calibration system, no recalibration, no schema change.
+- Pinned in course-engine tests: no typingTool in any subject registry
+  array; exactly one /writing/typing entry in the shell.
+
 ### Upgrade round: dedupe the owner Online entries (2026-10-11)
 
 - Reported: the owner section showed two entries, "Online status" and

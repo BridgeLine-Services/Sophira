@@ -135,12 +135,6 @@ const commonTools: EngineTool[] = [
   { label: "Changes", description: "Chronological record of subject-specific corrections and preference changes.", path: "/proposals" },
 ];
 
-const typingTool: EngineTool = {
-  label: "Typing and Writing Calibration",
-  description: "Calibrate the paced text reveal to your typing speed. Kept inside the subject workspace — not in Settings.",
-  path: "/writing/typing",
-};
-
 /**
  * Scientific Calculations (Science audit 2026-10-10): solves/verifies the
  * math inside chemistry and physics work — equations, substitutions, units.
@@ -154,7 +148,7 @@ const scientificCalculationsTool: EngineTool = {
 };
 
 export const ENGINE_TOOLS: Record<EngineId, EngineTool[]> = {
-  // English: exactly the 9 tools from the spec.
+  // English: exactly the 8 tools from the spec (typing calibration is the ONE centralized user-level section, not a per-course tool).
   writing: [
     commonTools[0],
     { label: "Essay Writing Engine", description: "Substantial essays and longer writing assignments — instructions, outlines, drafts, revisions, references, and preserved draft versions.", path: "/essay" },
@@ -164,9 +158,8 @@ export const ENGINE_TOOLS: Record<EngineId, EngineTool[]> = {
     commonTools[3],
     commonTools[4],
     commonTools[5],
-    typingTool,
   ],
-  // Math: exactly the 10 tools from the spec.
+  // Math: exactly the 9 tools from the spec (typing calibration is centralized).
   math: [
     commonTools[0],
     { label: "Scan to Solve", description: "Photograph a problem, confirm the interpreted expression, then solve with verified steps.", path: "/math" },
@@ -177,9 +170,8 @@ export const ENGINE_TOOLS: Record<EngineId, EngineTool[]> = {
     commonTools[3],
     commonTools[4],
     commonTools[5],
-    typingTool,
   ],
-  // Foreign Language: 8 tools, starting with the language selector.
+  // Foreign Language: 7 tools, starting with the language selector (typing calibration is centralized).
   foreign_language: [
     { label: "Language Selector", description: "Choose your target language, explanation language, and proficiency level.", path: "/courses/foreign-language/language-selector" },
     commonTools[0],
@@ -188,20 +180,21 @@ export const ENGINE_TOOLS: Record<EngineId, EngineTool[]> = {
     commonTools[3],
     commonTools[4],
     commonTools[5],
-    typingTool,
   ],
-  // Science subjects, History, Health, CS, and Other: 7 tools each.
-  biology: [...commonTools, typingTool],
+  // Science subjects, History, Health, CS, and Other: 6 tools each
+  // (typing calibration is centralized; Chemistry and Physics also carry
+  // Scientific Calculations, so they list 7).
+  biology: [...commonTools],
   // Science audit 2026-10-10: Chemistry and Physics must support
   // appropriate MATHEMATICAL capabilities from their own workspaces — the
   // same deterministic math solver and AI explainer, not a duplicate
   // backend and not a separate model.
-  chemistry: [...commonTools, scientificCalculationsTool, typingTool],
-  physics: [...commonTools, scientificCalculationsTool, typingTool],
-  humanities: [...commonTools, typingTool],
-  health: [...commonTools, typingTool],
-  programming: [...commonTools, typingTool],
-  general: [...commonTools, typingTool],
+  chemistry: [...commonTools, scientificCalculationsTool],
+  physics: [...commonTools, scientificCalculationsTool],
+  humanities: [...commonTools],
+  health: [...commonTools],
+  programming: [...commonTools],
+  general: [...commonTools],
 };
 
 /** Tools that honor a subject scope (?subject=) at the destination page. */
