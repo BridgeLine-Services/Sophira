@@ -4,9 +4,25 @@
  * authorization chain, RLS-only reads (no admin client), complete table
  * coverage, honest truncation, downloadable response shape.
  */
-import { readFileSync } from "fs";
-import { execSync as _exec } from "child_process";
-const execSync2 = (cmd: string): string[] => _exec(cmd, { encoding: "utf8" }).split("\n").filter(Boolean);
+import { readdirSync, readFileSync } from "fs";
+import { join } from "path";
+
+const migrationTables = (): string[] => {
+  const dir = "supabase/migrations";
+  const files = readdirSync(dir)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+
+  const tables = new Set<string>();
+  for (const file of files) {
+    const sql = readFileSync(join(dir, file), "utf8");
+    const matches = sql.matchAll(/^create\s+table\s+(?:if\s+not\s+exists\s+)?public\.(\w+)/gm);
+    for (const match of matches) {
+      tables.add(match[1]);
+    }
+  }
+  return [...tables].sort();
+};
 
 export function runAccountExportTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
   section("Account data export: complete, authorized, RLS-scoped, honest");
@@ -24,9 +40,7 @@ export function runAccountExportTests(assert: (c: boolean, n: string) => void, s
     "export: the route creates the user-scoped Supabase client for every read");
 
   // Complete table coverage: every user-owned table in the migrations is exported
-  const tableLines = execSync2(
-    "grep -h '^create table' supabase/migrations/*.sql | sed 's/create table //; s/if not exists //; s/public\\.//; s/ *(.*//' | tr -d ' ' | sort -u"
-  ).filter(Boolean);
+  const tableLines = migrationTables();
   const userOwned = tableLines.filter((t) =>
     !["invitations", "invitation_requests", "app_config", "sophira_meta", "owner_bootstrap", "provider_usage"].includes(t)
   );

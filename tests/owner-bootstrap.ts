@@ -13,7 +13,7 @@ type Section = (t: string) => void;
 export function runOwnerBootstrapTests(assert: Assert, section: Section): void {
   section("First-owner bootstrap (0025): in-app owner creation, single-owner, race-safe");
 
-  const migrations = readFileSync("supabase/migrations/0025_first_owner_bootstrap.sql", "utf8");
+  const migrations = readFileSync("supabase/migrations/0025_first_owner_bootstrap.sql", "utf8").replace(/\r\n/g, "\n");
   const createOwner = readFileSync("src/app/create-owner/page.tsx", "utf8");
   const setupPage = readFileSync("src/app/setup/page.tsx", "utf8");
   const route = readFileSync("src/app/api/setup-status/route.ts", "utf8");
@@ -40,7 +40,7 @@ export function runOwnerBootstrapTests(assert: Assert, section: Section): void {
   // ---- legacy operator intent preserved ----
   assert(migrations.includes("lower(v_owner_email) = lower(new.email)"),
     "bootstrap: a CONFIGURED owner_email still restricts the claim to that exact email");
-  assert(migrations.includes("insert into public.owner_bootstrap (id, claimed_by)\nselect 1, p.id"),
+  assert(/insert into public\.owner_bootstrap \(id, claimed_by\)\s*select 1, p\.id/s.test(migrations),
     "bootstrap: existing 0008-flow deployments get their window closed by the seed insert (no second owner)");
 
   // ---- the owner UI is honest and non-technical ----

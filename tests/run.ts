@@ -2576,7 +2576,7 @@ async function runSecurityRegressionTests(): Promise<void> {
       `security: EVERY table has RLS enabled (missing: ${noRls.join(", ") || "none"}) — no table may be world-readable`);
 
     // ---- every policy must be auth.uid()-scoped (no permissive policy) --
-    const policyRe = /create policy\s+(?:"[^"]+"|\w+)\s+on\s+public\.(\w+)[\s\S]*?;(?:\n|$)/g;
+    const policyRe = /create policy\s+(?:"[^"]+"|\w+)\s+on\s+public\.(\w+)[\s\S]*?;(?:\r?\n|$)/g;
     const policies: { table: string; body: string }[] = [];
     while ((m = policyRe.exec(sql)) !== null) policies.push({ table: m[1], body: m[0] });
     assert(policies.length >= 30, `security: found a sane number of policies (${policies.length})`);
