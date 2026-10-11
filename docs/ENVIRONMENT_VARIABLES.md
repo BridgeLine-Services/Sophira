@@ -71,6 +71,29 @@ Vercel deployment and environment sync (including the Supabase
 Integration and `vercel env pull`) are documented in
 **docs/VERCEL_DEPLOYMENT.md**.
 
+## MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET (optional until Word integration goes live)
+
+Server-side only. The Microsoft Entra app credentials for the Word
+integration ("Save to Word" in the notebook workspace). Create the app
+registration and secret exactly as described in
+docs/WORD_GOOGLE_DOCS_SETUP.md; the redirect URI required is
+https://sophira.vercel.app/api/integrations/microsoft/callback. The
+CLIENT ID is not secret, but the CLIENT SECRET is: place both in your
+hosting provider's environment settings, never in chat, files, or client
+code. Without them the integration honestly reports "not configured"
+and all local downloads (DOCX/PDF/PPTX) keep working.
+
+## GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET (optional until Google Docs integration goes live)
+
+Server-side only. The Google Cloud OAuth client credentials for the
+Google Docs integration ("Save to Google Docs"). Create the OAuth client
+exactly as described in docs/WORD_GOOGLE_DOCS_SETUP.md; the redirect URI
+required is https://sophira.vercel.app/api/integrations/google/callback,
+and the app requests ONLY the drive.file scope (documents created
+through Sophira - never the whole Drive). The CLIENT SECRET is secret:
+place both in your hosting provider's environment settings. Without them
+the integration honestly reports "not configured".
+
 ## GITHUB_HEALTH_TOKEN (optional, server-side only)
 
 Lets the Owner Dashboard's "Start a fresh full check" button start the
