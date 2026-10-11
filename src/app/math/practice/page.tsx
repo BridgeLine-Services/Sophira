@@ -16,6 +16,7 @@ export default function PracticePage() {
 
 function PracticeInner() {
   const courseId = useSearchParams().get("course_id");
+  const subject = useSearchParams().get("subject");
   const supabase = createClient();
   const { toast } = useToast();
   const [topic, setTopic] = useState("");
@@ -37,7 +38,7 @@ function PracticeInner() {
     try {
       const res = await fetch("/api/math/practice", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "generate", topic, count: 5, material_ids: picked, course_id: courseId, past_problems: problems.map((p) => p.problem ?? "") }),
+        body: JSON.stringify({ mode: "generate", topic, count: 5, material_ids: picked, course_id: courseId, subject, past_problems: problems.map((p) => p.problem ?? "") }),
       });
       const json = await res.json();
       if (!res.ok) { toast("error", json.error ?? "Could not generate problems."); return; }
@@ -55,7 +56,7 @@ function PracticeInner() {
     try {
       const res = await fetch("/api/math/practice", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "check", problem: p.problem, student_answer: attempt, course_id: courseId }),
+        body: JSON.stringify({ mode: "check", problem: p.problem, student_answer: attempt, course_id: courseId, subject }),
       });
       const json = await res.json();
       if (!res.ok) { toast("error", json.error ?? "Could not check your attempt."); return; }

@@ -202,6 +202,12 @@ const SUBJECT_SCOPED_PATHS = new Set([
   "/library", "/learning", "/proposals",
   "/essay", "/writing", "/writing/planning", "/writing/grammar", "/teachers",
   "/math",
+  // 2026-10-12 subject-propagation audit: these three tool routes were
+  // reachable from subject workspaces but silently lost the subject —
+  // the link never carried it and the destination never forwarded it.
+  "/math/practice",
+  "/math/test-prep",
+  "/courses/foreign-language/language-selector",
 ]);
 
 /** Attach the course context to a tool link (course workspaces). */

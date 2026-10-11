@@ -8,6 +8,20 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Fix round: subject propagation audit — the three silently-unscoped routes (2026-10-12)
+
+- /math/practice, /math/test-prep, and /courses/foreign-language/
+  language-selector were reachable from subject workspaces but the
+  links never carried the subject and the destinations never
+  forwarded it. All three are now subject-scoped; the math pages read
+  and forward the subject on every API call (generate + check +
+  prepare), and the APIs already consumed it into the shared
+  subjectPromptContext builder.
+- Query-param preservation pinned (?x -> &subject=), invalid-slug
+  honesty pinned (subjectBySlug -> null; context builder returns ""),
+  and genuinely non-scoped routes keep their plain route.
+- 12 new/updated assertions. Battery: 3355/3355 green; tsc clean.
+
 ### Upgrade round: revision-guarded, section-scoped Google Docs write-back (2026-10-12)
 
 - Objective 5 round 1: a member can write their draft into their

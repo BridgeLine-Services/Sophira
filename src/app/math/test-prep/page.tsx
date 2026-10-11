@@ -15,6 +15,7 @@ export default function TestPrepPage() {
 
 function TestPrepInner() {
   const courseId = useSearchParams().get("course_id");
+  const subject = useSearchParams().get("subject");
   const supabase = createClient();
   const { toast } = useToast();
   const [topics, setTopics] = useState("");
@@ -34,7 +35,7 @@ function TestPrepInner() {
     try {
       const res = await fetch("/api/math/prepare", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topics, exam_date: examDate || null, material_ids: picked, course_id: courseId }),
+        body: JSON.stringify({ topics, exam_date: examDate || null, material_ids: picked, course_id: courseId, subject }),
       });
       const json = await res.json();
       if (!res.ok) { toast("error", json.error ?? "Could not build the study plan."); return; }

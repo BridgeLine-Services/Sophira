@@ -79,8 +79,14 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "nav: subject-scoped tools carry ?subject= (Library)");
   assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "math") === "/math?subject=math",
     "nav: subject workspaces carry ?subject= into the math solver");
-  assert(subjectToolUrl({ label: "Test Preparation", description: "", path: "/math/test-prep" }, "math") === "/math/test-prep",
-    "nav: non-scoped tools keep their plain route");
+  assert(subjectToolUrl({ label: "Test Preparation", description: "", path: "/math/test-prep" }, "math") === "/math/test-prep?subject=math",
+    "nav: the test-prep route now carries ?subject= (was silently unscoped)");
+  assert(subjectToolUrl({ label: "Practice Problems", description: "", path: "/math/practice" }, "math") === "/math/practice?subject=math",
+    "nav: the practice route now carries ?subject= (was silently unscoped)");
+  assert(subjectToolUrl({ label: "Language Selector", description: "", path: "/courses/foreign-language/language-selector" }, "foreign-language") === "/courses/foreign-language/language-selector?subject=foreign-language",
+    "nav: the language-selector route now carries ?subject= (was silently unscoped)");
+  assert(subjectToolUrl({ label: "Downloads", description: "", path: "/downloads" }, "math") === "/downloads",
+    "nav: genuinely non-scoped routes keep their plain route");
 
   // ---- 4. Tool URLs carry the course context --------------------------------
   assert(toolUrl(ENGINE_TOOLS.writing[0], "abc-123") === "/teachers?course_id=abc-123",
@@ -595,5 +601,37 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const mathPage = readFileSync("src/app/math/page.tsx", "utf8");
   assert(mathPage.includes('urlMode === "teach"') && mathPage.includes('urlMode === "type"'),
     "math: /math?mode=teach and /math?mode=type open the correct workflows");
+
+
+  // ==== Subject propagation audit (2026-10-12): the three missing routes ====
+  section("subject propagation audit (scoped routes, param preservation)");
+  {
+    const enginesSrc = readFileSync("src/lib/courses/engines.ts", "utf8");
+    for (const route of ["/math/practice", "/math/test-prep", "/courses/foreign-language/language-selector"]) {
+      assert(enginesSrc.includes(`"${route}"`),
+        `routing: ${route} is subject-scoped — links from subject workspaces now carry the subject`);
+    }
+    const practicePage = readFileSync("src/app/math/practice/page.tsx", "utf8");
+    assert(practicePage.includes('get("subject")') &&
+      practicePage.includes("course_id: courseId, subject, past_problems") &&
+      practicePage.includes("course_id: courseId, subject })"),
+      "routing: /math/practice reads the subject param and forwards it on BOTH API calls (generate + check)");
+    const prepPage = readFileSync("src/app/math/test-prep/page.tsx", "utf8");
+    assert(prepPage.includes('get("subject")') && prepPage.includes("course_id: courseId, subject })"),
+      "routing: /math/test-prep reads the subject param and forwards it to the prepare API");
+    const practiceApi = readFileSync("src/app/api/math/practice/route.ts", "utf8");
+    assert(practiceApi.includes("subject?: string | null") && practiceApi.includes("body.subject"),
+      "ai: the practice API consumes the subject into the shared prompt-context builder");
+    const prepApi = readFileSync("src/app/api/math/prepare/route.ts", "utf8");
+    assert(prepApi.includes("subject?: string | null") && prepApi.includes("body.subject"),
+      "ai: the test-prep API consumes the subject into the shared prompt-context builder");
+    // Query-param preservation: a scoped route that already has params gets &subject=
+    assert(subjectToolUrl({ label: "Type to Solve", description: "", path: "/math?mode=type" }, "math") === "/math?mode=type&subject=math",
+      "routing: an existing query string is preserved and & is used (no broken ?x?subject= link)");
+    // Invalid subject slugs: the AI context builder is honest, never guesses
+    const { subjectBySlug } = require("../src/lib/courses/engines") as typeof import("../src/lib/courses/engines");
+    assert(subjectBySlug("not-a-real-subject") === null,
+      "ai: an invalid subject slug resolves to null — never treated as a real subject");
+  }
 
 }
