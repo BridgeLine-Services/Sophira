@@ -3,7 +3,7 @@
 Moved verbatim from README.md on 2026-10-07 (documentation-consistency
 round). "Suite:" numbers inside rows are the historical assertion counts at
 the time each feature landed; the CURRENT full-suite count is what `npm test`
-reports (2943 assertions as of 2026-10-09; `npm test` is authoritative). Per-feature status stays honest: "Implemented +
+reports (3,045 assertions as of 2026-10-11; `npm test` is authoritative). Per-feature status stays honest: "Implemented +
 automated tests" means wired end-to-end and covered offline; "requires
 external configuration" means the feature reports honestly and fabricates
 nothing until the owner configures it.
@@ -48,6 +48,35 @@ nothing until the owner configures it.
 | ONLINE STATUS PAGE (honest connectivity) | **Implemented and unit-tested (offline)** — `/online` (nav item included): real `navigator.onLine` connectivity, live `/api/health` probe, real pending-sync queue count and sync trigger from the existing offline engine. Unknown or failed states are reported honestly — the page never shows a false online or fabricated sync state. |
 | CHRONOLOGICAL CHANGES + SUBJECT-SCOPED VIEW | **Implemented and unit-tested (offline)** — `/proposals` rebuilt: global chronological change history (decided profile updates, learning patterns, memory updates) reading only real schema columns (`change_summary`, `decided_at`, `target_type`); with `?course_id=` it becomes the SUBJECT-scoped view, and a subject change never rewrites another subject's memories. |
 
-| NAVIGATION HIERARCHY + SUBJECT WORKSPACES (nav spec 2026-10-09) | **Implemented and unit-tested (offline)** — expandable Courses group (per-user persisted state, aria-expanded chevrons separate from links, auto-expand for direct nested routes), nested Science (Biology/Chemistry/Physics only beneath Science), spec-ordered subjects, spec-exact tool registry (English 9, Math 10, Foreign Language 8 with functioning persisted Language Selector — migration 0030, RLS; all others 7), 10 subject workspace routes, mobile drawer with focus management, real online status chip, global Changes merged into Learning / Memory, and real ?subject= scoping for Library/Memory/Changes. Suite: 3000. |
+| NAVIGATION HIERARCHY + SUBJECT WORKSPACES (nav spec 2026-10-09, gap-closure 2026-10-10) | **Implemented and unit-tested (offline)** — expandable Courses group (per-user persisted state, aria-expanded chevrons separate from links, auto-expand for direct nested routes), nested Science (Biology/Chemistry/Physics only beneath Science), spec-ordered subjects, spec-exact tool registry (English 9, Math 10, Foreign Language 8 with functioning persisted Language Selector — migration 0030, RLS; Chemistry and Physics 8 each with Scientific Calculations routing into the EXISTING deterministic math solver + AI explainer with a subject hint — no duplicate backend, no separate-model claim; Biology and all others 7), Science parent and nav drawer show the deduped union of Biology + Chemistry + Physics tools, query-aware active states (/math?mode=type vs mode=teach highlight only on a true query match), 10 subject workspace routes, mobile drawer with focus management, real online status chip, global Changes merged into Learning / Memory, and real ?subject= scoping for Library/Memory/Changes (+ the math solver). Suite: 3045. |
 See TEST_REPORT.md for the scenario-based acceptance history and
 docs/CHANGELOG.md for the dated upgrade rounds.
+
+---
+
+## Final gap-closure audit record (2026-10-11)
+
+**Branch:** `master` · **Commit:** `bdfa339` · **Suite:** 3,045/3,045 passed,
+`tsc` clean, `next build` clean, secret scan clean, `npm run verify` PASS.
+
+**Release gate at this commit:** 39 checks — 21 PASS, 0 FAIL, 17 BLOCKED,
+1 NOT RUN (APK). RELEASE STATUS: BLOCKED, entirely by owner-side
+configuration and physical-device verification — no code-side gate failure:
+
+- Live database / RLS / invitation / privacy / security-live matrices —
+  require production Supabase credentials (migrations 0001-0030 unverified
+  against production from this environment).
+- Production URL, AI provider, and search provider live tests — require
+  owner-configured deployment and keys.
+- PWA on physical Android/iPhone, APK build + device test — require
+  hardware and the Android toolchain (see docs/DEVICE_ACCEPTANCE.md,
+  docs/NATIVE_BUILDS.md).
+- Legal placeholders — require owner-supplied legal facts
+  (docs/legal/LEGAL_CONFIGURATION.md).
+
+Typing calibration: intentionally ONE shared, user-global baseline
+(migrations 0009 + 0018, user_id-scoped) — it measures the human's typing
+speed for paced output, not subject knowledge. Exposed from every subject
+workspace to the single real /writing/typing page; never a separate
+Settings feature. No data-model change was needed or made.
+

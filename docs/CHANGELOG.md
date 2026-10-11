@@ -8,6 +8,28 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: science gap-closure + final navigation audit (2026-10-10, commit bdfa339)
+
+- Science audit vs the master nav spec: Chemistry and Physics now expose
+  Scientific Calculations (/math?mode=type) into the EXISTING
+  deterministic math solver + AI explainer with a subject hint (units,
+  scientific notation, physical meaning) — no duplicate backend, no
+  separate-model claim. The Science parent workspace and the nav drawer
+  show the deduped union of Biology + Chemistry + Physics tools.
+- /api/ai/solve accepts a declared subject slug: a subject workspace
+  seeds the real workflow routing (chemistry/physics get their
+  mathjs-verified scientific workflows); AI classification still wins
+  when more specific. Practice and test-prep honor subject context when
+  no course is selected.
+- Query-aware nav active states: /math?mode=type vs /math?mode=teach
+  highlight only on a true query match (client-side search read, no
+  useSearchParams/Suspense trap).
+- Calibration audit: ONE shared user-global backend (migrations 0009 +
+  0018), every subject's link resolves to the real /writing/typing page.
+- Release gate: migration probe 0028 -> 0030 (subject_preferences REST
+  probe, 0001-0030 chain). Suite: 3045. Gate at this commit: 21 PASS,
+  0 FAIL, 17 BLOCKED (owner-side), 1 NOT RUN (APK).
+
 ### Upgrade round: navigation hierarchy + subject workspaces (2026-10-10)
 
 - Exact navigation hierarchy (spec): expandable Courses group with per-user
