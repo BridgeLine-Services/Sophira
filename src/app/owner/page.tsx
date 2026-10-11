@@ -76,9 +76,10 @@ export default async function OwnerPage() {
   return (
     <AppShell
       title="Owner Dashboard"
+      variant="owner"
       actions={
         <Link href="/dashboard?view=workspace">
-          <Button size="sm" variant="secondary">My workspace</Button>
+          <Button size="sm" variant="secondary">My Workspace</Button>
         </Link>
       }
     >

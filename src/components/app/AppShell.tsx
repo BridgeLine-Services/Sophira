@@ -7,7 +7,7 @@ import { CloudOff } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { BookOpen, Brain, ChevronDown, GraduationCap, Home, Library, LogOut, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, Wifi, X } from "lucide-react";
+import { BookOpen, Brain, Briefcase, ChevronDown, Gauge, GraduationCap, Home, Library, LogOut, MailQuestion, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, UserPlus, Users, Wifi, X } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 
 const NAV = [
@@ -17,6 +17,22 @@ const NAV = [
   { href: "/learning", label: "Learning / Memory", icon: Brain },
   { href: "/offline", label: "Offline", icon: CloudOff },
   { href: "/settings", label: "Settings", icon: Settings },
+];
+
+/**
+ * OWNER NAV (workspace-separation round 2026-10-11): the Owner Dashboard is
+ * its OWN environment with its own navigation layout. "My Workspace" is the
+ * single intentional exit into the personal academic workspace; the owner
+ * view never shows the workspace sections (Courses tree, Notebooks, etc.),
+ * and the workspace only links back here through the explicit Owner
+ * Dashboard entry and the brand logo.
+ */
+const OWNER_NAV = [
+  { href: "/dashboard?view=workspace", label: "My Workspace", icon: Briefcase },
+  { href: "#overview", label: "Overview", icon: Gauge },
+  { href: "#requests", label: "Invitation requests", icon: MailQuestion },
+  { href: "#invite", label: "Invite someone", icon: UserPlus },
+  { href: "#members", label: "Members", icon: Users },
 ];
 
 /**
@@ -197,10 +213,11 @@ function CourseTree({ userId, pathname, onNavigate }: {
   );
 }
 
-export function AppShell({ title, backHref, actions, children }: {
+export function AppShell({ title, backHref, actions, variant = "workspace", children }: {
   title: string;
   backHref?: string;
   actions?: ReactNode;
+  variant?: "workspace" | "owner";
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -333,8 +350,31 @@ export function AppShell({ title, backHref, actions, children }: {
     </Link>
   );
 
+  // Owner-environment navigation (workspace-separation round 2026-10-11):
+  // the owner layout lists only owner views + the single intentional exit to
+  // the personal workspace. No workspace sections leak into this environment.
+  const ownerNavLink = (href: string, label: string, Icon: typeof Home) => (
+    <Link
+      key={href}
+      href={href}
+      onClick={drawerOpen ? closeDrawer : undefined}
+      className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
+    >
+      <Icon className="h-4 w-4" aria-hidden />
+      {label}
+    </Link>
+  );
+
+  // Workspace-separation fix (2026-10-11): for the owner, bare /dashboard
+  // redirects to the Owner Dashboard (role routing), which would yank the
+  // user out of the workspace on every Home click. The workspace Home
+  // carries ?view=workspace for owners; the active state compares the
+  // base path so the query never breaks highlighting.
+  const workspaceHomeHref = isOwner ? "/dashboard?view=workspace" : "/dashboard";
+
   const navLink = (href: string, label: string, Icon: typeof Home) => {
-    const active = pathname === href || pathname.startsWith(href + "/");
+    const base = href.split("?")[0];
+    const active = pathname === base || pathname.startsWith(base + "/");
     return (
       <Link
         key={href}
@@ -357,24 +397,30 @@ export function AppShell({ title, backHref, actions, children }: {
         className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-ink/10 bg-paper/95 backdrop-blur lg:flex"
         aria-label="Primary"
       >
-        <Link href="/dashboard" className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
+        <Link href={variant === "owner" ? "/owner" : isOwner ? "/owner" : "/dashboard"} className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">S</span>
           Sophira
         </Link>
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label="Sections">
-          {isOwner && (
-            <Link
-              href="/owner"
-              className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
-                pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5")}
-            >
-              <ShieldCheck className="h-4 w-4" aria-hidden />
-              Owner Dashboard
-            </Link>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label={variant === "owner" ? "Owner sections" : "Sections"}>
+          {variant === "owner" ? (
+            OWNER_NAV.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))
+          ) : (
+            <>
+              {isOwner && (
+                <Link
+                  href="/owner"
+                  className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
+                    pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5")}
+                >
+                  <ShieldCheck className="h-4 w-4" aria-hidden />
+                  Owner Dashboard
+                </Link>
+              )}
+              {navLink(workspaceHomeHref, "Home", Home)}
+              <CourseTree userId={userId} pathname={pathname} />
+              {NAV.filter((n) => n.href !== "/courses" && n.href !== "/dashboard").map((n) => navLink(n.href, n.label, n.icon))}
+            </>
           )}
-          {navLink("/dashboard", "Home", Home)}
-          <CourseTree userId={userId} pathname={pathname} />
-          {NAV.filter((n) => n.href !== "/courses" && n.href !== "/dashboard").map((n) => navLink(n.href, n.label, n.icon))}
           {onlineChip(false)}
         </nav>
         <div className="border-t border-ink/10 p-3">
@@ -406,14 +452,14 @@ export function AppShell({ title, backHref, actions, children }: {
           </button>
           {backHref ? (
             <Link
-              href={backHref}
+              href={backHref === "/dashboard" && isOwner ? "/dashboard?view=workspace" : backHref}
               aria-label="Back"
               className="-ml-1 flex h-11 items-center rounded-lg px-2 text-ink-soft hover:bg-ink/5"
             >
               ←
             </Link>
           ) : (
-            <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-ink lg:hidden">
+            <Link href={variant === "owner" ? "/owner" : isOwner ? "/owner" : "/dashboard"} className="flex items-center gap-2 font-semibold text-ink lg:hidden">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">S</span>
               <span className="hidden sm:inline">Sophira</span>
             </Link>
@@ -432,25 +478,38 @@ export function AppShell({ title, backHref, actions, children }: {
           </button>
         </div>
         <nav className="mx-auto hidden max-w-4xl gap-1 overflow-x-auto px-4 pb-2 md:flex lg:hidden" aria-label="Main">
-          {isOwner && (
-            <Link
-              href="/owner"
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
-                pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5"
+          {variant === "owner" ? (
+            OWNER_NAV.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
+              >
+                <Icon className="h-4 w-4" aria-hidden />
+                {label}
+              </Link>
+            ))
+          ) : (
+            <>
+              {isOwner && (
+                <Link
+                  href="/owner"
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
+                    pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5"
+                  )}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  Owner
+                </Link>
               )}
-            >
-              <ShieldCheck className="h-4 w-4" />
-              Owner
-            </Link>
-          )}
-          {NAV.map(({ href, label, icon: Icon }) => (
+              {NAV.map(({ href: navHref, label, icon: Icon }) => (
             <Link
-              key={href}
-              href={href}
+              key={navHref}
+              href={navHref === "/dashboard" ? workspaceHomeHref : navHref}
               className={cn(
                 "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
-                pathname === href || pathname.startsWith(href + "/")
+                pathname === navHref || pathname.startsWith(navHref + "/")
                   ? "bg-accent-soft text-accent"
                   : "text-ink-soft hover:bg-ink/5"
               )}
@@ -459,6 +518,8 @@ export function AppShell({ title, backHref, actions, children }: {
               {label}
             </Link>
           ))}
+            </>
+          )}
         </nav>
       </header>
 
@@ -497,14 +558,20 @@ export function AppShell({ title, backHref, actions, children }: {
               </button>
             </div>
             <nav className="flex-1 space-y-0.5 px-3 pb-4" aria-label="Sections">
-              {isOwner && (
-                <Link href="/owner" onClick={closeDrawer} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/5">
-                  <ShieldCheck className="h-4 w-4" aria-hidden /> Owner Dashboard
-                </Link>
+              {variant === "owner" ? (
+                OWNER_NAV.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))
+              ) : (
+                <>
+                  {isOwner && (
+                    <Link href="/owner" onClick={closeDrawer} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/5">
+                      <ShieldCheck className="h-4 w-4" aria-hidden /> Owner Dashboard
+                    </Link>
+                  )}
+                  {navLink(workspaceHomeHref, "Home", Home)}
+                  <CourseTree userId={userId} pathname={pathname} onNavigate={closeDrawer} />
+                  {NAV.filter((n) => n.href !== "/courses" && n.href !== "/dashboard").map((n) => navLink(n.href, n.label, n.icon))}
+                </>
               )}
-              {navLink("/dashboard", "Home", Home)}
-              <CourseTree userId={userId} pathname={pathname} onNavigate={closeDrawer} />
-              {NAV.filter((n) => n.href !== "/courses" && n.href !== "/dashboard").map((n) => navLink(n.href, n.label, n.icon))}
               {onlineChip(true)}
             </nav>
             <div className="border-t border-ink/10 p-3">

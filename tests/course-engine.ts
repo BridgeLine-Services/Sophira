@@ -372,6 +372,33 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(shell3.includes("subjectTools(engines)"),
     "nav: the drawer shows the subject's full tool union (Science parent = combined children)");
 
+  // ============================================================
+  // WORKSPACE SEPARATION (2026-10-11): Owner Dashboard vs personal
+  // academic workspace — two environments, two navigation layouts.
+  // ============================================================
+  const shell4 = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  assert(shell4.includes("OWNER_NAV") && shell4.includes("My Workspace") && shell4.includes("/dashboard?view=workspace"),
+    "owner: the owner layout has its own navigation with My Workspace as the single intentional exit into the personal workspace");
+  assert(shell4.includes('variant === "owner" ? (') && shell4.includes('variant?: "workspace" | "owner"'),
+    "owner: AppShell has separate owner and workspace navigation layouts (variant prop)");
+  assert(shell4.includes('variant === "owner" ? "/owner" : isOwner ? "/owner" : "/dashboard"'),
+    "owner: the Sophira logo opens the Owner Dashboard for the owner (workspace users keep /dashboard)");
+  assert(shell4.includes('workspaceHomeHref = isOwner ? "/dashboard?view=workspace" : "/dashboard"') && shell4.includes('navLink(workspaceHomeHref, "Home", Home)'),
+    "workspace: Home inside the workspace opens the WORKSPACE Home even for the owner (no silent reset to the owner view)");
+  assert(shell4.includes('href.split("?")[0]') && shell4.includes('pathname === base'),
+    "workspace: query-carrying workspace links keep working active states");
+  assert(shell4.includes('backHref === "/dashboard" && isOwner ? "/dashboard?view=workspace" : backHref'),
+    "workspace: owner back-navigation from tool pages returns to the workspace, not the owner view");
+  const ownerPage2 = readFileSync("src/app/owner/page.tsx", "utf8");
+  assert(ownerPage2.includes('variant="owner"') && ownerPage2.includes("My Workspace"),
+    "owner: the Owner Dashboard renders the owner layout with a My Workspace action");
+  const dashPage = readFileSync("src/app/dashboard/page.tsx", "utf8");
+  assert(dashPage.includes('profile.role === "owner" && view !== "workspace"') && dashPage.includes('redirect("/owner")'),
+    "owner: bare /dashboard still role-routes the owner to the Owner Dashboard on direct entry (preserved behavior)");
+  const ownerDash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  assert(ownerDash.includes('id="overview"') && ownerDash.includes('id="requests"') && ownerDash.includes('id="invite"') && ownerDash.includes('id="members"'),
+    "owner: dashboard sections have anchor targets for the owner navigation items");
+
   // Courses hierarchy: Science is a parent with Biology/Chemistry/Physics nested.
   const coursesPage = readFileSync("src/app/courses/page.tsx", "utf8");
   assert(coursesPage.includes("COURSE_GROUPS"), "courses: the page renders the parent/nested course hierarchy");

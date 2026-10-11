@@ -168,7 +168,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
       )}
 
       {/* Overview tiles — aggregate activity only, never academic content */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div id="overview" className="grid grid-cols-2 gap-3 scroll-mt-4 sm:grid-cols-4">
         <Card><CardContent className="p-4">
           <p className="text-xs text-ink-soft">Total members</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{members.length}</p>
@@ -188,7 +188,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
       </div>
 
       {/* Invitation requests (workflow §5 — user-requested, owner-decided) */}
-      <section>
+      <section id="requests" className="scroll-mt-4">
         <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
           <MailQuestion className="h-5 w-5 text-accent" /> Invitation requests
         </h2>
@@ -235,7 +235,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
       </section>
 
       {/* Direct invitations */}
-      <section>
+      <section id="invite" className="scroll-mt-4">
         <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
           <UserPlus className="h-5 w-5 text-accent" /> Invite someone
         </h2>
@@ -325,7 +325,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
       </section>
 
       {/* Members */}
-      <section>
+      <section id="members" className="scroll-mt-4">
         <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
           <Users className="h-5 w-5 text-accent" /> Members
         </h2>
