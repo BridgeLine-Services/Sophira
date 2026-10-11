@@ -51,7 +51,7 @@ jobs:
         with:
           script: |
             const title = "Sophira health check needs your attention";
-            const { data: open } = await github.rest.issues.listForIssues({
+            const { data: open } = await github.rest.issues.listForRepo({
               owner: context.repo.owner, repo: context.repo.repo, state: "open", per_page: 100,
             });
             const existing = open.find((i) => i.title === title);

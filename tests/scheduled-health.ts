@@ -28,7 +28,7 @@ export function runScheduledHealthTests(assert: (c: boolean, n: string) => void,
     "scheduled health: no secret value is ever interpolated into the workflow (nothing sensitive in logs)");
   assert(wf.includes("upload-artifact") && wf.includes("retention-days"),
     "scheduled health: the full report is preserved as evidence, with a retention limit");
-  assert(wf.includes("needs your attention") && wf.includes("listForIssues"),
+  assert(wf.includes("needs your attention") && wf.includes("listForRepo"),
     "scheduled health: the owner notification is ONE pinned issue, searched before creation so it can never duplicate");
   assert(wf.includes('state: "closed"'),
     "scheduled health: the issue closes automatically when everything genuinely passes");

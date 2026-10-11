@@ -8,6 +8,21 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: health workflow notify fix (verified by a REAL dispatch) (2026-10-11)
+
+- First real execution of the scheduled health check (manual dispatch of
+  .github/workflows/health.yml, run 38117666331): the full gate ran in
+  Actions, the report artifact was saved, and the summarize step parsed
+  the real TOTAL line (39 checks: 21 PASS / 0 FAIL / 17 BLOCKED /
+  1 NOT RUN), but the owner-notification step crashed with
+  "github.rest.issues.listForIssues is not a function" - the
+  actions/github-script@v7 Octokit exposes the classic listForRepo
+  method name. Fixed the workflow to use listForRepo (and the
+  scheduled-health test pin that had matched the wrong name).
+- Everything else in the pipeline is verified working from the real run:
+  checkout, npm ci, the full gate battery, TOTAL parsing, and artifact
+  upload all succeeded.
+
 ### Upgrade round: ONE centralized Typing Calibration section (phase 4) (2026-10-11)
 
 - Reported: typing calibration was missing as a user-facing section and
