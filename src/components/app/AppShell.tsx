@@ -34,10 +34,11 @@ const NAV = [
 const OWNER_NAV = [
   { href: "/owner/health", label: "System Health", icon: Gauge },
   { href: "/dashboard?view=workspace", label: "My Workspace", icon: Briefcase },
-  { href: "#overview", label: "Overview", icon: Gauge },
-  { href: "#requests", label: "Invitation requests", icon: MailQuestion },
-  { href: "#invite", label: "Invite someone", icon: UserPlus },
-  { href: "#members", label: "Members", icon: Users },
+  { href: "/owner#overview", label: "Overview", icon: Gauge },
+  { href: "/owner#requests", label: "Invitation requests", icon: MailQuestion },
+  { href: "/owner#invite", label: "Invite someone", icon: UserPlus },
+  { href: "/owner#members", label: "Members", icon: Users },
+  { href: "/online", label: "Online status", icon: Wifi },
 ];
 
 /**
@@ -358,17 +359,26 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
   // Owner-environment navigation (workspace-separation round 2026-10-11):
   // the owner layout lists only owner views + the single intentional exit to
   // the personal workspace. No workspace sections leak into this environment.
-  const ownerNavLink = (href: string, label: string, Icon: typeof Home) => (
-    <Link
-      key={href}
-      href={href}
-      onClick={drawerOpen ? closeDrawer : undefined}
-      className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
-    >
-      <Icon className="h-4 w-4" aria-hidden />
-      {label}
-    </Link>
-  );
+  // Production nav fix (2026-10-11): section links carry the /owner route so
+  // they resolve correctly from EVERY owner page (a hash-only href resolves
+  // against the current URL, which is why they did nothing on /owner/health).
+  // Active styling is route-aware and never faked for a section link.
+  const ownerNavLink = (href: string, label: string, Icon: typeof Home) => {
+    const active = !href.includes("#") && pathname === href.split("#")[0].split("?")[0];
+    return (
+      <Link
+        key={href}
+        href={href}
+        onClick={drawerOpen ? closeDrawer : undefined}
+        className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
+          active ? "bg-ink/10 text-ink" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
+        }`}
+      >
+        <Icon className="h-4 w-4" aria-hidden />
+        {label}
+      </Link>
+    );
+  };
 
   // Workspace-separation fix (2026-10-11): for the owner, bare /dashboard
   // redirects to the Owner Dashboard (role routing), which would yank the

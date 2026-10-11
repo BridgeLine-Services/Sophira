@@ -161,6 +161,22 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
     return `${Math.floor(hrs / 24)} d ago`;
   };
 
+  // Production nav fix (2026-10-11): make /owner#section links work when
+  // arriving from any owner page, on direct URL entry, refresh, and browser
+  // back/forward. Without this, client-side navigation lands at the top of
+  // the page and the section link appears to do nothing.
+  useEffect(() => {
+    const scrollToHash = () => {
+      const h = window.location.hash;
+      if (!h || h.length < 2) return;
+      const el = document.getElementById(h.slice(1));
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    scrollToHash();
+    window.addEventListener("hashchange", scrollToHash);
+    return () => window.removeEventListener("hashchange", scrollToHash);
+  }, []);
+
   return (
     <div className="space-y-8">
       {toastMsg && (

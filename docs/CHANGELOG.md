@@ -8,6 +8,29 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: production fixes - owner nav, IndexedDB keys, System Health honesty (2026-10-11)
+
+- Owner navigation (reported: Invitation requests / Invite someone /
+  Members / Overview did nothing from /owner/health): root cause was
+  hash-only hrefs, which resolve against the CURRENT route. They now
+  carry the /owner route first (/owner#members etc.), with route-aware
+  active styling, an Online status entry, and a hash-scroll effect so
+  direct URL entry, refresh, and browser back/forward all reach the
+  section. Server-side owner authorization untouched.
+- Offline storage (reported: "Failed to execute 'put' on
+  'IDBObjectStore': The object store uses out-of-line keys and has no
+  key generator and the key parameter was not provided"): the kv store
+  is intentionally out-of-line keyed, but its write omitted the key.
+  Every kv write now supplies the key explicitly - no schema change,
+  no store recreation, no data loss; existing encrypted records and
+  queued edits preserved.
+- System Health in the deployed architecture: the hosting environment
+  cannot run the local gate script; the response now says so in plain
+  English with the REAL alternatives (the weekly automatic checkup and
+  the Run-workflow page) instead of a dead end. Still an honest
+  failure, never a cached success; owner-only access preserved.
+- 16 new assertions (tests/prod-fixes.ts, source + loop-expanded). Suite: 3186.
+
 ### Upgrade round: What I Need to Do Next (phase 15 deliverable) (2026-10-11)
 
 - docs/WHAT_I_NEED_TO_DO_NEXT.md: the beginner guide the owner asked for,

@@ -50,7 +50,7 @@ export async function GET() {
       {
         ok: false,
         error:
-          "The release checks could not run in this environment. This is a real failure, not a pass. The same checks run in the project's continuous integration, where full evidence is produced.",
+          "The release checks cannot run inside the app hosting environment (it does not allow running the full local check suite there). This is a real limitation, not a pass. Two honest ways to get the real check: the weekly automatic checkup (every Monday 06:00 UTC) posts results to the repository, or start one yourself at https://github.com/BridgeLine-Services/Sophira/actions/workflows/health.yml (choose Run workflow). The same checks also run on every code change in continuous integration.",
       },
       { status: 503 },
     );

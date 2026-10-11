@@ -77,7 +77,7 @@ export class IndexedDBBackend implements OfflineBackend {
     return v ?? null;
   }
   async set(key: string, value: Uint8Array): Promise<void> {
-    await this.tx("readwrite", (s) => s.put(value));
+    await this.tx("readwrite", (s) => s.put(value, key));
   }
   async delete(key: string): Promise<void> {
     await this.tx("readwrite", (s) => s.delete(key));

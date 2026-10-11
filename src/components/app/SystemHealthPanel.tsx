@@ -112,9 +112,16 @@ export function SystemHealthPanel() {
 
       {err && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900">
-          {err} You can retry from here; the same checks also run in the project&apos;s continuous
-          integration, which produces the full evidence.
-        </div>
+          {err} You can also start the full checkup yourself: open{" "}
+          <a
+            className="underline"
+            href="https://github.com/BridgeLine-Services/Sophira/actions/workflows/health.yml"
+            target="_blank"
+            rel="noreferrer"
+          >
+            the project&apos;s checkup page
+          </a>{" "}
+          and choose &quot;Run workflow&quot;. The weekly automatic checkup posts its results there too. </div>
       )}
 
       {data && (
