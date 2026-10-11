@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { getSearchProvider, searchProviderConfigured, SearchNotConfiguredError } from "@/lib/research/provider";
-import { fetchAndVerify, titlesCorrespond } from "@/lib/research/verify";
-import { generateQueries, dedupeSources, rankCandidates } from "@/lib/research/research";
-import { rankCandidatesForAssignment } from "@/lib/research/authority";
-import { parseISODateLoose } from "@/lib/research/citation";
+import { generateQueries } from "@/lib/research/research";
+import { executeResearchPass } from "@/lib/research/run";
 
 export const runtime = "nodejs";
 export const maxDuration = 240;
@@ -85,61 +83,21 @@ export async function POST(request: NextRequest) {
 
   // 1. Assignment-specific queries.
   const queries = generateQueries(spec, MAX_QUERIES);
-  const { data: queryRows } = await supabase
+  const { data: queryRowsOrig } = await supabase
     .from("research_queries")
     .insert(queries.map((q) => ({ user_id: user.id, project_id: project.id, query: q.query, provider: searchProviderConfigured() ? (process.env.SEARCH_PROVIDER || "brave") : "", status: "pending" })))
     .select("id, query");
-  const queryIdFor = new Map((queryRows ?? []).map((r) => [r.query, r.id]));
+  const queryRowsRaw = queryRowsOrig;
+  const queryIdFor = new Map((queryRowsRaw ?? []).map((r: { id: string; query: string }) => [r.query, r.id]));
 
-  // 2. Real external search — honestly reported when not configured.
-  if (!searchProviderConfigured()) {
-    await supabase.from("research_projects").update({
-      status: "failed",
-      failure_reason:
-        "No search provider is configured on the server. Set SEARCH_PROVIDER and SEARCH_API_KEY (server-side environment variables) — Sophira will not invent sources.",
-      updated_at: new Date().toISOString(),
-    }).eq("id", project.id);
-    return NextResponse.json({
-      data: {
-        project_id: project.id,
-        status: "failed",
-        queries: queries.map((q) => q.query),
-        sources: [],
-        warning:
-          "Research did not run: no search provider is configured (SEARCH_PROVIDER / SEARCH_API_KEY). Sophira will not fabricate sources — configure a provider and retry.",
-      },
-    });
-  }
+  // 2-3. Real external search + verification — SHARED EXECUTION CORE
+  // (one path for fresh runs and resumes; see lib/research/run.ts).
+  const queryRows = (queryRowsRaw ?? []).map((r: { id: string; query: string }) => ({ id: r.id, query: r.query }));
+  const { stored, searchFailures } = await executeResearchPass(
+    supabase, user.id, project.id, spec, queryRows, MAX_CANDIDATES,
+  );
 
-  let provider: ReturnType<typeof getSearchProvider>;
-  try {
-    provider = getSearchProvider();
-  } catch {
-    return NextResponse.json({ error: "Search provider misconfigured on the server." }, { status: 503 });
-  }
-
-  const allHits: Awaited<ReturnType<typeof provider.search>> = [];
-  const searchFailures: string[] = [];
-  for (const q of queries) {
-    try {
-      const hits = await provider.search(q.query, { maxResults: 6 });
-      for (const h of hits) allHits.push(h);
-      await supabase.from("research_queries").update({ status: "ok" })
-        .eq("id", queryIdFor.get(q.query) ?? "");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "search failed";
-      searchFailures.push(`${q.query}: ${msg}`);
-      await supabase.from("research_queries").update({ status: "failed" })
-        .eq("id", queryIdFor.get(q.query) ?? "");
-    }
-  }
-
-  // Assignment-aware ranking (2026-10-05): classify the task, apply its
-  // authority profile, teacher requirements override generic preferences.
-  // rankCandidates() itself is untouched and remains the generic fallback.
-  const ranked = rankCandidatesForAssignment(dedupeSources(allHits), spec);
-  const candidates = ranked.slice(0, MAX_CANDIDATES);
-  if (candidates.length === 0) {
+  if (stored.length === 0) {
     const reason = searchFailures.length
       ? `All searches failed: ${searchFailures.join("; ")}.`
       : "The search provider returned no usable results for this topic.";
@@ -147,91 +105,6 @@ export async function POST(request: NextRequest) {
       status: "failed", failure_reason: reason, updated_at: new Date().toISOString(),
     }).eq("id", project.id);
     return NextResponse.json({ data: { project_id: project.id, status: "failed", sources: [], warning: reason } });
-  }
-
-  // 3. Verify each candidate — actually fetch it.
-  const stored: Record<string, unknown>[] = [];
-  for (const { hit, decision } of candidates) {
-    const v = await fetchAndVerify(hit.url);
-    const titleMatch = titlesCorrespond(hit.title, v.title || hit.title);
-    let status = v.status;
-    const notes = [...v.notes];
-    if (status === "verified" && !titleMatch) {
-      status = "partially_verified";
-      notes.push("Search-listed title does not clearly correspond to the page title — metadata mismatch flagged.");
-    }
-    if (status === "verified" && titleMatch) {
-      notes.push("URL resolves, page is live and meaningful, listed title matches the page.");
-    }
-
-    const { data: row } = await supabase
-      .from("research_sources")
-      .insert({
-        user_id: user.id,
-        project_id: project.id,
-        original_url: hit.url,
-        final_url: v.finalUrl,
-        canonical_url: v.canonicalUrl,
-        domain: v.domain,
-        title: v.title || hit.title,
-        listed_title: hit.title,
-        author: v.author,
-        publisher: v.domain,
-        publication_date: parseISODateLoose(v.publicationDate),
-        source_type: "web",
-        doi: null,
-        http_status: v.httpStatus,
-        redirect_count: v.redirectCount,
-        verification_status: status,
-        verification_notes: notes.join(" ") || "No notes.",
-        content_extract: v.text.slice(0, 60_000),
-        content_chars: v.textChars,
-        integrity_hash: v.hash,
-        approval: "pending",
-        authority_category: decision.category,
-        authority_decision: decision,
-      })
-      .select("id")
-      .single();
-
-    // Verification log — a logging failure never corrupts the research.
-    if (row) {
-      await supabase.from("research_verifications").insert({
-        user_id: user.id,
-        source_id: row.id,
-        checked_at: new Date().toISOString(),
-        http_status: v.httpStatus,
-        final_url: v.finalUrl,
-        reachable: v.ok && v.textChars > 0,
-        content_chars: v.textChars,
-        title_match: titleMatch,
-        notes: notes.join(" "),
-        status,
-      });
-    }
-
-    stored.push({
-      source_id: row?.id,
-      title: v.title || hit.title,
-      url: v.finalUrl || hit.url,
-      status,
-      http_status: v.httpStatus,
-      redirect_count: v.redirectCount,
-      title_match: titleMatch,
-      content_chars: v.textChars,
-      author: v.author,
-      publication_date: parseISODateLoose(v.publicationDate),
-      notes,
-      authority: {
-        category: decision.category,
-        tier: decision.tier,
-        tier_name: decision.tier_name,
-        teacher_required: decision.teacher_required,
-        primary_source: decision.primary_source,
-        peer_reviewed: decision.peer_reviewed,
-        reasons: decision.reasons,
-      },
-    });
   }
 
   const verifiedCount = stored.filter((s) => s.status === "verified").length;

@@ -141,6 +141,35 @@ export function ResearchPanel({
 
   const [reverify, setReverify] = useState<{ results: Record<string, { status: string; explanation: string } | null>; summary: { verified: number; unverified: number; unavailable: number; stale: number; total: number }; completion: string } | null>(null);
   const [reverifyBusy, setReverifyBusy] = useState(false);
+  const [resumeBusy, setResumeBusy] = useState(false);
+
+  /** Resume an interrupted or failed run: stored sources are kept; only
+   * NEW candidates are searched, verified, and persisted. */
+  async function resumeResearch() {
+    if (!projectId) return;
+    setResumeBusy(true);
+    try {
+      const res = await fetch("/api/research/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        await load(projectId);
+        toast(json.data.status === "failed" ? "error" : "success",
+          json.data.warning
+            ? json.data.warning
+            : `Resume finished — ${json.data.new_sources} new source(s) added, ${json.data.total_sources} total. Review and approve.`);
+      } else {
+        toast("error", json.error ?? "Could not resume this project.");
+      }
+    } catch {
+      toast("error", "Could not reach the server.");
+    } finally {
+      setResumeBusy(false);
+    }
+  }
 
   async function verifyAllAgain() {
     if (!projectId) { toast("error", "Run research first."); return; }
@@ -303,6 +332,12 @@ export function ResearchPanel({
                 <Button size="sm" variant="secondary" onClick={verifyAllAgain} disabled={reverifyBusy}>
                   <RotateCcw className="mr-1 h-3.5 w-3.5" /> Verify all sources again
                 </Button>
+                {(data.project.status === "failed" || data.project.status === "searching") && (
+                  <Button size="sm" variant="secondary" onClick={resumeResearch} disabled={resumeBusy}>
+                    {resumeBusy ? <Spinner className="h-3.5 w-3.5" /> : <RotateCcw className="mr-1 h-3.5 w-3.5" />}
+                    {data.project.status === "failed" ? "Retry research" : "Resume interrupted run"}
+                  </Button>
+                )}
               </div>
               {reverify && (
                 <div className="rounded-lg border border-ink/10 bg-muted/40 p-3 text-sm">
