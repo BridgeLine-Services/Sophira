@@ -71,6 +71,14 @@ Vercel deployment and environment sync (including the Supabase
 Integration and `vercel env pull`) are documented in
 **docs/VERCEL_DEPLOYMENT.md**.
 
+## SUPABASE_URL (optional alternative, server-side only)
+
+The Supabase project URL as set by your hosting provider's Supabase
+integration. Sophira's server-side code (the release-gate migration probe
+and the owner System Health live database check) uses it when present,
+falling back to the same project's REST endpoint. It is never exposed to
+the browser and holds no secret value on its own.
+
 ## MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET (optional until Word integration goes live)
 
 Server-side only. The Microsoft Entra app credentials for the Word

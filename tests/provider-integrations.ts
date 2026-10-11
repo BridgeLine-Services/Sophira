@@ -137,4 +137,36 @@ export function runProviderIntegrationTests(assert: (c: boolean, n: string) => v
 
   // ---- honest limitation ----
   assert(true, "providers: live OAuth consent and real document saves remain BLOCKED until the owner registers the apps (docs/WORD_GOOGLE_DOCS_SETUP.md)");
+
+  // ---- runtime environment detection (pure, statuses only) ----
+  const { runtimeEnvironment } = require("../src/lib/owner/runtime-env") as typeof import("../src/lib/owner/runtime-env");
+  const emptyEnv = runtimeEnvironment({});
+  assert(emptyEnv.supabase_client.status === "MISSING" && emptyEnv.microsoft.status === "MISSING" && emptyEnv.google.status === "MISSING",
+    "runtime-env: an empty environment reports MISSING, never CONFIGURED");
+  assert(emptyEnv.github_health_token.status === "OPTIONAL",
+    "runtime-env: the optional one-click token is honestly OPTIONAL, never a blocker");
+  const fullEnv = runtimeEnvironment({
+    NEXT_PUBLIC_SUPABASE_URL: "https://db.example.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "k1",
+    SUPABASE_SERVICE_ROLE_KEY: "k2", GEMINI_API_KEY: "k3", SEARCH_API_KEY: "k4",
+    MICROSOFT_CLIENT_ID: "k5", MICROSOFT_CLIENT_SECRET: "k6",
+    GOOGLE_CLIENT_ID: "k7", GOOGLE_CLIENT_SECRET: "k8", NEXT_PUBLIC_SITE_URL: "https://sophira.vercel.app",
+  });
+  assert(fullEnv.supabase_client.status === "CONFIGURED" && fullEnv.ai_provider.status === "CONFIGURED" &&
+    fullEnv.microsoft.status === "CONFIGURED" && fullEnv.google.status === "CONFIGURED",
+    "runtime-env: a fully configured environment reports CONFIGURED");
+  assert(fullEnv.ai_provider.detail.includes("GEMINI_API_KEY"),
+    "runtime-env: the AI detail names WHICH provider is set (by name, never by value)");
+  const halfMs = runtimeEnvironment({ MICROSOFT_CLIENT_ID: "x" });
+  assert(halfMs.microsoft.detail.includes("both are required"),
+    "runtime-env: a half-set provider pair is reported honestly (both values required)");
+  const leaky = runtimeEnvironment({ NEXT_PUBLIC_SUPABASE_URL: "https://hush-example-abc.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "supersecret-claim-value-123" });
+  const serialized = JSON.stringify(leaky);
+  assert(!serialized.includes("hush-example") && !serialized.includes("supersecret-claim-value"),
+    "runtime-env: statuses NEVER leak actual environment values (verified with planted values)");
+  const healthRoute = readFileSync("src/app/api/owner/system-health/route.ts", "utf8");
+  assert(healthRoute.includes("runtime_environment") && healthRoute.includes("/rest/v1/provider_connections?select=id&limit=1"),
+    "runtime-env: System Health (github-actions mode) now shows the RUNNING server's real statuses incl. a live database probe of the newest migration table");
+  const panel2 = readFileSync("src/components/app/SystemHealthPanel.tsx", "utf8");
+  assert(panel2.includes("runtime_environment") && panel2.includes("statuses only"),
+    "runtime-env: the owner panel renders the live configuration card with statuses only");
 }

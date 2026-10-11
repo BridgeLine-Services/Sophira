@@ -84,6 +84,32 @@ export async function GET() {
           }
         }
       }
+      // RUNTIME VIEW (2026-10-11): what the RUNNING deployed server itself
+      // sees — statuses only, never values. Deliberately distinct from both
+      // the Vercel dashboard inventory (unreadable from here) and the CI
+      // runner's environment. Where the service-role key exists, a REAL
+      // database probe runs (this also proves the newest migration table).
+      const runtime = runtimeEnvironment();
+      let database_probe: RuntimeEnvStatus = {
+        status: "MISSING",
+        detail: "SUPABASE_SERVICE_ROLE_KEY is not available to this server, so the live database probe cannot run",
+      };
+      const dbUrl = (process.env.SUPABASE_URL ?? "").replace(/\/$/, "");
+      const dbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (dbUrl && dbKey) {
+        try {
+          const res = await fetch(`${dbUrl}/rest/v1/provider_connections?select=id&limit=1`, {
+            headers: { apikey: dbKey, Authorization: `Bearer ${dbKey}` },
+            cache: "no-store",
+            signal: AbortSignal.timeout(15000),
+          });
+          database_probe = res.ok
+            ? { status: "CONFIGURED", detail: "live REST probe reached the database; the newest migration table (0033 provider_connections) is reachable" }
+            : { status: "MISSING", detail: `live REST probe returned HTTP ${res.status} — the database rejected it; migrations may not be applied yet` };
+        } catch (e) {
+          database_probe = { status: "MISSING", detail: `live REST probe could not reach the database (${String(e).slice(0, 80)})` };
+        }
+      }
       return NextResponse.json({
         ok: true,
         source: "github-actions",
@@ -92,6 +118,7 @@ export async function GET() {
         run_updated_at: run?.updated_at ?? null,
         head_sha: run?.head_sha ?? null,
         gate_summary,
+        runtime_environment: { ...runtime, database: database_probe },
         note: "The full release suite runs in GitHub Actions, not on this server. The states below are the REAL workflow result. A successful run means the checks ran; the release verdict is the gate's own TOTAL line, which stays honest about every blocked item.",
       });
     } catch {
@@ -160,3 +187,4 @@ export async function POST() {
     );
   }
 }
+import { runtimeEnvironment, type RuntimeEnvStatus } from "@/lib/owner/runtime-env";

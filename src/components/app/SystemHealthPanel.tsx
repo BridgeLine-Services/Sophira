@@ -25,6 +25,7 @@ interface TranslatedCheck {
 }
 
 interface HealthData {
+  runtime_environment?: Record<string, { status: string; detail: string }>;
   ok: boolean;
   source: string;
   run_state?: string;
@@ -155,6 +156,23 @@ export function SystemHealthPanel() {
           and choose &quot;Run workflow&quot;. The weekly automatic checkup posts its results there too. </div>
       )}
 
+      {data?.source === "github-actions" && data.runtime_environment && (
+        <div className="rounded-lg border p-6">
+          <p className="text-xs uppercase tracking-wide text-ink-soft">This server&apos;s live configuration (statuses only — never values)</p>
+          <ul className="mt-2 space-y-1.5">
+            {Object.entries(data.runtime_environment).map(([k, v]) => (
+              <li key={k} className="text-sm">
+                <span className="font-medium text-ink">{k.replace(/_/g, " ")}</span>
+                <span className={"ml-2 text-xs font-semibold " + (v.status === "CONFIGURED" ? "text-emerald-600" : v.status === "OPTIONAL" ? "text-ink-soft" : "text-destructive")}>{v.status}</span>
+                <span className="block text-xs text-ink-soft">{v.detail}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-ink-soft">
+            This is what the RUNNING deployment itself sees — different from your Vercel dashboard inventory and from the CI runner. Anything MISSING here needs a value in your hosting settings, then a redeploy.
+          </p>
+        </div>
+      )}
       {data?.source === "github-actions" && (
         <div className="rounded-lg border p-6">
           <p className="text-xs uppercase tracking-wide text-ink-soft">Latest full checkup (GitHub Actions)</p>

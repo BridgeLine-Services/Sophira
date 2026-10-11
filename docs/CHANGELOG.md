@@ -8,6 +8,23 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: live runtime environment detection in System Health (2026-10-11)
+
+- New owner capability: when System Health shows the GitHub Actions
+  result (its normal production mode), it NOW ALSO lists what the
+  RUNNING deployed server itself sees — per-variable statuses
+  (CONFIGURED / MISSING / OPTIONAL) with plain-English detail, never
+  values. This is deliberately distinct from the Vercel dashboard
+  inventory (unreadable from the app) and from the CI runner env.
+- Live database probe: where the server-side Supabase URL + service
+  key exist, System Health performs a REAL REST probe of the newest
+  migration table (0033 provider_connections) — the owner sees
+  deployed-database health without terminal access.
+- SUPABASE_URL documented in the manifest + variable guide
+  (server-only, optional alternative; hosting integration sets it).
+- 10 new assertions incl. planted-value leak checks proving statuses
+  never expose real values. Battery: 3289/3289 green.
+
 ### Upgrade round: multi-user identity + PowerPoint/Google Slides saves (2026-10-11)
 
 - Migration 0033: provider_connections gains provider_account_id +
