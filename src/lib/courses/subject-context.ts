@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { subjectBySlug } from "@/lib/courses/engines";
+import { selectRelevantMemories, RETRIEVABLE_STATUSES, type StudentMemory } from "@/lib/memory/engine";
 
 /**
  * SUBJECT PROMPT CONTEXT (gap-closure 2026-10-10): when a shared tool is
@@ -12,7 +13,8 @@ import { subjectBySlug } from "@/lib/courses/engines";
 export async function subjectPromptContext(
   supabase: SupabaseClient,
   userId: string,
-  slug: string | null | undefined
+  slug: string | null | undefined,
+  opts: { courseId?: string | null } = {},
 ): Promise<string> {
   if (!slug) return "";
   const node = subjectBySlug(slug);
@@ -44,5 +46,41 @@ export async function subjectPromptContext(
       if (bits.length) context += ` The student's language setup — ${bits.join(", ")}.`;
     }
   }
+  // Shared course-aware memory: subject-scoped + course-scoped rows.
+  context += await sharedMemoryContext(supabase, userId, slug, opts.courseId);
   return context;
+}
+
+/**
+ * SHARED COURSE-AWARE MEMORY (2026-10-11): every subject workspace engine
+ * (Essay, Short Writing, Planning, Grammar, Math practice/prepare) shares
+ * the SAME memory system — subject-tagged and course-scoped student
+ * memories from student_memories (RLS: strictly the authenticated user's
+ * own rows). Retrieved here, relevance-selected and capped exactly like
+ * the main assistant path (lib/memory/engine.ts), so an English essay and
+ * the Grammar engine see the same English writing preferences, while a
+ * Biology lab report never receives English-specific essay rules.
+ */
+export async function sharedMemoryContext(
+  supabase: SupabaseClient,
+  userId: string,
+  slug: string | null | undefined,
+  courseId?: string | null,
+): Promise<string> {
+  if (!slug) return "";
+  const subject = slug.split("/").pop() || slug;
+  const { data } = await supabase
+    .from("student_memories")
+    .select("id, user_id, category, statement, details, subject, subject_tags, course_id, confidence, status, improvement_trend, origin, source, first_observed, last_observed, last_used_at, created_at, updated_at")
+    .eq("user_id", userId)
+    .in("status", RETRIEVABLE_STATUSES);
+  const memories = (data ?? []) as StudentMemory[];
+  const selection = selectRelevantMemories(memories, { subject, courseId: courseId ?? null });
+  if (selection.decisions.length === 0) return "";
+  const nowISO = new Date().toISOString();
+  await supabase
+    .from("student_memories")
+    .update({ last_used_at: nowISO })
+    .in("id", selection.decisions.map((d) => d.id));
+  return `\nShared subject memory (student-approved, relevance-selected):\n${selection.lines.join("\n")}`;
 }

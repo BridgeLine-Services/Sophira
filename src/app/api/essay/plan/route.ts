@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
   // Subject workspace context: an essay planned from a subject workspace
   // carries that subject (and, for Foreign Language, the saved language
   // setup) — never a silently unscoped generic essay.
-  const subjectContext = await subjectPromptContext(supabase, guard.data.user.id, body.subject);
+  const subjectContext = await subjectPromptContext(supabase, guard.data.user.id, body.subject, { courseId: body.course_id ?? null });
 
   const raw = await aiChat([
     {

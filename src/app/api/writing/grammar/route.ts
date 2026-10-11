@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   // Subject workspace context: a Biology check must not run as an unscoped
   // generic check. Only applies when no specific course was selected.
   if (!body.course_id) {
-    courseContext += await subjectPromptContext(supabase, user.id, body.subject);
+    courseContext += await subjectPromptContext(supabase, user.id, body.subject, { courseId: body.course_id ?? null });
   }
 
   const { data: profile } = await supabase.from("profiles").select("explanation_level").eq("id", user.id).single();

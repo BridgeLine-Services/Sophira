@@ -94,6 +94,7 @@ export interface StudentMemory {
   updated_at: string;
   evidence?: MemoryEvidenceRow[];
   evidence_count?: number;
+  course_id?: string | null;
 }
 
 export interface MemoryEvidenceInput {
@@ -261,6 +262,7 @@ export function studentTransition(
 export interface MemoryContext {
   subject?: string | null;
   task_type?: string | null;
+  courseId?: string | null;
   mode?: string | null;
 }
 
@@ -286,6 +288,10 @@ export function relevanceScore(m: StudentMemory, ctx: MemoryContext, nowISO?: st
   const subject = (ctx.subject || "").toLowerCase();
   const tags = m.subject_tags.map((t) => t.toLowerCase());
   let score = 0.2; // base: a real, non-archived, non-disabled memory
+  // COURSE SCOPE (0031): an exact-course match outranks a subject-tag
+  // match; a memory scoped to a DIFFERENT course is never selected for
+  // this course (see selectRelevantMemories eligible filter).
+  if (ctx.courseId && m.course_id === ctx.courseId) score += 0.6;
   if (subject && tags.includes(subject)) score += 0.5;
   if (subject && (m.subject || "").toLowerCase() === subject) score += 0.2;
   if (!subject || tags.includes(subject) || (m.subject || "").toLowerCase() === subject) {
@@ -316,7 +322,11 @@ export function selectRelevantMemories(
   ctx: MemoryContext,
   nowISO?: string,
 ): MemoryPromptSection {
-  const eligible = memories.filter((m) => RETRIEVABLE_STATUSES.includes(m.status));
+  const eligible = memories.filter((m) =>
+    RETRIEVABLE_STATUSES.includes(m.status) &&
+    // Course-scoped memories apply ONLY inside their own course — never
+    // in another course, and never in a course-less subject prompt.
+    !(m.course_id && m.course_id !== ctx.courseId));
   const scored = eligible
     .map((m) => ({ m, score: relevanceScore(m, ctx, nowISO) }))
     .sort((a, b) => b.score - a.score)

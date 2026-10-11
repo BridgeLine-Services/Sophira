@@ -62,6 +62,7 @@ export async function recordMemoryEvidence(
     category: StudentMemory["category"];
     statement: string;
     subject?: string | null;
+    course_id?: string | null;
     details?: string;
     evidence: MemoryEvidenceInput;
     source?: string;
@@ -90,6 +91,7 @@ export async function recordMemoryEvidence(
         statement: args.statement,
         details: args.details ?? "",
         subject: args.subject ?? null,
+        course_id: args.course_id ?? null,
         subject_tags: tagsFor(args.subject),
         confidence: INITIAL_AI_CONFIDENCE,
         status: "monitoring",
@@ -227,7 +229,7 @@ export async function studentMemoryAction(
 export async function listMemories(
   supabase: SupabaseClient,
   userId: string,
-  filters: { q?: string; category?: string; status?: string } = {},
+  filters: { q?: string; category?: string; status?: string; course_id?: string } = {},
 ): Promise<StudentMemory[]> {
   let query = supabase
     .from("student_memories")

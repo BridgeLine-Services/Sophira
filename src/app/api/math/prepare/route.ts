@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   }
   // Subject workspace context: test preparation honors the selected subject.
   if (!body.course_id) {
-    courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject);
+    courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject, { courseId: body.course_id ?? null });
   }
 
   try {

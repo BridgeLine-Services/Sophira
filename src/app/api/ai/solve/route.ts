@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
     subject: patternContext.subject ?? null,
     task_type: patternContext.task_type ?? null,
     mode,
+    courseId: (body as { course_id?: string | null }).course_id ?? null,
   });
   // Genuinely used memories: record usage (drives recency ranking).
   if (memorySelection.decisions.length > 0) {

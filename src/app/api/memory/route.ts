@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
   const statement = String(body.statement || "").trim();
   const details = String(body.details || "").trim();
   const subject = body.subject ? String(body.subject).trim() : null;
+  const course_id = body.course_id ? String(body.course_id) : null;
   if (!MEMORY_CATEGORIES.includes(category as never)) {
     return NextResponse.json({ error: "Unknown memory category." }, { status: 400 });
   }
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
       details,
       subject,
       subject_tags: subject ? [subject.toLowerCase()] : [],
+      course_id,
       confidence: 1, // student-stated facts are trusted at creation
       status: "active",
       origin: "student_supplied",

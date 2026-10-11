@@ -197,7 +197,7 @@ function runGate() {
     const url = env("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
     const key = env("SUPABASE_SERVICE_ROLE_KEY");
     if (!url || !key) return { status: "BLOCKED", detail: "database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate" };
-    // Probe the newest migration's table (0030 subject_preferences). 404/400 = migrations missing.
+    // Probe the newest migration's tables (0030 subject_preferences; 0031 adds student_memories.course_id). 404/400 = migrations missing.
     return (async () => ({ status: "async" }))() && { status: "NOT RUN", detail: "" }; // replaced below by async gate
   });
 
@@ -405,7 +405,7 @@ async function dbMigrations() {
   if (!target) return;
   if (!url || !key) {
     target.status = "BLOCKED";
-    target.detail = "database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — verify migrations 0001-0030 on the production database";
+    target.detail = "database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — verify migrations 0001-0031 on the production database";
     return;
   }
   try {
@@ -417,7 +417,7 @@ async function dbMigrations() {
       headers: { apikey: key.value, Authorization: `Bearer ${key.value}` },
       signal: AbortSignal.timeout(20000),
     });
-    if (res.ok) { target.status = "PASS"; target.detail = "migration 0030 (subject_preferences) reachable via the production REST API (migrations 0001-0030 appear applied)"; return; }
+    if (res.ok) { target.status = "PASS"; target.detail = "migration 0030 (subject_preferences) reachable via the production REST API (migrations 0001-0031 appear applied)"; return; }
     target.status = "FAIL";
     target.detail = `production database rejected the migration probe (HTTP ${res.status}) — migrations may be missing`;
   } catch (e) {

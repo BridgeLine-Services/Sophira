@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   // Subject workspace context: planning must honor the selected subject,
   // not silently run as a generic planner (only when no course is selected).
   if (!body.course_id) {
-    courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject);
+    courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject, { courseId: body.course_id ?? null });
   }
 
   try {

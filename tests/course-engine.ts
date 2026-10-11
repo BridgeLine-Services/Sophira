@@ -395,6 +395,53 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const dashPage = readFileSync("src/app/dashboard/page.tsx", "utf8");
   assert(dashPage.includes('profile.role === "owner" && view !== "workspace"') && dashPage.includes('redirect("/owner")'),
     "owner: bare /dashboard still role-routes the owner to the Owner Dashboard on direct entry (preserved behavior)");
+  // ============================================================
+  // STAGE 2 (2026-10-11): expand/collapse independence — Courses,
+  // Science, Biology, Chemistry, Physics are separate toggle keys.
+  // ============================================================
+  assert(shell.includes("function toggle(key: string)") && shell.includes("const next = { ...prev, [key]: !prev[key] };"),
+    "expand: one toggle flips ONLY its own key — expanding Science can never collapse Biology (no shared state)");
+  assert((shell.match(/chevron\(!!open\[node\.key\]/g) ?? []).length >= 1 && (shell.match(/chevron\(!!open\[`\$\{node\.key\}:\$\{child\.key\}`\]/g) ?? []).length >= 1,
+    "expand: Science and its Biology/Chemistry/Physics children have independent chevrons");
+  assert(shell.includes("aria-expanded={expanded}") && shell.includes("aria-label={expanded ? `Collapse") && shell.includes("h-11 w-11"),
+    "expand: chevrons expose accessible expanded state and meet the 44px touch minimum");
+
+  // ============================================================
+  // STAGE 3 (2026-10-11): shared course-aware memory architecture.
+  // ============================================================
+  const memMigration = readFileSync("supabase/migrations/0031_student_memory_course_scope.sql", "utf8");
+  assert(memMigration.includes("add column if not exists course_id") && memMigration.includes("references public.courses(id)"),
+    "memory: migration 0031 adds an explicit course_id identifier to student_memories (additive, reversible)");
+  assert(memMigration.includes("on delete set null") && !memMigration.includes("drop table") && !memMigration.includes("drop column"),
+    "memory: migration 0031 is non-destructive (no data loss possible)");
+  const memEngine = readFileSync("src/lib/memory/engine.ts", "utf8");
+  assert(memEngine.includes("course_id?: string | null;") && memEngine.includes("courseId?: string | null;"),
+    "memory: engine types carry the course scope end to end");
+  assert(memEngine.includes("ctx.courseId && m.course_id === ctx.courseId) score += 0.6"),
+    "memory: an exact-course match outranks a subject-tag match in relevance");
+  assert(memEngine.includes("!(m.course_id && m.course_id !== ctx.courseId)"),
+    "memory: a memory scoped to a DIFFERENT course never leaks into another course's or a course-less subject prompt");
+  const subjectCtx = readFileSync("src/lib/courses/subject-context.ts", "utf8");
+  assert(subjectCtx.includes("sharedMemoryContext") && subjectCtx.includes("selectRelevantMemories") && subjectCtx.includes("RETRIEVABLE_STATUSES"),
+    "memory: subject workspaces retrieve the SAME shared relevance-selected memory system as the main assistant (no per-engine isolation)");
+  assert(subjectCtx.includes("last_used_at"),
+    "memory: retrieved memories record usage (drives recency ranking)");
+  for (const route of ["src/app/api/essay/plan/route.ts", "src/app/api/writing/grammar/route.ts",
+                       "src/app/api/writing/plan/route.ts", "src/app/api/math/practice/route.ts",
+                       "src/app/api/math/prepare/route.ts"]) {
+    assert(readFileSync(route, "utf8").includes("courseId: body.course_id ?? null"),
+      `memory: ${route.split("/")[3]}/${route.split("/")[4]} passes the active course into the shared memory context`);
+  }
+  const solveRoute = readFileSync("src/app/api/ai/solve/route.ts", "utf8");
+  assert(solveRoute.includes("courseId: (body as { course_id?: string | null }).course_id ?? null"),
+    "memory: the main assistant's memory selection is course-aware too");
+  const memApi = readFileSync("src/app/api/memory/route.ts", "utf8");
+  assert(memApi.includes("course_id") && memApi.includes("course_id,"),
+    "memory: the memory API records course-scoped memories with explicit course identifiers");
+  const gateScript = readFileSync("scripts/release-gate.mjs", "utf8");
+  assert(gateScript.includes("0001-0031"),
+    "gate: migration range reflects 0031");
+
   const ownerDash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
   assert(ownerDash.includes('id="overview"') && ownerDash.includes('id="requests"') && ownerDash.includes('id="invite"') && ownerDash.includes('id="members"'),
     "owner: dashboard sections have anchor targets for the owner navigation items");
