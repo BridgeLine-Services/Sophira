@@ -7,6 +7,8 @@
 import { spawn, spawnSync } from "child_process";
 import { readFileSync, writeFileSync } from "fs";
 import { createServer, type Server } from "http";
+import { tmpdir } from "os";
+import { join } from "path";
 
 const SENTINEL = "sk-supersecret-doctor-sentinel-1234567890";
 const BARE_ENV: NodeJS.ProcessEnv = { PATH: process.env.PATH, NODE_ENV: process.env.NODE_ENV };
@@ -50,26 +52,28 @@ export async function runDoctorTests(assert: (c: boolean, n: string) => void, se
   assert(nextSteps >= 5, "doctor: every failing check names an exact next step");
   assert(empty.stdout.includes("✅") || empty.stdout.includes("❌"), "doctor: output uses plain ✅/❌ marks");
 
+  const tempEnvPath = join(tmpdir(), "doctor-env-test");
+
   // Fully configured offline env: Supabase / AI / Production URL are ✅; the
   // service-role key's value (the sentinel) is NEVER printed.
-  writeFileSync("/tmp/doctor-env-test",
+  writeFileSync(tempEnvPath,
     `NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co\n` +
     `NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-not-a-secret\n` +
     `SUPABASE_SERVICE_ROLE_KEY=${SENTINEL}\n` +
     `GEMINI_API_KEY=${SENTINEL}\n` +
     `NEXT_PUBLIC_SITE_URL=https://sophira.vercel.app\n`);
-  const full = doctor(["--env-file", "/tmp/doctor-env-test"]);
+  const full = doctor(["--env-file", tempEnvPath]);
   assert(full.stdout.includes("✅ Supabase connected"), "doctor: configured Supabase env shows ✅");
   assert(full.stdout.includes("✅ AI provider working"), "doctor: GEMINI_API_KEY shows a working AI provider");
   assert(full.stdout.includes("✅ Production URL set"), "doctor: NEXT_PUBLIC_SITE_URL shows the production URL set");
   assert(!full.stdout.includes(SENTINEL), "doctor: no secret value is ever echoed back");
 
   // Zero-billing: a paid key WITHOUT ALLOW_PAID_AI is ignored, not "working"
-  writeFileSync("/tmp/doctor-env-test",
+  writeFileSync(tempEnvPath,
     `NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co\n` +
     `NEXT_PUBLIC_SUPABASE_ANON_KEY=anon\n` +
     `OPENAI_API_KEY=${SENTINEL}\n`);
-  const paid = doctor(["--env-file", "/tmp/doctor-env-test"]);
+  const paid = doctor(["--env-file", tempEnvPath]);
   assert(paid.stdout.includes("❌ AI provider working"), "doctor: a paid key is IGNORED unless paid use is explicitly allowed (zero-billing, fail closed)");
   assert(paid.stdout.includes("ALLOW_PAID_AI"), "doctor: the next step explains the paid opt-in switch");
   assert(!paid.stdout.includes(SENTINEL), "doctor: the ignored paid key's VALUE never appears");
