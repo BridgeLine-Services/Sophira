@@ -8,6 +8,20 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### UI/UX round: responsive shell + contained owner tables (2026-10-12)
+
+- The shared main container widened from max-w-4xl to max-w-6xl
+  (header + tablet nav aligned with it): the personal workspace and
+  the Owner Dashboard now use a wide desktop viewport instead of a
+  narrow centered column; cards keep readable line lengths and stack
+  naturally at tablet/mobile sizes.
+- Dashboard content grids reflow to 3 columns on xl (2 at sm-md, 1 on
+  mobile) — no stretched full-width paragraphs.
+- Owner page: EVERY provider table now scrolls INSIDE its own
+  overflow-x-auto container (readable min-w preserved) — never a
+  page-wide horizontal overflow.
+- 6 new layout pins. Battery: 3384/3384 green; tsc clean; build clean.
+
 ### Upgrade round: shared academic-level adaptation, preschool through doctoral (2026-10-12)
 
 - New src/lib/ai/academic-levels.ts: the ONE shared behavioral config

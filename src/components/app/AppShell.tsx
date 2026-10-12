@@ -454,7 +454,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
       </aside>
 
       <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur lg:pl-60">
-        <div className="mx-auto flex h-14 max-w-4xl items-center gap-2 px-4">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
           <button
             ref={menuBtnRef}
             type="button"
@@ -493,7 +493,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             <LogOut className="h-5 w-5" />
           </button>
         </div>
-        <nav className="mx-auto hidden max-w-4xl gap-1 overflow-x-auto px-4 pb-2 md:flex lg:hidden" aria-label="Main">
+        <nav className="mx-auto hidden max-w-6xl gap-1 overflow-x-auto px-4 pb-2 md:flex lg:hidden" aria-label="Main">
           {variant === "owner" ? (
             OWNER_NAV.map(({ href, label, icon: Icon }) => (
               <Link
@@ -539,7 +539,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-28 pt-5 md:pb-12 lg:pl-60">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 md:pb-12 lg:pl-60">{children}</main>
 
       {/* MOBILE SLIDE-OUT DRAWER: the full navigation hierarchy on phones.
           Escape, backdrop tap, and navigation close it; focus is managed. */}

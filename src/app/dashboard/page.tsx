@@ -80,7 +80,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <AppShell title={`Welcome${greetingName}`}>
       <div className="space-y-8">
         {/* Primary actions */}
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Link
             href="/assignments/new"
             className="flex min-h-24 flex-col justify-center gap-1 rounded-card bg-accent p-4 text-white shadow-sm transition active:scale-[0.99]"
@@ -180,7 +180,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             )}
           </div>
           {courses?.length ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {courses.slice(0, 3).map((c) => (
                 <Link key={c.id} href={`/courses/${c.id}`} className="block">
                   <Card className="transition hover:border-accent/40">
@@ -217,7 +217,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             )}
           </div>
           {teachers?.length ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {teachers.slice(0, 3).map((t) => (
                 <Link key={t.id} href={`/teachers/${t.id}`} className="block">
                   <Card className="transition hover:border-accent/40">

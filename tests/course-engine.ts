@@ -693,4 +693,29 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "levels: no duplicated per-subject academic-level registry exists beside the shared module");
   }
 
+
+  // ==== UI/UX correction round: responsive shell + contained tables (2026-10-12) ====
+  section("responsive shell and owner table containment");
+  {
+    const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+    assert(shell.includes("mx-auto w-full max-w-6xl flex-1"),
+      "layout: the shared main container is max-w-6xl — the workspace and owner dashboard use the viewport instead of a narrow centered column");
+    assert(shell.split("max-w-6xl").length >= 4,
+      "layout: header, tablet nav, and main share the SAME max width so the shell stays aligned");
+    const owner = readFileSync("src/app/owner/page.tsx", "utf8");
+    const ownerTables = owner.split("<table").length - 1;
+    assert(ownerTables > 0, "owner: the provider registry table still exists (no capability data removed)");
+    const contained = owner.split("<table").slice(1).every((chunk) => {
+      const before = owner.slice(0, owner.indexOf(chunk.slice(0, 40)));
+      return before.slice(-400).includes("overflow-x-auto");
+    });
+    assert(contained,
+      "owner: EVERY provider table scrolls INSIDE its own container — never a page-wide horizontal overflow");
+    assert(owner.includes("min-w-[760px]"),
+      "owner: the provider table keeps a readable min width inside its scroll container");
+    const dash = readFileSync("src/app/dashboard/page.tsx", "utf8");
+    assert(dash.includes("sm:grid-cols-2 xl:grid-cols-3"),
+      "workspace: dashboard content grids reflow to 3 columns on wide desktops and stack naturally on smaller screens");
+  }
+
 }

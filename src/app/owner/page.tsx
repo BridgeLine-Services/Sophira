@@ -139,6 +139,7 @@ function ProviderDiagnosticsCard() {
         <Gauge className="h-4 w-4 text-accent" />
         AI provider diagnostics
       </div>
+      <div className="overflow-x-auto rounded-lg border border-ink/10">
       <table className="w-full text-sm">
         <tbody>
           {rows.map(([k, v]) => (
@@ -149,6 +150,7 @@ function ProviderDiagnosticsCard() {
           ))}
         </tbody>
       </table>
+      </div>
       <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
         {Object.entries(diag.reasons).map(([p, r]) => (
           <li key={p}>
