@@ -8,6 +8,21 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round 2: academic-level evaluation fixtures (2026-10-12)
+
+- New tests/fixtures/academic-levels.ts: representative tasks for seven
+  major engines (writing, math, chemistry, physics, humanities,
+  foreign_language, health), each with per-level behavioral
+  expectations anchored in the SHARED academic-level guidance — no
+  invented behavior, and the custom level always defers to the user's
+  own wording.
+- 182 new assertions: every fixture targets a real registry engine,
+  every expectation shares a meaningful token with its level's actual
+  guidance, expectations genuinely diverge across levels (no
+  copy-paste), major engines are covered across >= 6 of the 8 levels,
+  and the shared academicLevelBit provides the behavioral anchors.
+- Battery: 3588/3588 green; tsc clean; build clean.
+
 ### UI/UX round 3: owner nav grouped into functional areas (2026-10-12)
 
 - OWNER_NAV replaced by OWNER_NAV_GROUPS: Overview (dashboard overview,

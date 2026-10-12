@@ -788,4 +788,60 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     }
   }
 
+
+  // ==== Academic-level evaluation fixtures (2026-10-12) ====
+  section("academic-level evaluation fixtures (per-engine, per-level)");
+  {
+    const { ACADEMIC_TASKS, LEVEL_IDS } = require("./fixtures/academic-levels") as typeof import("./fixtures/academic-levels");
+    const { ACADEMIC_LEVELS, academicLevelBit } = require("../src/lib/ai/academic-levels") as typeof import("../src/lib/ai/academic-levels");
+    const guidanceById = new Map(ACADEMIC_LEVELS.map((l) => [l.id, l.guidance]));
+    const engineIds = new Set<string>([
+      "writing", "math", "biology", "chemistry", "physics", "humanities",
+      "programming", "foreign_language", "health", "general",
+    ]);
+    for (const fixture of ACADEMIC_TASKS) {
+      assert(engineIds.has(fixture.engine),
+        "fixtures: task targets a REAL registry engine — " + fixture.engine);
+      const levels = Object.keys(fixture.expectations);
+      for (const lvl of levels) {
+        assert((LEVEL_IDS as readonly string[]).includes(lvl),
+          "fixtures: expectation level is a registered level — " + fixture.engine + "/" + lvl);
+        const markers = fixture.expectations[lvl as keyof typeof fixture.expectations] ?? [];
+        const guidance = guidanceById.get(lvl as (typeof LEVEL_IDS)[number]) ?? "";
+        for (const marker of markers) {
+          const words = marker.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 4);
+          const shared = words.filter((w) => guidance.toLowerCase().includes(w));
+          assert(shared.length > 0,
+            "fixtures: '" + marker.slice(0, 40) + "' is anchored in the SHARED " + lvl + " guidance (no invented behavior)");
+        }
+      }
+      // Divergence: expectations must genuinely differ across levels
+      const seen = new Set<string>();
+      for (const lvl of levels) {
+        const marker = (fixture.expectations[lvl as keyof typeof fixture.expectations] ?? []).join(" ");
+        assert(!seen.has(marker),
+          "fixtures: " + fixture.engine + " expectations DIVERGE across levels (no copy-paste)");
+        seen.add(marker);
+      }
+      // Custom level: the honest ask-don't-guess default everywhere it appears
+      if (fixture.expectations.custom) {
+        assert(fixture.expectations.custom.some((m) => m.includes("follow the user")),
+          "fixtures: the custom level always defers to the user's own wording");
+      }
+    }
+    // Coverage: every major engine has at least one fixture, spanning at least 6 levels
+    const covered = new Set(ACADEMIC_TASKS.map((f) => f.engine));
+    for (const required of ["writing", "math", "chemistry", "physics", "humanities", "foreign_language", "health"]) {
+      assert(covered.has(required), "fixtures: major engine has a representative task — " + required);
+    }
+    for (const f of ACADEMIC_TASKS) {
+      assert(Object.keys(f.expectations).length >= 6,
+        "fixtures: " + f.engine + " spans at least 6 of the 8 levels");
+    }
+    // The shared bit used by BOTH context builders carries the guidance the fixtures anchor to
+    assert(academicLevelBit("doctoral").includes("critical analysis") &&
+      academicLevelBit("preschool").includes("everyday words"),
+      "fixtures: the shared academicLevelBit provides the behavioral anchors the fixtures reference");
+  }
+
 }
