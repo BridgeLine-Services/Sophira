@@ -718,4 +718,30 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "workspace: dashboard content grids reflow to 3 columns on wide desktops and stack naturally on smaller screens");
   }
 
+
+  // ==== Owner dashboard: overview-first restructure (2026-10-12) ====
+  section("owner dashboard overview and section order");
+  {
+    const owner = readFileSync("src/app/owner/page.tsx", "utf8");
+    assert(owner.includes("OwnerOverviewCard"),
+      "owner: an administrative overview built from REAL page data (RPC result, provider diagnostics, billing policy, member/request/invitation rows) now leads the dashboard");
+    assert(owner.indexOf("OwnerOverviewCard\n") < owner.indexOf("<NoUnexpectedChargesCard />"),
+      "owner: the overview renders BEFORE the security panel — actionable status first");
+    const ovIdx = owner.indexOf("members={members ?? null}");
+    const nuIdx = owner.indexOf("<NoUnexpectedChargesCard />");
+    assert(ovIdx > -1 && ovIdx < nuIdx,
+      "owner: the overview is placed above the No Unexpected Charges panel");
+    assert(owner.includes('id="owner-providers-h"') && owner.includes("AI Providers and Models") &&
+      owner.indexOf("CapabilityRegistryCard") < owner.indexOf("ProviderDiagnosticsCard"),
+      "owner: the provider capability registry + diagnostics live in a clearly labeled section, with capability-vs-connection explained");
+    const dashIdx = owner.indexOf("<OwnerDashboard");
+    const provIdx = owner.indexOf('id="owner-providers-h"');
+    assert(dashIdx > -1 && provIdx > dashIdx,
+      "owner: the provider registry sits BELOW the overview, security, and member management — no more table dominating the first screen");
+    assert(owner.includes('"unknown"') && owner.includes("Could not be loaded"),
+      "owner: unavailable data renders honest unknown/error text — never a fabricated healthy state");
+    assert(owner.includes("Registered capability is not the same as") && owner.includes("active, verified connection"),
+      "owner: the registry section distinguishes registered capability from verified connection");
+  }
+
 }

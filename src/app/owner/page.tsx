@@ -8,7 +8,7 @@ import { OwnerDashboard } from "@/components/app/OwnerDashboard";
 import { Badge, Button } from "@/components/ui";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import Link from "next/link";
-import { Briefcase, Gauge } from "lucide-react";
+import { Briefcase, CheckCircle2, ClipboardList, Gauge, XCircle } from "lucide-react";
 import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
 import { capabilityRegistry, noUnexpectedCharges } from "@/lib/ai/capabilities";
 
@@ -90,9 +90,13 @@ export default async function OwnerPage() {
         </span>
         <Badge>owner</Badge>
       </div>
+      <OwnerOverviewCard
+        members={members ?? null}
+        invitations={invitations ?? null}
+        requests={requests ?? null}
+        statsError={statsError}
+      />
       <NoUnexpectedChargesCard />
-      <CapabilityRegistryCard />
-      <ProviderDiagnosticsCard />
       {statsError && (
         <div className="mb-4 rounded-card border border-danger/30 bg-danger/5 p-3" role="alert">
           <p className="text-sm font-medium text-danger">{statsError}</p>
@@ -104,7 +108,93 @@ export default async function OwnerPage() {
         initialRequests={(requests || []) as InvitationRequest[]}
         siteUrl={siteUrl}
       />
+      <section className="mt-8" aria-labelledby="owner-providers-h">
+        <h2 id="owner-providers-h" className="mb-3 text-base font-semibold">AI Providers and Models</h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Detailed capability registry and live provider diagnostics. Registered capability is not the same as an
+          active, verified connection — the diagnostics card shows what is actually configured.
+        </p>
+        <CapabilityRegistryCard />
+        <ProviderDiagnosticsCard />
+      </section>
     </AppShell>
+  );
+}
+
+
+/**
+ * ADMINISTRATIVE OVERVIEW (2026-10-12 UI/UX round): compact status cards
+ * built ONLY from real data already loaded on this page — database RPC
+ * result, live AI provider diagnostics, the server-side billing policy,
+ * and the actual member/invitation/request rows. No fabricated "healthy"
+ * states: an unavailable check renders an honest "unknown"/"error".
+ */
+function OwnerOverviewCard({ members, invitations, requests, statsError }: {
+  members: NetworkMemberStats[] | null;
+  invitations: Invitation[] | null;
+  requests: InvitationRequest[] | null;
+  statsError: string | null;
+}) {
+  const env = readAiEnv();
+  const diag = providerDiagnostics(env);
+  const cards: Array<{ label: string; value: string; note: string; tone: "ok" | "warn" | "bad" | "info" }> = [
+    {
+      label: "Database",
+      value: statsError ? "Error" : "Connected",
+      note: statsError ? "Membership stats failed to load — see the banner below" : "Member statistics loaded successfully",
+      tone: statsError ? "bad" : "ok",
+    },
+    {
+      label: "AI provider",
+      value: diag.activeProvider ? diag.activeModel ?? diag.activeProvider : "Offline mode",
+      note: diag.activeProvider ? "Active provider and model" : "No external AI provider configured — on-device only",
+      tone: diag.activeProvider ? "ok" : "info",
+    },
+    {
+      label: "Billing protection",
+      value: paidAllowed(env) ? "Paid AI allowed" : "Zero-billing",
+      note: paidAllowed(env)
+        ? `Owner-configured, monthly budget $${env.MONTHLY_AI_BUDGET_USD}`
+        : "No Unexpected Charges policy active — no paid AI can run",
+      tone: paidAllowed(env) ? "warn" : "ok",
+    },
+    {
+      label: "Members",
+      value: members ? String(members.length) : "unknown",
+      note: members ? "Accounts in this private network" : "Could not be loaded",
+      tone: members ? "info" : "warn",
+    },
+    {
+      label: "Access requests",
+      value: requests ? String(requests.length) : "unknown",
+      note: requests && requests.length > 0 ? "Awaiting your review below" : requests ? "No pending requests" : "Could not be loaded",
+      tone: requests && requests.length > 0 ? "warn" : "info",
+    },
+    {
+      label: "Invitations",
+      value: invitations ? String(invitations.length) : "unknown",
+      note: invitations ? "Issued invitations (details below)" : "Could not be loaded",
+      tone: "info",
+    },
+  ];
+  return (
+    <section className="mb-6" aria-labelledby="owner-overview-h">
+      <h2 id="owner-overview-h" className="mb-3 text-base font-semibold">Administrative overview</h2>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {cards.map((c) => (
+          <div key={c.label} className="rounded-lg border bg-card p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{c.label}</p>
+            <p className="mt-1 flex items-center gap-2 text-lg font-semibold">
+              {c.tone === "ok" && <CheckCircle2 className="h-4 w-4 text-success" aria-hidden />}
+              {c.tone === "warn" && <ClipboardList className="h-4 w-4 text-accent" aria-hidden />}
+              {c.tone === "bad" && <XCircle className="h-4 w-4 text-danger" aria-hidden />}
+              {c.value}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{c.note}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

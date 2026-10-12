@@ -8,6 +8,20 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### UI/UX round 2: owner dashboard overview-first restructure (2026-10-12)
+
+- New OwnerOverviewCard: six compact status cards (database, AI
+  provider, billing protection, members, access requests, invitations)
+  built ONLY from data already on the page — RPC results, live
+  provider diagnostics, the server-side billing policy, and real row
+  counts. Unavailable data renders honest unknown/error text; tone is
+  icon+text, never color alone.
+- Page order fixed: overview -> security panel -> members/invitations
+  -> "AI Providers and Models" labeled section (registry + diagnostics
+  with an explicit capability-vs-connection note). The provider table
+  no longer dominates the first screen.
+- 6 new pins. Battery: 3391/3391 green; tsc clean; build clean.
+
 ### UI/UX round: responsive shell + contained owner tables (2026-10-12)
 
 - The shared main container widened from max-w-4xl to max-w-6xl
