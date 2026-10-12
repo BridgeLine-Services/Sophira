@@ -8,6 +8,21 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### Upgrade round: shared academic-level adaptation, preschool through doctoral (2026-10-12)
+
+- New src/lib/ai/academic-levels.ts: the ONE shared behavioral config
+  for academic level — eight registered levels (preschool, elementary,
+  middle, high-school, undergraduate, graduate, doctoral, custom) each
+  carrying real guidance for vocabulary, scaffolding, rigor, and
+  citation standards. Level strings are resolved from flexible wordings
+  (2nd grade, junior high, A-levels, undergrad, PhD, ...); unrecognized
+  levels become the user's own custom wording, never a wrong guess.
+- BOTH shared AI context builders (client.ts + context.ts) now use
+  academicLevelBit: a resolved level contributes BEHAVIOR, not a label
+  pasted into the prompt; unspecified keeps the honest
+  infer-from-the-question default. No per-subject duplicate registries.
+- 18 new assertions. Battery: 3378/3378 green; tsc clean; build clean.
+
 ### Audit round: course-independent lifecycle pins (2026-10-12)
 
 - Section 6 belt-and-suspenders: pinned that the dashboard lists ALL

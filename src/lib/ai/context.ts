@@ -16,6 +16,7 @@
  *      (prompt-injection defense, spec §36).
  */
 
+import { academicLevelBit } from "./academic-levels";
 import type { Course, Mode, Profile, TeacherProfile, WritingProfile } from "../types";
 import type { LearningPattern } from "../learning/patterns";
 import { patternsForPrompt, selectApplicablePatterns, intentionalWritingHabits } from "../learning/patterns";
@@ -218,7 +219,7 @@ export function composeAcademicContext(args: ComposeArgs): ComposedContext {
   // Layer 1 — global student profile (weakest; everything below may override)
   const bits: string[] = [];
   if (profile.display_name) bits.push(`Student name: ${profile.display_name}.`);
-  bits.push(`Academic level: ${profile.academic_level || "not specified — infer from the question"}.`);
+  bits.push(academicLevelBit(profile.academic_level));
   bits.push(`Explanation level: ${profile.explanation_level || "standard"}.`);
   if (profile.answer_style) bits.push(`Preferred answer style: ${profile.answer_style}.`);
   if (profile.formatting_pref) bits.push(`Preferred formatting: ${profile.formatting_pref}.`);

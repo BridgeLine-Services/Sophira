@@ -656,4 +656,41 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "ai: courseId is OPTIONAL in the subject context builder — subject-aware help works with no course at all");
   }
 
+
+
+
+  // ==== Academic-level adaptation: one shared behavioral config (2026-10-12) ====
+  section("academic-level adaptation (preschool -> doctoral, shared across engines)");
+  {
+    const { resolveAcademicLevel, academicLevelBit } = require("../src/lib/ai/academic-levels") as typeof import("../src/lib/ai/academic-levels");
+    for (const id of ["preschool", "elementary", "middle", "high-school", "undergraduate", "graduate", "doctoral", "custom"]) {
+      assert(resolveAcademicLevel(id)?.id === id, "levels: " + id + " is a registered, resolvable academic level");
+    }
+    const norm = (raw: string, want: string) => resolveAcademicLevel(raw)?.id === want;
+    assert(norm("PhD candidate", "doctoral") && norm("doctoral", "doctoral"),
+      "levels: doctoral wordings resolve to the doctoral spec");
+    assert(norm("2nd grade", "elementary") && norm("kindergarten", "preschool"),
+      "levels: early-education wordings resolve correctly (flexible grade names)");
+    assert(norm("junior high", "middle") && norm("A-levels", "high-school"),
+      "levels: middle/high-school wordings resolve across naming systems");
+    assert(norm("undergrad", "undergraduate") && norm("Master's", "graduate"),
+      "levels: university wordings resolve correctly");
+    assert(norm("underwater basket weaving 402", "custom"),
+      "levels: an unrecognized level resolves to custom (the user's own wording), never a wrong guess");
+    assert(resolveAcademicLevel("") === null && resolveAcademicLevel(null) === null,
+      "levels: an unspecified level resolves to null — the documented safe default");
+    const bit = academicLevelBit("doctoral");
+    assert(bit.startsWith("Academic level: Doctoral study.") && bit.includes("critical analysis"),
+      "levels: a resolved level contributes BEHAVIORAL guidance, not just a label");
+    assert(academicLevelBit("").includes("infer from the question"),
+      "levels: an unspecified level keeps the honest infer-from-question default");
+    const client = readFileSync("src/lib/ai/client.ts", "utf8");
+    const context = readFileSync("src/lib/ai/context.ts", "utf8");
+    assert(client.includes("academicLevelBit(profile.academic_level)") && context.includes("academicLevelBit(profile.academic_level)"),
+      "levels: BOTH shared AI context builders use the one academicLevelBit — one config, all engines");
+    const dup = require("child_process").execSync('grep -rln "doctoral" src/lib/courses src/lib/math src/lib/essay 2>/dev/null || true').toString().trim();
+    assert(dup === "",
+      "levels: no duplicated per-subject academic-level registry exists beside the shared module");
+  }
+
 }
