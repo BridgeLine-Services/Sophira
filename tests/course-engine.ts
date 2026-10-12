@@ -744,4 +744,48 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "owner: the registry section distinguishes registered capability from verified connection");
   }
 
+
+  // ==== Owner nav: grouped into functional areas (2026-10-12) ====
+  section("owner nav grouping and anchor integrity");
+  {
+    const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+    assert(shell.includes("OWNER_NAV_GROUPS"),
+      "owner-nav: the owner sidebar is grouped, not a flat list");
+    for (const h of ["Overview", "Members and Invitations", "Providers and Security", "My Workspace"]) {
+      assert(shell.includes(`heading: "${h}"`),
+        "owner-nav: functional group present — " + h);
+    }
+    const overviewPos = shell.indexOf('heading: "Overview"');
+    const membersPos = shell.indexOf('heading: "Members and Invitations"');
+    const provPos = shell.indexOf('heading: "Providers and Security"');
+    const wsPos = shell.indexOf('heading: "My Workspace"');
+    assert(overviewPos < membersPos && membersPos < provPos && provPos < wsPos,
+      "owner-nav: groups are ordered Overview -> Members -> Providers -> My Workspace");
+    assert(shell.includes("OWNER_NAV_GROUPS.flatMap"),
+      "owner-nav: the tablet row flattens the same groups — one source of truth, no duplicate nav definitions");
+    const flat = shell.slice(shell.indexOf("OWNER_NAV_GROUPS:"), shell.indexOf("];", shell.indexOf("OWNER_NAV_GROUPS:")));
+    const wsCount = (flat.match(/view=workspace/g) || []).length;
+    assert(wsCount === 1,
+      "owner-nav: exactly ONE My Workspace entry — no duplicated destinations");
+    const hrefs: string[] = [];
+    let hpos = flat.indexOf('href: "');
+    while (hpos !== -1) {
+      hrefs.push(flat.slice(hpos + 7, flat.indexOf('"', hpos + 7)));
+      hpos = flat.indexOf('href: "', hpos + 7);
+    }
+    assert(new Set(hrefs).size === hrefs.length,
+      "owner-nav: no duplicate hrefs anywhere in the owner nav");
+    // anchor integrity: every #fragment the nav points at must exist
+    const owner = readFileSync("src/app/owner/page.tsx", "utf8");
+    const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+    for (const frag of ["overview", "security", "owner-providers-h"]) {
+      assert(owner.includes(`id="${frag}"`),
+        "owner-nav: /owner#" + frag + " targets a real element on the owner page");
+    }
+    for (const frag of ["members", "invite", "requests"]) {
+      assert(dash.includes(`id="${frag}"`),
+        "owner-nav: /owner#" + frag + " targets a real section of the member dashboard");
+    }
+  }
+
 }

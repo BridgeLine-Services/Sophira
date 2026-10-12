@@ -32,13 +32,30 @@ const NAV = [
  * and the workspace only links back here through the explicit Owner
  * Dashboard entry and the brand logo.
  */
-const OWNER_NAV = [
-  { href: "/owner/health", label: "System Health", icon: Gauge },
-  { href: "/dashboard?view=workspace", label: "My Workspace", icon: Briefcase },
-  { href: "/owner#overview", label: "Overview", icon: Gauge },
-  { href: "/owner#requests", label: "Invitation requests", icon: MailQuestion },
-  { href: "/owner#invite", label: "Invite someone", icon: UserPlus },
-  { href: "/owner#members", label: "Members", icon: Users },
+const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; label: string; icon: typeof Home }> }> = [
+  {
+    heading: "Overview",
+    items: [
+      { href: "/owner#overview", label: "Dashboard overview", icon: Gauge },
+      { href: "/owner/health", label: "System Health", icon: Gauge },
+    ],
+  },
+  {
+    heading: "Members and Invitations",
+    items: [
+      { href: "/owner#members", label: "Members", icon: Users },
+      { href: "/owner#invite", label: "Invite someone", icon: UserPlus },
+      { href: "/owner#requests", label: "Invitation requests", icon: MailQuestion },
+    ],
+  },
+  {
+    heading: "Providers and Security",
+    items: [
+      { href: "/owner#security", label: "Security and billing", icon: ShieldCheck },
+      { href: "/owner#owner-providers-h", label: "AI providers and models", icon: Gauge },
+    ],
+  },
+  { heading: "My Workspace", items: [{ href: "/dashboard?view=workspace", label: "My Workspace", icon: Briefcase }] },
 ];
 
 /**
@@ -418,7 +435,12 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         </Link>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label={variant === "owner" ? "Owner sections" : "Sections"}>
           {variant === "owner" ? (
-            OWNER_NAV.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))
+            OWNER_NAV_GROUPS.map((g) => (
+              <div key={g.heading} className="mb-3">
+                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
+                {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
+              </div>
+            ))
           ) : (
             <>
               {isOwner && (
@@ -495,7 +517,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         </div>
         <nav className="mx-auto hidden max-w-6xl gap-1 overflow-x-auto px-4 pb-2 md:flex lg:hidden" aria-label="Main">
           {variant === "owner" ? (
-            OWNER_NAV.map(({ href, label, icon: Icon }) => (
+            OWNER_NAV_GROUPS.flatMap((g) => g.items).map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -575,7 +597,12 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             </div>
             <nav className="flex-1 space-y-0.5 px-3 pb-4" aria-label="Sections">
               {variant === "owner" ? (
-                OWNER_NAV.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))
+                OWNER_NAV_GROUPS.map((g) => (
+              <div key={g.heading} className="mb-3">
+                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
+                {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
+              </div>
+            ))
               ) : (
                 <>
                   {isOwner && (

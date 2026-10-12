@@ -96,7 +96,7 @@ export default async function OwnerPage() {
         requests={requests ?? null}
         statsError={statsError}
       />
-      <NoUnexpectedChargesCard />
+      <div id="security" className="scroll-mt-4"><NoUnexpectedChargesCard /></div>
       {statsError && (
         <div className="mb-4 rounded-card border border-danger/30 bg-danger/5 p-3" role="alert">
           <p className="text-sm font-medium text-danger">{statsError}</p>
@@ -178,7 +178,7 @@ function OwnerOverviewCard({ members, invitations, requests, statsError }: {
     },
   ];
   return (
-    <section className="mb-6" aria-labelledby="owner-overview-h">
+    <section id="overview" className="mb-6 scroll-mt-4" aria-labelledby="owner-overview-h">
       <h2 id="owner-overview-h" className="mb-3 text-base font-semibold">Administrative overview</h2>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((c) => (

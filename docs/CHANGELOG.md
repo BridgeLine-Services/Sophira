@@ -8,6 +8,21 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
+### UI/UX round 3: owner nav grouped into functional areas (2026-10-12)
+
+- OWNER_NAV replaced by OWNER_NAV_GROUPS: Overview (dashboard overview,
+  System Health), Members and Invitations (Members, Invite, Invitation
+  requests), Providers and Security (security/billing, AI providers
+  and models), and My Workspace (exactly one entry). The tablet row
+  flattens the SAME groups — one source of truth.
+- Every #fragment the nav points at now targets a real element:
+  #overview, #security, #owner-providers-h on the owner page and
+  #members/#invite/#requests on the member dashboard (scroll-mt so
+  the sticky header does not cover targets).
+- 12 new pins (group order, no duplicate hrefs, single My Workspace
+  entry, anchor integrity). Battery: 3407/3407 green; tsc clean;
+  build clean.
+
 ### UI/UX round 2: owner dashboard overview-first restructure (2026-10-12)
 
 - New OwnerOverviewCard: six compact status cards (database, AI
