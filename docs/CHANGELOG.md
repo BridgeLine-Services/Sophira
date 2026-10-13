@@ -8,7 +8,19 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
-##### Bug-fix round: invitation email delivery, typing honesty, dashboard sync, Integrations shell (2026-10-13)
+##### Bug-fix round 2: notebook deletion (2026-10-13)
+
+- Whole-notebook deletion is now a visible, confirm-guarded action on the
+  notebook page (owner-scoped server-side DELETE; returns to the list on
+  success; honest error keeps the record on failure).
+- Per-record deletion for notes and artifacts (including study guides,
+  quizzes, and flashcards, which are artifacts): new owner-enforced
+  DELETE handlers on /api/notebooks/:id/notes and /artifacts, with
+  confirm-guarded row actions that refresh without a manual reload.
+- Sources already had owner-scoped removal; unchanged.
+- Battery: 3626/3626 green; tsc clean; build clean; scan clean.
+
+### Bug-fix round: invitation email delivery, typing honesty, dashboard sync, Integrations shell (2026-10-13)
 
 - INVITATIONS: the lifecycle previously stopped at the database row — no
   email was ever sent. New server-side sender (src/lib/invitations/email.ts,

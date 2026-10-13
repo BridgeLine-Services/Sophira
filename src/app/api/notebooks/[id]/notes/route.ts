@@ -50,3 +50,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (error) return NextResponse.json({ error: "Could not save the note." }, { status: 500 });
   return NextResponse.json({ note: data });
 }
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = createClient();
+  const guard = await requireUser(supabase);
+  if (!guard.ok) return guard.response;
+  const { user } = guard.data;
+  const noteId = new URL(request.url).searchParams.get("note_id") || "";
+  if (!noteId) return NextResponse.json({ error: "Missing note id." }, { status: 400 });
+  const { data: nb } = await supabase.from("notebooks").select("id").eq("id", id).eq("user_id", user.id).maybeSingle();
+  if (!nb) return NextResponse.json({ error: "Notebook not found." }, { status: 404 });
+  const { error } = await supabase.from("notebook_notes").delete().eq("id", noteId).eq("notebook_id", id).eq("user_id", user.id);
+  if (error) return NextResponse.json({ error: "Could not delete the note." }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

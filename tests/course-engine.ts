@@ -947,4 +947,24 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "integrations: the page renders in the normal app shell with working navigation back to Settings");
   }
 
+// ==== Bug-fix round 2 (2026-10-13): notebook + record deletion ====
+  section("notebook deletion: whole notebook and per-record delete");
+  {
+    const nbRoute = readFileSync("src/app/api/notebooks/[id]/route.ts", "utf8");
+    assert(nbRoute.includes("export async function DELETE") && nbRoute.includes('.eq("user_id", user.id)'),
+      "notebook: whole-notebook DELETE exists and is owner-scoped server-side");
+    const nbPage = readFileSync("src/app/notebooks/[id]/page.tsx", "utf8");
+    assert(nbPage.includes("Delete notebook") && nbPage.includes("ConfirmDialog") && nbPage.includes('router.push("/notebooks")'),
+      "notebook: a visible Delete-notebook action with confirmation returns to the list after success");
+    assert(nbPage.includes("runConfirmedDelete") && nbPage.includes("the record is still there"),
+      "notebook: a FAILED delete keeps the record visible with an honest error (no silent loss)");
+    const notesRoute = readFileSync("src/app/api/notebooks/[id]/notes/route.ts", "utf8");
+    assert(notesRoute.includes("note_id") && notesRoute.includes('.eq("user_id", user.id)'),
+      "notebook: notes DELETE exists, is query-scoped, and is owner-enforced");
+    const artRoute = readFileSync("src/app/api/notebooks/[id]/artifacts/route.ts", "utf8");
+    assert(artRoute.includes("artifact_id") && artRoute.includes("notebook_artifacts"),
+      "notebook: artifacts DELETE exists on the real artifacts table");
+    assert(nbPage.includes("kind: \"note\"") && nbPage.includes("kind: \"artifact\""),
+      "notebook: per-record delete actions are wired for notes and artifacts");
+  }
 }
