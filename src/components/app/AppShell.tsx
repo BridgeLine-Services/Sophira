@@ -441,7 +441,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
               <div key={g.heading} className="mb-3">
                 <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
                 {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
-                {g.heading === "Personal" && (<div className="mt-1 px-1"><SignOutButton /></div>)}
+                {g.heading === "Personal" && (<SignOutButton nav />)}
               </div>
             ))
           ) : (

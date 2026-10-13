@@ -844,4 +844,16 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "fixtures: the shared academicLevelBit provides the behavioral anchors the fixtures reference");
   }
 
+// ==== Visual-acceptance round: sidebar sign-out is a nav item, not a CTA ====
+  section("sign-out styling in the owner sidebar");
+  {
+    const sob = readFileSync("src/components/app/SignOutButton.tsx", "utf8");
+    assert(sob.includes("nav?: boolean") && sob.includes("LogOut") && sob.includes("hover:bg-ink/5"),
+      "signout: the sidebar renders Sign Out as a quiet nav item with an icon (nav variant)");
+    assert(sob.includes("bg-accent") && sob.includes("rounded-button"),
+      "signout: the standalone error-page variant keeps its clear primary styling");
+    const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+    assert(shell.includes("<SignOutButton nav />") && !shell.includes("<SignOutButton />"),
+      "signout: the owner sidebar uses the nav variant everywhere");
+  }
 }
