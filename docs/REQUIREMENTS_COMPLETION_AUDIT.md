@@ -1,3 +1,7 @@
+> **SUPERSEDED (2026-10-13):** this document is a historical
+> snapshot. The current, authoritative status is **docs/COMPLETION_REPORT.md**
+> and the current owner checklist is **docs/WHAT_I_NEED_TO_DO_NEXT.md**.
+
 # Sophira — Requirements Completion Audit
 
 **Audit date:** 2026-10-09 · **Baseline audited:** commit `7c7295c` (universal mathematics
