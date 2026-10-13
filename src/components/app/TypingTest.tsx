@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createTypingTracker, rawTypingAccuracy, correctionRate } from "@/lib/typing";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner, useToast } from "@/components/ui";
 import { Gauge, RefreshCw, Target } from "lucide-react";
 
@@ -22,6 +23,9 @@ export interface TypingAttemptRow {
   wpm: number;
   accuracy: number;
   net_wpm: number;
+  raw_accuracy?: number | null;
+  corrections?: number | null;
+  backspaces?: number | null;
   valid_attempt: boolean;
   flags: string[];
   is_baseline: boolean;
@@ -51,6 +55,7 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
   const startRef = useRef<number | null>(null);
+  const trackerRef = useRef<ReturnType<typeof createTypingTracker> | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -81,13 +86,16 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
     if (!passage) return;
     setTyped("");
     startRef.current = null;
+    trackerRef.current = createTypingTracker(passage.text);
     setTyping(true);
   }
 
   function onChange(v: string) {
     if (!typing) return;
     if (startRef.current === null) startRef.current = Date.now();
-    setTyped(v.slice(0, (passage?.text.length ?? 200) + 80));
+    const next = v.slice(0, (passage?.text.length ?? 200) + 80);
+    trackerRef.current?.apply(next);
+    setTyped(next);
   }
 
   async function submit() {
@@ -102,6 +110,7 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
           typed,
           started_at_ms: startRef.current,
           ended_at_ms: Date.now(),
+          events: trackerRef.current?.summary() ?? null,
         }),
       });
       const json = await res.json();
@@ -278,7 +287,8 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
                 <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink-soft">
                   <th className="py-2 pr-3">Date</th>
                   <th className="py-2 pr-3">Gross WPM</th>
-                  <th className="py-2 pr-3">Accuracy</th>
+                  <th className="py-2 pr-3">Final accuracy</th>
+                  <th className="py-2 pr-3">Raw typing</th>
                   <th className="py-2 pr-3">Net WPM</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 pr-3">Baseline</th>
@@ -290,6 +300,11 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
                     <td className="py-2 pr-3 text-ink-soft">{new Date(a.test_date).toLocaleString()}</td>
                     <td className="py-2 pr-3">{Number(a.wpm).toFixed(0)}</td>
                     <td className="py-2 pr-3">{(Number(a.accuracy) * 100).toFixed(1)}%</td>
+                    <td className="py-2 pr-3" title="How accurately characters were first entered, before corrections">
+                      {a.raw_accuracy != null
+                        ? `${(Number(a.raw_accuracy) * 100).toFixed(1)}%${a.corrections != null && a.corrections > 0 ? ` (${a.corrections} fix${a.corrections === 1 ? "" : "es"})` : ""}`
+                        : "—"}
+                    </td>
                     <td className="py-2 pr-3">{Number(a.net_wpm).toFixed(0)}</td>
                     <td className="py-2 pr-3">
                       {a.valid_attempt ? <Badge tone="success">Valid</Badge> : <Badge tone="warn">Flagged: {a.flags.join(", ")}</Badge>}

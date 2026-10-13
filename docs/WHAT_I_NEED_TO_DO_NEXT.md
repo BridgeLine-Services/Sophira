@@ -54,6 +54,13 @@ legal pages stay unpublished and the release gate honestly reports the app is
 NOT READY for production release until the legal facts and attorney review are
 complete (private testing with invited users is fine meanwhile).
 
+## Optional: automatic invitation emails (about 10 minutes)
+- Without this, inviting works fine — you just copy the link and send it yourself.
+- Get a key at https://resend.com, verify your domain, then set in Vercel:
+  `RESEND_API_KEY` and `SOPHIRA_INVITE_FROM_EMAIL`
+  (`Sophira <invitations@yourdomain.com>`).
+- Done when: after you invite someone, the dashboard says "Email sent".
+
 ## 3. Answer the legal questions (reply in chat)
 - Does 10/04/2026 mean October 4, 2026 or April 10, 2026?
 - Which US state's law should govern the terms?

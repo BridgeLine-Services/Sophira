@@ -856,4 +856,95 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(shell.includes("<SignOutButton nav />") && !shell.includes("<SignOutButton />"),
       "signout: the owner sidebar uses the nav variant everywhere");
   }
+
+  // ==== Bug-fix round 2026-10-13: honest typing metrics ====
+  section("typing: final accuracy vs raw typing accuracy (the 100% defect)");
+  {
+    const { createTypingTracker, rawTypingAccuracy, correctionRate, validateEventSummary, computeTypingResult } =
+      require("../src/lib/typing") as typeof import("../src/lib/typing");
+    // Reproduce the reported scenario: mistype, backspace, correct, finish.
+    const t = createTypingTracker("hello world");
+    t.apply("hx");          // 'x' is wrong at entry time
+    t.apply("h");           // backspace removes the wrong char
+    t.apply("he");          // corrected
+    t.apply("hello world"); // completes the passage correctly
+    const sum = t.summary();
+    assert(sum.rawErrors === 1 && sum.corrections === 1 && sum.backspaces === 1,
+      "typing: the tracker records the raw error, the correction, and the backspace");
+    const result = computeTypingResult({ startedAtMs: 0, endedAtMs: 60000, typed: "hello world", reference: "hello world" });
+    assert(result.accuracy === 1,
+      "typing: FINAL-text accuracy legitimately reaches 100% for a corrected passage");
+    const raw = rawTypingAccuracy(sum);
+    assert(raw < 1 && Math.abs(raw - 11 / 12) < 0.001,
+      "typing: RAW typing accuracy reflects the entry-time mistake — a corrected passage is never reported as a flawless process");
+    assert(correctionRate(sum) > 0,
+      "typing: the correction rate is non-zero when the user fixed a mistake");
+    // Omissions, insertions, substitutions are all distinguishable events
+    const t2 = createTypingTracker("cat");
+    t2.apply("bat");   // substitution
+    t2.apply("batx");  // insertion (wrong)
+    t2.apply("bat");   // delete the insertion
+    const s2 = t2.summary();
+    assert(s2.rawErrors === 2 && s2.corrections === 1 && s2.backspaces === 1,
+      "typing: substitutions and insertions are separate entry-time errors");
+    // Server-side validation of a submitted summary
+    assert(validateEventSummary({ entered: 11, rawErrors: 1, corrections: 1, backspaces: 1, paste: false }, 11) !== null,
+      "typing: a consistent summary validates");
+    assert(validateEventSummary({ entered: 5, rawErrors: 0, corrections: 0, backspaces: 0 }, 11) === null,
+      "typing: fewer entries than submitted characters is rejected");
+    assert(validateEventSummary({ entered: 11, rawErrors: 0, corrections: 5, backspaces: 1 }, 10) === null,
+      "typing: more corrections than deletions is rejected");
+    assert(validateEventSummary("nope", 11) === null && validateEventSummary(null, 11) === null,
+      "typing: non-object summaries are rejected");
+    // UI + API wiring: the tracker feeds the attempt, the server persists honest columns
+    const test = readFileSync("src/components/app/TypingTest.tsx", "utf8");
+    assert(test.includes("createTypingTracker(passage.text)") && test.includes("events: trackerRef.current?.summary()") &&
+      test.includes("Raw typing") && test.includes("Final accuracy"),
+      "typing: the calibration UI tracks events, submits them, and shows final vs raw accuracy separately");
+    const api = readFileSync("src/app/api/typing/route.ts", "utf8");
+    assert(api.includes("validateEventSummary(body.events, typed.length)") && api.includes("raw_accuracy") &&
+      api.includes("paste_detected"),
+      "typing: the server validates the summary and persists raw accuracy — a paste attempt is flagged invalid");
+    const mig = readFileSync("supabase/migrations/0035_typing_event_metrics.sql", "utf8");
+    assert(mig.includes("add column if not exists raw_accuracy") && mig.includes("corrections"),
+      "typing: migration 0035 is non-destructive (add column if not exists)");
+  }
+
+  // ==== Bug-fix round 2026-10-13: invitation email delivery ====
+  section("invitations: real email delivery with honest status");
+  {
+    const email = readFileSync("src/lib/invitations/email.ts", "utf8");
+    assert(email.includes("not_configured") && email.includes("The email provider rejected"),
+      "invitations: the sender distinguishes not-configured, provider-rejected, and unreachable");
+    assert(email.includes('res.ok && json.id'),
+      "invitations: 'sent' is reported ONLY when the provider accepts the send with a message id");
+    const keyUses = (email.match(/apiKey/g) || []).length;
+    assert(keyUses === 3 && email.includes("Authorization: `Bearer ${apiKey}`"),
+      "invitations: the API key is used in exactly two places — the env read and the auth header — nothing else");
+    assert(email.includes("reason: ") === false || !/apiKey/.test(email.slice(email.indexOf("invitationEmailNote"))),
+      "invitations: no secret value is ever placed in a status message");
+    const api = readFileSync("src/app/api/invitations/route.ts", "utf8");
+    assert(api.includes('.eq("email", email)') && api.includes('.eq("status", "pending")') && api.includes(".gt("),
+      "invitations: a pending unexpired invitation for the same address is REUSED — retries never duplicate rows or emails");
+    assert(api.includes("email_status") && api.includes("email_note"),
+      "invitations: the response carries the honest email status and a human note");
+    const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+    assert(dash.includes("json.data.email_note") && dash.includes("inviteNote"),
+      "invitations: the owner sees the actual email result next to the copy link");
+    const mig = readFileSync("supabase/migrations/0036_invitation_email_status.sql", "utf8");
+    assert(mig.includes("email_status") && mig.includes("add column if not exists"),
+      "invitations: migration 0036 records delivery status non-destructively");
+    assert(dash.includes('fetch("/api/network/stats", { cache: "no-store" })') &&
+      dash.includes('fetch("/api/invitation-requests", { cache: "no-store" })'),
+      "dashboard: refreshes bypass the browser cache — mutations reflect immediately, and a failed refresh is surfaced, not silent");
+  }
+
+  // ==== Bug-fix round 2026-10-13: Integrations inside the app shell ====
+  section("integrations: page stays inside the application experience");
+  {
+    const page = readFileSync("src/app/settings/integrations/page.tsx", "utf8");
+    assert(page.includes("<AppShell") && page.includes('backHref="/settings"'),
+      "integrations: the page renders in the normal app shell with working navigation back to Settings");
+  }
+
 }

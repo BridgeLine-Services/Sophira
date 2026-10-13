@@ -111,3 +111,12 @@ Actions: write, limited to this repository only, and set it in your
 hosting provider's environment settings - never in chat, files, or
 client code. Reading the latest results needs no token at all; without
 this token the page shows the exact manual Run-workflow link instead.
+
+## Invitation emails (optional)
+
+- `RESEND_API_KEY` — turns on automatic invitation emails. Without it, the
+  owner copies the invitation link and shares it themselves; the dashboard
+  says so honestly instead of claiming an email was sent.
+- `SOPHIRA_INVITE_FROM_EMAIL` — the From address (e.g.
+  `Sophira <invitations@yourdomain.com>`). The provider requires the domain
+  to be verified first; until then the provider default is used.

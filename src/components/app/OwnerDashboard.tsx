@@ -28,6 +28,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   const [inviteExpires, setInviteExpires] = useState(14);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteNote, setInviteNote] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<NetworkMemberStats | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -38,12 +39,12 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   };
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/network/stats");
-    if (!res.ok) return;
+    const res = await fetch("/api/network/stats", { cache: "no-store" });
+    if (!res.ok) { toast("Could not refresh the member list — reload to retry."); return; }
     const json = await res.json();
     setMembers(json.data.members);
     setInvitations(json.data.invitations);
-    const rres = await fetch("/api/invitation-requests");
+    const rres = await fetch("/api/invitation-requests", { cache: "no-store" });
     if (rres.ok) {
       const rjson = await rres.json();
       setRequests(rjson.data);
@@ -71,6 +72,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
       const json = await res.json();
       if (res.ok) {
         setInviteLink(json.data.link);
+        setInviteNote(json.data.email_note ?? null);
         setInviteEmail("");
         await refresh();
       } else {
@@ -296,6 +298,9 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                 </Button>
               </div>
             )}
+      {inviteNote && (
+        <p className={"mt-1 text-xs " + (inviteNote.includes("Email sent to") ? "text-success" : "text-danger")}>{inviteNote}</p>
+      )}
             <p className="mt-2 text-xs text-ink-soft">
               Each link is single-use, tied to that email, expires automatically, and you can revoke it any time.
             </p>

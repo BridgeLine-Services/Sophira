@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
-import { computeTypingResult } from "@/lib/typing";
+import { computeTypingResult, validateEventSummary, rawTypingAccuracy } from "@/lib/typing";
 import { recomputeTypingProfile, trustworthyObservations, type ObservedTypingAttempt } from "@/lib/typing-profile";
 import { passageById, pickPassage } from "@/lib/typing-passage";
 
@@ -74,6 +74,7 @@ interface AttemptBody {
   typed?: string;
   started_at_ms?: number;
   ended_at_ms?: number;
+  events?: unknown;
 }
 
 export async function GET(request: NextRequest) {
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
 
   const { data: attempts, error } = await supabase
     .from("typing_attempts")
-    .select("id, test_date, duration_ms, characters_typed, wpm, accuracy, net_wpm, valid_attempt, flags, is_baseline, notes")
+    .select("id, test_date, duration_ms, characters_typed, wpm, accuracy, net_wpm, raw_accuracy, corrections, backspaces, valid_attempt, flags, is_baseline, notes")
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) return NextResponse.json({ error: "Could not load your typing history." }, { status: 500 });
@@ -147,6 +148,11 @@ export async function POST(request: NextRequest) {
     reference: passage.text,
   });
 
+  // Event summary (observational, counts only): validated for internal
+  // consistency — never trusted blindly. An inconsistent summary is
+  // dropped (stored as not captured) rather than corrupting the attempt.
+  const events = validateEventSummary(body.events, typed.length);
+
   const { data: row, error } = await supabase
     .from("typing_attempts")
     .insert({
@@ -157,10 +163,13 @@ export async function POST(request: NextRequest) {
       wpm: Math.round(result.wpm * 10) / 10,
       accuracy: Math.round(result.accuracy * 1000) / 1000,
       net_wpm: Math.round(result.netWpm * 10) / 10,
-      valid_attempt: result.validAttempt,
-      flags: result.flags,
+      valid_attempt: result.validAttempt && !(events?.paste ?? false),
+      flags: events?.paste ? [...result.flags, "paste_detected"] : result.flags,
+      raw_accuracy: events ? Math.round(rawTypingAccuracy(events) * 1000) / 1000 : null,
+      corrections: events ? events.corrections : null,
+      backspaces: events ? events.backspaces : null,
     })
-    .select("id, wpm, accuracy, net_wpm, duration_ms, valid_attempt, flags")
+    .select("id, wpm, accuracy, net_wpm, duration_ms, valid_attempt, flags, raw_accuracy, corrections, backspaces")
     .single();
   if (error) return NextResponse.json({ error: "Could not save the attempt: " + error.message }, { status: 500 });
 

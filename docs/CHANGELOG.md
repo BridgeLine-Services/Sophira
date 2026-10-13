@@ -8,7 +8,29 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
-#### Redesign round: reference-direction layout for Owner Dashboard + My Workspace (2026-10-13)
+##### Bug-fix round: invitation email delivery, typing honesty, dashboard sync, Integrations shell (2026-10-13)
+
+- INVITATIONS: the lifecycle previously stopped at the database row — no
+  email was ever sent. New server-side sender (src/lib/invitations/email.ts,
+  Resend): 'sent' only when the provider accepts the send; honest
+  not_configured/failed states with the copy-link fallback; idempotent —
+  retrying a pending invitation reuses it, never duplicating rows or
+  emails. Migration 0036 records the delivery status. UI shows the real
+  result next to the link.
+- DASHBOARD SYNC: refresh fetches were cacheable and failed silently; both
+  GETs now bypass the browser cache and a failed refresh is surfaced.
+- TYPING: the measurement model compared only the final text, so a user
+  who mistyped and corrected everything was reported as 100% accurate.
+  The calibration UI now tracks entry-time events (raw errors,
+  corrections, backspaces, paste detection); final-text accuracy and raw
+  typing accuracy are separate, documented metrics; the server validates
+  the event summary and stores raw accuracy (migration 0035).
+  Attempts table shows both. A paste attempt is flagged invalid.
+- INTEGRATIONS: the page rendered outside the app shell; it now lives in
+  the normal application experience with working back navigation.
+- 24 new assertions. Battery: 3615/3615 green; tsc clean; build clean.
+
+## Redesign round: reference-direction layout for Owner Dashboard + My Workspace (2026-10-13)
 
 - Owner top bar: a genuine AI-service status chip (real provider
   diagnostics, never hardcoded) next to the My Workspace action.
