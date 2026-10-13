@@ -101,6 +101,10 @@ export default function NotebooksPage() {
           </CardContent>
         </Card>
 
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-ink">Your notebooks</h2>
+          <Link href="/notebooks/archive" className="text-sm text-accent hover:underline">Archive</Link>
+        </div>
         {rows === null ? (
           <div className="flex justify-center py-8"><Spinner /></div>
         ) : rows.length === 0 ? (

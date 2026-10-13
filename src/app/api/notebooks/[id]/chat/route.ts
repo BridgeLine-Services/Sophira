@@ -29,6 +29,7 @@ async function loadSources(supabase: Awaited<ReturnType<typeof createClient>>, n
     .eq("notebook_id", notebookId)
     .eq("user_id", userId)
     .eq("included", true)
+    .is("archived_at", null)
     .order("pinned", { ascending: false })
     .order("created_at", { ascending: true });
   if (error || !data) return [];
@@ -188,6 +189,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .select("*")
     .eq("notebook_id", id)
     .eq("user_id", guard.data.user.id)
+    .is("archived_at", null)
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) return NextResponse.json({ error: "Could not load questions." }, { status: 500 });

@@ -8,7 +8,24 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
-##### Bug-fix round 2: notebook deletion (2026-10-13)
+##### Feature round: workspace archive, restore, provenance preservation (2026-10-13)
+
+- Migration 0037 adds the persisted archived_at lifecycle to notebooks,
+  sources, notes, questions, evidence, and artifacts (non-destructive;
+  every existing row stays active; owner indexes added).
+- ACTIVE -> ARCHIVED -> (separate, explicit) permanent deletion. Removing
+  a notebook or record now ARCHIVES it: identity, ownership, contents,
+  provenance, and relationships all survive, and the original record is
+  restored from the Archive (update, never insert — no duplicates).
+- /api/archive: owner-scoped list + archive/restore transitions with an
+  honest archived-parent note; no cascade — dependencies keep their own
+  lifecycle. AI retrieval and all active lists filter archived rows
+  server-side, not just in the UI.
+- New Archive page (/notebooks/archive) with restore actions, honest
+  empty/loading/error states; reachable from the notebooks list.
+- 22 regression pins. Battery: 3648/3648 green; tsc clean; build clean.
+
+### Bug-fix round 2: notebook deletion (2026-10-13)
 
 - Whole-notebook deletion is now a visible, confirm-guarded action on the
   notebook page (owner-scoped server-side DELETE; returns to the list on

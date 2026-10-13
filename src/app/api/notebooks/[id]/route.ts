@@ -26,11 +26,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const notebook = await resolveNotebook(supabase, id, user.id);
   if (!notebook) return NextResponse.json({ error: "Notebook not found." }, { status: 404 });
   const [sources, notes, questions, evidence, artifacts] = await Promise.all([
-    supabase.from("notebook_sources").select("*").eq("notebook_id", id).order("created_at", { ascending: true }),
-    supabase.from("notebook_notes").select("*").eq("notebook_id", id).order("created_at", { ascending: false }).limit(200),
-    supabase.from("notebook_questions").select("*").eq("notebook_id", id).order("created_at", { ascending: false }).limit(100),
-    supabase.from("notebook_evidence").select("*").eq("notebook_id", id).order("created_at", { ascending: false }).limit(500),
-    supabase.from("notebook_artifacts").select("*").eq("notebook_id", id).order("created_at", { ascending: false }).limit(100),
+    supabase.from("notebook_sources").select("*").eq("notebook_id", id).is("archived_at", null).order("created_at", { ascending: true }),
+    supabase.from("notebook_notes").select("*").eq("notebook_id", id).is("archived_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("notebook_questions").select("*").eq("notebook_id", id).is("archived_at", null).order("created_at", { ascending: false }).limit(100),
+    supabase.from("notebook_evidence").select("*").eq("notebook_id", id).is("archived_at", null).order("created_at", { ascending: false }).limit(500),
+    supabase.from("notebook_artifacts").select("*").eq("notebook_id", id).is("archived_at", null).order("created_at", { ascending: false }).limit(100),
   ]);
   return NextResponse.json({
     notebook,

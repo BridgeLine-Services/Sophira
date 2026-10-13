@@ -954,10 +954,10 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(nbRoute.includes("export async function DELETE") && nbRoute.includes('.eq("user_id", user.id)'),
       "notebook: whole-notebook DELETE exists and is owner-scoped server-side");
     const nbPage = readFileSync("src/app/notebooks/[id]/page.tsx", "utf8");
-    assert(nbPage.includes("Delete notebook") && nbPage.includes("ConfirmDialog") && nbPage.includes('router.push("/notebooks")'),
-      "notebook: a visible Delete-notebook action with confirmation returns to the list after success");
-    assert(nbPage.includes("runConfirmedDelete") && nbPage.includes("the record is still there"),
-      "notebook: a FAILED delete keeps the record visible with an honest error (no silent loss)");
+    assert(nbPage.includes("Archive notebook") && nbPage.includes("ConfirmDialog") && nbPage.includes('router.push("/notebooks")'),
+      "notebook: a visible Archive-notebook action with confirmation returns to the list after success");
+    assert(nbPage.includes("runConfirmedArchive") && nbPage.includes("the record is still in your workspace"),
+      "notebook: a FAILED removal keeps the record visible with an honest error (no silent loss)");
     const notesRoute = readFileSync("src/app/api/notebooks/[id]/notes/route.ts", "utf8");
     assert(notesRoute.includes("note_id") && notesRoute.includes('.eq("user_id", user.id)'),
       "notebook: notes DELETE exists, is query-scoped, and is owner-enforced");
@@ -966,5 +966,54 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "notebook: artifacts DELETE exists on the real artifacts table");
     assert(nbPage.includes("kind: \"note\"") && nbPage.includes("kind: \"artifact\""),
       "notebook: per-record delete actions are wired for notes and artifacts");
+  }
+// ==== Workspace archive lifecycle (2026-10-13, migration 0037) ====
+  section("archive lifecycle: persisted state, owner scoping, active filtering");
+  {
+    const mig = readFileSync("supabase/migrations/0037_workspace_archive.sql", "utf8");
+    const migFlat = mig.replace(/\s+/g, " ");
+    for (const t of ["notebooks", "notebook_sources", "notebook_notes", "notebook_questions", "notebook_evidence", "notebook_artifacts"]) {
+      assert(migFlat.includes(`alter table public.${t} add column if not exists archived_at`),
+        `archive: ${t} gains the persisted archived_at lifecycle column`);
+    }
+    assert(!/drop table|drop column/i.test(mig), "archive: the migration is non-destructive (no drops)");
+    const gen = readFileSync("src/lib/db-migrations.generated.ts", "utf8");
+    assert(gen.includes("0037_workspace_archive"), "archive: migration 0037 is embedded in the deploy chain");
+
+    const arc = readFileSync("src/app/api/archive/route.ts", "utf8");
+    assert(arc.includes('.eq("user_id", user.id)') && !arc.includes("body.user_id"),
+      "archive: every mutation is owner-scoped from the session — never a client-supplied user id");
+    assert(arc.includes(".update({ archived_at:") && !arc.includes(".insert("),
+      "archive: restore PRESERVES the original record identity (update, never insert — no duplicates)");
+    assert(arc.includes('action === "archive" ? new Date().toISOString() : null'),
+      "archive: repeated archive/restore transitions are idempotent single-row updates");
+    const nbUpdate = arc.slice(arc.indexOf("KINDS"), arc.indexOf("export async function GET"));
+    assert(!/table.*source.*then|cascade/i.test(nbUpdate),
+      "archive: no cascade — archiving one record never touches its dependencies");
+
+    const nbGet = readFileSync("src/app/api/notebooks/[id]/route.ts", "utf8");
+    let filtered = 0;
+    for (const t of ["notebook_sources", "notebook_notes", "notebook_questions", "notebook_evidence", "notebook_artifacts"]) {
+      const i = nbGet.indexOf(`from("${t}")`);
+      if (i >= 0 && nbGet.slice(i, i + 300).includes('.is("archived_at", null)')) filtered += 1;
+    }
+    assert(filtered === 5, `archive: all five active record lists exclude archived rows server-side (${filtered}/5)`);
+    const nbList = readFileSync("src/app/api/notebooks/route.ts", "utf8");
+    assert(nbList.includes('.is("archived_at", null)'),
+      "archive: the ACTIVE notebook list excludes archived notebooks server-side");
+    const chat = readFileSync("src/app/api/notebooks/[id]/chat/route.ts", "utf8");
+    assert(chat.includes('.is("archived_at", null)'),
+      "archive: AI retrieval excludes archived sources/questions from active grounding");
+
+    const page = readFileSync("src/app/notebooks/[id]/page.tsx", "utf8");
+    assert(page.includes("/api/archive") && page.includes("action: \"archive\"") && page.includes("Archive notebook") && !page.includes("runConfirmedDelete"),
+      "archive: the notebook page removes via the ARCHIVE lifecycle (no destructive default)");
+    const archPage = readFileSync("src/app/notebooks/archive/page.tsx", "utf8");
+    assert(archPage.includes("Nothing here is deleted") && archPage.includes("action: \"restore\"") && archPage.includes("cache: \"no-store\""),
+      "archive: the Archive interface restores honestly without stale cache");
+    assert(archPage.includes("Could not restore — it stays archived"),
+      "archive: a failed restore keeps the record archived with an honest error");
+    const nbPage = readFileSync("src/app/notebooks/page.tsx", "utf8");
+    assert(nbPage.includes("/notebooks/archive"), "archive: the archive is reachable from the notebooks list");
   }
 }

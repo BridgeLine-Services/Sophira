@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, EmptyState, Input, Label, Select, Spinner, Textarea, useToast } from "@/components/ui";
 import { ARTIFACT_TYPES, SOURCE_TYPES } from "@/lib/notebook/types";
 import type { AnswerLabel } from "@/lib/notebook/types";
-import { BookMarked, FileText, Gavel, MessageSquareText, Plus, Search, ShieldQuestion, Trash2 } from "lucide-react";
+import { Archive, BookMarked, FileText, Gavel, MessageSquareText, Plus, Search, ShieldQuestion } from "lucide-react";
 
 /**
  * Notebook workspace (2026-10-06) — private, academic, source-grounded.
@@ -139,22 +139,26 @@ export default function NotebookWorkspace() {
   const router = useRouter();
   const [confirmDel, setConfirmDel] = useState<null | { kind: "notebook" | "note" | "artifact"; id?: string; label: string }>(null);
 
-  const runConfirmedDelete = async () => {
+  // ARCHIVE LIFECYCLE (2026-10-13): removing from the workspace ARCHIVES the
+  // record — identity, contents, provenance, and relationships stay intact
+  // and it is restorable from /notebooks/archive. Nothing is destroyed here.
+  const runConfirmedArchive = async () => {
     const target = confirmDel;
     setConfirmDel(null);
     if (!target) return;
-    let ok = false;
-    if (target.kind === "notebook") {
-      const res = await fetch(`/api/notebooks/${id}`, { method: "DELETE" });
-      ok = res.ok;
-      if (ok) { toast("success", "Notebook deleted."); router.push("/notebooks"); return; }
-    } else if (target.kind === "note") {
-      ok = !!(await api(`/notes?note_id=${target.id}`, "DELETE"));
-    } else if (target.kind === "artifact") {
-      ok = !!(await api(`/artifacts?artifact_id=${target.id}`, "DELETE"));
+    const res = await fetch("/api/archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: target.kind, id: target.id, action: "archive" }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) {
+      toast("success", "Removed from your workspace. You can restore it from the Archive.");
+      if (target.kind === "notebook") { router.push("/notebooks"); return; }
+      await load();
+    } else {
+      toast("error", json.error || "Could not remove — the record is still in your workspace. Try again.");
     }
-    if (ok) { toast("success", "Deleted."); await load(); }
-    else toast("error", "Could not delete — the record is still there. Try again.");
   };
 
   const addSource = async () => {
@@ -282,7 +286,7 @@ export default function NotebookWorkspace() {
   return (
     <AppShell title={notebook?.title ?? "Notebook"} actions={
       <Button size="sm" variant="secondary" onClick={() => setConfirmDel({ kind: "notebook", label: `the entire notebook "${notebook?.title ?? "this notebook"}"` })}>
-        <Trash2 className="h-4 w-4" /> Delete notebook
+        <Archive className="h-4 w-4" /> Archive notebook
       </Button>
     }>
       <div className="mx-auto max-w-5xl space-y-4">
@@ -388,7 +392,7 @@ export default function NotebookWorkspace() {
                     <p className="whitespace-pre-wrap">{n.content}</p>
                     <p className="mt-1 text-xs text-ink/40">{new Date(n.created_at).toLocaleString()}</p>
                     <Button size="sm" variant="secondary" className="mt-1" onClick={() => setConfirmDel({ kind: "note", id: n.id, label: "this note" })}>
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                      <Archive className="h-3.5 w-3.5" /> Archive
                     </Button>
                   </CardContent></Card>
                 ))}
@@ -546,7 +550,7 @@ export default function NotebookWorkspace() {
                       <p className="mb-1 font-medium">{a.title}</p>
                       <ArtifactView artifact={a} />
                       <Button size="sm" variant="secondary" className="mt-1" onClick={() => setConfirmDel({ kind: "artifact", id: a.id, label: `this artifact (${a.title})` })}>
-                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                        <Archive className="h-3.5 w-3.5" /> Archive
                       </Button>
                     </CardContent>
                   </Card>
@@ -559,10 +563,10 @@ export default function NotebookWorkspace() {
       <ConfirmDialog
         open={confirmDel !== null}
         title="Delete permanently?"
-        message={`Delete ${confirmDel?.label ?? "this record"}? This cannot be undone.`}
+        message={`Remove ${confirmDel?.label ?? "this record"} from your workspace? Nothing is deleted — it moves to the Archive and can be restored.`}
         confirmLabel="Delete"
         destructive
-        onConfirm={() => { void runConfirmedDelete(); }}
+        onConfirm={() => { void runConfirmedArchive(); }}
         onCancel={() => setConfirmDel(null)}
       />
         {/* "Why this source?" dialog */}

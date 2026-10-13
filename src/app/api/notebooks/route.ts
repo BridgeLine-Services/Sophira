@@ -19,6 +19,7 @@ export async function GET() {
     .from("notebooks")
     .select("id,title,description,created_at,updated_at")
     .eq("user_id", user.id)
+    .is("archived_at", null)
     .order("updated_at", { ascending: false });
   if (error) return NextResponse.json({ error: "Could not load notebooks." }, { status: 500 });
   return NextResponse.json({ notebooks: data ?? [] });
