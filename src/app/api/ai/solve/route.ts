@@ -114,10 +114,12 @@ export async function POST(request: NextRequest) {
       if (!body.teacher_id && c?.teacher_id) body.teacher_id = c.teacher_id;
     }
     if (body.teacher_id) {
-      const { data: t } = await supabase.from("teachers").select("name").eq("id", body.teacher_id).eq("user_id", user.id).single();
+      const { data: t } = await supabase.from("teachers").select("name").eq("id", body.teacher_id).eq("user_id", user.id).is("archived_at", null).single();
       teacherName = t?.name ?? null;
       const { data: tp } = await supabase.from("teacher_profiles").select("*").eq("teacher_id", body.teacher_id).eq("user_id", user.id).single();
-      if (tp) teacherProfile = tp;
+      // An archived teacher is not active context: its profile is only used
+      // when the teacher itself resolved as ACTIVE above.
+      if (tp && t) teacherProfile = tp;
     }
   }
 

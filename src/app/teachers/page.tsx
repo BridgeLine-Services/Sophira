@@ -23,7 +23,7 @@ export default function TeachersPage() {
       setSubjectSlug(slug);
       const node = slug ? subjectBySlug(slug) : null;
       const [teacherRows, courseRows] = await Promise.all([
-        supabase.from("teachers").select("*").order("created_at", { ascending: false }),
+        supabase.from("teachers").select("*").is("archived_at", null).order("created_at", { ascending: false }),
         node
           ? supabase.from("courses").select("teacher_id, subject")
           : Promise.resolve(null),

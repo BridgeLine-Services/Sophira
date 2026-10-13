@@ -132,16 +132,28 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
   }
 
   async function onDeleteTeacher() {
+    // 2026-10-13: removal from the active workspace is ARCHIVE, not destruction.
+    // The teacher row, its profile, and every course reference stay intact and
+    // restorable from the Archive; the owner-scoped API enforces ownership.
     setBusy(true);
-    if (profile?.id) await supabase.from("teacher_profiles").delete().eq("id", profile.id);
-    const { error } = await supabase.from("teachers").delete().eq("id", teacher.id);
+    let ok = false;
+    try {
+      const res = await fetch("/api/archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "teacher", id: teacher.id, action: "archive" }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
     setBusy(false);
     setConfirmDelete(false);
-    if (error) {
-      toast("error", "Could not delete: " + error.message);
+    if (!ok) {
+      toast("error", "Could not archive this teacher. Nothing was changed.");
       return;
     }
-    toast("success", "Teacher deleted.");
+    toast("success", "Teacher archived. Restore it any time from the Archive.");
     router.push("/teachers");
   }
 
@@ -269,9 +281,9 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Delete this teacher?"
-        message="Their profile and rules are deleted too. Courses keep running without one."
-        confirmLabel="Delete"
+        title="Archive this teacher?"
+        message="They disappear from your active teachers and AI context, but nothing is deleted — restore them any time from the notebooks Archive."
+        confirmLabel="Archive"
         destructive
         onConfirm={onDeleteTeacher}
         onCancel={() => setConfirmDelete(false)}

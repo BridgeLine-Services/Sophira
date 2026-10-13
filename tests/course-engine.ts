@@ -1016,4 +1016,40 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     const nbPage = readFileSync("src/app/notebooks/page.tsx", "utf8");
     assert(nbPage.includes("/notebooks/archive"), "archive: the archive is reachable from the notebooks list");
   }
+// ==== Teachers + Library join the archive lifecycle (0038) ====
+  section("teacher and library removal is archive, not destruction");
+  {
+    const mig = readFileSync("supabase/migrations/0038_teacher_material_archive.sql", "utf8");
+    assert(mig.includes("alter table public.teachers") && mig.includes("alter table public.study_materials")
+      && mig.includes("add column if not exists archived_at") && !mig.includes("drop table"),
+      "archive-0038: additive archived_at on teachers + study_materials, zero drops");
+    const arc = readFileSync("src/app/api/archive/route.ts", "utf8");
+    assert(arc.includes('teacher: { table: "teachers"') && arc.includes('material: { table: "study_materials"'),
+      "archive API: teachers and library items are archiveable kinds");
+    const tpe = readFileSync("src/app/teachers/[id]/TeacherProfileEditor.tsx", "utf8");
+    assert(tpe.includes('kind: "teacher"') && !tpe.includes('.from("teachers").delete()'),
+      "teachers: removal calls the archive API — no client-side destructive delete remains");
+    assert(tpe.includes("Archive this teacher?") && tpe.includes("Nothing was changed."),
+      "teachers: honest archive confirmation and honest failure (record untouched on error)");
+    const lib = readFileSync("src/app/library/page.tsx", "utf8");
+    assert(lib.includes('kind: "material"') && !lib.includes('.from("study_materials").delete()'),
+      "library: removal archives the row and NEVER deletes the storage object");
+    assert(lib.split('.is("archived_at", null)').length >= 4,
+      "library: all three active material queries exclude archived items server-side");
+    const solve = readFileSync("src/app/api/ai/solve/route.ts", "utf8");
+    assert(solve.includes('from("teachers").select("name").eq("id", body.teacher_id).eq("user_id", user.id).is("archived_at", null)'),
+      "ai/solve: an archived teacher is not active teacher context");
+    assert(solve.includes("if (tp && t) teacherProfile = tp;"),
+      "ai/solve: a teacher profile is used only when the teacher itself is active");
+    for (const f of ["src/app/api/math/practice/route.ts", "src/app/api/math/prepare/route.ts"]) {
+      assert(readFileSync(f, "utf8").includes('from("study_materials").select("title, content").is("archived_at", null)'),
+        f + ": archived study materials are excluded from active study workflows");
+    }
+    const plan = readFileSync("src/app/api/essay/plan/route.ts", "utf8");
+    assert(plan.includes('.is("archived_at", null)'),
+      "essay/plan: an archived teacher is not active essay context");
+    const tpage = readFileSync("src/app/teachers/page.tsx", "utf8");
+    assert(tpage.includes('from("teachers").select("*").is("archived_at", null)'),
+      "teachers list: archived teachers are hidden from the active list");
+  }
 }

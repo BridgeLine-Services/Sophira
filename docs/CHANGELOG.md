@@ -8,7 +8,20 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
-##### Feature round: workspace archive, restore, provenance preservation (2026-10-13)
+##### Post-archive audit round: Teachers + Library join the lifecycle (2026-10-13)
+
+- Migration 0038: archived_at on teachers + study_materials (additive,
+  indexed, RLS unchanged). Removal from Teachers and the Library is now
+  confirm-guarded ARCHIVE (server-enforced, owner-scoped) instead of
+  client-side permanent delete; storage objects are never deleted on archive.
+- Active-context filters: teachers list, Library queries (course, assignment,
+  global), ai/solve teacher + profile gating, essay/plan, extract-teacher-doc,
+  math practice/prepare — archived teachers and materials are no longer active
+  AI context or active views.
+- docs/BACKUP_RECOVERY.md: honest, evidence-labeled backup/recovery runbook.
+- Battery: 3661/3661 green; tsc clean; build clean; scan clean.
+
+### Feature round: workspace archive, restore, provenance preservation (2026-10-13)
 
 - Migration 0037 adds the persisted archived_at lifecycle to notebooks,
   sources, notes, questions, evidence, and artifacts (non-destructive;

@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
       .select("id, name")
       .eq("id", body.teacher_id)
       .eq("user_id", guard.data.user.id)
+      .is("archived_at", null)
       .maybeSingle();
     if (teacher) {
       const { data: tp } = await supabase

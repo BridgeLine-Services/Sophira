@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "That's a long document. Please paste the most relevant section (up to 30,000 characters)." }, { status: 413 });
   }
 
-  const { data: teacher } = await supabase.from("teachers").select("id, name").eq("id", teacher_id).single();
+  const { data: teacher } = await supabase.from("teachers").select("id, name").eq("id", teacher_id).is("archived_at", null).single();
   if (!teacher) return NextResponse.json({ error: "Teacher not found." }, { status: 404 });
 
   let rules: Partial<Record<(typeof FIELDS)[number], string>> | null = null;

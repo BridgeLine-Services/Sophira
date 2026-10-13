@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   const count = Math.min(Math.max(body.count ?? 5, 1), 10);
   let materialText = "";
   if (body.material_ids?.length) {
-    const { data } = await supabase.from("study_materials").select("title, content").in("id", body.material_ids);
+    const { data } = await supabase.from("study_materials").select("title, content").is("archived_at", null).in("id", body.material_ids);
     materialText = (data ?? []).map((m) => `--- ${m.title || "untitled"} ---\n${(m.content ?? "").slice(0, 7000)}`).join("\n\n").slice(0, 20000);
   }
   if (!materialText && !body.topic) {

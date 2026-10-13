@@ -32,11 +32,13 @@ const KINDS = {
   question: { table: "notebook_questions", label: "Question" },
   evidence: { table: "notebook_evidence", label: "Evidence" },
   artifact: { table: "notebook_artifacts", label: "Artifact" },
+  teacher: { table: "teachers", label: "Teacher" },
+  material: { table: "study_materials", label: "Library item" },
 } as const;
 type Kind = keyof typeof KINDS;
 
 function snippet(row: Record<string, unknown>): string {
-  return String(row.title ?? row.question ?? row.content ?? row.source_id ?? row.id ?? "record");
+  return String(row.title ?? row.name ?? row.question ?? row.content ?? row.source_id ?? row.id ?? "record");
 }
 
 export async function GET() {

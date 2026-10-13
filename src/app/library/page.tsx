@@ -71,7 +71,8 @@ function LibraryPageInner() {
         const { data: courseMaterials } = await supabase
           .from("study_materials")
           .select("*")
-          .eq("course_id", courseId);
+          .eq("course_id", courseId)
+          .is("archived_at", null);
         const { data: assignmentIds } = await supabase
           .from("assignments")
           .select("id")
@@ -81,6 +82,7 @@ function LibraryPageInner() {
           const { data } = await supabase
             .from("study_materials")
             .select("*")
+            .is("archived_at", null)
             .in("assignment_id", assignmentIds.map((a) => a.id));
           assignmentMaterials = (data as StudyMaterial[]) ?? [];
         }
@@ -88,7 +90,8 @@ function LibraryPageInner() {
           .from("study_materials")
           .select("*")
           .is("course_id", null)
-          .is("assignment_id", null);
+          .is("assignment_id", null)
+          .is("archived_at", null);
 
         const byId = new Map<string, StudyMaterial>();
         for (const m of [...(courseMaterials ?? []), ...assignmentMaterials, ...(globalMaterials ?? [])] as StudyMaterial[]) {
@@ -175,14 +178,26 @@ function LibraryPageInner() {
   }, [materials, category, search, sort]);
 
   async function deleteMaterial(id: string) {
-    const { error } = await supabase.from("study_materials").delete().eq("id", id);
+    // 2026-10-13: Library removal is ARCHIVE — the row and its storage object
+    // stay intact and restorable; only the active view hides it.
+    let ok = false;
+    try {
+      const res = await fetch("/api/archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "material", id, action: "archive" }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
     setConfirmDelete(null);
-    if (error) {
-      toast("error", "Could not delete: " + error.message);
+    if (!ok) {
+      toast("error", "Could not archive this item. It is still in your library.");
       return;
     }
     setMaterials((m) => m.filter((x) => x.id !== id));
-    toast("success", "Deleted.");
+    toast("success", "Archived. Restore it any time from the notebooks Archive.");
   }
 
   async function saveNote(e: FormEvent) {
@@ -303,9 +318,9 @@ function LibraryPageInner() {
 
         <ConfirmDialog
           open={confirmDelete !== null}
-          title="Delete this item?"
-          message="This cannot be undone."
-          confirmLabel="Delete"
+          title="Archive this item?"
+          message="It disappears from your active Library and study workflows, but the file and its record stay intact — restore any time from the notebooks Archive."
+          confirmLabel="Archive"
           destructive
           onConfirm={() => confirmDelete && deleteMaterial(confirmDelete)}
           onCancel={() => setConfirmDelete(null)}
