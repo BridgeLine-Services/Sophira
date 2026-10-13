@@ -36,11 +36,11 @@ export default function NotebooksPage() {
         setRows(data.notebooks ?? []);
         setLoadError(false);
       } else {
-        setRows([]);
+        setRows((current) => current ?? []);
         setLoadError(true);
       }
     } catch {
-      setRows([]);
+      setRows((current) => current ?? []);
       setLoadError(true);
     }
   }, []);
@@ -108,11 +108,28 @@ export default function NotebooksPage() {
           </CardContent>
         </Card>
 
-        {loadError && (
+        {loadError && rows !== null && rows.length > 0 && (
+          <div className="rounded-card border border-warning/30 bg-warning/5 p-3" role="alert">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-medium text-warning">
+                Your notebook list could not refresh automatically. Showing the last saved version.
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => void load()} disabled={busy}>
+                Retry
+              </Button>
+            </div>
+          </div>
+        )}
+        {loadError && rows !== null && rows.length === 0 && (
           <div className="rounded-card border border-danger/30 bg-danger/5 p-3" role="alert">
-            <p className="text-sm font-medium text-danger">
-              Your notebooks could not be loaded right now. Creating a notebook still works — try again or reload the page.
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-medium text-danger">
+                Your notebooks could not be loaded right now. Creating a notebook still works — try again or reload the page.
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => void load()} disabled={busy}>
+                Retry
+              </Button>
+            </div>
           </div>
         )}
         <div className="flex items-center justify-between">
@@ -121,6 +138,11 @@ export default function NotebooksPage() {
         </div>
         {rows === null ? (
           <div className="flex justify-center py-8"><Spinner /></div>
+        ) : loadError && rows.length === 0 ? (
+          <div className="rounded-card border border-danger/30 bg-danger/5 p-5 text-center" role="alert">
+            <p className="text-sm font-medium text-danger">We could not load your notebook list right now.</p>
+            <Button className="mt-3" onClick={() => void load()} disabled={busy}>Retry loading notebooks</Button>
+          </div>
         ) : rows.length === 0 ? (
           <EmptyState title="No notebooks yet" description="Create one above — it stays private to your account." />
         ) : (
