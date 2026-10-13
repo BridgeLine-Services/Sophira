@@ -5,12 +5,13 @@ import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user"
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { OwnerDashboard } from "@/components/app/OwnerDashboard";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, Card, CardContent } from "@/components/ui";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import Link from "next/link";
 import { Briefcase, CheckCircle2, ClipboardList, Gauge, XCircle } from "lucide-react";
 import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
 import { capabilityRegistry, noUnexpectedCharges } from "@/lib/ai/capabilities";
+import { providerSetupStatus } from "@/lib/integrations/setup-status";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,8 @@ export default async function OwnerPage() {
     ? `Membership statistics could not be loaded (${(mErr?.message || "no data returned").replace(/[\n\r]/g, " ").slice(0, 160)}). The member list below may be incomplete — invitations and access management still work. Reload to retry.`
     : null;
 
+  const setup = providerSetupStatus();
+  const pageDiag = providerDiagnostics(readAiEnv());
   const hdrs = await headers();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${hdrs.get("x-forwarded-proto") || "http"}://${hdrs.get("host")}`;
 
@@ -78,9 +81,19 @@ export default async function OwnerPage() {
       title="Owner Dashboard"
       variant="owner"
       actions={
+        <>
+        <Link
+          href="/owner/health"
+          className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-ink shadow-sm hover:border-accent/40"
+          title="Your live AI service mode — details on the System Health page"
+        >
+          <span className={"h-2 w-2 rounded-full " + (pageDiag.activeProvider ? "bg-emerald-500" : "bg-amber-400")} aria-hidden />
+          {pageDiag.activeProvider ? "AI service ready" : "Local AI mode"}
+        </Link>
         <Link href="/dashboard?view=workspace">
           <Button size="sm" variant="secondary">My Workspace</Button>
         </Link>
+        </>
       }
     >
       <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -96,6 +109,45 @@ export default async function OwnerPage() {
         requests={requests ?? null}
         statsError={statsError}
       />
+      <section id="needs-attention" className="scroll-mt-4">
+        <h2 className="mb-3 text-base font-semibold text-ink">Needs attention</h2>
+        <div className="grid gap-2">
+          {(requests?.length ?? 0) > 0 && (
+            <Card><CardContent className="p-4">
+              <p className="font-medium text-ink">{requests?.length} access request{(requests?.length ?? 0) === 1 ? "" : "s"} waiting for your review</p>
+              <p className="mt-1 text-sm text-ink-soft">People asked to join your private network. Until you approve or decline, they cannot sign up.</p>
+              <Link href="#requests" className="mt-2 inline-block text-sm text-accent hover:underline">Review the requests &rarr;</Link>
+            </CardContent></Card>
+          )}
+          {(!setup.microsoft || !setup.google) && (
+            <Card><CardContent className="p-4">
+              <p className="font-medium text-ink">Word &amp; Google document saving is not set up yet</p>
+              <p className="mt-1 text-sm text-ink-soft">Members cannot connect their own Microsoft or Google accounts until the two provider apps are registered. This does not affect any other feature.</p>
+              <Link href="/settings/integrations" className="mt-2 inline-block text-sm text-accent hover:underline">Open Integrations settings &rarr;</Link>
+              <p className="mt-1 text-xs text-ink-soft">Step-by-step: docs/WORD_GOOGLE_DOCS_SETUP.md</p>
+            </CardContent></Card>
+          )}
+          {!setup.search && (
+            <Card><CardContent className="p-4">
+              <p className="font-medium text-ink">Live web research is not configured</p>
+              <p className="mt-1 text-sm text-ink-soft">Research tools fall back to your uploaded library sources and the AI model&rsquo;s own knowledge. Add a search key whenever you want live web results.</p>
+              <p className="mt-1 text-xs text-ink-soft">How: docs/ENVIRONMENT_VARIABLES.md</p>
+            </CardContent></Card>
+          )}
+          {statsError && (
+            <Card><CardContent className="p-4">
+              <p className="font-medium text-danger">Membership statistics could not be loaded</p>
+              <p className="mt-1 text-sm text-ink-soft">The member table may be incomplete. Invitations and access management still work. Reload the page to retry.</p>
+            </CardContent></Card>
+          )}
+          {(requests?.length ?? 0) === 0 && setup.microsoft && setup.google && setup.search && !statsError && (
+            <Card><CardContent className="p-4">
+              <p className="font-medium text-ink">Nothing needs your attention right now.</p>
+              <p className="mt-1 text-sm text-ink-soft">All configured services responded as expected. The release gate still lists the standing legal-review and device-test items until you complete them.</p>
+            </CardContent></Card>
+          )}
+        </div>
+      </section>
       <div id="security" className="scroll-mt-4"><NoUnexpectedChargesCard /></div>
       {statsError && (
         <div className="mb-4 rounded-card border border-danger/30 bg-danger/5 p-3" role="alert">

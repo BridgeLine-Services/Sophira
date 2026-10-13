@@ -714,8 +714,8 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(owner.includes("min-w-[760px]"),
       "owner: the provider table keeps a readable min width inside its scroll container");
     const dash = readFileSync("src/app/dashboard/page.tsx", "utf8");
-    assert(dash.includes("sm:grid-cols-2 xl:grid-cols-3"),
-      "workspace: dashboard content grids reflow to 3 columns on wide desktops and stack naturally on smaller screens");
+    assert(dash.includes("xl:grid-cols-2") && dash.includes("sm:grid-cols-2 xl:grid-cols-1"),
+      "workspace: dashboard content grids reflow responsively (two-column course/teacher overview on wide desktops) and stack naturally on smaller screens");
   }
 
 
@@ -751,16 +751,16 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
     assert(shell.includes("OWNER_NAV_GROUPS"),
       "owner-nav: the owner sidebar is grouped, not a flat list");
-    for (const h of ["Overview", "Members and Invitations", "Providers and Security", "My Workspace"]) {
+    for (const h of ["Overview", "Network Management", "Configuration", "Personal"]) {
       assert(shell.includes(`heading: "${h}"`),
         "owner-nav: functional group present — " + h);
     }
     const overviewPos = shell.indexOf('heading: "Overview"');
-    const membersPos = shell.indexOf('heading: "Members and Invitations"');
-    const provPos = shell.indexOf('heading: "Providers and Security"');
-    const wsPos = shell.indexOf('heading: "My Workspace"');
+    const membersPos = shell.indexOf('heading: "Network Management"');
+    const provPos = shell.indexOf('heading: "Configuration"');
+    const wsPos = shell.indexOf('heading: "Personal"');
     assert(overviewPos < membersPos && membersPos < provPos && provPos < wsPos,
-      "owner-nav: groups are ordered Overview -> Members -> Providers -> My Workspace");
+      "owner-nav: groups are ordered Overview -> Network -> Configuration -> Personal");
     assert(shell.includes("OWNER_NAV_GROUPS.flatMap"),
       "owner-nav: the tablet row flattens the same groups — one source of truth, no duplicate nav definitions");
     const flat = shell.slice(shell.indexOf("OWNER_NAV_GROUPS:"), shell.indexOf("];", shell.indexOf("OWNER_NAV_GROUPS:")));

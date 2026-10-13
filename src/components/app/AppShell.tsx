@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { SignOutButton } from "./SignOutButton";
 import { usePathname, useRouter } from "next/navigation";
 import { SyncStatus } from "@/components/app/SyncStatus";
 import { purgeOfflineOnLogout } from "@/lib/offline/client";
@@ -41,7 +42,7 @@ const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; la
     ],
   },
   {
-    heading: "Members and Invitations",
+    heading: "Network Management",
     items: [
       { href: "/owner#members", label: "Members", icon: Users },
       { href: "/owner#invite", label: "Invite someone", icon: UserPlus },
@@ -49,13 +50,14 @@ const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; la
     ],
   },
   {
-    heading: "Providers and Security",
+    heading: "Configuration",
     items: [
       { href: "/owner#security", label: "Security and billing", icon: ShieldCheck },
       { href: "/owner#owner-providers-h", label: "AI providers and models", icon: Gauge },
+      { href: "/settings/integrations", label: "Integrations", icon: Settings },
     ],
   },
-  { heading: "My Workspace", items: [{ href: "/dashboard?view=workspace", label: "My Workspace", icon: Briefcase }] },
+  { heading: "Personal", items: [{ href: "/dashboard?view=workspace", label: "My Workspace", icon: Briefcase }] },
 ];
 
 /**
@@ -439,6 +441,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
               <div key={g.heading} className="mb-3">
                 <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
                 {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
+                {g.heading === "Personal" && (<div className="mt-1 px-1"><SignOutButton /></div>)}
               </div>
             ))
           ) : (

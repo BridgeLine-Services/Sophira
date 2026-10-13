@@ -8,7 +8,26 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
-### Upgrade round 2: academic-level evaluation fixtures (2026-10-12)
+#### Redesign round: reference-direction layout for Owner Dashboard + My Workspace (2026-10-13)
+
+- Owner top bar: a genuine AI-service status chip (real provider
+  diagnostics, never hardcoded) next to the My Workspace action.
+- Owner sidebar groups renamed to the directive's four areas: Overview,
+  Network Management, Configuration, Personal — with Integrations added
+  under Configuration and Sign Out rendered inside Personal.
+- New "Needs attention" section on the owner dashboard: only real
+  findings (pending access requests, unregistered document providers,
+  missing search key, statistics errors), each with why it matters and
+  where to resolve it; an honest all-clear only when every check passes.
+- Secret-name boundary preserved: provider setup checks moved into the
+  server-only src/lib/integrations/setup-status.ts (booleans only), so
+  pages never reference secret variable names.
+- My Workspace: My Courses and My Teachers now sit side by side on wide
+  desktops (xl two-column overview) and stack naturally on smaller
+  screens; text stays at readable widths.
+- Battery: 3588/3588 green; tsc clean; build clean; scan clean.
+
+## Upgrade round 2: academic-level evaluation fixtures (2026-10-12)
 
 - New tests/fixtures/academic-levels.ts: representative tasks for seven
   major engines (writing, math, chemistry, physics, humanities,
