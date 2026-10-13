@@ -8,7 +8,19 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
-##### Post-archive audit round: Teachers + Library join the lifecycle (2026-10-13)
+##### Production-readiness round: archive-filter sweep + incident matrix (2026-10-13)
+
+- Closed nine genuine archive-filter gaps found by auditing EVERY active
+  retrieval path: notes/artifacts API lists, artifact-generation provenance
+  reads (only active sources cited), integration artifact loader, dashboard
+  teachers, course-page teacher picker (archived teacher names remain
+  visible on referencing courses as historical reference), math test-prep
+  + practice material pickers, and writing-plan context.
+- docs/BACKUP_RECOVERY.md gains the deployment/migration incident response
+  matrix (8 scenarios: detection, safe response, rollback vs restore).
+- Battery: 3671/3671 green; tsc clean; build clean; scan clean.
+
+### Post-archive audit round: Teachers + Library join the lifecycle (2026-10-13)
 
 - Migration 0038: archived_at on teachers + study_materials (additive,
   indexed, RLS unchanged). Removal from Teachers and the Library is now

@@ -25,6 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .select("*")
     .eq("notebook_id", id)
     .eq("user_id", guard.data.user.id)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: "Could not load artifacts." }, { status: 500 });
   return NextResponse.json({ artifacts: data ?? [] });
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .select("*")
     .eq("notebook_id", id)
     .eq("user_id", user.id)
+    .is("archived_at", null)
     .order("created_at", { ascending: true });
   if (srcErr) return NextResponse.json({ error: "Could not load sources." }, { status: 500 });
   const sources: NotebookSource[] = (srcRows ?? []).map((row) => ({

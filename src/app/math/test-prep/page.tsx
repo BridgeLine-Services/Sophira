@@ -26,7 +26,7 @@ function TestPrepInner() {
   const [prep, setPrep] = useState<Prep | null>(null);
 
   useEffect(() => {
-    supabase.from("study_materials").select("id, title").order("created_at", { ascending: false }).limit(50)
+    supabase.from("study_materials").select("id, title").is("archived_at", null).order("created_at", { ascending: false }).limit(50)
       .then(({ data }) => setMaterials((data as Mat[]) ?? []));
   }, [supabase]);
 

@@ -17,7 +17,8 @@ export async function loadArtifact(
   let q = supabase
     .from("notebook_artifacts")
     .select("id, notebook_id, artifact_type, title, content, provenance, created_at")
-    .eq("id", artifactId);
+    .eq("id", artifactId)
+    .is("archived_at", null);
   if (notebookId) q = q.eq("notebook_id", notebookId);
   const { data: row } = await q.maybeSingle();
   if (!row) return null;

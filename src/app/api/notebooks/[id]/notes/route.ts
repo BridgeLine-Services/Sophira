@@ -20,6 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .select("*")
     .eq("notebook_id", id)
     .eq("user_id", guard.data.user.id)
+    .is("archived_at", null)
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) return NextResponse.json({ error: "Could not load notes." }, { status: 500 });

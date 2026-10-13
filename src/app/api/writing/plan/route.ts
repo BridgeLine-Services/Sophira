@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       .from("study_materials")
       .select("title, content")
       .eq("course_id", body.course_id)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(3);
     if (docs?.length) materials = `\nRelevant saved materials the student provided: ${docs.map((d) => (d.title || "untitled").slice(0, 80)).join(", ")}.`;

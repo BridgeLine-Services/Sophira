@@ -19,7 +19,7 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
   if (!course) notFound();
 
   const [{ data: teachers }, { data: teacher }, { data: assignments }] = await Promise.all([
-    supabase.from("teachers").select("id, name").order("name"),
+    supabase.from("teachers").select("id, name").is("archived_at", null).order("name"),
     course.teacher_id
       ? supabase.from("teachers").select("id, name").eq("id", course.teacher_id).single()
       : Promise.resolve({ data: null }),

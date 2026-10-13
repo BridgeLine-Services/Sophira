@@ -56,7 +56,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const [{ data: courses }, { data: teachers }, { data: writingProfile }, { data: assignments }, { count: pendingProposals }, { data: recentFeedback }, { count: activePatterns }] = await Promise.all([
     supabase.from("courses").select("*").order("created_at", { ascending: false }),
-    supabase.from("teachers").select("id, name, notes").order("created_at", { ascending: false }),
+    supabase.from("teachers").select("id, name, notes").is("archived_at", null).order("created_at", { ascending: false }),
     supabase.from("writing_profiles").select("*").order("created_at", { ascending: false }).limit(1),
     supabase.from("assignments").select("id, title, mode, status, updated_at").order("updated_at", { ascending: false }).limit(5),
     supabase.from("profile_update_proposals").select("id", { count: "exact", head: true }).eq("status", "pending"),

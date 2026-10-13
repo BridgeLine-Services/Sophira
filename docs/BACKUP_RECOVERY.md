@@ -40,3 +40,19 @@ not restore-tested**, **Documented but not configured**, **Blocked**.
 
 No backup claim in this document is based on a configuration this agent could
 not see. Everything marked Blocked requires owner-side access.
+
+
+## Deployment and migration incident response matrix
+
+| Scenario | Detection signal | Safe immediate response | App rollback enough? | DB restore needed? | Files? | Verify before reopening |
+|---|---|---|---|---|---|---|
+| Bad application deployment | CI red on the deploy commit; health check fails; users report breakage | Vercel "Instant Rollback" to the previous deployment (code only — it never touches the database) | Yes | No | No | Health workflow + login + one active workflow on the rolled-back build |
+| Failed/partially applied migration | Migrations workflow fails on a commit | STOP: do not redeploy. The migration chain is idempotent (`add column if not exists`), so re-running after fixing the migration is safe | No | No — re-apply forward | No | Migration workflow green + app boots + active lists render |
+| Migration applied but runtime defect appears | Health/tests fail post-deploy | Roll the app back (old code is forward-compatible: new columns are nullable and unused by old code) then fix forward | Usually yes (additive-only policy) | No | No | Full suite + targeted workflow |
+| Broken integration config | Integrations page reports "not configured" honestly | Fix the provider env/registration; no data is at risk | n/a | No | No | Connect flow completes end to end |
+| Email provider unavailable | Invitation shows `failed` status with a safe reason | Owner copies the invitation link manually; retry when the provider recovers | n/a | No | No | Invitation status returns "sent" |
+| Missing/inaccessible stored file | Library entry shows an honest missing-file error | Restore the object from storage recovery, or remove the entry through Archive | No | Only if bucket objects were lost | Yes | Signed URL opens; owner-only |
+| Accidental archival | Record missing from active list | Archive page -> Restore (original ID preserved) | No | No | No | Record reappears in active list |
+| Accidental permanent deletion / corruption | User report; record gone even from Archive | Supabase PITR (Pro add-on, owner-gated) to a point before the event — evaluate data-loss window FIRST; never restore over newer valid data | No | Yes (PITR to a clean branch, then selective recovery) | If files affected | Ownership intact; RLS active; counts consistent |
+
+**Golden rule for every scenario:** application rollback and database recovery are INDEPENDENT. Never roll back the database merely because code failed, and never restore an old snapshot over newer valid user data without a data-loss evaluation.

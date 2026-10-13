@@ -1052,4 +1052,32 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(tpage.includes('from("teachers").select("*").is("archived_at", null)'),
       "teachers list: archived teachers are hidden from the active list");
   }
+// ==== Archive-filter sweep (2026-10-13, production-readiness round) ====
+  section("archived records excluded from EVERY active retrieval path");
+  {
+    const checks: Array<[string, string]> = [
+      ["src/app/api/notebooks/[id]/notes/route.ts", '.is("archived_at", null)'],
+      ["src/app/api/notebooks/[id]/artifacts/route.ts", '.is("archived_at", null)'],
+      ["src/lib/integrations/artifact-loader.ts", '.is("archived_at", null)'],
+      ["src/app/dashboard/page.tsx", '.is("archived_at", null)'],
+      ["src/app/math/test-prep/page.tsx", '.is("archived_at", null)'],
+      ["src/app/math/practice/page.tsx", '.is("archived_at", null)'],
+      ["src/app/api/writing/plan/route.ts", '.is("archived_at", null)'],
+      ["src/app/courses/[id]/page.tsx", '.is("archived_at", null)'],
+    ];
+    for (const [fp, needle] of checks) {
+      assert(readFileSync(fp, "utf8").includes(needle),
+        "archive-sweep: " + fp + " filters archived records out of active retrieval");
+    }
+    // artifact generation must not cite archived sources as fresh provenance
+    const art = readFileSync("src/app/api/notebooks/[id]/artifacts/route.ts", "utf8");
+    const srcBlock = art.slice(art.indexOf('.from("notebook_sources")'), art.indexOf('.order("created_at", { ascending: true })') + 1);
+    assert(srcBlock.includes('.is("archived_at", null)'),
+      "archive-sweep: artifact provenance reads only ACTIVE sources");
+    // the course page keeps the per-id teacher DISPLAY lookup (historical
+    // reference on a course that still references the archived teacher)
+    const crs = readFileSync("src/app/courses/[id]/page.tsx", "utf8");
+    assert(crs.includes('.eq("id", course.teacher_id).single()'),
+      "archive-sweep: archived teacher NAME remains visible on a referencing course");
+  }
 }
