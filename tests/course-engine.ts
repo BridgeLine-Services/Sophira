@@ -1080,4 +1080,29 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(crs.includes('.eq("id", course.teacher_id).single()'),
       "archive-sweep: archived teacher NAME remains visible on a referencing course");
   }
+// ==== Targeted bug-fix round (2026-10-13): issues 1-3 ====
+  section("notebook creation, typing resilience, owner integrations");
+  {
+    const nbPage = readFileSync("src/app/notebooks/page.tsx", "utf8");
+    assert(nbPage.includes("if (data.notebook) setRows((r) => [data.notebook, ...(r ?? [])]);"),
+      "bugfix-1: a server-confirmed notebook appears immediately after creation");
+    assert(nbPage.includes("setLoadError(true)") && nbPage.includes("Your notebooks could not be loaded right now"),
+      "bugfix-1: a list-loading failure is reported honestly, never silent");
+    assert(nbPage.includes("say(data.error ?? \"Could not create the notebook.\")"),
+      "bugfix-1: a failed create keeps the form usable and shows the server error");
+    const tRoute = readFileSync("src/app/api/typing/route.ts", "utf8");
+    assert(tRoute.includes("const retry = await supabase") && tRoute.includes("raw_accuracy ?? null"),
+      "bugfix-2: optional 0035 event-metric columns degrade instead of killing history loading");
+    assert(tRoute.indexOf("passage") >= 0 && tRoute.includes("Could not load your typing history."),
+      "bugfix-2: only a CORE query failure returns the history error; the passage still ships");
+    const ownerInt = readFileSync("src/app/owner/integrations/page.tsx", "utf8");
+    assert(ownerInt.includes('variant="owner"') && ownerInt.includes('profile.role !== "owner"') && ownerInt.includes("redirect"),
+      "bugfix-3: /owner/integrations is owner-guarded and renders in the OWNER shell");
+    const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+    assert(shell.includes('href: "/owner/integrations"') && !shell.includes('href: "/settings/integrations"'),
+      "bugfix-3: the owner nav no longer links into the user Settings integrations page");
+    const userInt = readFileSync("src/app/settings/integrations/page.tsx", "utf8");
+    assert(userInt.includes("IntegrationsPanel"),
+      "bugfix-3: the regular user integrations page is unchanged and intact");
+  }
 }

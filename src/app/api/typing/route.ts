@@ -85,21 +85,40 @@ export async function GET(request: NextRequest) {
   const passageId = request.nextUrl.searchParams.get("passage");
   const passage = (passageId && passageById(passageId)) || pickPassage(guard.data.user.id);
 
-  const { data: attempts, error } = await supabase
+  // The 0035 event-metric columns are OPTIONAL telemetry. A schema that lags
+  // the app (deploy racing the migration) must not break history loading or
+  // prevent the test from starting, so we degrade honestly instead of 500ing.
+  let attempts: Record<string, unknown>[] | null;
+  let attemptsError: { message: string } | null = null;
+  const first = await supabase
     .from("typing_attempts")
     .select("id, test_date, duration_ms, characters_typed, wpm, accuracy, net_wpm, raw_accuracy, corrections, backspaces, valid_attempt, flags, is_baseline, notes")
     .order("created_at", { ascending: false })
     .limit(50);
-  if (error) return NextResponse.json({ error: "Could not load your typing history." }, { status: 500 });
+  attemptsError = first.error;
+  attempts = first.data;
+  if (attemptsError) {
+    const retry = await supabase
+      .from("typing_attempts")
+      .select("id, test_date, duration_ms, characters_typed, wpm, accuracy, net_wpm, valid_attempt, flags, is_baseline, notes")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (retry.error) return NextResponse.json({ error: "Could not load your typing history." }, { status: 500 });
+    attempts = retry.data ?? [];
+  }
+  const safeAttempts: Array<Record<string, unknown>> = (attempts ?? []).map((a) => {
+    const row = a as Record<string, unknown>;
+    return { ...row, raw_accuracy: row.raw_accuracy ?? null, corrections: row.corrections ?? null, backspaces: row.backspaces ?? null };
+  });
 
-  const baseline = attempts.find((a) => a.is_baseline) ?? null;
+  const baseline: Record<string, unknown> | null = safeAttempts.find((a) => a.is_baseline) ?? null;
   // The OPTIONAL adaptive profile — never changes pacing unless enabled.
   const { data: profile } = await supabase
     .from("typing_profiles")
     .select("*")
     .eq("user_id", guard.data.user.id)
     .maybeSingle();
-  return NextResponse.json({ data: { passage, attempts, baseline, profile: profile ?? null } });
+  return NextResponse.json({ data: { passage, attempts: safeAttempts, baseline, profile: profile ?? null } });
 }
 
 export async function POST(request: NextRequest) {

@@ -54,7 +54,7 @@ const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; la
     items: [
       { href: "/owner#security", label: "Security and billing", icon: ShieldCheck },
       { href: "/owner#owner-providers-h", label: "AI providers and models", icon: Gauge },
-      { href: "/settings/integrations", label: "Integrations", icon: Settings },
+      { href: "/owner/integrations", label: "Integrations", icon: Settings },
     ],
   },
   { heading: "Personal", items: [{ href: "/dashboard?view=workspace", label: "My Workspace", icon: Briefcase }] },

@@ -8,7 +8,22 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
-##### Production-readiness round: archive-filter sweep + incident matrix (2026-10-13)
+##### Targeted bug fixes: notebook creation, typing, owner integrations, setup guide (2026-10-13)
+
+- Typing: optional 0035 event-metric columns no longer break history
+  loading (schema-lag-safe fallback, never fake data), so the test can
+  always start; only a core query failure returns the error.
+- Notebooks: a server-confirmed creation appears immediately even if the
+  follow-up list query fails, and list-loading failures show an honest
+  banner instead of a silent empty page.
+- Owner Integrations: new owner-guarded /owner/integrations page in the
+  owner shell; the owner nav no longer routes into user Settings. The user
+  integrations page is unchanged.
+- docs/SETUP_GUIDE.md: one plain-English setup page (required vs
+  optional, where values go, common fixes).
+- 8 regression pins. Battery: 3679/3679 green; tsc clean.
+
+### Production-readiness round: archive-filter sweep + incident matrix (2026-10-13)
 
 - Closed nine genuine archive-filter gaps found by auditing EVERY active
   retrieval path: notes/artifacts API lists, artifact-generation provenance

@@ -26,6 +26,7 @@ export default function NotebooksPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -33,11 +34,14 @@ export default function NotebooksPage() {
       if (res.ok) {
         const data = await res.json();
         setRows(data.notebooks ?? []);
+        setLoadError(false);
       } else {
         setRows([]);
+        setLoadError(true);
       }
     } catch {
       setRows([]);
+      setLoadError(true);
     }
   }, []);
 
@@ -63,6 +67,9 @@ export default function NotebooksPage() {
       } else {
         setTitle("");
         setDescription("");
+        // The server CONFIRMED the insert (it returned the row). Show it
+        // immediately even if the follow-up list query has trouble.
+        if (data.notebook) setRows((r) => [data.notebook, ...(r ?? [])]);
         await load();
       }
     } finally {
@@ -101,6 +108,13 @@ export default function NotebooksPage() {
           </CardContent>
         </Card>
 
+        {loadError && (
+          <div className="rounded-card border border-danger/30 bg-danger/5 p-3" role="alert">
+            <p className="text-sm font-medium text-danger">
+              Your notebooks could not be loaded right now. Creating a notebook still works — try again or reload the page.
+            </p>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink">Your notebooks</h2>
           <Link href="/notebooks/archive" className="text-sm text-accent hover:underline">Archive</Link>
