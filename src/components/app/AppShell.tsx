@@ -4,7 +4,7 @@ import { SignOutButton } from "./SignOutButton";
 import { usePathname, useRouter } from "next/navigation";
 import { SyncStatus } from "@/components/app/SyncStatus";
 import { purgeOfflineOnLogout } from "@/lib/offline/client";
-import { CloudOff } from "lucide-react";
+import { CloudOff, ScanLine } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -16,6 +16,8 @@ import { ScopeChip } from "@/components/app/ScopeChip";
 // Active subject/course scope indicator (course-aware engines round):
 // shows the real subject or course this engine is working within.
 const NAV = [
+  { href: "/math", label: "Type to Solve", icon: Sigma },
+  { href: "/math/scan", label: "Scan to Solve", icon: ScanLine },
   { href: "/writing/typing", label: "Typing Calibration", icon: Keyboard },
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/courses", label: "Courses", icon: BookOpen },

@@ -599,8 +599,23 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(mathRoute.includes('mode === "teach"') && mathRoute.includes("TEACH MODE"),
     "math: teach-me mode explains the concept without a second solver authority");
   const mathPage = readFileSync("src/app/math/page.tsx", "utf8");
-  assert(mathPage.includes('urlMode === "teach"') && mathPage.includes('urlMode === "type"'),
-    "math: /math?mode=teach and /math?mode=type open the correct workflows");
+  const scanPage = readFileSync("src/app/math/scan/page.tsx", "utf8");
+  assert(mathPage.includes('get("mode") === "teach"') && mathPage.includes("Scan to Solve") === false,
+    "math: /math is the Type to Solve workspace (teach mode preserved, no scanner form embedded)");
+  assert(scanPage.includes("Scan a math problem") && scanPage.includes("Open Type to Solve"),
+    "math: /math/scan is the independent Scan to Solve workspace");
+  const shellNav = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  assert(shellNav.includes("/math/scan"), "nav: Scan to Solve is reachable in the sidebar navigation");
+  const typePage2 = readFileSync("src/app/math/page.tsx", "utf8");
+  assert(typePage2.includes("Show math keyboard") && typePage2.includes("Input tips"),
+    "math UI: the approved Type to Solve controls exist (keyboard toggle + tips panel)");
+  assert(typePage2.includes('setMode("plain")') && typePage2.includes('setMode("editor")'),
+    "math UI: Math editor / Plain text switching is wired without losing state");
+  const kb = readFileSync("src/components/math/MathKeyboard.tsx", "utf8");
+  assert(kb.includes("onMouseDown={(e) => e.preventDefault()}" ) && kb.includes("onInsert(k.v)"),
+    "math keyboard: keys insert into the ACTIVE field without stealing focus");
+  assert(typePage2.includes("your expression is preserved") || typePage2.includes("your expression is still preserved") || typePage2.includes("your expression is kept"),
+    "math UI: failed solves keep the student's expression (honest error handling)");
 
 
   // ==== Subject propagation audit (2026-10-12): the three missing routes ====

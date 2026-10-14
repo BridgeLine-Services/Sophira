@@ -1,328 +1,182 @@
 "use client";
 
-import { Suspense, useRef, useState } from "react";
-import Link from "next/link";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Input, Label, Spinner, useToast } from "@/components/ui";
-import { preprocessForOcr, detectExpression, toGrayscale, type GrayImage } from "@/lib/math/image";
-import { MathEditor } from "@/components/math/MathEditor";
-import { TypesetMath } from "@/components/math/TypesetMath";
-import { AlertTriangle, Camera, CheckCheck, ScanLine, ShieldCheck } from "lucide-react";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Label, Spinner, useToast } from "@/components/ui";
+import { MathKeyboard } from "@/components/math/MathKeyboard";
+import { PipelineView, type PipelineResult } from "@/components/math/PipelineView";
+import { Delete, Lightbulb, Sparkles } from "lucide-react";
 
 /**
- * Scan Problem (2026-10-06): image-to-solution pipeline.
- *  scan → capture → crop/rotate/deskew → detect → OCR → reconstruct →
- *  DISPLAY the recognized expression (never skipped) → confirm/correct →
- *  deterministic solve → AI explains → teacher method → independent
- *  verification → steps. Failures are marked NEEDS REVIEW — never hidden.
+ * TYPE TO SOLVE (workflow-separation round, 2026-10-14): this page is the
+ * manual-entry workspace ONLY - scan lives at /math/scan. The approved
+ * reference layout: "Your problem" card with the Math editor / Plain text
+ * segmented control, expression area, Show math keyboard, Solve problem,
+ * the Input tips panel, and the in-card math keyboard. One canonical
+ * expression string is the single source of truth; switching modes or
+ * opening the keyboard NEVER clears it.
  */
 
-interface PipelineResult {
-  status: "OK" | "NEEDS CONFIRMATION" | "NEEDS REVIEW";
-  recognized: { rawText: string; expression: string; expressions: string[]; confidence: number; ambiguity: string[]; ocrEngine: string };
-  solution: { solved: boolean; kind: string; finalAnswer: string; steps: { text: string; expr?: string }[]; honestNote?: string };
-  multipleChoice?: { inverted: boolean; established: boolean; base: string; choices: { label: string; text: string; verdict: "correct" | "incorrect" | "cannot_determine"; reason: string }[] };
-  explanation: { text: string; source: string; honestNote: string };
-  verification: { status: string; checks: { name: string; passed: boolean; detail: string }[]; note: string };
-  teacherMethod: { applied: boolean; note: string } | null;
-  preprocess: { cropped: boolean; rotationDegrees: number; deskewDegrees: number; method: string };
-}
 
-export default function MathScanPage() {
-  // useSearchParams requires a Suspense boundary for prerendering.
-  return (
-    <Suspense fallback={null}>
-      <MathScanInner />
-    </Suspense>
-  );
-}
-
-function MathScanInner() {
-  const { toast } = useToast();
-  const urlMode = useSearchParams().get("mode");
+function MathTypePageInner() {
   const subjectSlug = useSearchParams().get("subject");
-  const [teachMode, setTeachMode] = useState(urlMode === "teach");
-  const [typeOpen, setTypeOpen] = useState(urlMode === "type");
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
-  const [rotation, setRotation] = useState(0);
-  const [preprocessInfo, setPreprocessInfo] = useState<string | null>(null);
+  const teachMode = useSearchParams().get("mode") === "teach";
+  const [expr, setExpr] = useState("");
+  const [mode, setMode] = useState<"editor" | "plain">("editor");
+  const [kbOpen, setKbOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<PipelineResult | null>(null);
-  const [confirmedExpr, setConfirmedExpr] = useState("");
-  const [confirming, setConfirming] = useState(false);
-  const [detect, setDetect] = useState<string | null>(null);
+  const { toast } = useToast();
+  const plainRef = useRef<HTMLTextAreaElement>(null);
+  const [mfReady, setMfReady] = useState(false);
+  const mfRef = useRef<unknown>(null);
 
-  const capture = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImageDataUrl(reader.result as string);
-      setResult(null);
-      setConfirmedExpr("");
-      setDetect(null);
-      setPreprocessInfo(null);
-    };
-    reader.readAsDataURL(file);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { MathfieldElement } = await import("mathlive");
+        if (!alive || typeof window === "undefined") return;
+        if (!customElements.get("math-field")) customElements.define("math-field", MathfieldElement);
+        setMfReady(true);
+      } catch { /* editor falls back to plain text below */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const latexToCanonicalMod = (v: string): string => {
+    // reuse the shared converter (same canonical path as Scan + keyboard)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fn = (window as unknown as { __latexToCanonical?: (s: string) => string }).__latexToCanonical;
+    return fn ? fn(v) : v;
   };
 
-  /** Step 3: crop/rotate/deskew on canvas + step 4 detect (both deterministic). */
-  const preprocess = () => {
-    if (!imageDataUrl) return;
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const maxSide = 1400;
-      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const rgba = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      const gray = toGrayscale(canvas.width, canvas.height, rgba);
-      const detection = detectExpression(gray);
-      setDetect(detection.detected ? `Expression detected — ${detection.reason}` : `Detection: ${detection.reason}`);
-      const pre = preprocessForOcr(gray, rotation);
-      setPreprocessInfo(`cropped to ink, rotated ${rotation}°, deskewed ${pre.deskewDegrees}° (deterministic)`);
-      // render the preprocessed image back for the user to see
-      const out = document.createElement("canvas");
-      out.width = pre.image.width;
-      out.height = pre.image.height;
-      const octx = out.getContext("2d")!;
-      const outData = octx.createImageData(pre.image.width, pre.image.height);
-      for (let i = 0; i < pre.image.grayscale.length; i++) {
-        const v = pre.image.grayscale[i];
-        outData.data[i * 4] = v; outData.data[i * 4 + 1] = v; outData.data[i * 4 + 2] = v; outData.data[i * 4 + 3] = 255;
-      }
-      octx.putImageData(outData, 0, 0);
-      setImageDataUrl(out.toDataURL("image/jpeg", 0.85));
-      setRotation(0);
-    };
-    img.src = imageDataUrl;
-  };
-
-  const solveImage = async (confirmedExpression?: string) => {
-    if (!imageDataUrl) { toast("error", "Scan or capture a problem first."); return; }
+  const solve = async () => {
+    if (!expr.trim()) { toast("error", "Type the problem first."); return; }
     setBusy(true);
     try {
       const res = await fetch("/api/math/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_data_url: imageDataUrl, rotation, confirmed_expression: confirmedExpression ?? null, mode: teachMode ? "teach" : "solve", ...(subjectSlug ? { subject: subjectSlug } : {}) }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.result) {
-        toast("error", json.error ?? "The pipeline failed. Nothing was guessed.");
-        return;
-      }
-      setResult(json.result as PipelineResult);
-      if (json.result.status === "NEEDS CONFIRMATION") setConfirming(true);
-      if (json.result.status === "OK") toast("success", "Solved and independently verified.");
-      if (json.result.status === "NEEDS REVIEW") toast("error", "Verification flagged this result — it is marked NEEDS REVIEW, not hidden.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirmAndSolve = async () => {
-    await solveImage(confirmedExpr || result?.recognized.expression);
-  };
-
-  const solveTyped = async () => {
-    if (!confirmedExpr.trim()) { toast("error", "Type the problem first."); return; }
-    setBusy(true);
-    try {
-      const res = await fetch("/api/math/solve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expression: confirmedExpr, mode: teachMode ? "teach" : "solve", ...(subjectSlug ? { subject: subjectSlug } : {}) }),
+        body: JSON.stringify({ expression: expr, mode: teachMode ? "teach" : "solve", ...(subjectSlug ? { subject: subjectSlug } : {}) }),
       });
       const json = await res.json();
       if (!res.ok || !json.result) { toast("error", json.error ?? "Failed."); return; }
       setResult(json.result as PipelineResult);
       if (json.result.status === "NEEDS REVIEW") toast("error", "Marked NEEDS REVIEW — see the verification section.");
       else toast("success", "Solved and independently verified.");
+    } catch {
+      toast("error", "Could not reach the solver — your expression is preserved.");
     } finally {
       setBusy(false);
     }
   };
 
+  /** Keyboard insertion routes to the ACTIVE field: the math editor (as a
+   * MathLive insert command, preserving cursor/selection) or the plain-text
+   * textarea at its cursor/selection. Never a blind string append. */
+  const insertToken = (token: string) => {
+    if (mode === "editor" && mfReady) {
+      const mf = mfRef.current as { executeCommand?: (c: unknown) => void } | null;
+      if (mf?.executeCommand) { mf.executeCommand(["insert", token]); return; }
+    }
+    const ta = plainRef.current;
+    if (!ta) { setExpr((e) => e + token); return; }
+    const s = ta.selectionStart ?? expr.length;
+    const e = ta.selectionEnd ?? s;
+    const next = expr.slice(0, s) + token + expr.slice(e);
+    setExpr(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = s + token.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  };
+
   return (
-    <AppShell title="Scan Problem">
-      <div className="mx-auto max-w-3xl space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><ScanLine className="h-4 w-4" /> Scan a math problem</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-ink/60">
-              Photograph an equation. Sophira preprocesses the image (crop, rotate, deskew — deterministic), reads it with OCR,
-              shows you EXACTLY what it thinks the expression says, and asks you to confirm. Only then does it solve —
-              deterministically (mathjs), never by guessing — and verifies the result independently. If verification fails
-              the answer is marked <span className="font-semibold">NEEDS REVIEW</span>, never hidden.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) capture(f); e.currentTarget.value = ""; }} />
-              <Button onClick={() => fileRef.current?.click()}><Camera className="mr-1 h-4 w-4" /> Scan Problem</Button>
-              {imageDataUrl && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs">rotate °</Label>
-                    <input type="range" min={0} max={359} value={rotation} onChange={(e) => setRotation(Number(e.target.value))} className="w-32" />
-                    <span className="text-xs text-ink/50">{rotation}°</span>
-                  </div>
-                  <Button variant="secondary" onClick={preprocess}>Crop / rotate / deskew</Button>
-                  <Button onClick={() => solveImage()} disabled={busy}>{busy ? <Spinner /> : "Recognize"}</Button>
-                </>
-              )}
-            </div>
-            {preprocessInfo && <p className="text-xs text-ink/50">{preprocessInfo}</p>}
-            {detect && <p className={`text-xs ${detect.startsWith("Expression detected") ? "text-success" : "text-warn"}`}>{detect}</p>}
-            {imageDataUrl && <img src={imageDataUrl} alt="scanned problem" className="max-h-64 rounded border border-ink/10" />}
+    <AppShell title="Math • Type to Solve">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <h1 className="text-2xl font-semibold">Type a math problem</h1>
+        <p className="text-sm text-ink/60">Enter an expression, equation, or word problem. Choose the input style that works for you.</p>
 
-            <details className="text-sm" open={typeOpen} onToggle={(e) => setTypeOpen((e.target as HTMLDetailsElement).open)}>
-              <summary className="cursor-pointer text-ink/60">Or type the problem directly</summary>
-              <div className="mt-2 space-y-2">
-                <Label>Structured editor (fractions, exponents, roots, integrals) — or switch to plain text. Examples: 2x + 5 = 17, ∫ 3x^2 dx, x^2 - 5x + 6 = 0</Label>
-                <MathEditor onCanonicalChange={setConfirmedExpr} />
-                <Button onClick={solveTyped} disabled={busy || !confirmedExpr.trim()}>{busy ? <Spinner /> : "Solve"}</Button>
-              </div>
-            </details>
-          </CardContent>
-        </Card>
+        <div className="flex gap-4">
+          <div className="min-w-0 flex-1 space-y-4">
+            <Card>
+              <CardHeader><CardTitle>Your problem</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="inline-flex rounded-lg border border-ink/10 p-1" role="tablist" aria-label="Input mode">
+                  <button type="button" role="tab" aria-selected={mode === "editor"}
+                    onClick={() => setMode("editor")}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "editor" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5"}`}>
+                    Math editor
+                  </button>
+                  <button type="button" role="tab" aria-selected={mode === "plain"}
+                    onClick={() => setMode("plain")}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "plain" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5"}`}>
+                    Plain text
+                  </button>
+                </div>
 
-        {result && <PipelineView result={result} confirming={confirming} onConfirmChange={setConfirmedExpr} onConfirm={confirmAndSolve} />}
-        {!result && !imageDataUrl && <EmptyState title="Nothing scanned yet" description="Tap Scan Problem to photograph an equation — or type one below." />}
+                {mode === "editor" && mfReady ? (
+                  <math-field
+                    ref={(el: unknown) => { mfRef.current = el; }}
+                    aria-label="Math expression editor"
+                    className="block w-full rounded-lg border border-ink/15 bg-white p-3 text-lg"
+                    style={{ minHeight: "6rem" }}
+                    onInput={(e: unknown) => {
+                      const el = e as { target?: { value?: string } };
+                      const v = el.target?.value;
+                      if (typeof v === "string") setExpr(latexToCanonicalMod(v));
+                    }}
+                  />
+                ) : (
+                  <textarea
+                    ref={plainRef}
+                    value={expr}
+                    onChange={(e) => setExpr(e.target.value)}
+                    aria-label="Math expression in plain text"
+                    placeholder="e.g. 2x + 5 = 17"
+                    className="block w-full rounded-lg border border-ink/15 bg-white p-3 text-lg"
+                    rows={3}
+                  />
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Button variant="secondary" onClick={() => setKbOpen((o) => !o)}>{kbOpen ? "Hide math keyboard" : "Show math keyboard"}</Button>
+                  <Button onClick={solve} disabled={busy || !expr.trim()}>
+                    {busy ? <Spinner /> : <><Sparkles className="mr-1 h-4 w-4" /> Solve problem</>}
+                  </Button>
+                </div>
+                <p className="text-xs text-ink/50">Switching input styles keeps your work. You can change modes at any time.</p>
+
+                {kbOpen && <MathKeyboard onInsert={insertToken} onClose={() => setKbOpen(false)} />}
+              </CardContent>
+            </Card>
+
+            {result && <PipelineView result={result} confirming={false} onConfirmChange={() => {}} onConfirm={() => {}} />}
+          </div>
+
+          <div className="hidden w-72 shrink-0 lg:block">
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Lightbulb className="h-4 w-4" /> Input tips</CardTitle></CardHeader>
+              <CardContent className="space-y-2 text-sm text-ink/70">
+                <p>Math editor: fractions, powers, roots and integrals</p>
+                <p>Plain text: type naturally, e.g. 2x + 5 = 17</p>
+                <p>Your expression stays intact when you switch modes.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </AppShell>
   );
 }
 
-function PipelineView({ result, confirming, onConfirmChange, onConfirm }: {
-  result: PipelineResult;
-  confirming: boolean;
-  onConfirmChange: (v: string) => void;
-  onConfirm: () => void;
-}) {
-  const needsConfirm = result.status === "NEEDS CONFIRMATION" || confirming;
+export default function MathTypePage() {
   return (
-    <div className="space-y-4">
-      {/* Step 7 — the recognized expression is ALWAYS shown first, never skipped */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCheck className="h-4 w-4" /> Recognized input (step 7 — always shown)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={result.recognized.ocrEngine === "deterministic" ? "neutral" : "accent"}>{result.recognized.ocrEngine} OCR</Badge>
-            <Badge tone={result.recognized.confidence >= 0.8 ? "success" : "warn"}>{(result.recognized.confidence * 100).toFixed(0)}% confidence</Badge>
-          </div>
-          <p className="rounded-lg border border-ink/10 bg-muted/40 p-3 font-mono text-lg">{result.recognized.expression || "(nothing recognized)"}</p>
-          {result.recognized.rawText && result.recognized.rawText !== result.recognized.expression && (
-            <p className="text-xs text-ink/50">raw OCR text: {result.recognized.rawText}</p>
-          )}
-          {result.recognized.ambiguity.length > 0 && (
-            <ul className="text-xs text-warn">
-              {result.recognized.ambiguity.map((a, i) => <li key={i}>⚠ {a}</li>)}
-            </ul>
-          )}
-          {needsConfirm && (
-            <div className="space-y-2 rounded-lg border border-warn/30 bg-warn/5 p-3">
-              <Label>Confirm or correct the expression before Sophira solves it:</Label>
-              <Input defaultValue={result.recognized.expression} onChange={(e) => onConfirmChange(e.target.value)} />
-              <Button size="sm" onClick={onConfirm}>That&apos;s right — solve it</Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* solution */}
-      {(result.solution.solved || result.solution.finalAnswer) && (
-        <Card>
-          <CardHeader><CardTitle>Solution (deterministic)</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            <Badge tone="neutral">{result.solution.kind.replace(/_/g, " ")}</Badge>
-            <ol className="space-y-1 text-sm">
-              {result.solution.steps.map((s, i) => (
-                <li key={i} className="flex flex-wrap items-baseline gap-1"><span>{s.text}</span>{s.expr && <span className="ml-1"><TypesetMath expr={s.expr} /></span>}</li>
-              ))}
-            </ol>
-            {result.solution.finalAnswer && (
-              <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 text-center">
-                <p className="mb-1 text-xs uppercase tracking-wide text-ink/50">Answer</p>
-                <div className="text-lg"><TypesetMath expr={result.solution.finalAnswer} display /></div>
-              </div>
-            )}
-            {result.solution.honestNote && <p className="text-xs text-warn">⚠ {result.solution.honestNote}</p>}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* multiple-choice analysis */}
-      {result.multipleChoice && (
-        <Card>
-          <CardHeader><CardTitle>Multiple-choice analysis</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="text-xs text-ink/60">
-              Problem solved: <span className="font-mono">{result.multipleChoice.base}</span>
-              {result.multipleChoice.inverted ? " — the question asks for the INCORRECT choice, so the logic is inverted." : ""}
-            </p>
-            <ul className="space-y-1">
-              {result.multipleChoice.choices.map((c) => (
-                <li key={c.label} className={c.verdict === "correct" ? "rounded border border-success/40 bg-success/10 p-2 font-medium" : c.verdict === "cannot_determine" ? "rounded border border-warn/40 bg-warn/10 p-2" : "rounded border border-ink/10 p-2"}>
-                  <strong>{c.label}.</strong> {c.text} — <em>{c.verdict === "correct" ? "Correct" : c.verdict === "incorrect" ? "Incorrect" : "Could not be established"}</em>: {c.reason}
-                </li>
-              ))}
-            </ul>
-            {!result.multipleChoice.established && <p className="text-xs text-warn">⚠ The underlying problem could not be solved with certainty, so no choice is confirmed — nothing was guessed.</p>}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* explanation */}
-      {result.explanation.text && (
-        <Card>
-          <CardHeader><CardTitle>Explanation</CardTitle></CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <Badge tone={result.explanation.source === "ai" ? "accent" : "neutral"}>{result.explanation.source === "ai" ? "AI explanation" : "deterministic summary"}</Badge>
-            <p className="whitespace-pre-wrap">{result.explanation.text}</p>
-            <p className="text-xs italic text-ink/40">{result.explanation.honestNote}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {result.teacherMethod && (
-        <p className="text-xs text-ink/60">Teacher method: {result.teacherMethod.note}</p>
-      )}
-
-      {/* verification */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {result.verification.status === "VERIFIED"
-              ? <><ShieldCheck className="h-4 w-4 text-success" /> Independent verification</>
-              : <><AlertTriangle className="h-4 w-4 text-warn" /> Independent verification — NEEDS REVIEW</>}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <Badge tone={result.verification.status === "VERIFIED" ? "success" : "warn"}>{result.verification.status}</Badge>
-          <p>{result.verification.note}</p>
-          {result.verification.checks.length > 0 && (
-            <ul className="space-y-1">
-              {result.verification.checks.map((c, i) => (
-                <li key={i} className={c.passed ? "text-ink/70" : "text-warn font-medium"}>
-                  {c.passed ? "✓" : "✗"} {c.name}: {c.detail}
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="text-xs text-ink/40">
-            Verification is deterministic (re-computation, numeric substitution, finite differences) — the language model is never the mathematical authority.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <Suspense>
+      <MathTypePageInner />
+    </Suspense>
   );
 }

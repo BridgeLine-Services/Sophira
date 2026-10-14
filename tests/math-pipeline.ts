@@ -227,13 +227,17 @@ export async function runMathPipelineTests(assert: Assert, section: Section): Pr
   assert(route.includes("Transcribe ONLY what is visible. Never solve"), "math wiring: the OCR prompt forbids solving");
   assert(route.includes("computed and verified"), "math wiring: the explanation prompt treats the deterministic result as final");
   assert(route.includes("NEEDS REVIEW") || route.includes("Nothing was guessed"), "math wiring: the route fails honestly, never with a fake answer");
-  const page = readFileSync(join(process.cwd(), "src", "app", "math", "page.tsx"), "utf8");
+  // workflow separation (2026-10-14): scan lives at /math/scan; the tracked
+  // sections render in the shared PipelineView used by BOTH pages.
+  const page = readFileSync(join(process.cwd(), "src", "app", "math", "scan", "page.tsx"), "utf8");
+  const sharedView = readFileSync(join(process.cwd(), "src", "components", "math", "PipelineView.tsx"), "utf8");
   assert(page.includes("Scan Problem"), "math wiring: the Scan Problem entry point exists");
-  assert(page.includes("Recognized input (step 7"), "math wiring: step 7 (recognized expression) is displayed first, never skipped");
-  assert(page.includes("NEEDS REVIEW"), "math wiring: the NEEDS REVIEW status is displayed");
-  assert(page.includes("Confirm or correct"), "math wiring: the confirm/correct gate is in the UI");
+  assert(page.includes("Open Type to Solve"), "math wiring: the scanner links to the separate Type workspace");
+  assert(sharedView.includes("Recognized input (step 7"), "math wiring: step 7 (recognized expression) is displayed first, never skipped");
+  assert(page.includes("NEEDS REVIEW") || sharedView.includes("NEEDS REVIEW"), "math wiring: the NEEDS REVIEW status is displayed");
+  assert(sharedView.includes("Confirm or correct"), "math wiring: the confirm/correct gate is in the UI");
   assert(page.includes("cropToInk") || page.includes("preprocessForOcr"), "math wiring: crop/rotate/deskew preprocessing runs on the client canvas");
-  for (const t of ["Recognized input", "Solution", "Explanation", "Independent verification"]) assert(page.includes(t), `math wiring: tracked section "${t}" is rendered separately`);
+  for (const t of ["Recognized input", "Solution", "Explanation", "Independent verification"]) assert(sharedView.includes(t), `math wiring: tracked section "${t}" is rendered separately`);
 }
 
 function near(a: number, b: number, tol = 1e-4) { return Math.abs(a - b) <= tol * Math.max(1, Math.abs(b)); }
