@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, EmptyState, Input, Label, Select, Spinner, Textarea, useToast } from "@/components/ui";
 import { ARTIFACT_TYPES, SOURCE_TYPES } from "@/lib/notebook/types";
 import type { AnswerLabel } from "@/lib/notebook/types";
-import { Archive, BookMarked, FileText, Gavel, MessageSquareText, Plus, Search, ShieldQuestion } from "lucide-react";
+import { Archive, BookMarked, FileText, Gavel, MessageSquareText, Plus, Search, ShieldQuestion, Trash2 } from "lucide-react";
 
 /**
  * Notebook workspace (2026-10-06) — private, academic, source-grounded.
@@ -138,6 +138,8 @@ export default function NotebookWorkspace() {
 
   const router = useRouter();
   const [confirmDel, setConfirmDel] = useState<null | { kind: "notebook" | "note" | "artifact"; id?: string; label: string }>(null);
+  const [confirmPermanent, setConfirmPermanent] = useState(false);
+  const [permanentBusy, setPermanentBusy] = useState(false);
 
   // ARCHIVE LIFECYCLE (2026-10-13): removing from the workspace ARCHIVES the
   // record — identity, contents, provenance, and relationships stay intact
@@ -158,6 +160,31 @@ export default function NotebookWorkspace() {
       await load();
     } else {
       toast("error", json.error || "Could not remove — the record is still in your workspace. Try again.");
+    }
+  };
+
+  // PERMANENT DELETION (separate from archive): destroys the notebook AND
+  // all associated data via the owner-scoped DELETE endpoint (DB on-delete
+  // cascade for children). Irreversible; only the server's confirmed result
+  // updates anything. Duplicate clicks are disabled while in flight.
+  const runPermanentDelete = async () => {
+    if (permanentBusy) return;
+    setPermanentBusy(true);
+    try {
+      const res = await fetch(`/api/notebooks/${id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast("error", json.error || "Could not delete the notebook — nothing was removed. Try again.");
+        setConfirmPermanent(false);
+        return;
+      }
+      toast("success", "Notebook permanently deleted.");
+      router.push("/notebooks");
+    } catch {
+      toast("error", "Could not reach the server — the notebook was not deleted.");
+      setConfirmPermanent(false);
+    } finally {
+      setPermanentBusy(false);
     }
   };
 
@@ -285,9 +312,14 @@ export default function NotebookWorkspace() {
 
   return (
     <AppShell title={notebook?.title ?? "Notebook"} actions={
-      <Button size="sm" variant="secondary" onClick={() => setConfirmDel({ kind: "notebook", label: `the entire notebook "${notebook?.title ?? "this notebook"}"` })}>
-        <Archive className="h-4 w-4" /> Archive notebook
-      </Button>
+      <>
+        <Button size="sm" variant="secondary" onClick={() => setConfirmDel({ kind: "notebook", label: notebook?.title ?? "this notebook" })}>
+          <Archive className="h-4 w-4" /> Archive notebook
+        </Button>
+        <Button size="sm" variant="danger" onClick={() => setConfirmPermanent(true)}>
+          <Trash2 className="h-4 w-4" /> Delete permanently
+        </Button>
+      </>
     }>
       <div className="mx-auto max-w-5xl space-y-4">
         <div className="flex flex-wrap gap-1">
@@ -565,13 +597,22 @@ export default function NotebookWorkspace() {
         title={confirmDel?.kind === "notebook" ? "Archive notebook?" : `Archive ${confirmDel?.label ?? "this record"}?`}
         message={
           confirmDel?.kind === "notebook"
-            ? `Archive "${confirmDel?.label ?? "this notebook"}"? It leaves your active workspace, but every source, note, question, piece of evidence, and artifact is preserved — restore it any time from the Archive.`
+            ? `Move "${confirmDel?.label ?? "this notebook"}" out of your active notebooks and into Archive. Its sources, notes, research, and other contents will be preserved. You can restore it later.`
             : `Remove ${confirmDel?.label ?? "this record"} from your workspace? Nothing is deleted — it moves to the Archive and can be restored.`
         }
         confirmLabel={confirmDel?.kind === "notebook" ? "Archive notebook" : "Archive"}
         destructive
         onConfirm={() => { void runConfirmedArchive(); }}
         onCancel={() => setConfirmDel(null)}
+      />
+      <ConfirmDialog
+        open={confirmPermanent}
+        title="Permanently delete notebook?"
+        message={`Permanently delete "${notebook?.title ?? "this notebook"}" and its associated notebook data (sources, notes, questions, evidence, research, study materials, and artifacts)? This action cannot be undone.`}
+        confirmLabel="Delete permanently"
+        destructive
+        onConfirm={() => { void runPermanentDelete(); }}
+        onCancel={() => setConfirmPermanent(false)}
       />
         {/* "Why this source?" dialog */}
         {whyFor && (

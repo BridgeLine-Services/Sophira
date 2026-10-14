@@ -1205,8 +1205,19 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "detail page: the notebook archive dialog is titled 'Archive notebook?' (never 'Delete permanently?')");
     assert(page.includes('confirmLabel={confirmDel?.kind === "notebook" ? "Archive notebook" : "Archive"}'),
       "detail page: the confirm button says 'Archive notebook' for notebooks, 'Archive' for records");
-    assert(page.includes("every source, note, question, piece of evidence, and artifact is preserved"),
+    assert(page.includes("Its sources, notes, research, and other contents will be preserved. You can restore it later."),
       "detail page: the archive dialog explains preservation + restore honestly");
+    assert(page.includes("Delete permanently") && page.includes('variant="danger"'),
+      "detail page: a visible, destructive-style Delete permanently action sits beside Archive notebook");
+    assert(page.includes('title="Permanently delete notebook?"') && page.includes("This action cannot be undone."),
+      "detail page: permanent deletion has its OWN dialog with irreversible consequences stated");
+    assert(page.includes("runPermanentDelete") && page.includes("Could not delete the notebook — nothing was removed"),
+      "detail page: permanent deletion calls the real handler and NEVER fakes success on failure");
+    const delBlock = page.slice(page.indexOf("runPermanentDelete"), page.indexOf("const addSource"));
+    assert(delBlock.includes("router.push(\"/notebooks\")"),
+      "detail page: successful deletion returns the user to the notebook list");
+    assert(page.includes("permanentBusy") && page.includes("if (permanentBusy) return;"),
+      "detail page: repeated permanent-delete submissions are disabled while in flight");
     assert(!page.includes('title="Delete permanently?"'),
       "detail page: no stale 'Delete permanently?' dialog remains on the ARCHIVE handler");
 

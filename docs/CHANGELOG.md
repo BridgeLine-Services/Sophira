@@ -1,3 +1,8 @@
+### Notebook lifecycle: visible Delete permanently on the notebook detail page (2026-10-14)
+
+- Detail page header now shows BOTH actions: Archive notebook (reversible, secondary) and Delete permanently (irreversible, danger-styled, Trash icon).
+- Two distinct confirmation dialogs with exact, non-contradictory copy; deletion uses the existing owner-scoped DELETE endpoint with DB cascade cleanup; success returns to the notebook list; failures never fake success; duplicate clicks disabled in flight.
+
 ### Notebook lifecycle UI: archive vs permanent delete, correctly separated (2026-10-14)
 
 - Detail page: the notebook archive dialog now says Archive notebook? / Archive notebook (was the contradictory Delete permanently? / Delete on an archiving handler).
