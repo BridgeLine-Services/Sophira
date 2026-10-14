@@ -562,9 +562,13 @@ export default function NotebookWorkspace() {
 
       <ConfirmDialog
         open={confirmDel !== null}
-        title="Delete permanently?"
-        message={`Remove ${confirmDel?.label ?? "this record"} from your workspace? Nothing is deleted — it moves to the Archive and can be restored.`}
-        confirmLabel="Delete"
+        title={confirmDel?.kind === "notebook" ? "Archive notebook?" : `Archive ${confirmDel?.label ?? "this record"}?`}
+        message={
+          confirmDel?.kind === "notebook"
+            ? `Archive "${confirmDel?.label ?? "this notebook"}"? It leaves your active workspace, but every source, note, question, piece of evidence, and artifact is preserved — restore it any time from the Archive.`
+            : `Remove ${confirmDel?.label ?? "this record"} from your workspace? Nothing is deleted — it moves to the Archive and can be restored.`
+        }
+        confirmLabel={confirmDel?.kind === "notebook" ? "Archive notebook" : "Archive"}
         destructive
         onConfirm={() => { void runConfirmedArchive(); }}
         onCancel={() => setConfirmDel(null)}

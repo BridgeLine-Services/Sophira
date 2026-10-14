@@ -1,3 +1,9 @@
+### Notebook lifecycle UI: archive vs permanent delete, correctly separated (2026-10-14)
+
+- Detail page: the notebook archive dialog now says Archive notebook? / Archive notebook (was the contradictory Delete permanently? / Delete on an archiving handler).
+- Archive page: NEW separate Delete permanently action for archived notebooks — its own dialog stating irreversibility and exactly what is destroyed, the real owner-scoped DELETE endpoint, FK-verified cascade (0022), honest failure handling.
+- 12 regression pins. Battery: 3724/3724 green.
+
 # Sophira — Changelog (dated upgrade rounds)
 
 Moved verbatim from README.md on 2026-10-07 so the README stays a short

@@ -1197,4 +1197,38 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(ty.includes("valid_attempt: result.validAttempt") && ty.includes("paste_detected"),
       "typing POST: suspicious/flagged attempts still cannot become the baseline during the transition");
   }
+// ==== Notebook lifecycle UI round (2026-10-14): archive vs permanent delete ====
+  section("archive dialog says ARCHIVE; permanent deletion is a separate, explicit flow");
+  {
+    const page = readFileSync("src/app/notebooks/[id]/page.tsx", "utf8");
+    assert(page.includes('title={confirmDel?.kind === "notebook" ? "Archive notebook?"'),
+      "detail page: the notebook archive dialog is titled 'Archive notebook?' (never 'Delete permanently?')");
+    assert(page.includes('confirmLabel={confirmDel?.kind === "notebook" ? "Archive notebook" : "Archive"}'),
+      "detail page: the confirm button says 'Archive notebook' for notebooks, 'Archive' for records");
+    assert(page.includes("every source, note, question, piece of evidence, and artifact is preserved"),
+      "detail page: the archive dialog explains preservation + restore honestly");
+    assert(!page.includes('title="Delete permanently?"'),
+      "detail page: no stale 'Delete permanently?' dialog remains on the ARCHIVE handler");
+
+    const arch = readFileSync("src/app/notebooks/archive/page.tsx", "utf8");
+    assert(arch.includes('title="Permanently delete notebook?"') && arch.includes('confirmLabel="Delete permanently"'),
+      "archive page: permanent deletion has its OWN dialog, honestly titled");
+    assert(arch.includes("This CANNOT be undone") && arch.includes("sources, notes, questions, evidence"),
+      "archive page: the dialog states irreversibility and exactly what is destroyed");
+    assert(arch.includes("/api/notebooks/${") && arch.includes('method: "DELETE"'),
+      "archive page: permanent deletion calls the real owner-scoped DELETE endpoint (never the archive handler)");
+    assert(arch.includes("it is still safe in the Archive"),
+      "archive page: a FAILED delete keeps the notebook and says so — no false success");
+    assert(arch.includes('it.kind === "notebook"'),
+      "archive page: permanent deletion is offered for notebooks (children cascade), restore stays available for all kinds");
+    assert(arch.includes("onCancel={() => setConfirmPermanent(null)}"),
+      "archive page: Cancel closes the dialog without changing anything");
+
+    const api = readFileSync("src/app/api/notebooks/[id]/route.ts", "utf8");
+    assert(api.includes('.eq("user_id", user.id)') && api.includes("Could not delete the notebook."),
+      "API: permanent deletion is owner-scoped and reports failure honestly");
+    const schema = readFileSync("supabase/migrations/0022_notebooks.sql", "utf8");
+    assert(schema.includes("references public.notebooks(id) on delete cascade"),
+      "DB: children cascade on notebook deletion (FK-verified, no orphaned records)");
+  }
 }

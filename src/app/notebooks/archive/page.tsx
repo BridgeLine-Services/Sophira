@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArchiveRestore } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
-import { Badge, Button, Card, CardContent, EmptyState, Spinner, useToast } from "@/components/ui";
+import { Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Spinner, useToast } from "@/components/ui";
 
 interface ArchivedItem {
   kind: string; kind_label: string; id: string; notebook_id: string | null;
@@ -21,6 +21,8 @@ export default function ArchivePage() {
   const [items, setItems] = useState<ArchivedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [confirmPermanent, setConfirmPermanent] = useState<{ id: string; title: string } | null>(null);
+  const [permaBusy, setPermaBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -56,6 +58,31 @@ export default function ArchivePage() {
     } finally { setBusy(null); }
   };
 
+  // PERMANENT deletion is a separate operation from Restore/Archive: it
+  // destroys the notebook AND its sources, notes, questions, evidence, and
+  // artifacts (DB on-delete cascade). Owner-scoped server endpoint; the row
+  // only leaves the list after the server confirms success.
+  async function deletePermanently() {
+    const target = confirmPermanent;
+    if (!target || permaBusy) return;
+    setPermaBusy(true);
+    try {
+      const res = await fetch(`/api/notebooks/${target.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast("error", json.error || "Could not delete the notebook — it is still safe in the Archive.");
+        return;
+      }
+      setItems((rows) => rows.filter((r) => r.id !== target.id));
+      toast("success", "Notebook permanently deleted.");
+    } catch {
+      toast("error", "Could not reach the server — the notebook is still in the Archive.");
+    } finally {
+      setPermaBusy(false);
+      setConfirmPermanent(null);
+    }
+    };
+
   return (
     <AppShell title="Archive" backHref="/notebooks">
       <p className="mb-4 text-sm text-ink-soft">
@@ -80,14 +107,31 @@ export default function ArchivePage() {
                     <Badge>{it.kind_label}</Badge> · removed {new Date(it.archived_at).toLocaleString()}
                   </p>
                 </div>
-                <Button size="sm" onClick={() => restore(it)} disabled={busy === it.id}>
-                  <ArchiveRestore className="h-4 w-4" /> Restore
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={() => restore(it)} disabled={busy === it.id}>
+                    <ArchiveRestore className="h-4 w-4" /> Restore
+                  </Button>
+                  {it.kind === "notebook" && (
+                    <Button size="sm" className="text-danger" disabled={permaBusy}
+                      onClick={() => setConfirmPermanent({ id: it.id, title: it.title })}>
+                      Delete permanently
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+      <ConfirmDialog
+        open={confirmPermanent !== null}
+        title="Permanently delete notebook?"
+        message={`This CANNOT be undone. "${confirmPermanent?.title ?? "This notebook"}" and all of its sources, notes, questions, evidence, research, study materials, and artifacts will be destroyed permanently.`}
+        confirmLabel="Delete permanently"
+        destructive
+        onConfirm={() => { void deletePermanently(); }}
+        onCancel={() => setConfirmPermanent(null)}
+      />
     </AppShell>
   );
 }
