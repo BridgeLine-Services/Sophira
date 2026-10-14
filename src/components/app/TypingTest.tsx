@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createTypingTracker, rawTypingAccuracy, correctionRate } from "@/lib/typing";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner, useToast } from "@/components/ui";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, Spinner, useToast } from "@/components/ui";
 import { Gauge, RefreshCw, Target } from "lucide-react";
 
 export interface TypingProfileRow {
@@ -54,6 +54,8 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
   const [loading, setLoading] = useState(true);
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
+  const [confirmDelAttempt, setConfirmDelAttempt] = useState<null | { id: string; date: string }>(null);
+  const [deleting, setDeleting] = useState(false);
   const startRef = useRef<number | null>(null);
   const trackerRef = useRef<ReturnType<typeof createTypingTracker> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -125,6 +127,32 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
       toast("error", "Could not reach the server — the attempt was not recorded.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function deleteAttempt() {
+    const target = confirmDelAttempt;
+    if (!target || deleting) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/typing", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attempt_id: target.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setAttempts((a) => a.filter((x) => x.id !== target.id));
+        toast("success", json.baseline_deleted ? "Attempt deleted — pick a new baseline when ready." : "Attempt deleted.");
+        await load();
+      } else {
+        toast("error", json.error || "Could not delete the attempt — it is still in your history.");
+      }
+    } catch {
+      toast("error", "Could not reach the server — the attempt is still in your history.");
+    } finally {
+      setDeleting(false);
+      setConfirmDelAttempt(null);
     }
   }
 
@@ -292,6 +320,7 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
                   <th className="py-2 pr-3">Net WPM</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 pr-3">Baseline</th>
+                  <th className="py-2 pr-3">Remove</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,6 +335,16 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
                         : "—"}
                     </td>
                     <td className="py-2 pr-3">{Number(a.net_wpm).toFixed(0)}</td>
+                    <td className="py-2 pr-3">
+                      <button
+                        type="button"
+                        className="text-xs text-ink-soft underline-offset-2 hover:text-danger hover:underline"
+                        aria-label={"Delete attempt from " + new Date(a.test_date).toLocaleDateString()}
+                        onClick={() => setConfirmDelAttempt({ id: a.id, date: a.test_date })}
+                      >
+                        Delete
+                      </button>
+                    </td>
                     <td className="py-2 pr-3">
                       {a.valid_attempt ? <Badge tone="success">Valid</Badge> : <Badge tone="warn">Flagged: {a.flags.join(", ")}</Badge>}
                     </td>
@@ -327,6 +366,16 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDelAttempt !== null}
+        title="Delete this attempt?"
+        message={"The attempt from " + (confirmDelAttempt ? new Date(confirmDelAttempt.date).toLocaleString() : "") + " is removed permanently. Your other attempts stay intact."}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => { void deleteAttempt(); }}
+        onCancel={() => setConfirmDelAttempt(null)}
+      />
     </div>
   );
 }

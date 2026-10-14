@@ -1105,4 +1105,60 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(userInt.includes("IntegrationsPanel"),
       "bugfix-3: the regular user integrations page is unchanged and intact");
   }
+// ==== P0 round (2026-10-14): migration-marker root cause + typing DELETE ====
+  section("migration markers: 0035-0038 are probe-verifiable, never skipped");
+  {
+    const mk = readFileSync("scripts/migration-markers.mjs", "utf8");
+    for (const f of ["0035_typing_event_metrics.sql", "0036_invitation_email_status.sql", "0037_workspace_archive.sql", "0038_teacher_material_archive.sql"]) {
+      assert(mk.includes('"' + f + '"'), "markers: " + f + " has a probe marker");
+    }
+    assert(mk.includes("column_name='backspaces'") && mk.includes("column_name='archived_at'"),
+      "markers: the marker expressions verify the live columns the production error reported missing");
+    // The apply loop skips files only until the first missing MARKED migration; with
+    // markers for 0035-0038 the probe now detects the gap and applies them.
+    const ap = readFileSync("scripts/apply-migrations.mjs", "utf8");
+    assert(ap.includes("mustApply = true"), "apply: gap detection drives the missing list");
+    const gen = readFileSync("src/lib/db-migrations.generated.ts", "utf8");
+    assert(gen.includes("0035_typing_event_metrics.sql") && gen.includes("0038_teacher_material_archive.sql"),
+      "wizard: the embedded chain includes the newest migrations");
+  }
+
+  section("typing DELETE: owner-scoped, baseline-safe, UI-wired");
+  {
+    const tr = readFileSync("src/app/api/typing/route.ts", "utf8");
+    assert(tr.includes("export async function DELETE"), "typing: DELETE handler exists");
+    assert(tr.includes('.eq("id", attemptId)') && tr.includes('.eq("user_id", user.id)'),
+      "typing: the delete is owner-scoped (id AND session user)");
+    assert(tr.includes("Attempt not found.") && tr.includes("{ status: 404 }"),
+      "typing: a missing or foreign attempt is one honest 404 (no existence disclosure)");
+    assert(tr.includes("baseline_deleted"), "typing: deleting the baseline is reported, not silently ignored");
+    assert(tr.includes("trustworthyObservations"), "typing: recalculation reads only eligible remaining attempts");
+    assert(tr.includes("never a silent promotion"), "typing: no flagged attempt is silently promoted");
+    const ui = readFileSync("src/components/app/TypingTest.tsx", "utf8");
+    assert(ui.includes("setConfirmDelAttempt") && ui.includes("ConfirmDialog") && ui.includes("deleteAttempt"),
+      "typing UI: every history row has a confirm-guarded delete action");
+    assert(ui.includes("it is still in your history"),
+      "typing UI: a failed delete keeps the attempt visible with an honest error");
+    assert(ui.includes('setAttempts((a) => a.filter((x) => x.id !== target.id))'),
+      "typing UI: the list updates immediately after server-confirmed deletion");
+  }
+// ==== P0 notebook fix (PR #5 merge): verify the merged behavior stays ====
+  section("notebook list: failed refresh preserves last-known-good + honest retry");
+  {
+    const nb = readFileSync("src/app/notebooks/page.tsx", "utf8");
+    assert(nb.includes("setRows((current) => current ?? [])"),
+      "notebooks: a failed refresh KEEPS the last known-good list (never silently empties)");
+    assert(nb.includes("Showing the last saved version") && nb.includes("Retry"),
+      "notebooks: a failed refresh shows an honest banner with a working retry");
+    assert(nb.includes("Creating a notebook still works"),
+      "notebooks: an initial load failure is distinguished from a real empty list");
+    assert(nb.includes("loadError"),
+      "notebooks: the error state is tracked separately from the list state");
+    const api = readFileSync("src/app/api/notebooks/route.ts", "utf8");
+    assert(api.includes('NextResponse.json({ notebooks: data ?? [] })'),
+      "notebooks API: an empty list and a failed query are never conflated");
+    const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+    assert(dash.includes("Could not refresh the member list") && dash.includes('{ cache: "no-store" }'),
+      "owner dashboard: a failed refresh toasts honestly and keeps the current lists (verified, no change needed)");
+  }
 }

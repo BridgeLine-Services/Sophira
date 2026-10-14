@@ -4,6 +4,26 @@ You never need a terminal, SQL, or code. Each step below says exactly where to
 click. Full status details live in docs/COMPLETION_REPORT.md (the authoritative
 report, updated 2026-10-13). Details for steps 1-2: docs/WORD_GOOGLE_DOCS_SETUP.md.
 
+## Fix the typing schema in production (2 minutes, no technical steps)
+
+**Why:** The Migrations CI job shows "success" even when it cannot reach your
+database (it prints a notice and skips when the two optional Supabase
+credentials are not configured). Result: migrations 0035-0038 were never
+applied to production, which caused the "Could not find the 'backspaces'
+column" typing error. This is now fixed at the root: the migrations carry
+probe markers, and the built-in repair flow at **/setup** detects and applies
+them automatically.
+
+**What to do:** Sign in as the owner, open **https://sophira.vercel.app/setup**
+once, and press the repair button if it appears. The missing columns are added
+safely (nothing is deleted or rewritten). Then reload the Typing page — it
+should work.
+
+**Alternative (optional, for automatic CI migrations):** create a personal
+access token at supabase.com/dashboard/account/tokens and add
+`SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` in GitHub repo Settings →
+Secrets and variables → Actions. Never share these values in chat.
+
 ## 1. Turn on "Save to Word" and "Save to Google Docs" (about 20 minutes)
 - Microsoft: https://entra.microsoft.com -> App registrations -> New registration.
   Name it Sophira. Add redirect URI:

@@ -29,4 +29,12 @@ export const MARKERS = {
     "exists(select 1 from information_schema.columns where table_schema='public' and table_name='provider_connections' and column_name='granted_scopes')",
   "0034_workload_selections.sql":
     "to_regclass('public.workload_selections') is not null",
+  "0035_typing_event_metrics.sql":
+    "exists(select 1 from information_schema.columns where table_schema='public' and table_name='typing_attempts' and column_name='backspaces')",
+  "0036_invitation_email_status.sql":
+    "exists(select 1 from information_schema.columns where table_schema='public' and table_name='invitations' and column_name='email_status')",
+  "0037_workspace_archive.sql":
+    "exists(select 1 from information_schema.columns where table_schema='public' and table_name='notebooks' and column_name='archived_at')",
+  "0038_teacher_material_archive.sql":
+    "exists(select 1 from information_schema.columns where table_schema='public' and table_name='teachers' and column_name='archived_at')",
 };

@@ -56,3 +56,18 @@ not see. Everything marked Blocked requires owner-side access.
 | Accidental permanent deletion / corruption | User report; record gone even from Archive | Supabase PITR (Pro add-on, owner-gated) to a point before the event — evaluate data-loss window FIRST; never restore over newer valid data | No | Yes (PITR to a clean branch, then selective recovery) | If files affected | Ownership intact; RLS active; counts consistent |
 
 **Golden rule for every scenario:** application rollback and database recovery are INDEPENDENT. Never roll back the database merely because code failed, and never restore an old snapshot over newer valid user data without a data-loss evaluation.
+
+## Schema-drift incident and fix (2026-10-14)
+
+Evidence: the live typing error ("Could not find the 'backspaces' column of
+'typing_attempts' in the schema cache") while the Migrations workflow reported
+success. Root cause, verified from the workflow definition and logs: the job
+exits 0 with a notice when its two optional Supabase credentials are absent,
+and the apply/wizard logic only applied unmarked tail migrations after the
+first missing MARKED migration — 0035-0038 had no markers, so they were
+skipped everywhere. Status before fix: **Unknown schema state reported as
+applied**. Fix: markers for 0035-0038 (probe-verifiable column checks) so both
+the CI job and the runtime wizard detect the gap and apply the idempotent
+migrations. Status after fix: **code verified; live schema verification
+Blocked** until the owner runs /setup repair or configures the CI credentials —
+only then can "backspaces exists in production" be claimed as Verified.

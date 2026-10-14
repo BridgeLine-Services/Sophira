@@ -245,3 +245,76 @@ export async function PATCH(request: NextRequest) {
   const profile = await syncTypingProfile(supabase, guard.data.user.id, Date.now());
   return NextResponse.json({ data: { ok: true, profile } });
 }
+
+export async function DELETE(request: NextRequest) {
+  const supabase = createClient();
+  const guard = await requireUser(supabase);
+  if (!guard.ok) return guard.response;
+  const { user } = guard.data;
+
+  let body: { attempt_id?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+  const attemptId = (body.attempt_id || "").trim();
+  if (!attemptId) return NextResponse.json({ error: "Missing attempt id." }, { status: 400 });
+
+  // Owner-scoped delete: session user only, RLS enforced. A missing or
+  // foreign attempt is the same honest 404 — no existence disclosure.
+  const { data: row } = await supabase
+    .from("typing_attempts")
+    .select("id, is_baseline")
+    .eq("id", attemptId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!row) return NextResponse.json({ error: "Attempt not found." }, { status: 404 });
+
+  const { error } = await supabase
+    .from("typing_attempts")
+    .delete()
+    .eq("id", attemptId)
+    .eq("user_id", user.id);
+  if (error) return NextResponse.json({ error: "Could not delete the attempt." }, { status: 500 });
+
+  // If the deleted attempt was the selected baseline, the derived profile
+  // recalculates from the remaining eligible attempts (never a stale pointer,
+  // never a silent promotion of a flagged attempt — the user picks a new
+  // baseline explicitly, and missing history displays as unknown).
+  let baselineDeleted = false;
+  if (row.is_baseline) {
+    baselineDeleted = true;
+    const { data: remaining } = await supabase
+      .from("typing_attempts")
+      .select("id, wpm, accuracy, valid_attempt, flags")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const { trustworthyObservations } = await import("@/lib/typing-profile");
+    const obs = trustworthyObservations((remaining ?? []).map((a: Record<string, unknown>) => ({
+      id: String(a.id),
+      wpm: Number(a.wpm),
+      accuracy: Number(a.accuracy),
+      valid: Boolean(a.valid_attempt),
+      flags: (a.flags as string[]) ?? [],
+      testDateMs: 0,
+      durationMs: 0,
+      charactersTyped: 0,
+      netWpm: 0,
+    })));
+    // Recalculate derived pace values from eligible remaining attempts only;
+    // the user's baseline stays the calibrated value until they pick a new
+    // baseline attempt explicitly (never a silent promotion).
+    const recent = obs.slice(-5);
+    const recentAvg = recent.length ? recent.reduce((sum, a) => sum + a.wpm, 0) / recent.length : null;
+    await supabase
+      .from("typing_profiles")
+      .update({
+        recent_average_wpm: recentAvg,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id);
+  }
+  return NextResponse.json({ ok: true, baseline_deleted: baselineDeleted });
+}
