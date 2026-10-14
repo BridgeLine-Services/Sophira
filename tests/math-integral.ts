@@ -61,11 +61,48 @@ export function runMathIntegralTests(assert: (c: boolean, n: string) => void, se
   // 4. Honest refusal: a genuinely unsupported integrand is NEVER guessed
   const n4 = normalizeMathText("∫ sin(x^2) dx");
   const r4 = solveIntegral(n4.expressions[0]);
-  assert(r4.solved === false && /review|never guessed/i.test(r4.honestNote ?? ""),
-    "math: ∫ sin(x²) dx (non-elementary family, unsupported here) stays NEEDS REVIEW — no fabricated answer");
+  assert(r4.solved === false && /I (could not|can see|tried)/i.test(r4.honestNote ?? ""),
+    "math: ∫ sin(x²) dx (non-elementary family, unsupported here) is refused with a friendly explanation — no fabricated answer");
 
   // 5. OCR confidence is never solution confidence: verification is a
   //    separate, deterministic step (pinned by the check emission above).
   assert(norm.expressions[0].includes("INTEGRAL"),
     "math: ∫ normalizes into the INTEGRAL pipeline token (camera OCR text takes the same path)");
 }
+
+/* ====== 2026-10-14 round: spoken integrals, OCR dedup, exp x trig, friendly voice ====== */
+
+// 1) Natural-language + OCR-duplicated instructions converge on ONE canonical form.
+const forms = [
+  "\u222B e^x sin(x) dx",
+  "integrate e^x*sin(x) with respect to x",
+  "Integral of Integral of Sin(x)e^x",
+  "INTEGRAL e^x sin(x) dx",
+];
+for (const f of forms) {
+  const n = normalizeMathText(f);
+  const solved = n.expressions.map((e) => solveIntegral(e)).find((r) => r.solved);
+  if (!solved || !solved.finalAnswer.includes("+ C")) {
+    throw new Error(`spoken/OCR form not solved: "${f}" -> ${JSON.stringify(n.expressions)}`);
+  }
+  if (!assertIntegralEquivalent(solved.finalAnswer.replace(/\s*\+\s*C$/, ""), "e^x * sin(x)", "x")) {
+    throw new Error(`antiderivative for "${f}" failed independent derivative verification`);
+  }
+}
+
+// 2) The e^x sin(x) regression: closed form + IBP reasoning in the steps.
+const reg = solveIntegral(normalizeMathText("\u222B e^x sin(x) dx").expressions[0]);
+if (!reg.solved) throw new Error("e^x sin(x) regression FAILED to solve");
+if (!assertIntegralEquivalent(reg.finalAnswer.replace(/\s*\+\s*C$/, ""), "e^x * sin(x)", "x")) {
+  throw new Error("e^x sin(x) antiderivative failed independent verification");
+}
+if (reg.steps.length < 4) throw new Error("e^x sin(x) explanation lacks the by-parts reasoning");
+if (!reg.steps.some((st) => /parts/i.test(st.text))) throw new Error("e^x sin(x) steps never mention integration by parts");
+
+// 3) Student-facing voice: internal diagnostics never dominate the answer.
+const pipelineText = String(require("fs").readFileSync("src/lib/math/pipeline.ts", "utf8"));
+if (pipelineText.includes('"The deterministic solver could not solve this — no answer was guessed."')) {
+  throw new Error("diagnostic-first refusal message still present");
+}
+
+console.log("math-integral round 2: PASS (spoken integrals, OCR dedup, exp\u00d7trig IBP, friendly refusals)");

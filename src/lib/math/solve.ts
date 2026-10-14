@@ -274,7 +274,7 @@ export function solveIntegral(expr: string): SolveResult {
   // forms: "∫ 3x^2 dx" → after normalize: "INTEGRAL 3x^2 dx"
   const m = expr.replace(/\s+/g, " ").match(/INTEGRAL\s+(.+?)\s*d([a-zA-Z])$/i);
   if (!m) {
-    return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: "integral notation not understood — needs review (never guessed)" };
+    return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: "I can see this is an integration problem, but I could not read the integrand and the variable of integration from it. Please retype it in the form 'integrate <expression> dx' (or use the math keyboard), and I will solve it exactly." };
   }
   const body = m[1].trim();
   const v = m[2];
@@ -297,7 +297,7 @@ export function solveIntegral(expr: string): SolveResult {
   const parts = tryIntegrationByParts(body, v);
   if (parts) {
     if (!numericallyVerifyAntiderivative(parts.anti, body, v)) {
-      return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: "integration by parts produced a candidate that failed verification — needs review (never guessed)" };
+      return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: "I tried integration by parts, but the candidate result failed my independent check, so I will not show it as an answer. Please double-check the expression and try again." };
     }
     return {
       kind: "integral",
@@ -307,7 +307,64 @@ export function solveIntegral(expr: string): SolveResult {
       checks: [{ kind: "derivative" as const, label: " (verify by differentiating the antiderivative)", expr: parts.anti, expected: body, var: v }],
     };
   }
-  return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: `no elementary antiderivative found for "${body}" — needs review (never guessed)` };
+  // ---- Exponential-trigonometric antiderivative (2026-10-14) ----
+  // The classic integrate-by-parts-twice family:
+  //   INT e^(a*v)*sin(b*v) dv = e^(av)*(a*sin(bv) - b*cos(bv))/(a^2+b^2) + C
+  //   INT e^(a*v)*cos(b*v) dv = e^(av)*(a*cos(bv) + b*sin(bv))/(a^2+b^2) + C
+  // Derived by integrating by parts twice and isolating the original
+  // integral - a real general method, not a special-case lookup. The
+  // result is STILL independently verified numerically before use.
+  const et = exponentialTrigAntiderivative(body, v);
+  if (et) {
+    if (!numericallyVerifyAntiderivative(et.anti, body, v)) {
+      return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: "I derived a candidate by integration by parts, but it failed my independent check, so I will not show it as an answer. Please double-check the expression and try again." };
+    }
+    return {
+      kind: "integral",
+      solved: true,
+      finalAnswer: `${et.anti} + C`,
+      steps: et.steps,
+      checks: [{ kind: "derivative" as const, label: " (verify by differentiating the antiderivative)", expr: et.anti, expected: body, var: v }],
+    };
+  }
+  return { kind: "integral", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: `I could not find an elementary antiderivative for "${body}" with the rules I have today. Check the expression for typos, or rewrite it as a sum of simpler terms I can integrate one by one.` };
+}
+
+/* --------- exponential x trig antiderivative (IBP twice) --------- */
+function exponentialTrigAntiderivative(body: string, v: string): { anti: string; steps: SolveStep[] } | null {
+  try {
+    const simplified = String(math.simplify(body));
+    // Both factor orders: e^a*sin(b) and sin(b)*e^a (OCR and typing produce both).
+    let m = simplified.match(/e\s*\^\s*\(?\s*([a-zA-Z0-9.+\- ]+)\s*\)?\s*\*?\s*(sin|cos)\s*\((.+?)\)\s*$/);
+    if (!m) m = simplified.match(/(sin|cos)\s*\((.+?)\)\s*\*?\s*e\s*\^\s*\(?\s*([a-zA-Z0-9.+\- ]+)\s*\)?\s*$/);
+    if (!m) return null;
+    // normalize capture order to [aArg, fn, bArg] regardless of which
+    // factor came first in the integrand
+    const trigFirst = /^(sin|cos)$/.test(String(m[1]));
+    const aArg = trigFirst ? String(m[3]).trim() : String(m[1]).trim();
+    const fn = (trigFirst ? String(m[1]) : String(m[2])) as "sin" | "cos";
+    const bArg = trigFirst ? String(m[2]).trim() : String(m[3]).trim();
+    const da = Number(math.evaluate(String(math.derivative(aArg, v)), {}));
+    const ba = Number(math.evaluate(String(math.derivative(bArg, v)), {}));
+    const aOff = Number(math.evaluate(aArg, { [v]: 0 }));
+    const bOff = Number(math.evaluate(bArg, { [v]: 0 }));
+    if (![da, ba, aOff, bOff].every(Number.isFinite)) return null;
+    const trig = fn === "sin"
+      ? `(${da} * sin(${bArg}) - ${ba} * cos(${bArg})) / (${da}^2 + ${ba}^2)`
+      : `(${da} * cos(${bArg}) + ${ba} * sin(${bArg})) / (${da}^2 + ${ba}^2)`;
+    const anti = `e^(${aArg}) * ${trig}`;
+    const steps: SolveStep[] = [
+      { text: "Set up integration by parts, taking the trig factor as u (its derivatives cycle, which is what closes the loop).", expr: `u = ${fn}(${bArg}),  dv = e^(${aArg}) d${v}` },
+      { text: "Differentiate u and integrate dv.", expr: `du = ${ba} * ${fn === "sin" ? "cos" : "-sin"}(${bArg}) d${v},  v = e^(${aArg}) / ${da}` },
+      { text: "Apply the parts rule INT u dv = u*v - INT v du.", expr: `INT e^(${aArg}) ${fn}(${bArg}) d${v} = u*v - INT v du` },
+      { text: "The remaining integral is the same exponential-trig shape again - integrate by parts a second time.", expr: `INT v du = ...` },
+      { text: "The original integral now appears on both sides. Bring it across and solve for it algebraically.", expr: `(${da}^2 + ${ba}^2) * INT = e^(${aArg}) * (${da} * ${fn}(${bArg}) ${fn === "sin" ? "-" : "+"} ${ba} * ${fn === "sin" ? "cos" : "sin"}(${bArg}))` },
+      { text: "Divide through and add the constant of integration.", expr: `INT = ${anti} + C` },
+    ];
+    return { anti, steps };
+  } catch {
+    return null;
+  }
 }
 
 /* ---------------- integration by parts (tabular) ---------------- */

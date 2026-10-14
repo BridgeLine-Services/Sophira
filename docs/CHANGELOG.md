@@ -1,3 +1,21 @@
+### Math engine: spoken integrals, OCR dedup, exponential-trig integration by parts (2026-10-14)
+
+- One canonical INTEGRAL form for BOTH Scan and Type input: the spoken forms
+  ("integrate f with respect to x", "integral of f dx", "INTEGRAL f dx") and
+  the glyph now converge; OCR-duplicated instruction words
+  ("Integral of Integral of Sin(x)e^x") are merged; capitalized function
+  names are canonicalized; a missing differential is inferred only when the
+  integrand has exactly ONE free variable.
+- New general exponential-trig antiderivative via integration by parts
+  twice: INT e^(av) sin(bv) dv and the cos family - real closed-form method
+  (no special-casing), independently verified by numeric differentiation
+  before the answer is ever claimed. The reported regression
+  INT e^x sin(x) dx now solves with the full by-parts reasoning and +C.
+- Student-facing refusals: the diagnostic-first messages
+  ("The deterministic solver could not solve this - no answer was guessed")
+  are replaced with specific, friendly guidance that preserves the
+  never-fabricate guarantee.
+
 ### Notebook lifecycle: visible Delete permanently on the notebook detail page (2026-10-14)
 
 - Detail page header now shows BOTH actions: Archive notebook (reversible, secondary) and Delete permanently (irreversible, danger-styled, Trash icon).

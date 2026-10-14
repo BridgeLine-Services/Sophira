@@ -106,7 +106,7 @@ export async function runMathPipelineTests(assert: Assert, section: Section): Pr
   s = solveProblem("INTEGRAL 1/x dx");
   assert(s.solved && s.finalAnswer.includes("log"), "math domain: ∫1/x dx = log|x| + C");
   s = solveProblem("INTEGRAL x^(1/2) dx");
-  assert(!s.solved && (s.honestNote ?? "").includes("never guessed"), "math domain: unsupported integral is refused honestly (NEEDS REVIEW path)");
+  assert(!s.solved && /I (could not|can see|tried)/i.test(s.honestNote ?? ""), "math domain: unsupported integral is refused honestly with a student-friendly explanation (never fabricated)");
   // matrices
   s = solveProblem("det([[1,2],[3,4]])");
   assert(s.solved && s.finalAnswer === "-2", "math domain: det [[1,2],[3,4]] = -2");

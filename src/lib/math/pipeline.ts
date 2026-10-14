@@ -381,7 +381,10 @@ export async function runMathPipeline(image: { width: number; height: number; gr
 }
 
 function deterministicExplanation(solution: SolutionSection): string {
-  if (!solution.solved) return "The deterministic solver could not solve this — no answer was guessed. " + (solution.honestNote ?? "");
+  if (!solution.solved) {
+    const note = solution.honestNote ?? "I could not solve this with the rules I have today.";
+    return `I could not solve this one with certainty, so I will not guess. ${note} You can retype the problem (for example \"integrate 2x^2 dx\" or \"solve 3x + 2 = 11\"), correct a scanned transcription, or simplify it into a form I support — and I will solve it exactly.`;
+  }
   const lines = solution.steps.map((s, i) => `${i + 1}. ${s.text}${s.expr ? ` — ${s.expr}` : ""}`).join("\n");
   return `Solved ${solution.kind.replace(/_/g, " ")} deterministically:\n${lines}\nAnswer: ${solution.finalAnswer}`;
 }

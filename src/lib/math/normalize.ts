@@ -91,6 +91,34 @@ export function normalizeMathText(raw: string): NormalizeResult {
   // matrix/vector brackets, where commas are list separators)
   if (!/[\[\]]/.test(text)) text = text.replace(/(\d),(\d)(?!\d)/g, "$1.$2");
 
+  // ---- Natural-language integral instructions (2026-10-14) ----
+  // OCR frequently emits words instead of (or alongside) the integral glyph,
+  // sometimes BOTH ("Integral of INTEGRAL ..."). Recognize the spoken forms
+  // and converge them onto the SAME canonical INTEGRAL token the glyph maps
+  // to - one representation for Scan AND Type input.
+  const spoken = text.replace(/\s+/g, " ").trim();
+  let spoken2 = spoken.replace(/\bintegrate\b|\bintegral\b/gi, "INTEGRAL");
+  // merge duplicated instruction runs: "INTEGRAL of INTEGRAL of X" -> "INTEGRAL X"
+  spoken2 = spoken2.replace(/(?:\bINTEGRAL\b\s*(?:of\s*)?)+/gi, "INTEGRAL ");
+  // "INTEGRAL X with respect to v" / "INTEGRAL X dv" -> canonical form
+  spoken2 = spoken2.replace(/INTEGRAL\s+(.+?)\s+with\s+respect\s+to\s+([a-zA-Z])\s*$/i, (_m2: string, f: string, v: string) => `INTEGRAL ${f} d${v}`);
+  spoken2 = spoken2.replace(/INTEGRAL\s+(.+?)\s+d([a-zA-Z])\s*$/i, (_m2: string, f: string, v: string) => `INTEGRAL ${f} d${v}`);
+  if (spoken2 !== spoken) text = spoken2;
+  // INTEGRAL with a missing differential ("INTEGRAL sin(x)e^x", common in
+  // OCR): if the integrand has exactly ONE free variable, that variable is
+  // unambiguous - append d<var>. If it has none or several, leave it and
+  // let the solver request clarification honestly.
+  const intNoDiff = text.match(/^\s*INTEGRAL\s+(.+?)\s*$/i);
+  if (intNoDiff && !/\sd[a-zA-Z]\s*$/i.test(text)) {
+    const integrand = intNoDiff[1];
+    const stripped = integrand.toLowerCase()
+      .replace(/sin|cos|tan|log|ln|exp|sqrt|abs|pi|e/g, "");
+    const vars = Array.from(new Set(stripped.match(/[a-z]/g) ?? []));
+    if (vars.length === 1) text = `INTEGRAL ${integrand} d${vars[0]}`;
+  }
+  // OCR often capitalizes function names ("Sin(x)") - mathjs is case-sensitive.
+  text = text.replace(/\b(Sin|Cos|Tan|Log|Ln|Exp|Sqrt|Abs)\s*\(/g, (mm: string, fn: string) => fn.toLowerCase() + "(");
+
   // split systems: newlines / semicolons / " and " between equations
   const pieces = text
     .split(/[\n;]+|\band\b(?=\s*[a-zA-Z][a-zA-Z]*\s*[+\-=])/i)
