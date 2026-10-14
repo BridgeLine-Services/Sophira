@@ -99,6 +99,7 @@ export interface MathPipelineResult {
   explanation: ExplanationSection;
   verification: VerificationSection;
   teacherMethod: { applied: boolean; note: string } | null;
+  multipleChoice?: { inverted: boolean; established: boolean; base: string; choices: { label: string; text: string; verdict: "correct" | "incorrect" | "cannot_determine"; reason: string }[] };
 }
 
 export const CONFIRM_THRESHOLD = 0.8;
@@ -311,6 +312,12 @@ export async function runMathPipeline(image: { width: number; height: number; gr
 
   // step 9: deterministic solve
   const solution = solveProblem(finalExpressions.join(" ; "), finalExpressions) as SolveResult;
+  let multipleChoice: NonNullable<MathPipelineResult["multipleChoice"]> | undefined;
+  try {
+    const { analyzeMultipleChoice, detectChoices } = await import("./mcq");
+    const questionText = (ocrResult.text ?? "").trim();
+    if (detectChoices(questionText)) multipleChoice = analyzeMultipleChoice(questionText);
+  } catch { /* additive - never breaks the core solve */ }
   stepsCompleted.push("solve");
   const solutionSection: SolutionSection = {
     solved: solution.solved,
@@ -376,6 +383,7 @@ export async function runMathPipeline(image: { width: number; height: number; gr
     explanation,
     verification,
     teacherMethod,
+    ...(multipleChoice ? { multipleChoice } : {}),
     classification,
   };
 }

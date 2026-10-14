@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Input, Label, Spinner, useToast } from "@/components/ui";
 import { preprocessForOcr, detectExpression, toGrayscale, type GrayImage } from "@/lib/math/image";
+import { MathEditor } from "@/components/math/MathEditor";
+import { TypesetMath } from "@/components/math/TypesetMath";
 import { AlertTriangle, Camera, CheckCheck, ScanLine, ShieldCheck } from "lucide-react";
 
 /**
@@ -20,6 +22,7 @@ interface PipelineResult {
   status: "OK" | "NEEDS CONFIRMATION" | "NEEDS REVIEW";
   recognized: { rawText: string; expression: string; expressions: string[]; confidence: number; ambiguity: string[]; ocrEngine: string };
   solution: { solved: boolean; kind: string; finalAnswer: string; steps: { text: string; expr?: string }[]; honestNote?: string };
+  multipleChoice?: { inverted: boolean; established: boolean; base: string; choices: { label: string; text: string; verdict: "correct" | "incorrect" | "cannot_determine"; reason: string }[] };
   explanation: { text: string; source: string; honestNote: string };
   verification: { status: string; checks: { name: string; passed: boolean; detail: string }[]; note: string };
   teacherMethod: { applied: boolean; note: string } | null;
@@ -179,12 +182,10 @@ function MathScanInner() {
 
             <details className="text-sm" open={typeOpen} onToggle={(e) => setTypeOpen((e.target as HTMLDetailsElement).open)}>
               <summary className="cursor-pointer text-ink/60">Or type the problem directly</summary>
-              <div className="mt-2 flex flex-wrap items-end gap-2">
-                <div className="flex-1 min-w-56">
-                  <Label>e.g. 2x + 5 = 17, x^2 - 5x + 6 = 0, ∫ 3x^2 dx, dy/dx x^3, det([[1,2],[3,4]])</Label>
-                  <Input value={confirmedExpr} onChange={(e) => setConfirmedExpr(e.target.value)} placeholder="Type the problem" />
-                </div>
-                <Button onClick={solveTyped} disabled={busy}>{busy ? <Spinner /> : "Solve"}</Button>
+              <div className="mt-2 space-y-2">
+                <Label>Structured editor (fractions, exponents, roots, integrals) — or switch to plain text. Examples: 2x + 5 = 17, ∫ 3x^2 dx, x^2 - 5x + 6 = 0</Label>
+                <MathEditor onCanonicalChange={setConfirmedExpr} />
+                <Button onClick={solveTyped} disabled={busy || !confirmedExpr.trim()}>{busy ? <Spinner /> : "Solve"}</Button>
               </div>
             </details>
           </CardContent>
@@ -245,11 +246,37 @@ function PipelineView({ result, confirming, onConfirmChange, onConfirm }: {
             <Badge tone="neutral">{result.solution.kind.replace(/_/g, " ")}</Badge>
             <ol className="space-y-1 text-sm">
               {result.solution.steps.map((s, i) => (
-                <li key={i}>{s.text}{s.expr && <span className="ml-1 font-mono">{s.expr}</span>}</li>
+                <li key={i} className="flex flex-wrap items-baseline gap-1"><span>{s.text}</span>{s.expr && <span className="ml-1"><TypesetMath expr={s.expr} /></span>}</li>
               ))}
             </ol>
-            {result.solution.finalAnswer && <p className="rounded-lg bg-muted/50 p-3 font-mono text-lg">{result.solution.finalAnswer}</p>}
+            {result.solution.finalAnswer && (
+              <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 text-center">
+                <p className="mb-1 text-xs uppercase tracking-wide text-ink/50">Answer</p>
+                <div className="text-lg"><TypesetMath expr={result.solution.finalAnswer} display /></div>
+              </div>
+            )}
             {result.solution.honestNote && <p className="text-xs text-warn">⚠ {result.solution.honestNote}</p>}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* multiple-choice analysis */}
+      {result.multipleChoice && (
+        <Card>
+          <CardHeader><CardTitle>Multiple-choice analysis</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-xs text-ink/60">
+              Problem solved: <span className="font-mono">{result.multipleChoice.base}</span>
+              {result.multipleChoice.inverted ? " — the question asks for the INCORRECT choice, so the logic is inverted." : ""}
+            </p>
+            <ul className="space-y-1">
+              {result.multipleChoice.choices.map((c) => (
+                <li key={c.label} className={c.verdict === "correct" ? "rounded border border-success/40 bg-success/10 p-2 font-medium" : c.verdict === "cannot_determine" ? "rounded border border-warn/40 bg-warn/10 p-2" : "rounded border border-ink/10 p-2"}>
+                  <strong>{c.label}.</strong> {c.text} — <em>{c.verdict === "correct" ? "Correct" : c.verdict === "incorrect" ? "Incorrect" : "Could not be established"}</em>: {c.reason}
+                </li>
+              ))}
+            </ul>
+            {!result.multipleChoice.established && <p className="text-xs text-warn">⚠ The underlying problem could not be solved with certainty, so no choice is confirmed — nothing was guessed.</p>}
           </CardContent>
         </Card>
       )}

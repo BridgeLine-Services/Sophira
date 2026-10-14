@@ -1,3 +1,18 @@
+### Math: MathLive editor, KaTeX typeset rendering, real MCQ analysis (2026-10-14)
+
+- Type to Solve now offers a structured MathLive editor (fractions, exponents,
+  roots, integrals, trig, matrices via its on-screen virtual keyboard) whose
+  LaTeX converts into the SAME canonical representation used by OCR; plain
+  text entry remains fully supported.
+- Answers and step expressions are typeset with KaTeX (mathjs syntax to TeX,
+  graceful plain-text fallback, no raw HTML from untrusted input).
+- Multiple-choice questions are genuinely evaluated: choices are detected
+  (multi-line or inline), the base problem goes through the shared
+  normalize-classify-solve-verify path, every candidate is compared to the
+  independently solved answer (multi-solution answers and NOT-questions
+  handled), and unestablishable candidates are honestly labeled instead of
+  guessed.
+
 ### Math engine: spoken integrals, OCR dedup, exponential-trig integration by parts (2026-10-14)
 
 - One canonical INTEGRAL form for BOTH Scan and Type input: the spoken forms
