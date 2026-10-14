@@ -405,21 +405,42 @@ async function dbMigrations() {
   if (!target) return;
   if (!url || !key) {
     target.status = "BLOCKED";
-    target.detail = "database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — verify migrations 0001-0034 on the production database";
+    target.detail = "database credentials (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not available to the gate — live migration verification is BLOCKED (never PASS)";
     return;
   }
   try {
-    // Probe the NEWEST migration (0030 subject_preferences): a select via the
-    // production REST API returns 200 when the table exists (empty result is
-    // fine — RLS keeps service-role reads minimal and nothing is stored).
-    const res = await fetch(`${url.value.replace(/\/$/, "")}/rest/v1/workload_selections?select=id&limit=1`, {
-      method: "GET",
-      headers: { apikey: key.value, Authorization: `Bearer ${key.value}` },
-      signal: AbortSignal.timeout(20000),
-    });
-    if (res.ok) { target.status = "PASS"; target.detail = "migration 0034 (workload_selections) reachable via the production REST API (migrations 0001-0034 appear applied)"; return; }
-    target.status = "FAIL";
-    target.detail = `production database rejected the migration probe (HTTP ${res.status}) — migrations may be missing`;
+    // Probe the NEWEST marker objects (the tail of the chain): a column
+    // select via the production REST API returns 200 only when the column
+    // exists in the live schema cache — exactly what burned production when
+    // 0035-0038 were silently skipped while the gate probed only 0034.
+    // Probing the tail proves the whole strictly-linear chain is applied.
+    const probes = [
+      { label: "typing_attempts.backspaces (0035)", path: "/rest/v1/typing_attempts?select=backspaces&limit=0" },
+      { label: "invitations.email_status (0036)", path: "/rest/v1/invitations?select=email_status&limit=0" },
+      { label: "notebooks.archived_at (0037)", path: "/rest/v1/notebooks?select=archived_at&limit=0" },
+      { label: "teachers.archived_at (0038)", path: "/rest/v1/teachers?select=archived_at&limit=0" },
+    ];
+    const failed = [];
+    for (const probe of probes) {
+      const res = await fetch(`${url.value.replace(/\/$/, "")}${probe.path}`, {
+        method: "GET",
+        headers: { apikey: key.value, Authorization: `Bearer ${key.value}` },
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!res.ok) failed.push(`${probe.label}: HTTP ${res.status}`);
+    }
+    if (failed.length === 0) {
+      target.status = "PASS";
+      target.detail = "newest migration markers (0035-0038) verified in the LIVE production schema via REST — the strictly linear chain 0001-0038 is applied";
+      return;
+    }
+    if (failed.length === probes.length) {
+      target.status = "FAIL";
+      target.detail = `production database rejected every migration probe (${failed.join("; ").slice(0, 150)}) — migrations may be missing`;
+    } else {
+      target.status = "FAIL";
+      target.detail = `live schema is missing the newest migrations (${failed.join("; ").slice(0, 150)}) — run the /setup repair to apply the missing tail`;
+    }
   } catch (e) {
     target.status = "BLOCKED";
     target.detail = `could not reach the production database (${String(e).slice(0, 120)})`;

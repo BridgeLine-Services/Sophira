@@ -512,8 +512,8 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "scope: the active subject/course scope is visible next to the title in every engine page");
 
   const gateScript = readFileSync("scripts/release-gate.mjs", "utf8");
-  assert(gateScript.includes("0001-0034"),
-    "gate: migration range reflects 0034 (workload selections)");
+  assert(gateScript.includes("0001-0038"),
+    "gate: migration range reflects the CURRENT chain end 0038 (tail-marker probe)");
 
   const ownerDash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
   assert(ownerDash.includes('id="overview"') && ownerDash.includes('id="requests"') && ownerDash.includes('id="invite"') && ownerDash.includes('id="members"'),
@@ -1160,5 +1160,23 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
     assert(dash.includes("Could not refresh the member list") && dash.includes('{ cache: "no-store" }'),
       "owner dashboard: a failed refresh toasts honestly and keeps the current lists (verified, no change needed)");
+  }
+// ==== Release-hardening round (2026-10-14): the false-green migration gate ====
+  section("live migration verification can never silently pass on the wrong probe");
+  {
+    const gate = readFileSync("scripts/release-gate.mjs", "utf8");
+    assert(gate.includes("typing_attempts?select=backspaces") && gate.includes("teachers?select=archived_at"),
+      "release gate: the LIVE migration probe checks the NEWEST marker objects (0035-0038), not the stale 0034 table");
+    assert(gate.includes("run the /setup repair to apply the missing tail"),
+      "release gate: a partially missing tail is a FAIL with the exact repair action, never a PASS");
+    assert(!gate.includes("0001-0034 appear applied"),
+      "release gate: no stale '0001-0034' PASS detail remains");
+    const markers = readFileSync("scripts/migration-markers.mjs", "utf8");
+    const self = readFileSync("scripts/apply-migrations.mjs", "utf8");
+    assert(self.includes("the newest migration") && self.includes("NO marker"),
+      "self-test: the newest migration must always carry a marker (recurrence guard for the silent-skip root cause)");
+    const wf = readFileSync(".github/workflows/migrations.yml", "utf8");
+    assert(wf.includes("MIGRATIONS-LIVE-STATUS: BLOCKED_NO_CREDENTIALS") && wf.includes("never means migrations were applied or verified"),
+      "migrations workflow: missing credentials emit an explicit BLOCKED state and summary — never a false green");
   }
 }

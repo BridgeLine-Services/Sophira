@@ -55,7 +55,15 @@ function selfTest() {
     // every marker object must be created by its own migration (sanity)
     if (m === "0025_first_owner_bootstrap.sql" && !sql.includes("owner_bootstrap")) throw new Error("self-test: 0025 marker mismatch");
   }
-  console.log("apply-migrations self-test: PASS (chain files present, markers consistent)");
+  // 2026-10-14 recurrence guard: migrations after the LAST marker are
+  // invisible to both apply paths (frontier logic) and can be silently
+  // skipped forever — exactly what happened with 0035-0038 in production.
+  // The NEWEST migration in the chain must therefore always carry a marker.
+  const newest = files[files.length - 1];
+  if (!MARKERS[newest]) {
+    throw new Error(`self-test: the newest migration (${newest}) has NO marker — unmarked tail migrations can be silently skipped by every apply path; add a probe marker for it in scripts/migration-markers.mjs`);
+  }
+  console.log("apply-migrations self-test: PASS (chain files present, markers consistent, newest migration is probe-verifiable)");
 }
 
 async function mgmtQuery(query, token, ref) {

@@ -336,8 +336,8 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "N10b: missing application credentials are distinguished from a missing initialization channel");
   // CI workflow: missing secrets skip with a notice (secondary mechanism).
   const wf = readFileSync(".github/workflows/migrations.yml", "utf8");
-  assert(wf.includes("exit 0") && wf.includes("Optional CI migrations skipped") && !wf.includes("exit 1\n"),
-    "wizard: a missing optional CI token only SKIPS the secondary job with a notice - first-launch production initialization never depends on GitHub Actions");
+  assert(wf.includes("exit 0") && wf.includes("MIGRATIONS-LIVE-STATUS: BLOCKED_NO_CREDENTIALS") && wf.includes("never means migrations were applied or verified") && !wf.includes("exit 1\n"),
+    "wizard: a missing optional CI token emits an explicit BLOCKED state and summary (never a false green) - first-launch production initialization never depends on GitHub Actions");
   // server-only: the embedded chain is never imported by a client component.
   const clientFiles = walkFiles("src").filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"));
   for (const f of clientFiles) {

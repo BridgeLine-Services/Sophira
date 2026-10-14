@@ -41,7 +41,16 @@ jobs:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ] || [ -z "${SUPABASE_PROJECT_REF:-}" ]; then
-            echo "::notice::Optional CI migrations skipped (no Supabase Management API secrets configured). First-launch production initialization does not depend on this job: the deployed app initializes its database itself from /setup using the Vercel Supabase Integration's direct connection."
+            echo "MIGRATIONS-LIVE-STATUS: BLOCKED_NO_CREDENTIALS"
+            echo "live_migrations=blocked_no_credentials" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Live migration verification: BLOCKED"
+              echo ""
+              echo "This run did NOT check the production database: the Supabase Management API credentials (secrets SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF) are not configured on this repository. A green checkmark on this job never means migrations were applied or verified."
+              echo ""
+              echo "- If this is a production release: run the /setup repair once (or configure the two secrets) and require the release gate's live db-migrations check to be PASS."
+              echo "- Development/first-launch: acceptable — the deployed app initializes its own database from /setup via the Vercel Supabase Integration's direct connection."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           npm run db:migrate
