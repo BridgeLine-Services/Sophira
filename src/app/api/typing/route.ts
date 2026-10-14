@@ -172,25 +172,52 @@ export async function POST(request: NextRequest) {
   // dropped (stored as not captured) rather than corrupting the attempt.
   const events = validateEventSummary(body.events, typed.length);
 
-  const { data: row, error } = await supabase
-    .from("typing_attempts")
-    .insert({
-      user_id: user.id,
-      test_date: new Date(ended).toISOString(),
-      duration_ms: Math.round(result.durationMs),
-      characters_typed: result.charactersTyped,
-      wpm: Math.round(result.wpm * 10) / 10,
-      accuracy: Math.round(result.accuracy * 1000) / 1000,
-      net_wpm: Math.round(result.netWpm * 10) / 10,
-      valid_attempt: result.validAttempt && !(events?.paste ?? false),
-      flags: events?.paste ? [...result.flags, "paste_detected"] : result.flags,
-      raw_accuracy: events ? Math.round(rawTypingAccuracy(events) * 1000) / 1000 : null,
-      corrections: events ? events.corrections : null,
-      backspaces: events ? events.backspaces : null,
-    })
-    .select("id, wpm, accuracy, net_wpm, duration_ms, valid_attempt, flags, raw_accuracy, corrections, backspaces")
-    .single();
-  if (error) return NextResponse.json({ error: "Could not save the attempt: " + error.message }, { status: 500 });
+  // TRANSITION-SAFE INSERT (2026-10-14): the optional event-metric columns
+  // (raw_accuracy, corrections, backspaces — migration 0035) are exactly
+  // that: OPTIONAL, nullable, NULL = "not captured". If the live schema has
+  // not received 0035 yet (the reported 'backspaces' schema-cache error),
+  // the attempt still saves WITHOUT the event columns instead of failing
+  // entirely — the metrics honestly read as not captured until the
+  // migration applies. Core metrics (wpm, accuracy, duration) always save.
+  const coreInsert = {
+    user_id: user.id,
+    test_date: new Date(ended).toISOString(),
+    duration_ms: Math.round(result.durationMs),
+    characters_typed: result.charactersTyped,
+    wpm: Math.round(result.wpm * 10) / 10,
+    accuracy: Math.round(result.accuracy * 1000) / 1000,
+    net_wpm: Math.round(result.netWpm * 10) / 10,
+    valid_attempt: result.validAttempt && !(events?.paste ?? false),
+    flags: events?.paste ? [...result.flags, "paste_detected"] : result.flags,
+  };
+  const insertWithMetrics = {
+    ...coreInsert,
+    raw_accuracy: events ? Math.round(rawTypingAccuracy(events) * 1000) / 1000 : null,
+    corrections: events ? events.corrections : null,
+    backspaces: events ? events.backspaces : null,
+  };
+  let row: Record<string, unknown> | null = null;
+  let metricsRecorded = true;
+  {
+    const full = await supabase
+      .from("typing_attempts")
+      .insert(insertWithMetrics)
+      .select("id, wpm, accuracy, net_wpm, duration_ms, valid_attempt, flags, raw_accuracy, corrections, backspaces")
+      .single();
+    if (full.error) {
+      // Schema-transition retry: same core attempt, no optional columns.
+      const retry = await supabase
+        .from("typing_attempts")
+        .insert(coreInsert)
+        .select("id, wpm, accuracy, net_wpm, duration_ms, valid_attempt, flags, raw_accuracy, corrections, backspaces")
+        .single();
+      if (retry.error) return NextResponse.json({ error: "Could not save the attempt: " + retry.error.message }, { status: 500 });
+      row = retry.data;
+      metricsRecorded = false;
+    } else {
+      row = full.data;
+    }
+  }
 
   // Adaptive profile: only trustworthy observations update the estimate.
   // Suspicious/flagged attempts are stored in history but NEVER corrupt it.
@@ -203,12 +230,13 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     data: {
       attempt: row,
+      metrics_recorded: metricsRecorded,
       valid: result.validAttempt,
       flags: result.flags,
       profile_updated: profileSynced,
       // Honest guidance, mirroring the flags exactly.
       message: result.validAttempt
-        ? "Attempt saved."
+        ? "Attempt saved." + (metricsRecorded ? "" : " (typing-event detail will be captured once the database update finishes.)")
         : "Attempt saved, but it was flagged (" + result.flags.join(", ") + ") and cannot become your baseline.",
     },
   });

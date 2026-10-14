@@ -8,7 +8,28 @@ docs/FEATURE_STATUS.md and docs/RELEASE_PROCESS.md.
 
 ---
 
-##### Targeted bug fixes: notebook creation, typing, owner integrations, setup guide (2026-10-13)
+##### Production repair: notebooks + typing survive the migration transition (2026-10-14)
+
+Both live bugs share one verified root cause: production has not received
+migrations 0035-0038 (the false-green migration gate, fixed in code on
+b93261f/0ef64ae, has not yet RUN against production — it needs one /setup
+repair visit or the CI migration secrets). The application now degrades
+honestly and correctly during that transition instead of breaking:
+
+- /api/notebooks GET: if the archived_at filter fails on the missing
+  column, the list retries owner-scoped and unfiltered — provably
+  identical while the column is absent (nothing can be archived without
+  it). Real database failures still error honestly.
+- /api/typing POST: if the optional event-metric columns are missing, the
+  attempt saves without them (NULL = not captured, the documented
+  semantic) and the response says so. Core metrics always save; flagged
+  attempts still cannot become the baseline.
+- The migrations remain the true source fix and are idempotent; the
+  transition code simply bridges until they apply.
+
+Battery: 3712/3712 green; tsc clean; build clean; scan clean.
+
+### Targeted bug fixes: notebook creation, typing, owner integrations, setup guide (2026-10-13)
 
 - Typing: optional 0035 event-metric columns no longer break history
   loading (schema-lag-safe fallback, never fake data), so the test can

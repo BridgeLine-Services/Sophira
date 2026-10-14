@@ -1179,4 +1179,22 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(wf.includes("MIGRATIONS-LIVE-STATUS: BLOCKED_NO_CREDENTIALS") && wf.includes("never means migrations were applied or verified"),
       "migrations workflow: missing credentials emit an explicit BLOCKED state and summary — never a false green");
   }
+// ==== Production repair round (2026-10-14): both live bugs share one cause ====
+  section("schema-transition resilience: notebooks list + typing save survive 0035/0037 lag");
+  {
+    const nb = readFileSync("src/app/api/notebooks/route.ts", "utf8");
+    assert(nb.includes("TRANSITION-SAFE LIST") && nb.includes("NO notebook can be") && nb.includes("archived_at"),
+      "notebooks GET: during the 0037 transition the list falls back to the owner-scoped unfiltered query (identical result while the column is absent) instead of failing");
+    assert(nb.includes('if (legacy.error) return NextResponse.json({ error: "Could not load notebooks." }'),
+      "notebooks GET: a REAL database failure still errors honestly — the fallback never masks a genuine outage");
+    const ty = readFileSync("src/app/api/typing/route.ts", "utf8");
+    assert(ty.includes("TRANSITION-SAFE INSERT") && ty.includes("insert(coreInsert)"),
+      "typing POST: during the 0035 transition the attempt saves without the optional event columns instead of failing entirely");
+    assert(ty.includes("metrics_recorded: metricsRecorded") && ty.includes("database update finishes"),
+      "typing POST: the response and message honestly disclose that event metrics were not captured (never a fake success)");
+    assert(ty.includes('"Could not save the attempt: " + retry.error.message'),
+      "typing POST: if BOTH inserts fail the error is honest — no silent empty success");
+    assert(ty.includes("valid_attempt: result.validAttempt") && ty.includes("paste_detected"),
+      "typing POST: suspicious/flagged attempts still cannot become the baseline during the transition");
+  }
 }
