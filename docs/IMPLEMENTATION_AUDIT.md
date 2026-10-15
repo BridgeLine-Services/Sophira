@@ -301,6 +301,45 @@ the repairs below after real production failures were diagnosed live.
 | `∫ 4x cos(2 − 3x) dx` returned NEEDS REVIEW | The solver only handled elementary power-rule antiderivatives (the refusal itself was honest and is preserved) | Deterministic **tabular integration by parts** (polynomial × sin/cos/exp of a linear argument), every candidate verified by symbolic differentiation + numeric comparison before being claimed | **VERIFIED** (regression test suite; note: the task-supplied expected answer had a sign error — the verified correct form is −(4x/3)sin(2−3x) **+ (4/9)**cos(2−3x) + C) |
 | Login redirect loop / blank dashboard (pre-acceptance) | Middleware/page guard conflict over stale sessions; broken provision closed with a 409 | Server-verified session handling, loop-proof account guards, provisioning repaired idempotently at sign-in | **VERIFIED LIVE** |
 
+## Gap-closure audit — final status (2026-10-15, commit c4f3596 and after)
+
+Closed this audit (all verified: tests, tsc, build, secret scan, CI green
+on the exact commits; production CSS bundle verified to match HEAD):
+
+- Math engine: one canonical pipeline for Scan + Type; natural-language
+  and OCR-duplicated instruction parsing; exponential-trigonometric
+  integration by parts with independent verification; honest student
+  voice; MathLive structured editor; in-card math keyboard; KaTeX
+  typesetting; real multiple-choice analysis; upgraded OCR prompt.
+- Workflow separation: /math (Type to Solve) and /math/scan (Scan to
+  Solve) are independent pages; sidebar entries added.
+- Notebook lifecycle: Active -> Archived -> Permanently Deleted with
+  distinct dialogs and owner-scoped server actions.
+- Redesign: app-wide premium palette via shared tokens, complete button
+  state system, sidebar active stripe, shared data-table design, unified
+  section-heading pattern on every page; Math redesigned to the approved
+  screenshots; developer jargon removed from the student-facing AI voice
+  (shared TUTOR_PERSONA).
+- Deployment: Vercel auto-deploy verified serving HEAD (CSS bundle hash
+  compared against a fresh local build).
+
+Still open — ALL owner-side, none repo-side:
+
+1. The one-time /setup migration repair at sophira.vercel.app/setup
+   (applies migrations 0035-0038; app-level bridges cover the meantime).
+2. Signed-in owner click-through acceptance (needs the owner account).
+3. db:migrate:check against production (needs SUPABASE_ACCESS_TOKEN +
+   SUPABASE_PROJECT_REF).
+4. Test Supabase project (live security matrices + restore drill).
+5. Microsoft/Google OAuth registrations.
+6. Optional RESEND_API_KEY for invitation emails.
+7. Legal: 28 owner facts unresolved; attorney review required before
+   publication.
+8. Physical device testing (see docs/DEVICE_ACCEPTANCE.md).
+
+The repository side of the audit is complete. Every remaining item
+requires owner credentials, owner accounts, or owner judgment.
+
 ## Remaining gaps (honest register)
 
 1. **Signed-in owner click-through** — the final human acceptance pass
