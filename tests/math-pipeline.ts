@@ -238,7 +238,16 @@ export async function runMathPipelineTests(assert: Assert, section: Section): Pr
   assert(sharedView.includes("Confirm or correct"), "math wiring: the confirm/correct gate is in the UI");
   assert(page.includes("cropToInk") || page.includes("preprocessForOcr"), "math wiring: crop/rotate/deskew preprocessing runs on the client canvas");
   for (const t of ["Recognized input", "Solution", "Explanation", "Independent verification"]) assert(sharedView.includes(t), `math wiring: tracked section "${t}" is rendered separately`);
+  // ==== Mode routing pins (2026-10-15) ====
+  const typePageSrc = readFileSync(join(process.cwd(), "src", "app", "math", "page.tsx"), "utf8");
+  assert(typePageSrc.includes('searchParams.get("mode")') && typePageSrc.includes('mode === "teach"'),
+    "mode routing: /math reads mode deterministically (type default, teach distinct)");
+  assert(typePageSrc.includes('router.replace("/math/scan")') && typePageSrc.includes("subjectSlug && !mode"),
+    "mode routing: the legacy /math?subject=math link unambiguously selects SCANNING");
+  assert(typePageSrc.includes("Teach Me How to Solve") && typePageSrc.includes("aria-current"),
+    "mode routing: the three experiences are presented with a clear selected state");
 }
+
 
 function near(a: number, b: number, tol = 1e-4) { return Math.abs(a - b) <= tol * Math.max(1, Math.abs(b)); }
 function evalStr(s: string): number {

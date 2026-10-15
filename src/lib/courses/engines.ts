@@ -162,7 +162,7 @@ export const ENGINE_TOOLS: Record<EngineId, EngineTool[]> = {
   // Math: exactly the 9 tools from the spec (typing calibration is centralized).
   math: [
     commonTools[0],
-    { label: "Scan to Solve", description: "Photograph a problem, confirm the interpreted expression, then solve with verified steps.", path: "/math" },
+    { label: "Scan to Solve", description: "Photograph a problem, confirm the interpreted expression, then solve with verified steps.", path: "/math/scan" },
     { label: "Type to Solve", description: "Enter equations or word problems and get clear notation with step-by-step solutions.", path: "/math?mode=type" },
     { label: "Teach Me How to Solve", description: "Concept-first teaching: why the method works, each step explained, hints on request.", path: "/math?mode=teach" },
     { label: "Test Preparation", description: "Review concepts, build a study plan, and prepare for exams from your own materials.", path: "/math/test-prep" },

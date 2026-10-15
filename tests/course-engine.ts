@@ -615,16 +615,20 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "ocr: the vision prompt captures complete questions, forbids duplicated instructions, and keeps every multiple-choice option");
   const mathPage = readFileSync("src/app/math/page.tsx", "utf8");
   const scanPage = readFileSync("src/app/math/scan/page.tsx", "utf8");
-  assert(mathPage.includes('get("mode") === "teach"') && mathPage.includes("Scan to Solve") === false,
+  assert(mathPage.includes('mode === "teach"') && mathPage.includes('inputMode === "editor"'),
     "math: /math is the Type to Solve workspace (teach mode preserved, no scanner form embedded)");
   assert(scanPage.includes("Scan a math problem") && scanPage.includes("Open Type to Solve"),
     "math: /math/scan is the independent Scan to Solve workspace");
   const shellNav = readFileSync("src/components/app/AppShell.tsx", "utf8");
-  assert(shellNav.includes("/math/scan"), "nav: Scan to Solve is reachable in the sidebar navigation");
+  const enginesRegistry = readFileSync("src/lib/courses/engines.ts", "utf8");
+  assert(!shellNav.includes('href: "/math"') && !shellNav.includes('href: "/math/scan"'),
+    "nav: Scan/Type to Solve are NOT standalone global side-panel entries");
+  assert(enginesRegistry.includes('label: "Scan to Solve"') && enginesRegistry.includes('path: "/math/scan"') && enginesRegistry.includes('path: "/math?mode=teach"'),
+    "nav: Math exposes Scan to Solve (/math/scan), Type to Solve, and Teach Me How to Solve via the tool registry");
   const typePage2 = readFileSync("src/app/math/page.tsx", "utf8");
   assert(typePage2.includes("Show math keyboard") && typePage2.includes("Input tips"),
     "math UI: the approved Type to Solve controls exist (keyboard toggle + tips panel)");
-  assert(typePage2.includes('setMode("plain")') && typePage2.includes('setMode("editor")'),
+  assert(typePage2.includes('setInputMode("plain")') && typePage2.includes('setInputMode("editor")'),
     "math UI: Math editor / Plain text switching is wired without losing state");
   const kb = readFileSync("src/components/math/MathKeyboard.tsx", "utf8");
   assert(kb.includes("onMouseDown={(e) => e.preventDefault()}" ) && kb.includes("onInsert(k.v)"),

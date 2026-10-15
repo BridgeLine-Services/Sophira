@@ -16,8 +16,6 @@ import { ScopeChip } from "@/components/app/ScopeChip";
 // Active subject/course scope indicator (course-aware engines round):
 // shows the real subject or course this engine is working within.
 const NAV = [
-  { href: "/math", label: "Type to Solve", icon: Sigma },
-  { href: "/math/scan", label: "Scan to Solve", icon: ScanLine },
   { href: "/writing/typing", label: "Typing Calibration", icon: Keyboard },
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/courses", label: "Courses", icon: BookOpen },

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Label, Spinner, useToast } from "@/components/ui";
 import { MathKeyboard } from "@/components/math/MathKeyboard";
@@ -20,10 +20,21 @@ import { Delete, Lightbulb, Sparkles } from "lucide-react";
 
 
 function MathTypePageInner() {
-  const subjectSlug = useSearchParams().get("subject");
-  const teachMode = useSearchParams().get("mode") === "teach";
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const subjectSlug = searchParams.get("subject");
+  // MODE ROUTING (2026-10-15): /math?mode=type (or no mode) = Type to
+  // Solve; /math?mode=teach = Teach Me How to Solve; the legacy
+  // /math?subject=math link (pre-split scan entry) unambiguously selects
+  // SCANNING by moving to /math/scan. Invalid/missing mode = Type (the
+  // documented default).
+  const mode = searchParams.get("mode");
+  const teachMode = mode === "teach";
+  useEffect(() => {
+    if (subjectSlug && !mode) router.replace("/math/scan");
+  }, [subjectSlug, mode, router]);
   const [expr, setExpr] = useState("");
-  const [mode, setMode] = useState<"editor" | "plain">("editor");
+  const [inputMode, setInputMode] = useState<"editor" | "plain">("editor");
   const [kbOpen, setKbOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<PipelineResult | null>(null);
@@ -77,7 +88,7 @@ function MathTypePageInner() {
    * MathLive insert command, preserving cursor/selection) or the plain-text
    * textarea at its cursor/selection. Never a blind string append. */
   const insertToken = (token: string) => {
-    if (mode === "editor" && mfReady) {
+    if (inputMode === "editor" && mfReady) {
       const mf = mfRef.current as { executeCommand?: (c: unknown) => void } | null;
       if (mf?.executeCommand) { mf.executeCommand(["insert", token]); return; }
     }
@@ -100,25 +111,47 @@ function MathTypePageInner() {
         <h1 className="text-2xl font-semibold">Type a math problem</h1>
         <p className="text-sm text-ink/60">Enter an expression, equation, or word problem. Choose the input style that works for you.</p>
 
+        <nav aria-label="Math experiences" className="flex flex-wrap gap-2 text-sm">
+          {[
+            { label: "Scan to Solve", href: "/math/scan", active: false },
+            { label: "Type to Solve", href: subjectSlug ? `/math?mode=type&subject=${subjectSlug}` : "/math?mode=type", active: !teachMode },
+            { label: "Teach Me How to Solve", href: subjectSlug ? `/math?mode=teach&subject=${subjectSlug}` : "/math?mode=teach", active: teachMode },
+          ].map((m) => (
+            <a key={m.label} href={m.href} aria-current={m.active ? "page" : undefined}
+              className={`rounded-full border px-3 py-1.5 font-medium transition ${m.active ? "border-accent bg-accent-soft text-accent" : "border-ink/10 bg-white text-ink-soft hover:border-accent/40 hover:text-accent"}`}>
+              {m.label}
+            </a>
+          ))}
+        </nav>
+        {teachMode && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Teach Me How to Solve</CardTitle></CardHeader>
+            <CardContent className="text-sm text-ink/70">
+              Type a problem below and I will teach you the method, not just the answer: the concept
+              behind it, why each step works, and hints so you can solve the next one yourself.
+            </CardContent>
+          </Card>
+        )}
+
         <div className="flex gap-4">
           <div className="min-w-0 flex-1 space-y-4">
             <Card>
               <CardHeader><CardTitle>Your problem</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <div className="inline-flex rounded-lg border border-ink/10 p-1" role="tablist" aria-label="Input mode">
-                  <button type="button" role="tab" aria-selected={mode === "editor"}
-                    onClick={() => setMode("editor")}
-                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "editor" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5"}`}>
+                  <button type="button" role="tab" aria-selected={inputMode === "editor"}
+                    onClick={() => setInputMode("editor")}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${inputMode === "editor" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5"}`}>
                     Math editor
                   </button>
-                  <button type="button" role="tab" aria-selected={mode === "plain"}
-                    onClick={() => setMode("plain")}
-                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "plain" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5"}`}>
+                  <button type="button" role="tab" aria-selected={inputMode === "plain"}
+                    onClick={() => setInputMode("plain")}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${inputMode === "plain" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5"}`}>
                     Plain text
                   </button>
                 </div>
 
-                {mode === "editor" && mfReady ? (
+                {inputMode === "editor" && mfReady ? (
                   <math-field
                     ref={(el: unknown) => { mfRef.current = el; }}
                     aria-label="Math expression editor"
