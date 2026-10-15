@@ -1,5 +1,28 @@
 # Dependency security audit & upgrade plan (2026-10-07)
 
+## Superseding verification update (2026-10-14)
+
+The Next.js 16 migration is not required to clear the current high/critical
+production advisories. Sophira now uses **Next.js 15.5.28** with compatible
+async cookie/route-parameter handling. The `postcss` dependency is pinned to
+8.5.29 and the `image-size` transitive dependency is overridden to 2.0.4.
+These changes were verified by the complete offline suite (3747/3747), a
+production build, and TypeScript checking.
+
+Current `npm audit --omit=dev` result: **0 critical, 0 high, 3 moderate**.
+The remaining `mammoth`/`argparse`/`sprintf-js` findings are associated with
+Mammoth's command-line dependencies; Sophira calls only its document-parsing
+library API, not its CLI. The full-tree audit still reports 5 high and 5
+moderate findings in development/build dependencies (including the Tailwind
+3.4.19 and CSS/file-watcher toolchain). They are not present in a
+production-only install; keep build inputs trusted and do not treat this as a
+clean full-tree audit.
+
+The older Next.js 14.2.35-specific discussion below is historical. The
+remaining production release blockers are live authorization/configuration,
+external services, device verification, and owner/legal setup—not an
+unresolved Next.js critical/high advisory.
+
 `npm audit` review of every vulnerability in the tree, what was done on the
 `chore/dependency-security-audit` branch, and the exact remaining work. This
 document is the honest record: what is fixed, what is NOT fixable without a

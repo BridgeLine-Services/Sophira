@@ -25,8 +25,9 @@ export const dynamic = "force-dynamic";
 export default async function LearningPage({
   searchParams,
 }: {
-  searchParams?: { course_id?: string; subject?: string };
+  searchParams?: Promise<{ course_id?: string; subject?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const supabase = createClient();
   const user = await requireUser(supabase);
 
@@ -34,11 +35,11 @@ export default async function LearningPage({
   // subject (plus global memories). RLS still governs every row; this only
   // narrows the signed-in student's own view.
   let course: { name: string; subject: string | null } | null = null;
-  if (searchParams?.course_id) {
+  if (resolvedSearchParams?.course_id) {
     const { data } = await supabase
       .from("courses")
       .select("name, subject")
-      .eq("id", searchParams.course_id)
+      .eq("id", resolvedSearchParams.course_id)
       .single();
     course = (data as { name: string; subject: string | null } | null) ?? null;
   }
@@ -47,8 +48,8 @@ export default async function LearningPage({
   // user's own courses in that subject group plus intentionally global
   // memories. RLS governs every row; this only narrows the owner of the data.
   let subjectScope: { label: string; subjects: string[] } | null = null;
-  if (!searchParams?.course_id && searchParams?.subject) {
-    const node = subjectBySlug(searchParams.subject);
+  if (!resolvedSearchParams?.course_id && resolvedSearchParams?.subject) {
+    const node = subjectBySlug(resolvedSearchParams.subject);
     if (node) {
       const { data: groupCourses } = await supabase.from("courses").select("subject").order("name");
       const subjects = Array.from(new Set(

@@ -25,6 +25,10 @@ export function runVercelConfigTests(assert: (c: boolean, n: string) => void, se
   const nextConfig = readFileSync("next.config.mjs", "utf8");
   assert(!nextConfig.includes("src-tauri") && !nextConfig.includes("tauri"),
     "vercel: the Next.js build configuration has no Tauri dependency (web build needs no Rust)");
+  assert(nextConfig.includes('"/terms": ["./docs/legal/TERMS_OF_SERVICE.md"]')
+      && nextConfig.includes('"/privacy": ["./docs/legal/PRIVACY_POLICY.md"]')
+      && nextConfig.includes('"/license": ["./LICENSE"]'),
+    "vercel: legal pages include their canonical repository documents in serverless output tracing");
 
   // Desktop app remains intact and independent of Vercel
   assert(existsSync("src-tauri/tauri.conf.json") && existsSync("src-tauri/Cargo.toml"),

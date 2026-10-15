@@ -80,27 +80,30 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <AppShell title={`Welcome${greetingName}`}>
       <div className="space-y-8">
         {/* Primary actions */}
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Start something</h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-          <Link
-            href="/assignments/new"
-            className="flex min-h-24 flex-col justify-center gap-1 rounded-card bg-accent p-4 text-white shadow-sm transition active:scale-[0.99]"
-          >
-            <span className="flex items-center gap-2 font-semibold">
-              <FileText className="h-5 w-5" /> Start an assignment
-            </span>
-            <span className="text-sm text-white/80">Upload it, paste it, or photograph it — I&apos;ll follow your teacher&apos;s rules.</span>
-          </Link>
-          <Link
-            href="/assignments/new?mode=learn"
-            className="flex min-h-24 flex-col justify-center gap-1 rounded-card border border-ink/10 bg-white p-4 shadow-sm transition active:scale-[0.99]"
-          >
-            <span className="flex items-center gap-2 font-semibold text-ink">
-              <HelpCircle className="h-5 w-5 text-accent" /> Ask a question
-            </span>
-            <span className="text-sm text-ink-soft">Any subject, any level — explained the way you like.</span>
-          </Link>
-        </div>
+        <section aria-labelledby="dashboard-start-heading">
+          <h2 id="dashboard-start-heading" className="text-xl font-semibold tracking-tight text-ink">What would you like to work on?</h2>
+          <p className="mt-1 text-sm text-ink-soft">Start with an assignment or ask a question. Your courses and teacher preferences stay in context.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <Link
+              href="/assignments/new"
+              className="group flex min-h-28 flex-col justify-center gap-1.5 rounded-card bg-gradient-to-br from-accent to-accent-deep p-5 text-white shadow-[0_12px_24px_rgba(81,69,232,0.18)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(81,69,232,0.24)] active:scale-[0.99]"
+            >
+              <span className="flex items-center gap-2 font-semibold">
+                <FileText className="h-5 w-5" /> Start an assignment
+              </span>
+              <span className="text-sm text-white/85">Upload, paste, or photograph your instructions. Sophira will follow your teacher&apos;s rules.</span>
+            </Link>
+            <Link
+              href="/assignments/new?mode=learn"
+              className="flex min-h-28 flex-col justify-center gap-1.5 rounded-card border border-ink/10 bg-white p-5 shadow-[0_1px_3px_rgba(37,43,58,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-md active:scale-[0.99]"
+            >
+              <span className="flex items-center gap-2 font-semibold text-ink">
+                <HelpCircle className="h-5 w-5 text-accent" /> Ask a question
+              </span>
+              <span className="text-sm text-ink-soft">Any subject, any level — explained the way you like.</span>
+            </Link>
+          </div>
+        </section>
 
         {/* More ways to work — quick launch (all modes are real, from MODES) */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">

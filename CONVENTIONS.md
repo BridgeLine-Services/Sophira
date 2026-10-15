@@ -1,11 +1,11 @@
 # SOPHIRA — Build Conventions (READ FIRST)
 
-You are writing part of a Next.js 14 (App Router, TypeScript) application called **Sophira**, a private AI academic assistant. Another process is assembling the whole app; you own ONLY the files listed in your task. Never modify files outside your list, never run `npm install`, never run `next build`/`tsc`, never touch `package.json` or the database migrations.
+You are writing part of a Next.js 15 (App Router, TypeScript) application called **Sophira**, a private AI academic assistant. Another process is assembling the whole app; you own ONLY the files listed in your task. Never modify files outside your list, never run `npm install`, never run `next build`/`tsc`, never touch `package.json` or the database migrations.
 
 Project root: `/app/conversations/6ab551847f5a9262295ae144/sophira`
 
 ## Stack (already scaffolded — do not change)
-- Next.js 14.2 App Router + TypeScript (strict), Tailwind CSS 3.4, lucide-react icons.
+- Next.js 15 App Router + TypeScript (strict), Tailwind CSS 3.4, lucide-react icons.
 - Supabase for auth/db/storage. RLS is enforced on EVERY table: rows are visible only to their owner (`user_id = auth.uid()`), so you never need to filter by other users, but always `.eq("user_id", user.id)` in queries for clarity.
 - Env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server-only), `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `SOPHIRA_MODEL`, `NEXT_PUBLIC_SITE_URL`.
 

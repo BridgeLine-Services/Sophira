@@ -6,7 +6,8 @@ import type { AiResponse, Assignment, Course, Teacher, WorkSession } from "@/lib
 
 export const dynamic = "force-dynamic";
 
-export default async function AssignmentWorkspacePage({ params }: { params: { id: string } }) {
+export default async function AssignmentWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -14,7 +15,7 @@ export default async function AssignmentWorkspacePage({ params }: { params: { id
   const { data: assignment } = await supabase
     .from("assignments")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
   if (!assignment) notFound();
 

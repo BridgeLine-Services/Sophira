@@ -17,7 +17,7 @@ type Assert = (condition: boolean, name: string) => void;
 type Section = (title: string) => void;
 
 function src(rel: string): string {
-  return readFileSync(join(process.cwd(), rel), "utf8");
+  return readFileSync(join(process.cwd(), rel), "utf8").replace(/\r\n/g, "\n");
 }
 
 export async function runHostileAuditTests(assert: Assert, section: Section): Promise<void> {

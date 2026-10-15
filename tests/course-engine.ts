@@ -4,7 +4,8 @@
  * Writing Engine; Learning + Memory consolidated into one destination;
  * Library scoped by course with server-enforced filtering.
  */
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
+import { join } from "path";
 import {
   classifyEngine, ENGINES, ENGINE_TOOLS, subjectTools, toolUrl, subjectToolUrl, COURSE_GROUPS, SUBJECT_TREE,
 } from "../src/lib/courses/engines";
@@ -140,6 +141,10 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const nav = readFileSync("src/components/app/AppShell.tsx", "utf8");
   assert(nav.includes('"Learning / Memory"') && nav.includes('"/learning"'),
     "learning: the navigation exposes ONE Learning / Memory destination");
+  assert(nav.includes('href="#main-content"') && nav.includes('id="main-content"') && nav.includes('aria-current={active ? "page" : undefined}'),
+    "accessibility: shared navigation provides a skip link, main landmark, and current-page semantics");
+  assert(readFileSync("src/app/globals.css", "utf8").includes("prefers-reduced-motion: reduce"),
+    "accessibility: global motion honors the reduced-motion preference");
   assert(!nav.includes('"/corrections"') && !nav.includes('"/memories"'),
     "learning: the old separate Learning and Memory nav entries are gone");
   assert(learningPage.includes("/writing/typing") && !learningPage.includes("/typing-calibration"),
@@ -183,7 +188,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const managerSrc = readFileSync("src/components/app/MemoryManager.tsx", "utf8");
   assert(managerSrc.includes("subjectFilter"),
     "memory: the memory list supports a course-subject filter (subject + global memories only)");
-  assert(learningPage.includes("searchParams?.course_id") && learningPage.includes("subjectFilter"),
+  assert(learningPage.includes("resolvedSearchParams?.course_id") && learningPage.includes("subjectFilter"),
     "memory: /learning?course_id= narrows the memories section to the course's subject via an RLS-scoped course read");
   assert(ENGINE_TOOLS.general.some((t) => t.path === "/learning"),
     "memory: the engine Memory tool routes to the unified Learning / Memory destination with course context");
@@ -726,8 +731,16 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     const context = readFileSync("src/lib/ai/context.ts", "utf8");
     assert(client.includes("academicLevelBit(profile.academic_level)") && context.includes("academicLevelBit(profile.academic_level)"),
       "levels: BOTH shared AI context builders use the one academicLevelBit — one config, all engines");
-    const dup = require("child_process").execSync('grep -rln "doctoral" src/lib/courses src/lib/math src/lib/essay 2>/dev/null || true').toString().trim();
-    assert(dup === "",
+    const containsDuplicatedLevelRegistry = (dir: string): boolean =>
+      readdirSync(dir, { withFileTypes: true }).some((entry) => {
+        const path = join(dir, entry.name);
+        return entry.isDirectory()
+          ? containsDuplicatedLevelRegistry(path)
+          : /\.(ts|tsx)$/.test(entry.name) && readFileSync(path, "utf8").includes("doctoral");
+      });
+    const hasDuplicate = ["src/lib/courses", "src/lib/math", "src/lib/essay"]
+      .some(containsDuplicatedLevelRegistry);
+    assert(!hasDuplicate,
       "levels: no duplicated per-subject academic-level registry exists beside the shared module");
   }
 
