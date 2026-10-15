@@ -605,6 +605,9 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "ai persona: the math explanation prompt speaks with the shared tutor voice, not diagnostic jargon");
   assert(aiClient.includes("const parts = [HONESTY_RULES, TUTOR_PERSONA,"),
     "ai persona: EVERY academic chat (all modes and subjects) composes the shared tutor voice, not just math");
+  const globalsCss = readFileSync("src/app/globals.css", "utf8");
+  assert(globalsCss.includes(".data-table thead th") && globalsCss.includes(".data-table tbody tr:hover"),
+    "design system: one shared data-table design (headers, rhythm, hover) instead of per-page table styles");
   assert(mathRoute.includes("transcribe the WHOLE question") && mathRoute.includes("State each instruction word ONCE") && mathRoute.includes("EVERY visible answer choice"),
     "ocr: the vision prompt captures complete questions, forbids duplicated instructions, and keeps every multiple-choice option");
   const mathPage = readFileSync("src/app/math/page.tsx", "utf8");

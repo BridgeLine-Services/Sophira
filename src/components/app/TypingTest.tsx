@@ -310,7 +310,7 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
         <div>
           <h4 className="mb-2 text-sm font-semibold text-ink">Your attempts</h4>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="data-table">
               <thead>
                 <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink-soft">
                   <th className="py-2 pr-3">Date</th>

@@ -29,6 +29,14 @@ body {
 ::-webkit-scrollbar { height: 6px; width: 6px; }
 ::-webkit-scrollbar-thumb { @apply bg-ink-soft/30 rounded-full; }
 
+/* Shared data-table design (2026-10-15): consistent headers, row rhythm,
+   hover feedback, and numeric alignment for every table in the app. */
+.data-table { @apply w-full text-sm; }
+.data-table thead th { @apply border-b border-ink/10 bg-accent-soft/50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-soft; }
+.data-table tbody td { @apply border-b border-ink/5 px-3 py-2.5 align-middle text-ink; }
+.data-table tbody tr:hover { @apply bg-accent-soft/40; }
+.data-table tbody tr:last-child td { @apply border-b-0; }
+
 /* markdown-ish rendering inside results */
 .result-body h1, .result-body h2, .result-body h3 { @apply font-semibold mt-5 mb-2 text-ink; }
 .result-body h1 { @apply text-xl; }

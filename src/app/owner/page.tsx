@@ -282,7 +282,7 @@ function ProviderDiagnosticsCard() {
         AI provider diagnostics
       </div>
       <div className="overflow-x-auto rounded-lg border border-ink/10">
-      <table className="w-full text-sm">
+      <table className="data-table">
         <tbody>
           {rows.map(([k, v]) => (
             <tr key={k} className="border-b last:border-b-0">
@@ -348,7 +348,7 @@ function CapabilityRegistryCard() {
     <div className="mb-6 rounded-lg border bg-card p-4">
       <div className="mb-2 text-sm font-semibold">Provider capability registry (shown before activation)</div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-xs">
+        <table className="data-table w-full min-w-[760px] text-xs">
           <thead>
             <tr className="border-b text-left text-muted-foreground">
               <th className="py-1.5 pr-3">provider</th>
