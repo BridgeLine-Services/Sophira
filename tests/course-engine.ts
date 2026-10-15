@@ -598,6 +598,11 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const mathRoute = readFileSync("src/app/api/math/solve/route.ts", "utf8");
   assert(mathRoute.includes('mode === "teach"') && mathRoute.includes("TEACH MODE"),
     "math: teach-me mode explains the concept without a second solver authority");
+  const aiClient = readFileSync("src/lib/ai/client.ts", "utf8");
+  assert(aiClient.includes("TUTOR_PERSONA") && aiClient.includes("NEVER mention internal engineering"),
+    "ai persona: one warm, jargon-free tutor voice is defined once and shared by every AI surface");
+  assert(mathRoute.includes("TUTOR_PERSONA"),
+    "ai persona: the math explanation prompt speaks with the shared tutor voice, not diagnostic jargon");
   assert(mathRoute.includes("transcribe the WHOLE question") && mathRoute.includes("State each instruction word ONCE") && mathRoute.includes("EVERY visible answer choice"),
     "ocr: the vision prompt captures complete questions, forbids duplicated instructions, and keeps every multiple-choice option");
   const mathPage = readFileSync("src/app/math/page.tsx", "utf8");

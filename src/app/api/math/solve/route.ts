@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { subjectBySlug } from "@/lib/courses/engines";
 import { requireUser } from "@/lib/supabase/guard";
 import { runMathPipeline, type MathPipelineResult } from "@/lib/math/pipeline";
-import { aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
+import { aiChat, aiConfigured, parseJsonLoose, TUTOR_PERSONA } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -136,8 +136,9 @@ async function explainWithAi(solution: { kind: string; finalAnswer: string; step
       {
         role: "system",
         content: [
+          TUTOR_PERSONA,
           "You explain mathematics to a student.",
-          "The solution steps and the final answer are ALREADY computed and verified by a deterministic engine — they are given to you and are final. You must not change, recompute, or contradict any number in them.",
+          "The solution steps and the final answer are ALREADY computed and verified — they are given to you and are final. You must not change, recompute, or contradict any number in them. In your explanation, do not describe HOW the answer was produced internally - just teach the mathematics.",
           "Explain WHY each step works, in friendly plain language, at high-school level.",
           subjectLabel
             ? `The student is working in a ${subjectLabel} context: interpret the mathematics in that scientific setting — attend to units, scientific notation, and physical meaning. The computed steps and final answer remain final.`
