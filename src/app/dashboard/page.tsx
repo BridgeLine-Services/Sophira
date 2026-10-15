@@ -80,6 +80,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <AppShell title={`Welcome${greetingName}`}>
       <div className="space-y-8">
         {/* Primary actions */}
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Start something</h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
           <Link
             href="/assignments/new"
@@ -121,6 +122,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
 
         {/* What I remember — real counts from your data (workflow §6) */}
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">What I remember</h2>
         <p className="text-sm text-ink-soft">
           Working from <strong className="text-ink">{courses?.length ?? 0} course{(courses?.length ?? 0) === 1 ? "" : "s"}</strong>,{" "}
           <strong className="text-ink">{teachers?.length ?? 0} teacher{(teachers?.length ?? 0) === 1 ? "" : "s"}</strong> with their profiles,{" "}
