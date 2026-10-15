@@ -250,7 +250,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
         {/* Writing profile */}
         <section>
-          <h2 className="mb-3 text-base font-semibold text-ink">My Writing Profile</h2>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">My Writing Profile</h2>
           <Card>
             <CardContent className="flex items-start gap-3 p-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
@@ -280,7 +280,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         {/* Recent assignments */}
         <section>
-          <h2 className="mb-3 text-base font-semibold text-ink">Recent assignments</h2>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Recent assignments</h2>
           {assignments?.length ? (
             <div className="divide-y divide-ink/5 rounded-card border border-ink/10 bg-white">
               {assignments.map((a) => (
@@ -305,7 +305,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {/* Recent feedback */}
         {recentFeedback && recentFeedback.length > 0 && (
           <section>
-            <h2 className="mb-3 text-base font-semibold text-ink">Recent feedback</h2>
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Recent feedback</h2>
             <div className="divide-y divide-ink/5 rounded-card border border-ink/10 bg-white">
               {recentFeedback.map((f) => (
                 <div key={f.id} className="p-4">

@@ -93,7 +93,7 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
         </Card>
 
         <section>
-          <h2 className="mb-3 text-base font-semibold text-ink">Assignments in this course</h2>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Assignments in this course</h2>
           <p className="sr-only">Assignments opened from this course keep its course and teacher context attached.</p>
           {assignments?.length ? (
             <div className="divide-y divide-ink/5 rounded-card border border-ink/10 bg-white">
