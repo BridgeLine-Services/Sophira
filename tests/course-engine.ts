@@ -77,8 +77,10 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // Subject tool links carry the subject scope where the destination honors it.
   assert(subjectToolUrl({ label: "Library", description: "", path: "/library" }, "math") === "/library?subject=math",
     "nav: subject-scoped tools carry ?subject= (Library)");
-  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "math") === "/math?subject=math",
-    "nav: subject workspaces carry ?subject= into the math solver");
+  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math/scan" }, "math") === "/math/scan?subject=math",
+    "nav: Scan to Solve carries ?subject= into its canonical /math/scan route");
+  assert(subjectToolUrl({ label: "Type to Solve", description: "", path: "/math?mode=type" }, "math") === "/math?mode=type&subject=math",
+    "nav: Type to Solve carries ?subject= on the canonical /math?mode=type route");
   assert(subjectToolUrl({ label: "Test Preparation", description: "", path: "/math/test-prep" }, "math") === "/math/test-prep?subject=math",
     "nav: the test-prep route now carries ?subject= (was silently unscoped)");
   assert(subjectToolUrl({ label: "Practice Problems", description: "", path: "/math/practice" }, "math") === "/math/practice?subject=math",
@@ -307,8 +309,10 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "subject: /teachers honors ?subject= — subject teachers are TAGGED from real course links, never fabricated and never hiding profiles");
   assert(subjectToolUrl({ label: "Essay", description: "", path: "/essay" }, "biology") === "/essay?subject=biology",
     "subject: subject workspace Essay/Writing/Teachers links now carry ?subject= (not silently generic)");
-  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "biology") === "/math?subject=biology",
-    "subject: the math solver carries the subject context for science calculations");
+  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math/scan" }, "biology") === "/math/scan?subject=biology",
+    "subject: the scanner carries the subject context for science calculations");
+  assert(subjectToolUrl({ label: "Scan to Solve", description: "", path: "/math" }, "math") === "/math?subject=math",
+    "nav: LEGACY compatibility - an old /math tool path still resolves subject-scoped, and the /math page deliberately redirects /math?subject=math to /math/scan");
   assert(subjectToolUrl({ label: "Typing and Writing Calibration", description: "", path: "/writing/typing" }, "biology") === "/writing/typing",
     "subject: non-shared tools keep their plain route (calibration is intentionally global)");
 
