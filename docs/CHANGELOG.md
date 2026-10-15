@@ -1,3 +1,14 @@
+### App-wide visual refresh: premium indigo palette via shared tokens (2026-10-15)
+
+One change, whole application: the shared Tailwind design tokens now carry the
+approved reference palette - neutral #f8f8fa canvas, #252b3a ink, #697386
+secondary text, #5145e8 indigo accent with #f0eeff lavender highlights and a
+#3f35c9 deep accent, plus aligned card shadows. Because every page and every
+button already consumes these tokens through the shared ui components
+(Button, Card, Badge, Input...), the new look propagates app-wide - all 60
+routes, dashboards, courses, notebooks, math workspaces, settings and dialogs -
+with zero behavior change.
+
 ### Math: MathLive editor, KaTeX typeset rendering, real MCQ analysis (2026-10-14)
 
 - Type to Solve now offers a structured MathLive editor (fractions, exponents,
