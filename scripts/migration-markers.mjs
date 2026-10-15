@@ -37,4 +37,6 @@ export const MARKERS = {
     "exists(select 1 from information_schema.columns where table_schema='public' and table_name='notebooks' and column_name='archived_at')",
   "0038_teacher_material_archive.sql":
     "exists(select 1 from information_schema.columns where table_schema='public' and table_name='teachers' and column_name='archived_at')",
+  "0039_supabase_security_hardening.sql":
+    "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'touch_updated_at' and n.nspname = 'public' and p.proconfig::text like '%search_path%' and p.proconfig::text not like '%public, pg_temp%')",
 };
