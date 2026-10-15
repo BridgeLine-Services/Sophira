@@ -20,19 +20,20 @@ export const dynamic = "force-dynamic";
 export default async function ProposalsPage({
   searchParams,
 }: {
-  searchParams?: { course_id?: string; subject?: string };
+  searchParams?: Promise<{ course_id?: string; subject?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   // Optional course context (subject-scoped Changes view).
   let course: { id: string; name: string; subject: string | null } | null = null;
-  if (searchParams?.course_id) {
+  if (resolvedSearchParams?.course_id) {
     const { data } = await supabase
       .from("courses")
       .select("id, name, subject")
-      .eq("id", searchParams.course_id)
+      .eq("id", resolvedSearchParams.course_id)
       .single();
     course = (data as { id: string; name: string; subject: string | null } | null) ?? null;
   }
@@ -42,8 +43,8 @@ export default async function ProposalsPage({
   // to the user's own courses in that subject group. A change in one subject
   // never appears in another subject's view.
   let subjectScope: { label: string; slug: string; subjects: string[] } | null = null;
-  if (!course && searchParams?.subject) {
-    const node = subjectBySlug(searchParams.subject);
+  if (!course && resolvedSearchParams?.subject) {
+    const node = subjectBySlug(resolvedSearchParams.subject);
     if (node) {
       const { data: groupCourses } = await supabase.from("courses").select("subject").order("name");
       const subjects = Array.from(new Set(

@@ -29,7 +29,7 @@ export async function requireUser(supabase: SupabaseClient): Promise<User> {
   }
   if (user) return user;
   try {
-    const store = cookies();
+    const store = await cookies();
     for (const { name } of store.getAll()) {
       if (name.startsWith("sb-") && name.includes("auth-token")) {
         // Same name/path supabase-ssr used when setting — guarantees deletion.
@@ -79,4 +79,3 @@ export async function readProfileWithRepair(
   }
   return { profile: null, reason: failure };
 }
-

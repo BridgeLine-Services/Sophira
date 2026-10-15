@@ -7,12 +7,13 @@ import { TeacherProfileEditor } from "./TeacherProfileEditor";
 
 export const dynamic = "force-dynamic";
 
-export default async function TeacherDetailPage({ params }: { params: { id: string } }) {
+export default async function TeacherDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: teacher } = await supabase.from("teachers").select("*").eq("id", params.id).single();
+  const { data: teacher } = await supabase.from("teachers").select("*").eq("id", id).single();
   if (!teacher) notFound();
 
   const [{ data: profile }, { data: courses }] = await Promise.all([

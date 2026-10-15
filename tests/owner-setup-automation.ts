@@ -168,7 +168,7 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   }
   // db-bootstrap: empty + configured => the COMPLETE chain (STATE B);
   // partial => frontier detection (STATE C). Owner exists => closed (F).
-  const bootSrc = readFileSync("src/lib/db-bootstrap.ts", "utf8");
+  const bootSrc = readFileSync("src/lib/db-bootstrap.ts", "utf8").replace(/\r\n/g, "\n");
   assert(bootSrc.includes("import { MIGRATIONS } from") && bootSrc.includes("applyMigrationChain"),
     "wizard: the runtime applies the repository's own embedded chain");
   assert(bootSrc.includes("probe.chainStarted === false") && bootSrc.includes("if (migrationAutomationConfigured()) {\n      return await runChainAutomation();"),

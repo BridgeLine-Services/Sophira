@@ -162,6 +162,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
               key={tool.label}
               href={subjectToolUrl(tool, slug)}
               onClick={onNavigate}
+              aria-current={active ? "page" : undefined}
               className={cn("block rounded-md px-2.5 py-2.5 text-[13px]",
                 active ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
             >
@@ -194,6 +195,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
                 <Link
                   href={`/courses/${node.slug}`}
                   onClick={onNavigate}
+                  aria-current={subjectActive(node.slug) ? "page" : undefined}
                   className={cn("flex-1 rounded-lg px-3 py-2 text-sm font-medium",
                     subjectActive(node.slug) ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
                 >
@@ -209,6 +211,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
                         <Link
                           href={`/courses/${child.slug}`}
                           onClick={onNavigate}
+                          aria-current={subjectActive(child.slug) ? "page" : undefined}
                           className={cn("flex-1 rounded-lg px-3 py-1.5 text-sm",
                             subjectActive(child.slug) ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
                         >
@@ -228,6 +231,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
           <Link
             href="/courses"
             onClick={onNavigate}
+            aria-current={pathname === "/courses" ? "page" : undefined}
             className={cn("block rounded-lg px-3 py-2 text-sm", pathname === "/courses" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5")}
           >
             All courses…
@@ -369,6 +373,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
       className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
         pathname === "/online" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
       aria-label={online ? "Online — view live status" : "Offline — view live status"}
+      aria-current={pathname === "/online" ? "page" : undefined}
     >
       <Wifi className="h-4 w-4" aria-hidden />
       {online ? "Online" : "Offline"}
@@ -389,6 +394,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         key={href}
         href={href}
         onClick={drawerOpen ? closeDrawer : undefined}
+        aria-current={active ? "page" : undefined}
         className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
           active ? "bg-ink/10 text-ink" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
         }`}
@@ -414,6 +420,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         key={href}
         href={href}
         onClick={drawerOpen ? closeDrawer : undefined}
+        aria-current={active ? "page" : undefined}
         className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
           active ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
       >
@@ -425,6 +432,12 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
 
   return (
     <div className="flex min-h-dvh flex-col">
+      <a
+        href="#main-content"
+        className="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:font-semibold focus:text-ink focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       {/* PERSISTENT SIDEBAR RAIL (lg+): brand, expandable Courses hierarchy,
           the section list, the online status chip, and sign out. */}
       <aside
@@ -449,6 +462,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
               {isOwner && (
                 <Link
                   href="/owner"
+                  aria-current={pathname === "/owner" ? "page" : undefined}
                   className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
                     pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5")}
                 >
@@ -524,6 +538,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
               <Link
                 key={href}
                 href={href}
+                aria-current={!href.includes("#") && pathname === href.split("#")[0].split("?")[0] ? "page" : undefined}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
               >
                 <Icon className="h-4 w-4" aria-hidden />
@@ -535,6 +550,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
               {isOwner && (
                 <Link
                   href="/owner"
+                  aria-current={pathname === "/owner" ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
                     pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5"
@@ -548,6 +564,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             <Link
               key={navHref}
               href={navHref === "/dashboard" ? workspaceHomeHref : navHref}
+              aria-current={pathname === navHref || pathname.startsWith(navHref + "/") ? "page" : undefined}
               className={cn(
                 "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
                 pathname === navHref || pathname.startsWith(navHref + "/")
@@ -564,7 +581,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 md:pb-12 lg:pl-60">{children}</main>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 md:pb-12 lg:pl-60">{children}</main>
 
       {/* MOBILE SLIDE-OUT DRAWER: the full navigation hierarchy on phones.
           Escape, backdrop tap, and navigation close it; focus is managed. */}
@@ -645,6 +662,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             <Link
               key={href}
               href={href}
+              aria-current={pathname === href || pathname.startsWith(href + "/") ? "page" : undefined}
               className={cn(
                 "flex min-w-[64px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-medium",
                 pathname === href || pathname.startsWith(href + "/") ? "text-accent" : "text-ink-soft"

@@ -53,7 +53,7 @@ lines.push("# Reminder: ALLOW_PAID_AI=false + MONTHLY_AI_BUDGET_USD=0 guarantee 
 const out = lines.join("\n");
 
 if (process.argv.includes("--check")) {
-  const current = readFileSync(join(root, ".env.example"), "utf8");
+  const current = readFileSync(join(root, ".env.example"), "utf8").replace(/\r\n/g, "\n");
   if (current !== out) {
     console.error("env: .env.example is OUT OF SYNC with src/config/env.manifest.json - run: node scripts/gen-env-example.mjs");
     process.exit(1);

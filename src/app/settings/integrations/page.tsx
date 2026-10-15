@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { IntegrationsPanel } from "@/components/app/IntegrationsPanel";
 import { AppShell } from "@/components/app/AppShell";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,16 @@ export const dynamic = "force-dynamic";
 export default async function IntegrationsPage() {
   const supabase = createClient();
   const guard = await requireUser(supabase);
-  if (!guard.ok) return guard.response;
+  if (!guard.ok) {
+    if (guard.response.status === 401) redirect("/login");
+    return (
+      <AppShell title="Integrations">
+        <p className="mx-auto max-w-xl rounded-card border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
+          We couldn&apos;t verify your access to integrations. Please try again later or contact the owner.
+        </p>
+      </AppShell>
+    );
+  }
   return (
     <AppShell title="Integrations" backHref="/settings">
       <div className="mx-auto max-w-2xl">

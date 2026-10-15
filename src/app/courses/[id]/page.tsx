@@ -10,12 +10,13 @@ import { Wrench } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function CourseDetailPage({ params }: { params: { id: string } }) {
+export default async function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: course } = await supabase.from("courses").select("*").eq("id", params.id).single();
+  const { data: course } = await supabase.from("courses").select("*").eq("id", id).single();
   if (!course) notFound();
 
   const [{ data: teachers }, { data: teacher }, { data: assignments }] = await Promise.all([

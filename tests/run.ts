@@ -2851,7 +2851,7 @@ async function runInvitationRegressionTests(): Promise<void> {
 async function runAcceptanceDocTests(): Promise<void> {
   section("24. Master acceptance workflow — dedicated sections doc conformance");
   {
-    const doc = fs.readFileSync(path.join(process.cwd(), "docs", "MASTER_ACCEPTANCE_WORKFLOW.md"), "utf8");
+    const doc = fs.readFileSync(path.join(process.cwd(), "docs", "MASTER_ACCEPTANCE_WORKFLOW.md"), "utf8").replace(/\r\n/g, "\n");
     const dedicated = doc.slice(doc.indexOf("# Dedicated Acceptance Sections"));
     for (let i = 1; i <= 24; i++) {
       assert(dedicated.includes(`## A${i}.`),
@@ -2877,8 +2877,10 @@ async function runAcceptanceDocTests(): Promise<void> {
     for (const m of dedicated.match(/Status: PASSED \(VERIFIED offline\)\*\* — tests\/run\.ts/g) ?? []) {
       assert(m.includes("tests/run.ts"), "");
     }
-    assert((dedicated.match(/executed\n?2026-10-05|executed 2026-10-05/g) ?? []).length >= 20,
-      "acceptance doc: every PASSED row cites executed evidence with the run date");
+    const passedRows = dedicated.match(/\*\*Status: PASSED/g) ?? [];
+    const datedEvidence = dedicated.match(/executed\s*2026-10-\d{2}/g) ?? [];
+    assert(passedRows.length > 0 && datedEvidence.length === passedRows.length,
+      "acceptance doc: every PASSED row cites dated execution evidence without pinning an obsolete day");
     assert(dedicated.includes("PASSED on the basis of code existing"),
       "acceptance doc: explicitly states code existence alone never counts as PASSED");
     assert(dedicated.includes("IMPLEMENTED means the mechanism exists. VERIFIED means it was observed"),
