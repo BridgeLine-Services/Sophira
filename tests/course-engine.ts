@@ -603,6 +603,8 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "ai persona: one warm, jargon-free tutor voice is defined once and shared by every AI surface");
   assert(mathRoute.includes("TUTOR_PERSONA"),
     "ai persona: the math explanation prompt speaks with the shared tutor voice, not diagnostic jargon");
+  assert(aiClient.includes("const parts = [HONESTY_RULES, TUTOR_PERSONA,"),
+    "ai persona: EVERY academic chat (all modes and subjects) composes the shared tutor voice, not just math");
   assert(mathRoute.includes("transcribe the WHOLE question") && mathRoute.includes("State each instruction word ONCE") && mathRoute.includes("EVERY visible answer choice"),
     "ocr: the vision prompt captures complete questions, forbids duplicated instructions, and keeps every multiple-choice option");
   const mathPage = readFileSync("src/app/math/page.tsx", "utf8");

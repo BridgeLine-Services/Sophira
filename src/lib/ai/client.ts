@@ -232,7 +232,9 @@ export function buildSystemPrompt(args: {
     patternContext,
   });
 
-  const parts = [HONESTY_RULES, MODE_INSTRUCTIONS[mode], workflow.extraSystem];
+  // TUTOR_PERSONA (2026-10-15): one premium tutor voice app-wide - the
+  // redesign applied to the AI itself, alongside the honesty contract.
+  const parts = [HONESTY_RULES, TUTOR_PERSONA, MODE_INSTRUCTIONS[mode], workflow.extraSystem];
   parts.push(...composed.promptSections);
 
   if (composed.applied.conflicts.length) {
