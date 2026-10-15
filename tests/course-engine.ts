@@ -608,6 +608,9 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const globalsCss = readFileSync("src/app/globals.css", "utf8");
   assert(globalsCss.includes(".data-table thead th") && globalsCss.includes(".data-table tbody tr:hover"),
     "design system: one shared data-table design (headers, rhythm, hover) instead of per-page table styles");
+  const ownerPageHead = readFileSync("src/app/owner/page.tsx", "utf8");
+  assert(ownerPageHead.includes("uppercase tracking-wider text-ink-soft"),
+    "design system: the owner dashboard uses the app-wide section-heading pattern");
   assert(mathRoute.includes("transcribe the WHOLE question") && mathRoute.includes("State each instruction word ONCE") && mathRoute.includes("EVERY visible answer choice"),
     "ocr: the vision prompt captures complete questions, forbids duplicated instructions, and keeps every multiple-choice option");
   const mathPage = readFileSync("src/app/math/page.tsx", "utf8");

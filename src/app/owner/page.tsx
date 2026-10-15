@@ -110,7 +110,7 @@ export default async function OwnerPage() {
         statsError={statsError}
       />
       <section id="needs-attention" className="scroll-mt-4">
-        <h2 className="mb-3 text-base font-semibold text-ink">Needs attention</h2>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Needs attention</h2>
         <div className="grid gap-2">
           {(requests?.length ?? 0) > 0 && (
             <Card><CardContent className="p-4">
@@ -161,7 +161,7 @@ export default async function OwnerPage() {
         siteUrl={siteUrl}
       />
       <section className="mt-8" aria-labelledby="owner-providers-h">
-        <h2 id="owner-providers-h" className="mb-3 text-base font-semibold">AI Providers and Models</h2>
+        <h2 id="owner-providers-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">AI Providers and Models</h2>
         <p className="mb-3 text-xs text-muted-foreground">
           Detailed capability registry and live provider diagnostics. Registered capability is not the same as an
           active, verified connection — the diagnostics card shows what is actually configured.
@@ -231,7 +231,7 @@ function OwnerOverviewCard({ members, invitations, requests, statsError }: {
   ];
   return (
     <section id="overview" className="mb-6 scroll-mt-4" aria-labelledby="owner-overview-h">
-      <h2 id="owner-overview-h" className="mb-3 text-base font-semibold">Administrative overview</h2>
+      <h2 id="owner-overview-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Administrative overview</h2>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((c) => (
           <div key={c.label} className="rounded-lg border bg-card p-4">
