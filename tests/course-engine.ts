@@ -598,6 +598,8 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const mathRoute = readFileSync("src/app/api/math/solve/route.ts", "utf8");
   assert(mathRoute.includes('mode === "teach"') && mathRoute.includes("TEACH MODE"),
     "math: teach-me mode explains the concept without a second solver authority");
+  assert(mathRoute.includes("transcribe the WHOLE question") && mathRoute.includes("State each instruction word ONCE") && mathRoute.includes("EVERY visible answer choice"),
+    "ocr: the vision prompt captures complete questions, forbids duplicated instructions, and keeps every multiple-choice option");
   const mathPage = readFileSync("src/app/math/page.tsx", "utf8");
   const scanPage = readFileSync("src/app/math/scan/page.tsx", "utf8");
   assert(mathPage.includes('get("mode") === "teach"') && mathPage.includes("Scan to Solve") === false,

@@ -28,12 +28,19 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 async function visionOcr(dataUrl: string): Promise<{ text: string; confidence: number; notes: string[] }> {
   if (dataUrl.length > MAX_IMAGE_BYTES * 1.4) throw new Error("image too large (max 8MB)");
   const prompt = [
-    "You are a math OCR transcriber. Transcribe the mathematical expression in this image EXACTLY as written.",
+    "You are a math OCR transcriber. Transcribe the mathematical problem in this image EXACTLY as written.",
     "Rules:",
-    "- Transcribe ONLY what is visible. Never solve, never simplify, never correct.",
-    "- Use plain ASCII math: ^ for exponents, sqrt(...) for roots, / for fractions, * for multiplication, = for equals.",
-    "- Use unicode → ASCII: x² → x^2, √9 → sqrt(9), ÷ → /, × → *.",
-    "- For systems, put each equation on its own line.",
+    "- Transcribe ONLY what is visible. Never solve, never simplify, never correct, never guess missing parts.",
+    "- If a full question is visible (instructions, units, constraints, answer choices), transcribe the WHOLE question, not just an expression.",
+    "- State each instruction word ONCE. Never repeat or duplicate instructions like 'integral of' or the problem statement.",
+    "- Notation: ^ for exponents (x² → x^2), sqrt(...) for roots (√9 → sqrt(9)), / for fractions and stacked fractions ((a over b) → a/b), * for multiplication (× · ⋅ → *), ÷ → /.",
+    "- Integrals: write the integrand then the differential, e.g. '∫ e^x sin(x) dx' or 'integral of e^x sin(x) dx'. Keep the dx. Preserve limits if visible (e.g. '∫ from 0 to 4 of ... dx').",
+    "- Derivatives: preserve the form visible (dy/dx, f'(x), d/dx(...)).",
+    "- Subscripts and superscripts: x_1, x^2. Limits: lim(x→0). Summations: sum from i=1 to n of ...",
+    "- Matrices: put each row on its own line, entries comma-separated, wrapped in [ ].",
+    "- Multiple-choice questions: transcribe the question first, then EVERY visible answer choice on its own line as 'A) ...', 'B) ...', etc. Never drop or reorder choices.",
+    "- Word problems: preserve the wording, quantities, and units exactly.",
+    "- If part of the image is unreadable, transcribe the rest and say so in notes with a LOWER confidence.",
     '- Reply with JSON only: {"expression": "...", "confidence": 0.0-1.0, "notes": ["..."]} where confidence is your honest transcription confidence.',
   ].join("\n");
   const raw = await aiChat(
