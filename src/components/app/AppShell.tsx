@@ -135,7 +135,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
   const subjectActive = (slug: string) => linkActive(`/courses/${slug}`);
   const rowCls = (active: boolean) =>
     cn("flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium",
-      active ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink");
+      active ? "bg-accent-soft text-accent font-medium shadow-[inset_3px_0_0_#5145e8]" : "text-ink-soft hover:bg-ink/5 hover:text-ink");
 
   const chevron = (expanded: boolean, label: string) => (
     <button

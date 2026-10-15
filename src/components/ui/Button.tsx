@@ -11,10 +11,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-white hover:bg-accent/90 disabled:bg-accent/40",
-  secondary: "bg-white border border-ink/15 text-ink hover:bg-accent/5 disabled:opacity-50",
-  ghost: "text-ink-soft hover:bg-ink/5 disabled:opacity-50",
-  danger: "bg-white border border-danger/30 text-danger hover:bg-danger/5 disabled:opacity-50",
+  // full-state design (2026-10-15): default / hover / pressed / focus /
+  // disabled for every variant. Deep indigo hover (not a washed /90),
+  // clear pressed feedback, ring focus for keyboards, calm disabled.
+  primary: "bg-accent text-white shadow-[0_1px_2px_rgba(37,43,58,0.12)] hover:bg-accent-deep active:bg-accent-deep disabled:bg-accent/40 disabled:shadow-none",
+  secondary: "bg-white border border-ink/15 text-ink hover:border-accent/40 hover:text-accent active:bg-accent-soft disabled:opacity-50",
+  ghost: "text-ink-soft hover:bg-ink/5 hover:text-ink active:bg-ink/10 disabled:opacity-50",
+  danger: "bg-white border border-danger/30 text-danger hover:border-danger/50 hover:bg-danger/5 active:bg-danger/10 disabled:opacity-50",
 };
 
 const sizes: Record<Size, string> = {
@@ -29,6 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       className={cn(
         "inline-flex items-center justify-center rounded-lg font-medium transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
         "disabled:cursor-not-allowed active:scale-[0.99]",
         variants[variant],
         sizes[size],
