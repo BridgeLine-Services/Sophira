@@ -56,8 +56,12 @@ export class SupabaseRemoteAdapter implements RemoteAdapter {
   async fetchChanged(table: OfflineTable, since: string | null): Promise<RemoteRow[]> {
     const sb = SUPABASE_TABLE[table];
     let q = (await this.sb()).from(sb).select("*");
-    if (since) q = q.gt("updated_at", since);
-    const { data, error } = await q.order("updated_at", { ascending: true });
+    const cursor = parseCursor(since);
+    if (cursor) {
+      // The id tie-breaker prevents rows sharing an updated_at from being skipped.
+      q = q.or(`updated_at.gt.${cursor.updated_at},and(updated_at.eq.${cursor.updated_at},id.gt.${cursor.id})`);
+    }
+    const { data, error } = await q.order("updated_at", { ascending: true }).order("id", { ascending: true });
     if (error) throw new Error(error.message);
     return (data ?? []).map((d) => ({
       id: (d as Record<string, unknown>).id as string,
@@ -98,24 +102,45 @@ export class SupabaseRemoteAdapter implements RemoteAdapter {
     return { ok: true, updated_at: new Date().toISOString() };
   }
 
-  async isAuthorized(): Promise<boolean> {
+  async isAuthorized(): Promise<AuthorizationState> {
     const sb = await this.sb().catch(() => null);
-    if (!sb) return false;
-    const { data } = await sb.auth.getSession();
-    if (!data.session) return false;
-    // probe with a cheap RLS-guarded call — revoked users fail here
-    const { error } = await sb.from("profiles").select("id").limit(1);
-    return !error;
+    if (!sb) return { kind: "unknown", detail: "client unavailable" };
+    const { data, error } = await sb.auth.getSession();
+    if (error) {
+      return isDefinitiveAuthError(error) ? { kind: "unauthorized", detail: error.message } : { kind: "unknown", detail: error.message };
+    }
+    if (!data.session) return { kind: "unauthorized", detail: "no active session" };
+    // A data-plane 403/RLS failure is not proof of revocation: grants and
+    // policies can be broken while the session remains valid.
+    const probe = await sb.from("profiles").select("id").limit(1);
+    if (probe.error) return { kind: "unknown", detail: probe.error.message };
+    return { kind: "authorized" };
   }
 }
 
-function classifyError(error: { message?: string; code?: string }): ApplyResult {
+export type AuthorizationState =
+  | { kind: "authorized" }
+  | { kind: "unauthorized"; detail?: string }
+  | { kind: "unknown"; detail?: string };
+
+function isDefinitiveAuthError(error: { message?: string; code?: string }): boolean {
   const msg = (error.message ?? "").toLowerCase();
-  if (msg.includes("revoked") || msg.includes("row-level security") || msg.includes("permission denied") || (error.code === "42501")) {
-    return { ok: false, failure: { kind: "revoked" } };
-  }
-  if (msg.includes("jwt") || msg.includes("token") || msg.includes("not authenticated")) {
-    return { ok: false, failure: { kind: "auth" } };
-  }
+  return ["bad_jwt", "invalid jwt", "jwt expired", "session not found", "refresh token not found", "not authenticated"].some((v) => msg.includes(v)) || error.code === "invalid_grant";
+}
+
+function classifyError(error: { message?: string; code?: string }): ApplyResult {
+  if (isDefinitiveAuthError(error)) return { ok: false, failure: { kind: "auth" } };
   return { ok: false, failure: { kind: "server", detail: error.message } };
+}
+
+function parseCursor(value: string | null): { updated_at: string; id: string } | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as { updated_at?: unknown; id?: unknown };
+    if (typeof parsed.updated_at === "string" && typeof parsed.id === "string") return parsed as { updated_at: string; id: string };
+  } catch {
+    // Cursors written by older versions were timestamps; replay from that boundary.
+    return { updated_at: value, id: "" };
+  }
+  return null;
 }

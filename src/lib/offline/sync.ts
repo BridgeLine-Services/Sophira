@@ -50,8 +50,8 @@ export interface RemoteAdapter {
   fetchChanged(table: OfflineTable, since: string | null): Promise<RemoteRow[]>;
   /** Apply an op; server-side updated_at comes back on success. */
   applyOp(op: QueueOp, record: OfflineRecord | null): Promise<ApplyResult>;
-  /** Is the session currently authorized at all? (revocation probe) */
-  isAuthorized(): Promise<boolean>;
+  /** Authorization state; unknown must preserve local data and queue. */
+  isAuthorized(): Promise<boolean | { kind: "authorized" | "unauthorized" | "unknown"; detail?: string }>;
 }
 
 export interface SyncReport {
@@ -94,11 +94,17 @@ export class SyncEngine {
    */
   async run(): Promise<SyncReport> {
     const report: SyncReport = { uploaded: 0, pulled: 0, conflicts: 0, failures: 0, revoked: false, complete: false, detail: [] };
-    const authorized = await this.remote.isAuthorized();
-    if (!authorized) {
+    const authorization = await this.remote.isAuthorized();
+    const authState = typeof authorization === "boolean" ? (authorization ? "authorized" : "unauthorized") : authorization.kind;
+    if (authState === "unknown") {
+      report.failures += 1;
+      report.detail.push(`authorization could not be confirmed${typeof authorization === "boolean" ? "" : `: ${authorization.detail ?? "temporary failure"}`}; queue preserved`);
+      return report;
+    }
+    if (authState === "unauthorized") {
       report.revoked = true;
-      await this.sealQueue("session revoked or unauthorized — queue sealed; logout will purge local data");
-      report.detail.push("not authorized: queue sealed, logout required");
+      await this.sealQueue("confirmed invalid session — queue sealed; logout will purge local data");
+      report.detail.push("confirmed invalid session: queue sealed, logout required");
       return report;
     }
 
@@ -166,14 +172,26 @@ export class SyncEngine {
         report.detail.push(`pull skipped for ${table} (remote unavailable)`);
         continue;
       }
+      let cursor = since ? this.parseCursor(since) : null;
       for (const rr of changed) {
         const local = await this.store.read(table, rr.id).catch(() => null);
-        // never clobber local unsynced edits — those reconcile via the queue
-        if (local && local.sync_status !== "synced") continue;
-        await this.store.upsertFromServer(table, rr.id, rr.row, rr.updated_at);
-        report.pulled += 1;
+        // Do not advance past an unsynced row: it must be revisited after the
+        // upload/conflict decision, rather than silently disappearing from pull.
+        if (local && local.sync_status !== "synced") {
+          report.detail.push(`pull paused for ${table}/${rr.id}: local edit remains unsynced`);
+          break;
+        }
+        try {
+          await this.store.upsertFromServer(table, rr.id, rr.row, rr.updated_at);
+          cursor = { updated_at: rr.updated_at, id: rr.id };
+          await this.setSyncCursor(table, JSON.stringify(cursor));
+          report.pulled += 1;
+        } catch (error) {
+          report.failures += 1;
+          report.detail.push(`pull paused for ${table}/${rr.id}: ${error instanceof Error ? error.message : "row processing failed"}`);
+          break;
+        }
       }
-      await this.setSyncCursor(table, new Date().toISOString());
     }
 
     const stillPending = await this.queue.count();
@@ -247,6 +265,16 @@ export class SyncEngine {
   }
   private async setSyncCursor(table: OfflineTable, iso: string): Promise<void> {
     await this.store.backendSet(this.cursorKey(table), new TextEncoder().encode(iso));
+  }
+
+  private parseCursor(value: string): { updated_at: string; id: string } | null {
+    try {
+      const parsed = JSON.parse(value) as { updated_at?: unknown; id?: unknown };
+      if (typeof parsed.updated_at === "string" && typeof parsed.id === "string") return parsed as { updated_at: string; id: string };
+    } catch {
+      return { updated_at: value, id: "" };
+    }
+    return null;
   }
 }
 
