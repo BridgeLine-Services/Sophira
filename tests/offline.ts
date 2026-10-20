@@ -58,11 +58,19 @@ class FakeRemote implements RemoteAdapter {
   }
 
   async fetchChanged(table: OfflineTable, since: string | null): Promise<RemoteRow[]> {
-    const out: RemoteRow[] = [];
-    for (const [id, r] of Array.from(this.t(table))) {
-      if (!since || r.updated_at > since) out.push({ id, row: { ...r.row }, updated_at: r.updated_at });
+    let cursor: { updated_at: string; id: string } | null = null;
+    if (since) {
+      try {
+        const parsed = JSON.parse(since) as { updated_at?: unknown; id?: unknown };
+        if (typeof parsed.updated_at === "string" && typeof parsed.id === "string") cursor = { updated_at: parsed.updated_at, id: parsed.id };
+      } catch {
+        cursor = { updated_at: since, id: "" };
+      }
     }
-    return out;
+    return Array.from(this.t(table))
+      .filter(([id, r]) => !cursor || r.updated_at > cursor.updated_at || (r.updated_at === cursor.updated_at && id > cursor.id))
+      .sort(([aId, a], [bId, b]) => a.updated_at === b.updated_at ? aId.localeCompare(bId) : a.updated_at.localeCompare(b.updated_at))
+      .map(([id, r]) => ({ id, row: { ...r.row }, updated_at: r.updated_at }));
   }
 
   async applyOp(op: QueueOp, record: OfflineRecord | null): Promise<ApplyResult> {
