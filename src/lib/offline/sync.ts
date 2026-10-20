@@ -94,7 +94,14 @@ export class SyncEngine {
    */
   async run(): Promise<SyncReport> {
     const report: SyncReport = { uploaded: 0, pulled: 0, conflicts: 0, failures: 0, revoked: false, complete: false, detail: [] };
-    const authorization = await this.remote.isAuthorized();
+    let authorization: boolean | { kind: "authorized" | "unauthorized" | "unknown"; detail?: string };
+    try {
+      authorization = await this.remote.isAuthorized();
+    } catch (error) {
+      report.failures += 1;
+      report.detail.push(`authorization probe failed: ${error instanceof Error ? error.message : "temporary failure"}; queue preserved`);
+      return report;
+    }
     const authState = typeof authorization === "boolean" ? (authorization ? "authorized" : "unauthorized") : authorization.kind;
     if (authState === "unknown") {
       report.failures += 1;
@@ -164,7 +171,13 @@ export class SyncEngine {
 
     // 4/6. pull remote changes into the mirror
     for (const table of MIRRORED_TABLES) {
-      const since = await this.lastSyncCursor(table);
+      let since: string | null = null;
+      try {
+        since = await this.lastSyncCursor(table);
+      } catch (error) {
+        report.failures += 1;
+        report.detail.push(`cursor read failed for ${table}: ${error instanceof Error ? error.message : "temporary failure"}; replaying from the beginning`);
+      }
       let changed: RemoteRow[];
       try {
         changed = await this.remote.fetchChanged(table, since);
