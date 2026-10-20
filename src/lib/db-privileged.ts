@@ -21,6 +21,22 @@ import { Client } from "pg";
 import { directPostgresConfigured, connectionString, sslConfigFor, stripSslmode } from "./db-ddl";
 import { publicSupabaseUrl } from "./supabase-config";
 
+const DB_FUNCTIONS = new Set(["revoke_all_sessions"] as const);
+const TABLE_COLUMNS = {
+  invitations: new Set(["token"] as const),
+  profiles: new Set(["id"] as const),
+} as const;
+const PROFILE_COLUMNS = new Set(["status", "access_revoked_at", "can_request_invites"] as const);
+
+type AllowedDbFunction = (typeof DB_FUNCTIONS extends Set<infer T> ? T : never);
+type AllowedTable = keyof typeof TABLE_COLUMNS;
+
+function requireAllowed<T extends string>(kind: string, value: string, allowed: Set<T>): asserts value is T {
+  if (!value || !allowed.has(value as T)) {
+    throw new Error(`Invalid ${kind} identifier`);
+  }
+}
+
 async function withClient<T>(
   fn: (client: { query: (q: string, p?: unknown[]) => Promise<{ rows: unknown[] }> }) => Promise<T>
 ): Promise<T | null> {
@@ -45,6 +61,7 @@ async function withClient<T>(
 /** Invoke a database function (the RPC replacement). Returns true only on
  *  a clean function call (the function's OWN refusal is still a result). */
 export async function callDbFunction(fnName: string, params: unknown[]): Promise<{ ok: boolean; error?: string }> {
+  requireAllowed("function", fnName, DB_FUNCTIONS);
   const res = await withClient(async (client) => {
     const r = await client.query(`select public.${fnName}(${params.map((_, i) => `$${i + 1}`).join(", ")}) as result`, params);
     return { ok: true, value: r.rows[0] };
@@ -59,6 +76,8 @@ export async function selectRow(
   column: string,
   value: string
 ): Promise<Record<string, unknown> | null> {
+  requireAllowed("table", table, new Set(Object.keys(TABLE_COLUMNS) as AllowedTable[]));
+  requireAllowed("column", column, TABLE_COLUMNS[table]);
   return withClient(async (client) => {
     const r = await client.query(
       `select * from public.${table} where ${column} = $1 limit 1`,
@@ -90,6 +109,7 @@ export async function updateProfileColumns(
 ): Promise<boolean> {
   const entries = Object.entries(fields).filter(([, v]) => v !== undefined);
   if (entries.length === 0) return false;
+  for (const [key] of entries) requireAllowed("profile column", key, PROFILE_COLUMNS);
   const sets = entries.map(([k], i) => `${k} = $${i + 2}`);
   const values = entries.map(([, v]) => v);
   const res = await withClient(async (client) => {
