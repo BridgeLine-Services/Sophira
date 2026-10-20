@@ -214,7 +214,10 @@ async function main() {
   const envIdx = args.indexOf("--env-file");
   const envFile = envIdx !== -1 ? args[envIdx + 1] : null;
   const env = loadEnv(envFile);
-  const liveUrl = (urlArg || env.NEXT_PUBLIC_SITE_URL || "").trim();
+  // Only an explicit --url opts into network probes. NEXT_PUBLIC_SITE_URL is
+  // still evaluated as configuration, but must not make offline diagnostics
+  // unexpectedly contact a deployment (or depend on its availability).
+  const liveUrl = (urlArg || "").trim();
 
   let live = null;
   if (isUrl(liveUrl)) {

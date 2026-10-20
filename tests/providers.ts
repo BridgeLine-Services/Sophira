@@ -314,27 +314,30 @@ export async function runSecretScanTests(assert: Assert, section: Section): Prom
 
   // 2. positive control: a planted leak in a client-like chunk MUST fail
   const tmp = join(process.cwd(), ".tmp-scan-fixture");
-  rmSync(tmp, { recursive: true, force: true });
-  mkdirSync(tmp, { recursive: true });
-  writeFileSync(
-    join(tmp, "chunk-abc123.js"),
-    'window.x = process.env.SUPABASE_SERVICE_ROLE_KEY; const s = "SEARCH_API_KEY";'
-  );
   let failedAsExpected = false;
   try {
-    execFileSync("node", ["scripts/secret-scan.mjs", "--dir", tmp]);
-  } catch {
-    failedAsExpected = true;
-  }
-  assert(failedAsExpected, "planted secret names in a client chunk FAIL the scan");
+    rmSync(tmp, { recursive: true, force: true });
+    mkdirSync(tmp, { recursive: true });
+    writeFileSync(
+      join(tmp, "chunk-abc123.js"),
+      'window.x = process.env.SUPABASE_SERVICE_ROLE_KEY; const s = "SEARCH_API_KEY";'
+    );
+    try {
+      execFileSync("node", ["scripts/secret-scan.mjs", "--dir", tmp]);
+    } catch {
+      failedAsExpected = true;
+    }
+    assert(failedAsExpected, "planted secret names in a client chunk FAIL the scan");
 
-  // 3. negative control: clean code passes
-  rmSync(tmp, { recursive: true, force: true });
-  mkdirSync(tmp, { recursive: true });
-  writeFileSync(join(tmp, "chunk-clean.js"), 'console.log("NEXT_PUBLIC_SUPABASE_ANON_KEY is public by design");');
-  execFileSync("node", ["scripts/secret-scan.mjs", "--dir", tmp]); // throws on failure
-  assert(true, "clean chunk passes (NEXT_PUBLIC_/anon names are not flagged)");
-  rmSync(tmp, { recursive: true, force: true });
+    // 3. negative control: clean code passes
+    rmSync(tmp, { recursive: true, force: true });
+    mkdirSync(tmp, { recursive: true });
+    writeFileSync(join(tmp, "chunk-clean.js"), 'console.log("NEXT_PUBLIC_SUPABASE_ANON_KEY is public by design");');
+    execFileSync("node", ["scripts/secret-scan.mjs", "--dir", tmp]);
+    assert(true, "clean chunk passes (NEXT_PUBLIC_/anon names are not flagged)");
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 
   // 4. NO secret in localStorage / IndexedDB: every source file that touches
   //    browser storage must never reference a secret name.
