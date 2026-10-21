@@ -4,10 +4,10 @@
   "private": true,
   "description": "Sophira - a private AI academic assistant",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "tsc -p tests/tsconfig.json && node tests-dist/tests/run.js",
     "cap:sync": "cap sync android && cap sync ios",
     "android:build": "SOPHIRA_NATIVE_RELEASE=1 npx cap sync android && cd android && ./gradlew assembleRelease",
