@@ -4,7 +4,7 @@
   "private": true,
   "description": "Sophira - a private AI academic assistant",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
