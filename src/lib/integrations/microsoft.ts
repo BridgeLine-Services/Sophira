@@ -206,3 +206,126 @@ export async function downloadDriveItem(accessToken: string, itemId: string, dri
   const bytes = Buffer.from(await res.arrayBuffer());
   return { ok: true, bytes, mime: res.headers.get("content-type"), error: null };
 }
+
+// ---------------------------------------------------------------------------
+// SAFE REPLACEMENT + RECOVERY (2026-10-26)
+// A stale listing is NEVER proof a file is unchanged. Every replacement:
+//   1. the caller supplies the eTag it actually saw (expected_etag);
+//   2. we re-read the CURRENT item metadata;
+//   3. a mismatch refuses the write BEFORE anything is sent;
+//   4. the PUT itself is conditional (If-Match), so a change between our
+//      check and the write also fails (412) instead of overwriting.
+// OneDrive's own version history is the recoverable copy for Word files;
+// Sophira never claims a binary snapshot it did not store.
+// ---------------------------------------------------------------------------
+
+export interface ItemMetadata {
+  ok: boolean;
+  eTag: string | null;
+  id: string | null;
+  name: string | null;
+  webUrl: string | null;
+  lastModifiedDateTime: string | null;
+  size: number | null;
+  error: string | null;
+}
+
+export async function getItemMetadata(accessToken: string, itemId: string): Promise<ItemMetadata> {
+  const res = await fetch(
+    `${MICROSOFT_GRAPH}/me/drive/items/${encodeURIComponent(itemId)}?$select=id,name,eTag,webUrl,lastModifiedDateTime,size`,
+    { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(20000) },
+  );
+  if (!res.ok) {
+    const error = res.status === 404 ? "that file no longer exists or the id is wrong"
+      : res.status === 403 ? "Microsoft says this account is not permitted to read that file"
+      : res.status === 401 ? "the connection needs to be re-established"
+      : `Microsoft returned HTTP ${res.status}`;
+    return { ok: false, eTag: null, id: null, name: null, webUrl: null, lastModifiedDateTime: null, size: null, error };
+  }
+  const json = (await res.json()) as { id?: string; name?: string; eTag?: string; webUrl?: string; lastModifiedDateTime?: string; size?: number };
+  return { ok: true, eTag: json.eTag ?? null, id: json.id ?? null, name: json.name ?? null, webUrl: json.webUrl ?? null, lastModifiedDateTime: json.lastModifiedDateTime ?? null, size: typeof json.size === "number" ? json.size : null, error: null };
+}
+
+export interface GuardedReplaceResult {
+  saved: boolean;
+  conflict: boolean;
+  url: string | null;
+  eTag: string | null;
+  error: string | null;
+}
+
+/** Conditional replacement: the write is refused by the provider (412) if the file changed. */
+export async function overwriteDocxGuarded(
+  accessToken: string,
+  itemId: string,
+  bytes: Buffer,
+  expectedEtag: string,
+): Promise<GuardedReplaceResult> {
+  const res = await fetch(`${MICROSOFT_GRAPH}/me/drive/items/${encodeURIComponent(itemId)}/content`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "If-Match": expectedEtag,
+    },
+    body: new Uint8Array(bytes),
+    cache: "no-store",
+  });
+  if (res.status === 412) {
+    return { saved: false, conflict: true, url: null, eTag: null, error: "This file changed in OneDrive while Sophira was preparing the update. Nothing was overwritten. Your draft is safe — review the latest version and try again." };
+  }
+  if (!res.ok) {
+    return { saved: false, conflict: false, url: null, eTag: null, error: `OneDrive rejected the update (HTTP ${res.status}). Nothing was overwritten.` };
+  }
+  const json = (await res.json()) as { webUrl?: string; eTag?: string };
+  return { saved: true, conflict: false, url: json.webUrl ?? null, eTag: json.eTag ?? null, error: null };
+}
+
+export interface ItemVersion { id: string; lastModifiedDateTime: string | null }
+
+/** Provider version history (the honest recoverable copy for Word files). */
+export async function listItemVersions(
+  accessToken: string,
+  itemId: string,
+): Promise<{ ok: boolean; versions: ItemVersion[]; error: string | null }> {
+  const res = await fetch(
+    `${MICROSOFT_GRAPH}/me/drive/items/${encodeURIComponent(itemId)}/versions?$select=id,lastModifiedDateTime`,
+    { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(20000) },
+  );
+  if (!res.ok) {
+    const error = res.status === 404 ? "This file has no version history available (the account or drive type may not keep versions)."
+      : res.status === 403 ? "Microsoft says this account is not permitted to list versions of that file."
+      : `Microsoft returned HTTP ${res.status} while listing versions.`;
+    return { ok: false, versions: [], error };
+  }
+  const json = (await res.json()) as { value?: Array<{ id?: string; lastModifiedDateTime?: string }> };
+  const versions = (json.value ?? [])
+    .filter((v): v is { id: string; lastModifiedDateTime?: string } => typeof v.id === "string")
+    .map((v) => ({ id: v.id, lastModifiedDateTime: v.lastModifiedDateTime ?? null }));
+  return { ok: true, versions, error: null };
+}
+
+/** Restore a provider version, guarded by the eTag the user reviewed. */
+export async function restoreItemVersion(
+  accessToken: string,
+  itemId: string,
+  versionId: string,
+  expectedEtag: string,
+): Promise<{ ok: boolean; conflict: boolean; error: string | null }> {
+  const res = await fetch(
+    `${MICROSOFT_GRAPH}/me/drive/items/${encodeURIComponent(itemId)}/versions/${encodeURIComponent(versionId)}/restore`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "If-Match": expectedEtag },
+      cache: "no-store",
+      signal: AbortSignal.timeout(30000),
+    },
+  );
+  if (res.status === 412) {
+    return { ok: false, conflict: true, error: "This file changed since you reviewed it. Nothing was restored — review the latest version and try again." };
+  }
+  if (!res.ok) {
+    return { ok: false, conflict: false, error: `Microsoft could not restore that version (HTTP ${res.status}). The current file was left untouched.` };
+  }
+  return { ok: true, conflict: false, error: null };
+}

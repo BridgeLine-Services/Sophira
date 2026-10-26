@@ -123,3 +123,56 @@ Local DOCX, PDF, and (new) PPTX export never require provider credentials:
 they build files from your stored notebook artifacts with provenance
 attached, and download through your browser. Direct Word and Google Docs
 editing is an addition on top of that, never a replacement for it.
+
+
+---
+
+## Document history (2026-10-26)
+
+Every confirmed Sophira document operation is recorded in
+`public.document_history` (migration `0040_document_history.sql`):
+owner-scoped RLS reads, service-role-only writes, no token columns, and
+account-deletion cascade. The Downloads/Documents UI exposes a **History**
+button on each workload selection with:
+
+- the version timeline (event type, outcome, provenance, timestamp),
+- **Check for changes outside Sophira** — compares provider state with the
+  last preserved version (Google: content fingerprint + diff; Microsoft:
+  provider eTag metadata only),
+- **Compare last two versions** (line diff, additions/removals),
+- **Create recovery copy** (Google: a NEW document from the preserved
+  snapshot; the original is never modified),
+- **Show OneDrive versions / Restore** (Microsoft: provider version history,
+  restore guarded by the reviewed eTag).
+
+**Provenance is evidence, not authorship.** History labels Sophira-generated,
+Sophira-inserted, user-requested, user-confirmed, external-observed,
+provider-reported, or unknown. Sophira never produces an authorship score or
+a misconduct verdict from revision metadata.
+
+### Word replacement safety
+
+Replacing a Word file is a **whole-file** operation (a freshly built DOCX from
+your Sophira artifact — existing Word comments/tracked changes are not
+preserved). It now requires the eTag of the version you reviewed:
+
+1. open the file's current version in Sophira (`GET /api/integrations/microsoft/documents?item_id=...`),
+2. confirm the replacement with that eTag,
+3. Sophira re-reads the file and refuses if it changed (and the PUT itself is
+   `If-Match`-guarded, so a concurrent change fails with 412).
+
+### Live verification still required (owner actions)
+
+Code is complete and unit-tested with mocks; nothing below can be done from
+the repository:
+
+1. Register the Google Cloud OAuth client with the redirect URI
+   `https://sophira.vercel.app/api/integrations/google/callback`, scope
+   `drive.file` only.
+2. Register the Microsoft Entra app with
+   `https://sophira.vercel.app/api/integrations/microsoft/callback` and
+   delegated `Files.ReadWrite offline_access`.
+3. Set `GOOGLE_CLIENT_ID/SECRET` and `MICROSOFT_CLIENT_ID/SECRET` in Vercel.
+4. Connect a real account, then verify: create → read → section insertion →
+   conflict (edit in the provider between read and write) → history events →
+   compare → recovery copy → Word eTag replacement refusal.

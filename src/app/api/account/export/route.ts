@@ -41,6 +41,7 @@ const USER_TABLES = [
   "work_schedules",
   "provider_connections",
   "workload_selections",
+  "document_history",
   "schedule_executions",
   "work_sessions",
   "rubric_audits",

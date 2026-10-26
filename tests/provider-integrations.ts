@@ -113,8 +113,8 @@ export function runProviderIntegrationTests(assert: (c: boolean, n: string) => v
   const docsMs = readFileSync("src/app/api/integrations/microsoft/documents/route.ts", "utf8");
   assert(docsMs.includes("loadArtifact") && docsMs.includes("artifactAsDocx"),
     "word: the document is built FROM THE STORED artifact row through the RLS client, then uploaded as a real DOCX");
-  assert(docsMs.includes("body.overwrite && body.item_id"),
-    "word: overwriting an existing file requires BOTH an explicit flag and the known item id — never silent");
+  assert(docsMs.includes("if (body.overwrite)") && docsMs.includes('if (!itemId)') && docsMs.includes("expected_etag"),
+    "word: overwriting an existing file requires BOTH an explicit flag and the known item id — never silent (now eTag-guarded)");
 
   const docsGg = readFileSync("src/app/api/integrations/google/documents/route.ts", "utf8");
   const googleLib = readFileSync("src/lib/integrations/google.ts", "utf8");
