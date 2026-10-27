@@ -84,3 +84,29 @@ but the schema has not been created yet. Choose ONE path:
 `bootstrap-all.sql` is generated from `supabase/migrations/` — regenerate it
 with `npm run db:bootstrap-sql` whenever a migration is added. A test fails
 if it ever falls behind the chain.
+
+## 2026-10-27 — Current production state and the 2-minute database init
+
+Evidence (live): `/api/setup-status` reports `database: checked` but
+`migrationsPresent: false`, and the GitHub "Migrations" workflow logs show
+`MIGRATIONS-LIVE-STATUS: BLOCKED_NO_CREDENTIALS` (no SUPABASE_ACCESS_TOKEN /
+SUPABASE_PROJECT_REF secrets). Vercel cannot reach Supabase's direct Postgres
+port, so /setup's one-click repair cannot run. The schema has never been
+created, which is why the owner cannot create an account yet.
+
+Do this once (no technical knowledge needed, nothing is deleted):
+1. Open https://sophira.vercel.app/setup and press the "your Supabase SQL
+   editor" link (or Supabase dashboard -> SQL Editor).
+2. Open supabase/bootstrap-all.sql (the "one-time setup file" link in the
+   same panel), select all, copy.
+3. Paste into the SQL editor and press Run. It is idempotent; re-running is
+   safe.
+4. Return to /setup and press "Check again" — step 2 turns green and
+   "Create your owner account" appears. Register there with your email and a
+   password you choose; the first registration becomes the owner and owner
+   creation then closes permanently.
+
+Prefer full automation instead? Add `SUPABASE_ACCESS_TOKEN` +
+`SUPABASE_PROJECT_REF` as GitHub Actions secrets (the Migrations workflow
+then applies everything on the next push) or as Vercel environment variables
+(then "Set Up Sophira" works in-app).

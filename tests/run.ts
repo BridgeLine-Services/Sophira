@@ -3479,6 +3479,30 @@ async function runMemoryTests(): Promise<void> {
 // changed — this section machine-checks that the diagnostic can never leak
 // secrets, never imply a predefined owner password, and reports honestly.
 // ---------------------------------------------------------------------------
+async function runResearchModeTests(): Promise<void> {
+  const { searchModeNotice, searchProviderConfigured } = await import("../src/lib/research/provider");
+  const saved = { p: process.env.SEARCH_PROVIDER, k: process.env.SEARCH_API_KEY, b: process.env.SEARCH_BASE_URL };
+  try {
+    process.env.SEARCH_PROVIDER = "local"; delete process.env.SEARCH_API_KEY;
+    const local = searchModeNotice();
+    assert(local?.mode === "local" && local.message.includes("switched off") && local.message.includes("still work"),
+      "research: SEARCH_PROVIDER=local is explained as switched off (never 'no results'), and local work is preserved");
+    process.env.SEARCH_PROVIDER = "brave"; delete process.env.SEARCH_API_KEY;
+    const un = searchModeNotice();
+    assert(un?.mode === "unconfigured" && un.message.includes("SEARCH_API_KEY") && /not configured/i.test(un.message),
+      "research: a missing key names the variables and states that nothing was searched or invented");
+    assert(!(un?.message ?? "").includes("returned no usable results"),
+      "research: configuration gaps are never reported as empty search results");
+    process.env.SEARCH_API_KEY = "test-key-not-real";
+    assert(searchModeNotice() === null && searchProviderConfigured() === true,
+      "research: a configured provider produces no notice");
+  } finally {
+    if (saved.p === undefined) delete process.env.SEARCH_PROVIDER; else process.env.SEARCH_PROVIDER = saved.p;
+    if (saved.k === undefined) delete process.env.SEARCH_API_KEY; else process.env.SEARCH_API_KEY = saved.k;
+    if (saved.b === undefined) delete process.env.SEARCH_BASE_URL; else process.env.SEARCH_BASE_URL = saved.b;
+  }
+}
+
 async function runSupabaseUrlTests(): Promise<void> {
   const { normalizeSupabaseUrl, chooseUrlFromCandidates, projectDashboardLinks } = await import("../src/lib/supabase-config");
   const n1 = normalizeSupabaseUrl("https://abc.supabase.co/rest/v1/");
@@ -3714,5 +3738,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

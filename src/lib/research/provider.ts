@@ -65,6 +65,32 @@ export class SearchNotConfiguredError extends Error {
   }
 }
 
+/**
+ * Honest, non-technical explanation of WHY no web results can appear.
+ * "local" is an intentional mode (no external calls), and a missing key is
+ * a configuration gap - the two must never be reported as "you got no
+ * results", which implies the search ran. Returns null when a real external
+ * provider is configured.
+ */
+export function searchModeNotice(): { mode: "local" | "unconfigured"; message: string } | null {
+  const provider = (process.env.SEARCH_PROVIDER || "brave").toLowerCase();
+  if (provider === "local") {
+    return {
+      mode: "local",
+      message:
+        "Web research is switched off in this installation (SEARCH_PROVIDER=local). Your saved documents and sources still work. To turn on web research, the owner sets SEARCH_PROVIDER and SEARCH_API_KEY in the hosting environment, then redeploys.",
+    };
+  }
+  if (!searchProviderConfigured()) {
+    return {
+      mode: "unconfigured",
+      message:
+        "Web research is not configured yet: the server is missing SEARCH_PROVIDER / SEARCH_API_KEY (server-only values, set in the hosting environment). Nothing was searched and no sources were invented.",
+    };
+  }
+  return null;
+}
+
 export function searchProviderConfigured(): boolean {
   const provider = (process.env.SEARCH_PROVIDER || "brave").toLowerCase();
   if (provider === "local") return true; // fully local: no key, no external calls

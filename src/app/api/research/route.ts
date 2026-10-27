@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
-import { getSearchProvider, searchProviderConfigured, SearchNotConfiguredError } from "@/lib/research/provider";
+import { getSearchProvider, searchProviderConfigured, searchModeNotice, SearchNotConfiguredError } from "@/lib/research/provider";
 import { generateQueries } from "@/lib/research/research";
 import { executeResearchPass } from "@/lib/research/run";
 
@@ -98,9 +98,12 @@ export async function POST(request: NextRequest) {
   );
 
   if (stored.length === 0) {
-    const reason = searchFailures.length
-      ? `All searches failed: ${searchFailures.join("; ")}.`
-      : "The search provider returned no usable results for this topic.";
+    const notice = searchModeNotice();
+    const reason = notice
+      ? notice.message
+      : searchFailures.length
+        ? `All searches failed: ${searchFailures.join("; ")}.`
+        : "The search provider returned no usable results for this topic.";
     await supabase.from("research_projects").update({
       status: "failed", failure_reason: reason, updated_at: new Date().toISOString(),
     }).eq("id", project.id);
