@@ -3479,6 +3479,31 @@ async function runMemoryTests(): Promise<void> {
 // changed — this section machine-checks that the diagnostic can never leak
 // secrets, never imply a predefined owner password, and reports honestly.
 // ---------------------------------------------------------------------------
+async function runSupabaseUrlTests(): Promise<void> {
+  const { normalizeSupabaseUrl, chooseUrlFromCandidates } = await import("../src/lib/supabase-config");
+  const n1 = normalizeSupabaseUrl("https://abc.supabase.co/rest/v1/");
+  assert(n1.url === "https://abc.supabase.co" && (n1.reason ?? "").includes("path removed"),
+    "supabase url: a /rest/v1 suffix is stripped to the bare origin (caused 'Invalid path specified in request URL' in production)");
+  assert(normalizeSupabaseUrl("https://abc.supabase.co/").url === "https://abc.supabase.co",
+    "supabase url: a trailing slash normalizes to the origin");
+  assert(normalizeSupabaseUrl("http://abc.supabase.co").url === null,
+    "supabase url: plain http to a hosted project is rejected");
+  assert(normalizeSupabaseUrl("https://evil.example.com").url === null,
+    "supabase url: a non-supabase host is rejected (never point the admin client elsewhere)");
+  assert(normalizeSupabaseUrl("http://127.0.0.1:54321").url === "http://127.0.0.1:54321",
+    "supabase url: loopback dev URLs are allowed outside production");
+  assert(normalizeSupabaseUrl("not a url").url === null, "supabase url: garbage is rejected");
+  const c1 = chooseUrlFromCandidates({ classic: "https://ok.supabase.co", newStyle: "https://ok.supabase.co/rest/v1", dbRef: "ok" });
+  assert(c1.url === "https://ok.supabase.co" && c1.issues.length >= 1,
+    "supabase url: a malformed variable is normalized, not passed through as-is");
+  const c2 = chooseUrlFromCandidates({ classic: "https://old.supabase.co", newStyle: "https://new.supabase.co", dbRef: "new" });
+  assert(c2.source === "SUPABASE_URL" && c2.url === "https://new.supabase.co",
+    "supabase url: the project matching the database wins when the two variables disagree");
+  const c3 = chooseUrlFromCandidates({ classic: "https://ok.supabase.co", newStyle: "postgres://user:pw@db:5432/postgres", dbRef: "ok" });
+  assert(c3.source === "NEXT_PUBLIC_SUPABASE_URL" && c3.url === "https://ok.supabase.co",
+    "supabase url: a database URI accidentally placed in SUPABASE_URL is refused");
+}
+
 async function runOwnerSetupTests(): Promise<void> {
   const { evaluateOwnerSetup } = await import("../src/lib/owner-setup");
   type OwnerAccountStatus = "unknown" | "none" | "active" | "revoked";
@@ -3660,5 +3685,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

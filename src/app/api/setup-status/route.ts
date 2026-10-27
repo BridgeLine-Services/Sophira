@@ -46,6 +46,8 @@ export async function GET() {
       migrationsPresent: status.probe.migrationsPresent,
       migrationAutomationConfigured: status.probe.migrationAutomationConfigured,
       setupChannel: status.probe.setupChannel,
+      probeChannel: status.probe.probeChannel,
+      directProbeFailed: status.probe.directProbeFailed,
       ownerEmailConfigured: status.probe.ownerEmailConfigured,
       ownerAccount: status.probe.ownerAccount,
     },

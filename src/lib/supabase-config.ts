@@ -108,23 +108,59 @@ function decodeJwtClaims(token: string): Record<string, unknown> | null {
 
 /** Which named variable the chosen public URL came from (a NAME, not a value). */
 function choosePublicUrl(): { source: "NEXT_PUBLIC_SUPABASE_URL" | "SUPABASE_URL" | null; url: string | null } {
-  const classic = read("NEXT_PUBLIC_SUPABASE_URL");
-  const newStyle = read("SUPABASE_URL");
-  if (classic && newStyle && classic !== newStyle) {
-    // Both present and DIFFERENT: prefer the one that matches the actual
-    // database the direct connection points at.
-    const dbRef = databaseProjectRef();
-    if (dbRef) {
-      if (urlProjectRef(newStyle) === dbRef) return { source: "SUPABASE_URL", url: newStyle };
-      if (urlProjectRef(classic) === dbRef) return { source: "NEXT_PUBLIC_SUPABASE_URL", url: classic };
-    }
-    // No database ref to arbitrate: the integration-provisioned pair
-    // (SUPABASE_*) is the newer generation - prefer it.
-    return { source: "SUPABASE_URL", url: newStyle };
+  const choice = chooseUrlFromCandidates({
+    classic: read("NEXT_PUBLIC_SUPABASE_URL"),
+    newStyle: read("SUPABASE_URL"),
+    dbRef: databaseProjectRef(),
+  });
+  return { source: choice.source, url: choice.url };
+}
+
+
+/** Validates and reduces a Supabase base URL to its bare origin. Clients
+ *  append /rest/v1/... themselves; a URL that already contains a path
+ *  (e.g. .../rest/v1) fails every request with "Invalid path specified in
+ *  request URL" - which broke the service-role probe and first-owner
+ *  creation on Vercel (2026-10-27). Local dev may use a loopback origin. */
+export function normalizeSupabaseUrl(raw: string | null | undefined): { url: string | null; reason: string | null } {
+  const value = (raw ?? "").trim();
+  if (value === "") return { url: null, reason: "missing" };
+  let parsed: URL;
+  try { parsed = new URL(value); } catch { return { url: null, reason: "not a URL" }; }
+  const host = parsed.hostname;
+  // Loopback development hosts (Supabase CLI). Production is https-only:
+  // the same policy the environment validator applies.
+  const loopback = host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
+  const allowHttp = loopback && process.env.NODE_ENV !== "production";
+  if (parsed.protocol !== "https:" && !(allowHttp && parsed.protocol === "http:")) return { url: null, reason: "must start with https://" };
+  if (!loopback && !host.endsWith(".supabase.co")) return { url: null, reason: "not a *.supabase.co project URL" };
+  const hadPath = parsed.pathname !== "/" && parsed.pathname !== "";
+  return { url: `${parsed.protocol}//${parsed.host}`, reason: hadPath ? "path removed (use the bare project URL)" : null };
+}
+
+export interface UrlCandidateChoice {
+  source: "NEXT_PUBLIC_SUPABASE_URL" | "SUPABASE_URL" | null;
+  url: string | null;
+  /** NAMES + reasons only - never values. */
+  issues: string[];
+}
+
+/** Pure chooser (tested): validate both candidates, then apply the existing
+ *  project-ref arbitration. A malformed value is SKIPPED, never passed on. */
+export function chooseUrlFromCandidates(input: { classic: string | null; newStyle: string | null; dbRef: string | null }): UrlCandidateChoice {
+  const issues: string[] = [];
+  const classic = normalizeSupabaseUrl(input.classic);
+  const newStyle = normalizeSupabaseUrl(input.newStyle);
+  if (input.classic && classic.reason) issues.push(`NEXT_PUBLIC_SUPABASE_URL: ${classic.reason}`);
+  if (input.newStyle && newStyle.reason) issues.push(`SUPABASE_URL: ${newStyle.reason}`);
+  if (classic.url && newStyle.url && classic.url !== newStyle.url && input.dbRef) {
+    if (urlProjectRef(newStyle.url) === input.dbRef) return { source: "SUPABASE_URL", url: newStyle.url, issues };
+    if (urlProjectRef(classic.url) === input.dbRef) return { source: "NEXT_PUBLIC_SUPABASE_URL", url: classic.url, issues };
   }
-  if (classic) return { source: "NEXT_PUBLIC_SUPABASE_URL", url: classic };
-  if (newStyle) return { source: "SUPABASE_URL", url: newStyle };
-  return { source: null, url: null };
+  if (classic.url && newStyle.url && classic.url !== newStyle.url && !input.dbRef) return { source: "SUPABASE_URL", url: newStyle.url, issues };
+  if (classic.url) return { source: "NEXT_PUBLIC_SUPABASE_URL", url: classic.url, issues };
+  if (newStyle.url) return { source: "SUPABASE_URL", url: newStyle.url, issues };
+  return { source: null, url: null, issues };
 }
 
 export function publicSupabaseUrl(): string | null {
@@ -220,6 +256,8 @@ export function supabaseConfigStatus(): {
   urlSplit: boolean;
   /** Does the chosen URL project match the direct-database project? */
   urlMatchesDatabase: boolean;
+  /** Malformed/ignored URL variables (NAMES + reasons only, never values). */
+  urlIssues: string[];
 } {
   const { source: urlSource } = choosePublicUrl();
   const classic = read("NEXT_PUBLIC_SUPABASE_URL");
@@ -241,6 +279,7 @@ export function supabaseConfigStatus(): {
       candidate.role === "service_role" &&
       (candidate.ref === null || candidate.ref === chosenRef),
     urlSplit: classic !== null && newStyle !== null && classic !== newStyle,
+    urlIssues: chooseUrlFromCandidates({ classic, newStyle, dbRef: databaseProjectRef() }).issues,
     urlMatchesDatabase: dbRef === null || chosenRef === null ? true : dbRef === chosenRef,
   };
 }
