@@ -50,6 +50,12 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "J1: fresh initialized database with no owner: state READY, creation possible");
   assert(bootAll.includes("-- ===================== 0026_first_owner_recovery.sql") && bootAll.indexOf("0025_first_owner_bootstrap.sql") < bootAll.indexOf("0026_first_owner_recovery.sql"),
     "J1: bootstrap-all.sql carries the full chain through 0026, in order");
+  const migFiles = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
+  const missingMigs = migFiles.filter((f) => !bootAll.includes(f));
+  assert(missingMigs.length === 0,
+    "J1: bootstrap-all.sql is FRESH - every migration file appears (regenerate with npm run db:bootstrap-sql; it once stopped at 0026 and missed the rest)");
+  assert(bootAll.includes("document_history") && bootAll.indexOf("-- ===================== 0026_first_owner_recovery.sql") < bootAll.indexOf("-- ===================== 0040_document_history.sql"),
+    "J1: the paste-once file carries the newest schema (0040) after the owner bootstrap, in order");
   assert(applyScript.includes("--self-test") && applyScript.includes("marker"),
     "J1: the migration automation self-tests and probes markers");
 

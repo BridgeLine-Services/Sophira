@@ -64,3 +64,23 @@ configured; nothing pretends to be connected.
 
 For the full technical list see docs/ENVIRONMENT_VARIABLES.md; for your
 personal action checklist see docs/WHAT_I_NEED_TO_DO_NEXT.md.
+
+## When /setup says the database tables are missing (SETUP_REQUIRED)
+
+This is the state shown when the app can reach Supabase (service role works)
+but the schema has not been created yet. Choose ONE path:
+
+1. **Fastest, no extra secrets (recommended):** open the Supabase dashboard →
+   SQL Editor → New query, paste the complete contents of
+   `supabase/bootstrap-all.sql` from this repository, and Run. It is additive
+   and safe to re-run. Then reload https://sophira.vercel.app/create-owner.
+2. **Automatic from the app:** add `SUPABASE_ACCESS_TOKEN` (Supabase personal
+   access token) and `SUPABASE_PROJECT_REF` to Vercel (Production), redeploy,
+   then open /setup and use the repair action. Migrations then apply over
+   HTTPS (needed because Vercel cannot reach Supabase's direct Postgres port).
+3. **GitHub Actions:** the repository contains `.github/workflows/migrations.yml`;
+   add the same two secrets to the repository and run the workflow.
+
+`bootstrap-all.sql` is generated from `supabase/migrations/` — regenerate it
+with `npm run db:bootstrap-sql` whenever a migration is added. A test fails
+if it ever falls behind the chain.

@@ -1,8 +1,10 @@
--- SOPHIRA COMPLETE DATABASE SETUP (2026-10-06)
+-- SOPHIRA COMPLETE DATABASE SETUP (regenerated 2026-10-27)
+-- Applies every migration in order (0001_init.sql ... 0040_document_history.sql).
 -- Run this SINGLE file once in the Supabase SQL editor for a fresh
--- installation. It applies every migration (0001-0025) in order.
--- After it succeeds, open https://sophira.vercel.app and click
--- "Create Owner Account" - no other database configuration is needed.
+-- installation. Every migration is additive and idempotent (IF NOT EXISTS /
+-- guarded DO blocks), so re-running is safe. After it succeeds, open
+-- https://sophira.vercel.app/create-owner and create the owner account.
+-- Regenerate with: npm run db:bootstrap-sql
 
 -- ===================== 0001_init.sql =====================
 -- =====================================================================
@@ -1485,6 +1487,13 @@ alter table public.profiles
 
 -- Owner-only membership view, extended with email + revocation date.
 -- SECURITY: unchanged fail-closed owner check; aggregate metadata only.
+-- Postgres cannot change a function's return type with CREATE OR REPLACE
+-- (live-deployment finding 2026-10-07: the chain failed here with
+-- "cannot change return type of existing function" whenever 0005's
+-- original signature was already present). Drop first, then recreate;
+-- the function body re-establishes the grants below, and the body's
+-- owner-only check keeps the drop window safe.
+drop function if exists public.network_stats();
 create or replace function public.network_stats()
 returns table (
   user_id uuid,
@@ -2080,6 +2089,26 @@ end;
 $$;
 
 -- ===================== 0026_first_owner_recovery.sql =====================
+-- SOPHIRA migration 0026: first-owner recovery + schema version marker
+-- (2026-10-07, owner-setup automation round)
+--
+-- GOAL: make the first-owner experience self-healing WITHOUT weakening a
+-- single control:
+--   * a STALE auth user (created by an earlier failed/incomplete owner
+--     attempt: the account exists in auth.users but no profiles row was
+--     created) can be COMPLETED into the first owner — but only by that
+--     user's own authenticated session, only through a database race-safe
+--     claim, and only while no owner exists;
+--   * the completion function is NOT callable by any browser client
+--     (revoked from anon/authenticated; granted only to the server's
+--     service role, which the app uses after verifying the session);
+--   * the 0025 security contract is fully preserved: exactly one owner,
+--     the database decides, invitation-only for everyone after.
+--
+-- sophira_meta: a tiny server-only key/value table so the application can
+-- PROBE the applied schema version through normal (service-role) queries
+-- — no SQL editor inspection, no pg_catalog access from the app.
+
 create table if not exists public.sophira_meta (
   key   text primary key,
   value text not null
@@ -2141,3 +2170,546 @@ $$;
 -- The recovery function is callable ONLY server-side (service role).
 revoke all on function public.complete_first_owner(uuid) from anon, authenticated;
 grant execute on function public.complete_first_owner(uuid) to service_role;
+
+-- ===================== 0027_grants_backfill.sql =====================
+-- =====================================================================
+-- SOPHIRA migration 0027: table grants + profile backfill (2026-10-08)
+--
+-- ROOT CAUSE (live owner-account failure, 2026-10-08): the schema was
+-- initialized over the direct Postgres channel by the first-launch
+-- wizard. On current Supabase projects, objects created that way do NOT
+-- inherit the classic anon/authenticated default privileges, and none
+-- of migrations 0001-0026 contained explicit GRANTs. Result: every
+-- authenticated PostgREST query failed with "permission denied for
+-- table X" (surfaced as "Could not save: permission denied for table
+-- writing_samples"), every profiles read returned an error treated as
+-- "profile missing", and RLS policies could never even be evaluated.
+-- This migration restores the grants contract the app was written for.
+-- =====================================================================
+
+-- >>> grants:begin (pinned byte-identical to GRANTS_SQL in src/lib/db-privileged.ts)
+grant usage on schema public to anon, authenticated;
+grant select on all tables in schema public to anon;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to anon, authenticated;
+
+-- Future objects created by the migration/maintenance roles inherit the
+-- same contract, so this never regresses on a fresh database.
+do $$
+declare r text;
+begin
+  foreach r in array array['postgres', 'supabase_admin', 'supabase_auth_admin'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      begin
+        execute format('alter default privileges for role %I in schema public grant select on tables to anon, authenticated', r);
+        execute format('alter default privileges for role %I in schema public grant select, insert, update, delete on tables to authenticated', r);
+        execute format('alter default privileges for role %I in schema public grant usage, select on sequences to anon, authenticated', r);
+      exception when insufficient_privilege then null;
+      end;
+    end if;
+  end loop;
+end $$;
+-- >>> grants:end
+
+-- ---------------------------------------------------------------------
+-- Profile backfill: every REAL auth user gets its profile row. A user
+-- can only exist in auth.users if signup was approved (the
+-- handle_new_user trigger creates the profile and refuses uninvited
+-- signups) — so a missing profile is always a repair artifact, never an
+-- uninvited account. Idempotent.
+-- ---------------------------------------------------------------------
+insert into public.profiles (id, display_name, role)
+select u.id, coalesce(u.raw_user_meta_data->>'display_name', ''), 'user'
+  from auth.users u
+ where not exists (select 1 from public.profiles p where p.id = u.id);
+
+-- Owner explicitness: if no owner profile exists (pre-trigger databases),
+-- promote the earliest profile — ownership is never left ambiguous.
+update public.profiles set role = 'owner'
+ where not exists (select 1 from public.profiles where role = 'owner')
+   and id = (select id from public.profiles order by created_at limit 1);
+
+-- Keep the single-owner bootstrap claim consistent with the owner row.
+insert into public.owner_bootstrap (id, claimed_by)
+select 1, p.id from public.profiles p where p.role = 'owner'
+on conflict (id) do nothing;
+
+-- ===================== 0028_network_stats_repair.sql =====================
+-- =====================================================================
+-- SOPHIRA migration 0028: network_stats() structural repair (2026-10-08)
+--
+-- LIVE FINDING (owner dashboard): "Statistics are unavailable: structure
+-- of query does not match function result type." That is the plpgsql
+-- RETURN QUERY error raised when the function's declared RETURNS TABLE
+-- does not match the query it executes. The previous definitions (0005
+-- and 0019) declare OUT parameters whose NAMES collide with real column
+-- names (user_id, email, role, status, created_at...) — a fragile
+-- pattern: any plpgsql variable-substitution drift, column type change,
+-- or partially applied chain version leaves the function structurally
+-- broken at RUNTIME even though it created cleanly.
+--
+-- REPAIR: recreate the function with collision-PROOF out-parameter
+-- names (o_*), explicit casts on every selected column, and a stable
+-- 13-column contract that matches the owner UI (0019 contract: email +
+-- access_revoked_at). Drop-first (a RETURNS TABLE change is not allowed
+-- via CREATE OR REPLACE), then re-grant execute to authenticated.
+-- Owner-only check, aggregate metadata only — NO academic content
+-- (privacy boundary, workflow §22), both unchanged.
+-- =====================================================================
+
+drop function if exists public.network_stats();
+
+create or replace function public.network_stats()
+returns table (
+  o_user_id uuid,
+  o_display_name text,
+  o_email text,
+  o_role text,
+  o_status text,
+  o_access_revoked_at timestamptz,
+  o_onboarded boolean,
+  o_can_request_invites boolean,
+  o_created_at timestamptz,
+  o_last_active_at timestamptz,
+  o_assignment_count bigint,
+  o_response_count bigint,
+  o_subject_usage jsonb
+)
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not exists (select 1 from public.profiles p
+                 where p.id = auth.uid() and p.role = 'owner') then
+    raise exception 'network_stats is owner-only' using errcode = '42501';
+  end if;
+
+  return query
+  select
+    p.id                                   ::uuid,
+    p.display_name                         ::text,
+    au.email                               ::text,
+    p.role                                 ::text,
+    p.status                               ::text,
+    p.access_revoked_at                    ::timestamptz,
+    p.onboarded                            ::boolean,
+    p.can_request_invites                  ::boolean,
+    p.created_at                           ::timestamptz,
+    p.last_active_at                       ::timestamptz,
+    (select count(*) from public.assignments a
+      where a.user_id = p.id)              ::bigint,
+    (select count(*) from public.responses r
+      where r.user_id = p.id)              ::bigint,
+    coalesce((
+      select jsonb_agg(jsonb_build_object('subject', s.subject, 'count', s.c))
+      from (
+        select a.subject, count(*) as c
+        from public.assignments a
+        where a.user_id = p.id and a.subject is not null
+        group by a.subject
+        order by c desc
+      ) s
+    ), '[]'::jsonb)                        ::jsonb
+  from public.profiles p
+  join auth.users au on au.id = p.id;
+end;
+$$;
+
+revoke all on function public.network_stats() from anon, authenticated;
+grant execute on function public.network_stats() to authenticated;
+
+-- ===================== 0029_study_materials_course.sql =====================
+-- =====================================================================
+-- SOPHIRA migration 0029: course-scoped Library (2026-10-09)
+--
+-- The course-engine workspace exposes a per-course Library view. The
+-- existing study_materials schema could not scope a material to a course
+-- (only assignment_id existed), so this adds an optional course_id.
+--
+-- PRIVACY: no RLS policy changes — "study_materials_own" (user_id =
+-- auth.uid()) continues to govern every row. course_id only narrows the
+-- user's OWN material set; it can never widen access to another user's
+-- data. A null course_id + null assignment_id keeps a material global.
+-- =====================================================================
+
+alter table public.study_materials
+  add column if not exists course_id uuid
+  references public.courses(id) on delete set null;
+
+create index if not exists idx_study_materials_course
+  on public.study_materials (user_id, course_id)
+  where course_id is not null;
+
+-- ===================== 0030_subject_preferences.sql =====================
+-- 0030: subject-level preferences (Foreign Language selector and any future
+-- per-subject settings). Owned strictly by the authenticated user via RLS.
+create table if not exists public.subject_preferences (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  subject text not null,
+  target_language text,
+  explanation_language text,
+  proficiency text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, subject)
+);
+
+alter table public.subject_preferences enable row level security;
+
+create policy "subject_preferences_own_all"
+  on public.subject_preferences
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+grant select, insert, update, delete on public.subject_preferences to authenticated;
+
+-- ===================== 0031_student_memory_course_scope.sql =====================
+-- =====================================================================
+-- 0031: STUDENT MEMORY COURSE SCOPE (shared-memory round 2026-10-11)
+-- Hierarchical memory, level 3 of 5: student_memories gains an explicit
+-- course_id identifier so course-level memories can be recorded and
+-- retrieved WITHOUT relying on display names or duplicated rows.
+-- Additive + reversible (removing the column restores the prior schema).
+-- RLS: unchanged — policies are user_id own-row, so course-scoped
+-- rows inherit the same strict isolation automatically.
+-- =====================================================================
+
+alter table public.student_memories
+  add column if not exists course_id uuid
+    references public.courses(id) on delete set null;
+
+-- A course-scoped memory is retrieved only inside that course (handled in
+-- lib/memory/engine.ts relevance selection); never in another course or a
+-- bare subject prompt.
+create index if not exists student_memories_user_course_idx
+  on public.student_memories (user_id, course_id);
+
+-- ===================== 0032_provider_connections.sql =====================
+-- =====================================================================
+-- 0032: PROVIDER CONNECTIONS (Microsoft Word + Google Docs, 2026-10-11)
+-- Stores each user's OAuth tokens for the connected document providers.
+-- SECURITY MODEL: this table deliberately has NO RLS policies, which means
+-- anon/authenticated roles are DENIED all access (Supabase default when
+-- RLS is enabled without policies). Only the server-side service role —
+-- used exclusively by /api/integrations/* routes — can read or write
+-- tokens. Client code can never SELECT access tokens; the status routes
+-- expose only booleans and labels, never token values.
+-- Additive + reversible (dropping the table restores the prior schema).
+-- =====================================================================
+
+create table if not exists public.provider_connections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null check (provider in ('microsoft','google')),
+  account_label text,
+  access_token text not null,
+  refresh_token text,
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, provider)
+);
+
+alter table public.provider_connections enable row level security;
+-- Intentionally NO policies: tokens are service-role-only.
+
+create index if not exists provider_connections_user_idx
+  on public.provider_connections (user_id, provider);
+
+-- ===================== 0033_provider_connection_metadata.sql =====================
+-- =====================================================================
+-- 0033: PROVIDER CONNECTION METADATA (multi-user identity round, 2026-10-11)
+-- provider_connections gains the provider-side account identity and the
+-- scopes the user actually granted, so every operation can be audited
+-- against the RIGHT connected account. Tokens remain service-role-only
+-- (RLS enabled, no client policies — unchanged from 0032).
+-- Additive + reversible.
+-- =====================================================================
+
+alter table public.provider_connections
+  add column if not exists provider_account_id text,
+  add column if not exists granted_scopes text;
+
+-- ===================== 0034_workload_selections.sql =====================
+-- =====================================================================
+-- 0034: WORKLOAD SELECTIONS (document access + explicit scope, 2026-10-12)
+-- A selection records WHICH provider document the AUTHENTICATED user
+-- chose for a Sophira task, plus their EXPLICIT workload scope (section,
+-- questions, deliverables). It is the boundary record for the personal
+-- AI workload rule: Sophira processes only the authenticated member's
+-- selected workload, never a non-member's work.
+-- Owner-scoped like other private user records: RLS ON with
+-- authenticated, owner-only policies (NOT service-role-only like
+-- provider_connections 0032 — these rows carry no secrets; they carry
+-- the user's own task choices and are needed by the user's own client).
+-- Additive + reversible.
+-- =====================================================================
+
+create table if not exists public.workload_selections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null check (provider in ('microsoft','google')),
+  provider_document_id text not null,
+  document_title text,
+  document_url text,
+  access_state text not null default 'unverified' check (access_state in ('unverified','read','write')),
+  scope_description text,
+  content_fingerprint text,
+  status text not null default 'active' check (status in ('active','archived')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, provider, provider_document_id)
+);
+
+alter table public.workload_selections enable row level security;
+
+create policy "own selections: read"
+  on public.workload_selections for select to authenticated
+  using (auth.uid() = user_id);
+
+create policy "own selections: insert"
+  on public.workload_selections for insert to authenticated
+  with check (auth.uid() = user_id);
+
+create policy "own selections: update"
+  on public.workload_selections for update to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "own selections: delete"
+  on public.workload_selections for delete to authenticated
+  using (auth.uid() = user_id);
+
+create index if not exists workload_selections_user_idx
+  on public.workload_selections (user_id);
+
+-- ===================== 0035_typing_event_metrics.sql =====================
+-- =====================================================================
+-- SOPHIRA migration 0035 — honest typing event metrics (2026-10-13)
+--
+-- The original accuracy column is FINAL-TEXT accuracy: how closely the
+-- submitted text matches the reference. That alone cannot distinguish a
+-- flawless typist from one who mistyped and corrected everything (the
+-- reported "100% accuracy despite backspacing" defect).
+--
+-- These OPTIONAL columns store the event summary the calibration UI
+-- records (counts only — never what was typed):
+--   raw_accuracy  how accurately characters were first entered (0..1)
+--   corrections  wrong characters the user then deleted
+--   backspaces   total deletions, correct or wrong
+--
+-- Non-destructive: add column if not exists; existing rows keep NULL
+-- ("not captured by that attempt"), and every consumer treats NULL as
+-- unknown rather than zero. RLS is unchanged (table policy 0009).
+-- =====================================================================
+
+alter table public.typing_attempts
+  add column if not exists raw_accuracy numeric check (raw_accuracy is null or (raw_accuracy >= 0 and raw_accuracy <= 1)),
+  add column if not exists corrections int check (corrections is null or corrections >= 0),
+  add column if not exists backspaces int check (backspaces is null or backspaces >= 0);
+
+-- ===================== 0036_invitation_email_status.sql =====================
+-- =====================================================================
+-- SOPHIRA migration 0036 — invitation email delivery status (2026-10-13)
+--
+-- The invitation lifecycle now sends the email through a configured
+-- provider and records the HONEST outcome. The owner-only dashboard shows
+-- this status; nothing here is a fabricated success:
+--   email_status     'sent' | 'not_configured' | 'failed' | null (legacy rows)
+--   email_error      safe-to-display reason when a send failed
+--   email_sent_at    provider-accepted send time
+-- Non-destructive: add column if not exists; legacy rows stay NULL.
+-- =====================================================================
+
+alter table public.invitations
+  add column if not exists email_status text check (email_status in ('sent', 'not_configured', 'failed')),
+  add column if not exists email_error text,
+  add column if not exists email_sent_at timestamptz;
+
+-- ===================== 0037_workspace_archive.sql =====================
+-- =====================================================================
+-- SOPHIRA migration 0037 — workspace archive lifecycle (2026-10-13)
+--
+-- ACTIVE -> ARCHIVED -> (separate, explicit) PERMANENT DELETION.
+--
+--   * archived_at IS NULL means ACTIVE (the default for every existing
+--     row; nothing is archived by this migration, no data is rewritten).
+--   * archived_at NOT NULL means REMOVED FROM THE ACTIVE WORKSPACE: the
+--     row stays owned, intact, and restorable. Active lists, counts, and
+--     AI retrieval exclude it (enforced server-side, not just in the UI).
+--
+-- Non-destructive: "add column if not exists" only. No table is dropped,
+-- no RLS policy changes (ownership policies already scope every row to
+-- its user), and restoring simply sets archived_at back to NULL.
+-- =====================================================================
+
+alter table public.notebooks        add column if not exists archived_at timestamptz;
+alter table public.notebook_sources add column if not exists archived_at timestamptz;
+alter table public.notebook_notes   add column if not exists archived_at timestamptz;
+alter table public.notebook_questions add column if not exists archived_at timestamptz;
+alter table public.notebook_evidence  add column if not exists archived_at timestamptz;
+alter table public.notebook_artifacts add column if not exists archived_at timestamptz;
+
+-- The archive view scans a user's rows by owner + state.
+create index if not exists notebooks_active_idx on public.notebooks (user_id, archived_at);
+create index if not exists notebook_sources_active_idx on public.notebook_sources (notebook_id, archived_at);
+create index if not exists notebook_notes_active_idx on public.notebook_notes (notebook_id, archived_at);
+create index if not exists notebook_questions_active_idx on public.notebook_questions (notebook_id, archived_at);
+create index if not exists notebook_evidence_active_idx on public.notebook_evidence (notebook_id, archived_at);
+create index if not exists notebook_artifacts_active_idx on public.notebook_artifacts (notebook_id, archived_at);
+
+-- ===================== 0038_teacher_material_archive.sql =====================
+-- =====================================================================
+-- SOPHIRA migration 0038 — teachers + study materials join the archive
+-- lifecycle (2026-10-13, post-archive audit round).
+--
+-- Same contract as 0037: archived_at NULL = ACTIVE (every existing row),
+-- NOT NULL = removed from the active workspace but fully intact and
+-- restorable. Additive only: no drops, no rewrites, RLS unchanged.
+--
+--   * teachers: archiving removes the teacher from active lists and
+--     ACTIVE teacher context; courses that reference the teacher keep
+--     their reference and fall back to honest "no teacher context".
+--   * study_materials (Library): archiving removes the item from the
+--     active Library and active study workflows; the DB row and any
+--     storage object are preserved (no storage deletion on archive).
+-- =====================================================================
+
+alter table public.teachers        add column if not exists archived_at timestamptz;
+alter table public.study_materials add column if not exists archived_at timestamptz;
+
+create index if not exists idx_teachers_user_archived
+  on public.teachers (user_id, archived_at);
+create index if not exists idx_study_materials_user_archived
+  on public.study_materials (user_id, archived_at);
+
+-- ===================== 0039_supabase_security_hardening.sql =====================
+-- ============================================================================
+-- 0039: Supabase security advisor remediation (2026-10-15)
+--
+-- Addresses, without changing any behavior:
+--   * function_search_path_mutable          -> explicit safe search paths
+--   * anon_security_definer_function_executable
+--   * authenticated_security_definer_function_executable
+--     -> minimum-privilege execution grants per function, based on the ACTUAL
+--        callers verified in the application code:
+--          complete_first_owner   -> /api/complete-owner (service-role key)
+--          get_invitation_by_token-> invitation signup (anonymous, required)
+--          network_stats           -> /api/network/stats (authenticated owner;
+--                                     the function also enforces owner-only)
+--          handle_new_user         -> auth trigger (supabase_auth_admin only)
+--          rls_auto_enable         -> administrative; not referenced anywhere
+--                                     in the application -> dropped if present
+--
+-- ALTER FUNCTION ... SET is used instead of CREATE OR REPLACE so function
+-- bodies, trigger behavior, and ownership are untouched.
+-- ============================================================================
+
+begin;
+
+-- 1) touch_updated_at(): pin the search path (advisor: mutable search path).
+alter function public.touch_updated_at() set search_path = pg_catalog;
+
+-- 2) handle_new_user(): auth trigger on auth.users. It runs as the trusted
+--    auth-admin role during signup; no client role ever needs EXECUTE.
+alter function public.handle_new_user() set search_path = pg_catalog, public;
+revoke execute on function public.handle_new_user() from PUBLIC, anon, authenticated;
+
+-- 3) complete_first_owner(p_user_id uuid): one-time owner bootstrap. The
+--    application calls it ONLY from /api/complete-owner using the
+--    service-role key, and the function itself is atomic and single-use
+--    (owner slot claimed once; refuses if any owner exists). Ordinary
+--    clients must not be able to execute it at all.
+alter function public.complete_first_owner(uuid) set search_path = pg_catalog, public;
+revoke execute on function public.complete_first_owner(uuid) from PUBLIC, anon, authenticated;
+
+-- 4) get_invitation_by_token(p_token text): anonymous lookup of ONE pending
+--    invitation is genuinely required for invitation-only signup. Keep the
+--    anon capability (scoped: pending-only, exact token, SECURITY DEFINER)
+--    but remove the blanket PUBLIC grant.
+alter function public.get_invitation_by_token(text) set search_path = pg_catalog, public;
+revoke execute on function public.get_invitation_by_token(text) from PUBLIC;
+grant execute on function public.get_invitation_by_token(text) to anon, authenticated;
+
+-- 5) network_stats(): owner-only aggregate (the function re-checks the
+--    caller's role). Called by /api/network/stats with the signed-in
+--    user's client -> authenticated needs EXECUTE; anon and PUBLIC do not.
+alter function public.network_stats() set search_path = pg_catalog, public;
+revoke execute on function public.network_stats() from PUBLIC, anon;
+grant execute on function public.network_stats() to authenticated;
+
+-- 6) rls_auto_enable(): an administrative helper that flips RLS on tables.
+--    Nothing in the application or migrations invokes it; RLS belongs to
+--    migrations/deployments. Clients must never execute it. If a copy
+--    exists in this database, remove it (idempotent).
+drop function if exists public.rls_auto_enable();
+
+commit;
+
+-- ===================== 0040_document_history.sql =====================
+-- =====================================================================
+-- 0040: DOCUMENT HISTORY (cross-provider, 2026-10-26)
+-- Owner-scoped record of document operations Sophira PERFORMED and
+-- versions it actually OBSERVED. This is NOT an authorship detector and
+-- stores no tokens. Snapshots (canonical text for Google Docs) are private
+-- student work: RLS owner-only reads; writes happen exclusively through
+-- the service role in /api/integrations/* routes.
+-- Additive + reversible (dropping the table restores the prior schema).
+-- =====================================================================
+
+create table if not exists public.document_history (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null check (provider in ('google','microsoft')),
+  provider_document_id text not null,
+  selection_id uuid references public.workload_selections(id) on delete set null,
+  document_title text,
+  document_url text,
+  event_type text not null check (event_type in (
+    'document_discovered','baseline_captured','document_read','draft_prepared',
+    'insertion_attempted','insertion_confirmed','document_created',
+    'replacement_attempted','replacement_confirmed',
+    'external_change_observed','conflict_detected',
+    'restore_attempted','restore_completed','restore_refused'
+  )),
+  actor text not null check (actor in ('user','sophira','external','provider')),
+  provenance text not null check (provenance in (
+    'sophira-generated','sophira-inserted','user-requested','user-confirmed',
+    'external-observed','provider-reported','unknown'
+  )),
+  outcome text not null check (outcome in ('pending','confirmed','failed','conflicted','unavailable')),
+  sequence integer not null,
+  provider_revision text,
+  previous_revision text,
+  content_fingerprint text,
+  previous_fingerprint text,
+  snapshot_text text,
+  snapshot_truncated boolean not null default false,
+  snapshot_format text,
+  target_section text,
+  summary text not null,
+  error_category text,
+  diff_summary jsonb,
+  observed_at timestamptz not null default now(),
+  recorded_at timestamptz not null default now(),
+  parent_event_id uuid references public.document_history(id) on delete set null,
+  unique (user_id, provider, provider_document_id, sequence)
+);
+
+alter table public.document_history enable row level security;
+
+-- The OWNER may read their own history. There are deliberately NO insert,
+-- update, or delete policies: history rows are written only by the service
+-- role inside authenticated API routes, so a client cannot forge or erase
+-- events (and cannot insert rows for another user).
+create policy "own document history: read"
+  on public.document_history for select to authenticated
+  using (auth.uid() = user_id);
+
+create index if not exists document_history_doc_idx
+  on public.document_history (user_id, provider, provider_document_id, sequence desc);
+
+create index if not exists document_history_user_time_idx
+  on public.document_history (user_id, recorded_at desc);
