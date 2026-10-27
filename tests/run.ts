@@ -3096,7 +3096,11 @@ async function runAccessControlTests(): Promise<void> {
     // (the ONE-CLICK repair action, 2026-10-07: accepts only a fixed action
     // name, never SQL or identifiers; every response categorical; refuses
     // permanently once an owner exists — see tests/owner-setup-automation.ts).
-    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status", "/api/ai/health", "/api/setup-repair"];
+    // setup-sql (2026-10-27): the one-paste DATABASE SETUP TEXT needed before
+    // any account exists. Fixed schema text from the public migrations,
+    // accepts no input, contains no secret (machine-checked in
+    // tests/owner-setup-automation.ts).
+    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status", "/api/ai/health", "/api/setup-repair", "/api/setup-sql"];
     for (const rf of routeFiles) {
       const rel = ("/api" + rf.slice(apiRoot.length)).replaceAll("\\", "/").replace("/route.ts", "");
       const src = fs.readFileSync(rf, "utf8");
@@ -3115,6 +3119,7 @@ async function runAccessControlTests(): Promise<void> {
           rel === "/api/setup-status" ||
           rel === "/api/ai/health" ||
           rel === "/api/setup-repair" ||
+          rel === "/api/setup-sql" ||
           src.includes("token"),
           `access: public route ${rel} is health/ai-health/setup-status/setup-repair (categorical status only) or operates solely on its single-use token`
         );

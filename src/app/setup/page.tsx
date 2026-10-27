@@ -29,7 +29,7 @@ export default async function SetupPage() {
   // 2026-10-27: the SQL-editor link is the reliable manual path when the
   // hosting platform cannot reach the database directly (live Vercel case).
   const sqlEditorUrl = dashboard.sqlEditorUrl;
-  const setupSqlUrl = "https://raw.githubusercontent.com/BridgeLine-Services/Sophira/master/supabase/bootstrap-all.sql";
+  const setupSqlUrl = "/api/setup-sql";
   const creation = status.ownerCreation;
   const connected = status.probe.supabaseConfigured;
   const databaseReady = status.probe.migrationsPresent === true;

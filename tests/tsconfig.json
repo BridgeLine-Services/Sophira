@@ -28,6 +28,7 @@
     "../src/lib/ai/context.ts",
     "../src/lib/extract/documents.ts",
     "../src/lib/types.ts",
-    "../src/lib/auth-errors.ts"
+    "../src/lib/auth-errors.ts",
+    "../src/lib/bootstrap-sql.generated.ts"
   ]
 }

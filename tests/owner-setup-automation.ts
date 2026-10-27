@@ -78,6 +78,23 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
   assert(bootLines.every((l, i) => !/add constraint/i.test(l) ||
       bootLines.slice(Math.max(0, i - 2), i).some((p2) => /drop constraint if exists/i.test(p2))),
     "J1: every add constraint drops the existing constraint first (safe to run twice)");
+  // Change 4: the app serves its own setup text (no GitHub dependency).
+  {
+    const route = readFileSync("src/app/api/setup-sql/route.ts", "utf8");
+    const { BOOTSTRAP_SQL } = require("../src/lib/bootstrap-sql.generated.js") as { BOOTSTRAP_SQL: string };
+    assert(route.includes("text/plain") && route.includes("no-store") && !/request|NextRequest/.test(route),
+      "J1: /api/setup-sql serves fixed text/plain, no-store, and accepts NO input");
+    assert(BOOTSTRAP_SQL.includes("-- ===================== 0001_init.sql") && BOOTSTRAP_SQL.includes("-- ===================== 0040_document_history.sql"),
+      "J1: the served setup text contains every migration 0001-0040");
+    assert(!BOOTSTRAP_SQL.includes("eyJ") && !BOOTSTRAP_SQL.includes("sb_secret") && !BOOTSTRAP_SQL.includes("postgres://"),
+      "J1: the served setup text contains NO token, key or connection string");
+    const setupPage = readFileSync("src/app/setup/page.tsx", "utf8");
+    const wizard = readFileSync("src/app/setup/SetupWizard.tsx", "utf8");
+    assert(setupPage.includes('const setupSqlUrl = "/api/setup-sql"'),
+      "J1: the setup page links to the app-served text, not GitHub");
+    assert(wizard.includes("Copy the setup text") && wizard.includes("Open the setup text"),
+      "J1: the wizard offers a one-click copy with a plain fallback link");
+  }
   assert(bootAll.includes("SAFE TO RUN MORE THAN ONCE"),
     "J1: the generated header states the file is safe to re-run");
   assert(applyScript.includes("--self-test") && applyScript.includes("marker"),

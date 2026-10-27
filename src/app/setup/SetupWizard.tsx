@@ -40,6 +40,7 @@ export default function SetupWizard({
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState(-1);
   const [result, setResult] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"idle" | "ok" | "failed">("idle");
 
   async function run() {
     setBusy(true);
@@ -122,6 +123,36 @@ export default function SetupWizard({
       )}
       {!available && channel === "direct-postgres" && (
         <div className="mt-4 space-y-3 text-sm">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const r = await fetch(setupSqlUrl);
+                const text = await r.text();
+                await navigator.clipboard.writeText(text);
+                setCopied("ok");
+              } catch {
+                setCopied("failed");
+              }
+            }}
+            className="rounded-lg bg-accent px-5 py-2.5 font-medium text-white"
+          >
+            Copy the setup text
+          </button>
+          {copied === "ok" && (
+            <p className="text-sm text-ink-soft">
+              Copied. Now paste it into the Supabase window (Ctrl+V / Cmd+V) and press Run.
+            </p>
+          )}
+          {copied === "failed" && (
+            <p className="text-sm text-ink-soft">
+              Your browser blocked copying.{" "}
+              <a className="font-medium text-accent underline" href={setupSqlUrl} target="_blank" rel="noopener noreferrer">
+                Open the setup text
+              </a>{" "}
+              and press Ctrl+A / Cmd+A, then Ctrl+C / Cmd+C.
+            </p>
+          )}
           <ol className="list-decimal space-y-2 pl-5">
             <li>
               Open{" "}
@@ -148,6 +179,9 @@ export default function SetupWizard({
               Return here and press <strong>Check again</strong>.
             </li>
           </ol>
+          <p className="text-sm text-ink-soft">
+            If you see "permission denied" or "already exists", just press Run again - it is safe.
+          </p>
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
