@@ -56,6 +56,30 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "J1: bootstrap-all.sql is FRESH - every migration file appears (regenerate with npm run db:bootstrap-sql; it once stopped at 0026 and missed the rest)");
   assert(bootAll.includes("document_history") && bootAll.indexOf("-- ===================== 0026_first_owner_recovery.sql") < bootAll.indexOf("-- ===================== 0040_document_history.sql"),
     "J1: the paste-once file carries the newest schema (0040) after the owner bootstrap, in order");
+  // 3c substitute (no Postgres in CI): every statement must be GUARDED so a
+  // second Run cannot fail with "already exists".
+  const bootLines = bootAll.split("\n");
+  const unguarded = (kind: string): number =>
+    bootLines.filter((l, i) => {
+      if (!new RegExp(`^\\s*create ${kind}\\b`, "i").test(l)) return false;
+      for (let j = i - 1; j >= 0; j--) {
+        const prev = bootLines[j].trim();
+        if (!prev || prev.startsWith("--")) continue;
+        return !new RegExp(`^drop ${kind} if exists`, "i").test(prev);
+      }
+      return true;
+    }).length;
+  assert(!bootLines.some((l) => /^\s*create table (?!if not exists)/i.test(l)),
+    "J1: every create table is IF NOT EXISTS (safe to run twice)");
+  assert(!bootLines.some((l) => /^\s*create (unique )?index (?!if not exists)/i.test(l)),
+    "J1: every create index is IF NOT EXISTS (safe to run twice)");
+  assert(unguarded("policy") === 0 && unguarded("trigger") === 0,
+    "J1: every policy/trigger is preceded by its drop-if-exists guard (safe to run twice)");
+  assert(bootLines.every((l, i) => !/add constraint/i.test(l) ||
+      bootLines.slice(Math.max(0, i - 2), i).some((p2) => /drop constraint if exists/i.test(p2))),
+    "J1: every add constraint drops the existing constraint first (safe to run twice)");
+  assert(bootAll.includes("SAFE TO RUN MORE THAN ONCE"),
+    "J1: the generated header states the file is safe to re-run");
   assert(applyScript.includes("--self-test") && applyScript.includes("marker"),
     "J1: the migration automation self-tests and probes markers");
 

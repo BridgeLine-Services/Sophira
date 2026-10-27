@@ -1,10 +1,11 @@
 -- SOPHIRA COMPLETE DATABASE SETUP (regenerated 2026-10-27)
 -- Applies every migration in order (0001_init.sql ... 0040_document_history.sql).
 -- Run this SINGLE file once in the Supabase SQL editor for a fresh
--- installation. Every migration is additive and idempotent (IF NOT EXISTS /
--- guarded DO blocks), so re-running is safe. After it succeeds, open
--- https://sophira.vercel.app/create-owner and create the owner account.
--- Regenerate with: npm run db:bootstrap-sql
+-- installation. It is SAFE TO RUN MORE THAN ONCE: every table, index,
+-- policy, trigger and constraint is guarded, so re-running is harmless.
+-- After it succeeds, open https://sophira.vercel.app/create-owner and
+-- create the owner account.
+-- Regenerate with: npm run db:bootstrap-sql (never edit by hand)
 
 -- ===================== 0001_init.sql =====================
 -- =====================================================================
@@ -19,7 +20,7 @@ create extension if not exists "pgcrypto";
 -- ---------------------------------------------------------------------
 -- profiles: one row per user, id matches auth.users
 -- ---------------------------------------------------------------------
-create table public.profiles (
+create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null default '',
   role text not null default 'user' check (role in ('owner','user')),
@@ -35,7 +36,9 @@ create table public.profiles (
   updated_at timestamptz not null default now()
 );
 alter table public.profiles enable row level security;
+drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles for select using (id = auth.uid());
+drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles for update using (id = auth.uid());
 -- inserts happen via the trigger below (service role).
 
@@ -55,6 +58,7 @@ begin
   return new;
 end;
 $$;
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
@@ -62,7 +66,7 @@ create trigger on_auth_user_created
 -- ---------------------------------------------------------------------
 -- invitations: owner-controlled onboarding for a small private group
 -- ---------------------------------------------------------------------
-create table public.invitations (
+create table if not exists public.invitations (
   id uuid primary key default gen_random_uuid(),
   email text not null,
   token text not null unique default encode(gen_random_bytes(24),'hex'),
@@ -72,6 +76,7 @@ create table public.invitations (
   accepted_at timestamptz
 );
 alter table public.invitations enable row level security;
+drop policy if exists "invitations_owner_manage" on public.invitations;
 create policy "invitations_owner_manage" on public.invitations
   for all using (invited_by = auth.uid()) with check (invited_by = auth.uid());
 
@@ -93,7 +98,7 @@ grant execute on function public.get_invitation_by_token(text) to anon, authenti
 --   official_* (from teacher), examples (teacher-provided worked examples),
 --   corrections (graded feedback), and ai_notes (unconfirmed AI guesses).
 -- ---------------------------------------------------------------------
-create table public.teachers (
+create table if not exists public.teachers (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
@@ -101,10 +106,11 @@ create table public.teachers (
   created_at timestamptz not null default now()
 );
 alter table public.teachers enable row level security;
+drop policy if exists "teachers_own" on public.teachers;
 create policy "teachers_own" on public.teachers
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-create table public.teacher_profiles (
+create table if not exists public.teacher_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   teacher_id uuid not null references public.teachers(id) on delete cascade,
@@ -136,13 +142,14 @@ create table public.teacher_profiles (
   unique (teacher_id)
 );
 alter table public.teacher_profiles enable row level security;
+drop policy if exists "teacher_profiles_own" on public.teacher_profiles;
 create policy "teacher_profiles_own" on public.teacher_profiles
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------
 -- courses
 -- ---------------------------------------------------------------------
-create table public.courses (
+create table if not exists public.courses (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
@@ -155,13 +162,14 @@ create table public.courses (
   created_at timestamptz not null default now()
 );
 alter table public.courses enable row level security;
+drop policy if exists "courses_own" on public.courses;
 create policy "courses_own" on public.courses
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------
 -- writing samples + writing profile
 -- ---------------------------------------------------------------------
-create table public.writing_samples (
+create table if not exists public.writing_samples (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
@@ -175,10 +183,11 @@ create table public.writing_samples (
   created_at timestamptz not null default now()
 );
 alter table public.writing_samples enable row level security;
+drop policy if exists "writing_samples_own" on public.writing_samples;
 create policy "writing_samples_own" on public.writing_samples
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-create table public.writing_profiles (
+create table if not exists public.writing_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   summary jsonb default '{}',   -- analyzed style patterns
@@ -189,13 +198,14 @@ create table public.writing_profiles (
   updated_at timestamptz not null default now()
 );
 alter table public.writing_profiles enable row level security;
+drop policy if exists "writing_profiles_own" on public.writing_profiles;
 create policy "writing_profiles_own" on public.writing_profiles
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------
 -- assignments, files, work sessions, responses
 -- ---------------------------------------------------------------------
-create table public.assignments (
+create table if not exists public.assignments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
@@ -214,10 +224,11 @@ create table public.assignments (
   updated_at timestamptz not null default now()
 );
 alter table public.assignments enable row level security;
+drop policy if exists "assignments_own" on public.assignments;
 create policy "assignments_own" on public.assignments
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-create table public.assignment_files (
+create table if not exists public.assignment_files (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   assignment_id uuid not null references public.assignments(id) on delete cascade,
@@ -231,10 +242,11 @@ create table public.assignment_files (
   created_at timestamptz not null default now()
 );
 alter table public.assignment_files enable row level security;
+drop policy if exists "assignment_files_own" on public.assignment_files;
 create policy "assignment_files_own" on public.assignment_files
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-create table public.work_sessions (
+create table if not exists public.work_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   assignment_id uuid references public.assignments(id) on delete cascade,
@@ -244,10 +256,11 @@ create table public.work_sessions (
   updated_at timestamptz not null default now()
 );
 alter table public.work_sessions enable row level security;
+drop policy if exists "work_sessions_own" on public.work_sessions;
 create policy "work_sessions_own" on public.work_sessions
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-create table public.responses (
+create table if not exists public.responses (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   assignment_id uuid references public.assignments(id) on delete cascade,
@@ -259,13 +272,14 @@ create table public.responses (
   created_at timestamptz not null default now()
 );
 alter table public.responses enable row level security;
+drop policy if exists "responses_own" on public.responses;
 create policy "responses_own" on public.responses
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------
 -- feedback + profile_update_proposals (approval-controlled learning loop)
 -- ---------------------------------------------------------------------
-create table public.feedback (
+create table if not exists public.feedback (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   response_id uuid references public.responses(id) on delete set null,
@@ -278,10 +292,11 @@ create table public.feedback (
   created_at timestamptz not null default now()
 );
 alter table public.feedback enable row level security;
+drop policy if exists "feedback_own" on public.feedback;
 create policy "feedback_own" on public.feedback
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-create table public.profile_update_proposals (
+create table if not exists public.profile_update_proposals (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   target_type text not null check (target_type in ('teacher','writing')),
@@ -295,13 +310,14 @@ create table public.profile_update_proposals (
   decided_at timestamptz
 );
 alter table public.profile_update_proposals enable row level security;
+drop policy if exists "profile_update_proposals_own" on public.profile_update_proposals;
 create policy "profile_update_proposals_own" on public.profile_update_proposals
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------
 -- study_materials: personal library
 -- ---------------------------------------------------------------------
-create table public.study_materials (
+create table if not exists public.study_materials (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   category text not null check (category in
@@ -314,6 +330,7 @@ create table public.study_materials (
   created_at timestamptz not null default now()
 );
 alter table public.study_materials enable row level security;
+drop policy if exists "study_materials_own" on public.study_materials;
 create policy "study_materials_own" on public.study_materials
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -324,12 +341,16 @@ insert into storage.buckets (id, name, public) values ('private-docs', 'private-
   on conflict (id) do nothing;
 
 -- Users can manage files ONLY inside their own uid folder.
+drop policy if exists "private_docs_own_select" on storage.objects;
 create policy "private_docs_own_select" on storage.objects
   for select using (bucket_id = 'private-docs' and auth.uid()::text = (storage.foldername(name))[1]);
+drop policy if exists "private_docs_own_insert" on storage.objects;
 create policy "private_docs_own_insert" on storage.objects
   for insert with check (bucket_id = 'private-docs' and auth.uid()::text = (storage.foldername(name))[1]);
+drop policy if exists "private_docs_own_update" on storage.objects;
 create policy "private_docs_own_update" on storage.objects
   for update using (bucket_id = 'private-docs' and auth.uid()::text = (storage.foldername(name))[1]);
+drop policy if exists "private_docs_own_delete" on storage.objects;
 create policy "private_docs_own_delete" on storage.objects
   for delete using (bucket_id = 'private-docs' and auth.uid()::text = (storage.foldername(name))[1]);
 
@@ -339,14 +360,19 @@ create policy "private_docs_own_delete" on storage.objects
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end $$;
+drop trigger if exists profiles_touch on public.profiles;
 create trigger profiles_touch before update on public.profiles
   for each row execute procedure public.touch_updated_at();
+drop trigger if exists teacher_profiles_touch on public.teacher_profiles;
 create trigger teacher_profiles_touch before update on public.teacher_profiles
   for each row execute procedure public.touch_updated_at();
+drop trigger if exists writing_profiles_touch on public.writing_profiles;
 create trigger writing_profiles_touch before update on public.writing_profiles
   for each row execute procedure public.touch_updated_at();
+drop trigger if exists assignments_touch on public.assignments;
 create trigger assignments_touch before update on public.assignments
   for each row execute procedure public.touch_updated_at();
+drop trigger if exists work_sessions_touch on public.work_sessions;
 create trigger work_sessions_touch before update on public.work_sessions
   for each row execute procedure public.touch_updated_at();
 
@@ -359,6 +385,7 @@ create trigger work_sessions_touch before update on public.work_sessions
 
 drop policy if exists "invitations_owner_manage" on public.invitations;
 
+drop policy if exists "invitations_owner_manage" on public.invitations;
 create policy "invitations_owner_manage" on public.invitations
   for all
   using (
@@ -378,6 +405,7 @@ create policy "invitations_owner_manage" on public.invitations
 
 -- Profiles: allow a user to INSERT their own profile row as a safety net
 -- (normally created by the signup trigger, but some flows bypass triggers).
+drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (id = auth.uid());
 
@@ -410,6 +438,7 @@ create index if not exists profile_versions_target_idx
 
 alter table public.profile_versions enable row level security;
 
+drop policy if exists "Users manage only their own profile versions" on public.profile_versions;
 create policy "Users manage only their own profile versions"
   on public.profile_versions for all
   using (auth.uid() = user_id)
@@ -495,6 +524,7 @@ create index if not exists academic_sources_user_idx
 
 alter table public.academic_sources enable row level security;
 
+drop policy if exists "Users manage only their own sources" on public.academic_sources;
 create policy "Users manage only their own sources"
   on public.academic_sources for all
   using (auth.uid() = user_id)
@@ -557,6 +587,7 @@ alter table public.invitation_requests enable row level security;
 
 -- A user can submit a request for themselves ONLY if they hold the
 -- can_request_invites permission (owner-granted). A revoked user cannot.
+drop policy if exists "invitation_requests_insert_permitted" on public.invitation_requests;
 create policy "invitation_requests_insert_permitted"
   on public.invitation_requests for insert
   with check (
@@ -569,11 +600,13 @@ create policy "invitation_requests_insert_permitted"
   );
 
 -- A requester can always see their own requests.
+drop policy if exists "invitation_requests_requester_select" on public.invitation_requests;
 create policy "invitation_requests_requester_select"
   on public.invitation_requests for select
   using (requester_id = auth.uid());
 
 -- The owner can see and decide every request.
+drop policy if exists "invitation_requests_owner_select" on public.invitation_requests;
 create policy "invitation_requests_owner_select"
   on public.invitation_requests for select
   using (
@@ -581,6 +614,7 @@ create policy "invitation_requests_owner_select"
             where p.id = auth.uid() and p.role = 'owner')
   );
 
+drop policy if exists "invitation_requests_owner_update" on public.invitation_requests;
 create policy "invitation_requests_owner_update"
   on public.invitation_requests for update
   using (
@@ -589,6 +623,7 @@ create policy "invitation_requests_owner_update"
   );
 
 -- No one but the owner can DELETE requests.
+drop policy if exists "invitation_requests_owner_delete" on public.invitation_requests;
 create policy "invitation_requests_owner_delete"
   on public.invitation_requests for delete
   using (
@@ -633,9 +668,11 @@ create index if not exists learning_patterns_user_idx
 
 alter table public.learning_patterns enable row level security;
 
+drop policy if exists "learning_patterns_own" on public.learning_patterns;
 create policy "learning_patterns_own" on public.learning_patterns
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+drop trigger if exists learning_patterns_touch on public.learning_patterns;
 create trigger learning_patterns_touch before update on public.learning_patterns
   for each row execute procedure public.touch_updated_at();
 
@@ -661,8 +698,8 @@ begin
   end if;
 end $$;
 
-alter table public.feedback
-  add constraint feedback_kind_check check (kind in (
+alter table public.feedback drop constraint if exists feedback_kind_check;
+alter table public.feedback add constraint feedback_kind_check check (kind in (
     'approve', 'error', 'correction', 'teacher_corrected', 'different_method',
     'teacher_wanted', 'writing_pref', 'this_is_normal', 'no_longer_correct',
     'remember', 'forget', 'assignment_only', 'note'
@@ -907,6 +944,7 @@ $$;
 -- Re-arm the trigger definition (drop + create keeps it attached to the
 -- same event, guaranteeing the new function body is used).
 drop trigger if exists on_auth_user_created on auth.users;
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
@@ -962,6 +1000,7 @@ create unique index if not exists typing_attempts_one_baseline
 
 alter table public.typing_attempts enable row level security;
 
+drop policy if exists "typing_attempts_own_all" on public.typing_attempts;
 create policy "typing_attempts_own_all"
   on public.typing_attempts for all
   using (user_id = auth.uid())
@@ -1046,6 +1085,7 @@ create unique index if not exists work_schedules_one_per_assignment
 
 alter table public.work_schedules enable row level security;
 
+drop policy if exists "work_schedules_own_all" on public.work_schedules;
 create policy "work_schedules_own_all"
   on public.work_schedules for all
   using (user_id = auth.uid())
@@ -1085,6 +1125,7 @@ create table if not exists public.rubric_audits (
 
 alter table public.rubric_audits enable row level security;
 
+drop policy if exists "rubric_audits_own_all" on public.rubric_audits;
 create policy "rubric_audits_own_all"
   on public.rubric_audits for all
   using (user_id = auth.uid())
@@ -1118,6 +1159,7 @@ create table if not exists public.research_projects (
 );
 
 alter table public.research_projects enable row level security;
+drop policy if exists "research_projects_own_all" on public.research_projects;
 create policy "research_projects_own_all" on public.research_projects
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1133,6 +1175,7 @@ create table if not exists public.research_queries (
 );
 
 alter table public.research_queries enable row level security;
+drop policy if exists "research_queries_own_all" on public.research_queries;
 create policy "research_queries_own_all" on public.research_queries
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1167,6 +1210,7 @@ create table if not exists public.research_sources (
 );
 
 alter table public.research_sources enable row level security;
+drop policy if exists "research_sources_own_all" on public.research_sources;
 create policy "research_sources_own_all" on public.research_sources
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 create index if not exists research_sources_project_idx
@@ -1188,6 +1232,7 @@ create table if not exists public.research_claims (
 );
 
 alter table public.research_claims enable row level security;
+drop policy if exists "research_claims_own_all" on public.research_claims;
 create policy "research_claims_own_all" on public.research_claims
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1203,6 +1248,7 @@ create table if not exists public.research_citations (
 );
 
 alter table public.research_citations enable row level security;
+drop policy if exists "research_citations_own_all" on public.research_citations;
 create policy "research_citations_own_all" on public.research_citations
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1222,6 +1268,7 @@ create table if not exists public.research_verifications (
 );
 
 alter table public.research_verifications enable row level security;
+drop policy if exists "research_verifications_own_all" on public.research_verifications;
 create policy "research_verifications_own_all" on public.research_verifications
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 create index if not exists research_verifications_source_idx
@@ -1261,8 +1308,8 @@ alter table public.research_claims
 -- no passage supplied — never guessed, never silently verified).
 alter table public.research_claims
   drop constraint if exists research_claims_status_check;
-alter table public.research_claims
-  add constraint research_claims_status_check
+alter table public.research_claims drop constraint if exists research_claims_status_check;
+alter table public.research_claims add constraint research_claims_status_check
   check (status in ('supported','partially_supported','unsupported','missing','verified','unverified'));
 
 -- Statuses stored by the new pipeline (verified/partially_supported/
@@ -1342,8 +1389,8 @@ alter table public.learning_patterns
 -- Status ladder gains the intermediate demotion step.
 alter table public.learning_patterns
   drop constraint if exists learning_patterns_status_check;
-alter table public.learning_patterns
-  add constraint learning_patterns_status_check check (
+alter table public.learning_patterns drop constraint if exists learning_patterns_status_check;
+alter table public.learning_patterns add constraint learning_patterns_status_check check (
     status in ('candidate', 'active', 'corrected', 'inactive', 'recurring',
                'temporary', 'teacher_required', 'lower_confidence')
   );
@@ -1402,6 +1449,7 @@ create table if not exists public.schedule_executions (
 );
 
 alter table public.schedule_executions enable row level security;
+drop policy if exists "schedule_executions_own_all" on public.schedule_executions;
 create policy "schedule_executions_own_all" on public.schedule_executions
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1451,6 +1499,7 @@ create table if not exists public.typing_profiles (
 
 alter table public.typing_profiles enable row level security;
 
+drop policy if exists "typing_profiles_own_all" on public.typing_profiles;
 create policy "typing_profiles_own_all"
   on public.typing_profiles for all
   using (user_id = auth.uid())
@@ -1656,6 +1705,7 @@ alter table public.student_memories enable row level security;
 -- STRICT own-row isolation: a user sees and manages ONLY their own
 -- memories. The owner is NOT exempt — RLS applies equally to every
 -- role (the owner manages membership, never academic content).
+drop policy if exists "student_memories_own_all" on public.student_memories;
 create policy "student_memories_own_all"
   on public.student_memories for all
   using (user_id = auth.uid())
@@ -1692,6 +1742,7 @@ create index if not exists student_memory_evidence_user_idx
 
 alter table public.student_memory_evidence enable row level security;
 
+drop policy if exists "student_memory_evidence_own_all" on public.student_memory_evidence;
 create policy "student_memory_evidence_own_all"
   on public.student_memory_evidence for all
   using (user_id = auth.uid())
@@ -1724,7 +1775,7 @@ create table if not exists provider_usage (
 -- No client access at all — server/service-role only.
 alter table provider_usage enable row level security;
 
-create index provider_usage_created_at_idx on provider_usage (created_at desc);
+create index if not exists provider_usage_created_at_idx on provider_usage (created_at desc);
 
 -- ===================== 0022_notebooks.sql =====================
 -- =====================================================================
@@ -1751,6 +1802,7 @@ create table if not exists public.notebooks (
 );
 
 alter table public.notebooks enable row level security;
+drop policy if exists "notebooks_own_all" on public.notebooks;
 create policy "notebooks_own_all" on public.notebooks
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1793,6 +1845,7 @@ create table if not exists public.notebook_sources (
 -- OWNER-ONLY RLS. Deliberately NO admin policy: every other user,
 -- including admins, is blocked from reading source content.
 alter table public.notebook_sources enable row level security;
+drop policy if exists "notebook_sources_own_all" on public.notebook_sources;
 create policy "notebook_sources_own_all" on public.notebook_sources
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1813,6 +1866,7 @@ create table if not exists public.notebook_notes (
 );
 
 alter table public.notebook_notes enable row level security;
+drop policy if exists "notebook_notes_own_all" on public.notebook_notes;
 create policy "notebook_notes_own_all" on public.notebook_notes
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1832,6 +1886,7 @@ create table if not exists public.notebook_questions (
 );
 
 alter table public.notebook_questions enable row level security;
+drop policy if exists "notebook_questions_own_all" on public.notebook_questions;
 create policy "notebook_questions_own_all" on public.notebook_questions
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1856,6 +1911,7 @@ create table if not exists public.notebook_evidence (
 );
 
 alter table public.notebook_evidence enable row level security;
+drop policy if exists "notebook_evidence_own_all" on public.notebook_evidence;
 create policy "notebook_evidence_own_all" on public.notebook_evidence
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1877,6 +1933,7 @@ create table if not exists public.notebook_artifacts (
 );
 
 alter table public.notebook_artifacts enable row level security;
+drop policy if exists "notebook_artifacts_own_all" on public.notebook_artifacts;
 create policy "notebook_artifacts_own_all" on public.notebook_artifacts
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -1934,14 +1991,18 @@ create table if not exists public.essay_sessions (
 alter table public.essay_sessions enable row level security;
 
 drop policy if exists "Users read own essay sessions" on public.essay_sessions;
+drop policy if exists "Users read own essay sessions" on public.essay_sessions;
 create policy "Users read own essay sessions" on public.essay_sessions
   for select using (auth.uid() = user_id);
+drop policy if exists "Users insert own essay sessions" on public.essay_sessions;
 drop policy if exists "Users insert own essay sessions" on public.essay_sessions;
 create policy "Users insert own essay sessions" on public.essay_sessions
   for insert with check (auth.uid() = user_id);
 drop policy if exists "Users update own essay sessions" on public.essay_sessions;
+drop policy if exists "Users update own essay sessions" on public.essay_sessions;
 create policy "Users update own essay sessions" on public.essay_sessions
   for update using (auth.uid() = user_id);
+drop policy if exists "Users delete own essay sessions" on public.essay_sessions;
 drop policy if exists "Users delete own essay sessions" on public.essay_sessions;
 create policy "Users delete own essay sessions" on public.essay_sessions
   for delete using (auth.uid() = user_id);
@@ -1966,8 +2027,8 @@ create policy "Users delete own essay sessions" on public.essay_sessions
 alter table public.profiles
   drop constraint if exists profiles_status_check;
 
-alter table public.profiles
-  add constraint profiles_status_check
+alter table public.profiles drop constraint if exists profiles_status_check;
+alter table public.profiles add constraint profiles_status_check
   check (status in ('pending','accepted','active','revoked'));
 
 -- ===================== 0025_first_owner_bootstrap.sql =====================
@@ -2357,6 +2418,7 @@ create table if not exists public.subject_preferences (
 
 alter table public.subject_preferences enable row level security;
 
+drop policy if exists "subject_preferences_own_all" on public.subject_preferences;
 create policy "subject_preferences_own_all"
   on public.subject_preferences
   for all to authenticated
@@ -2465,19 +2527,23 @@ create table if not exists public.workload_selections (
 
 alter table public.workload_selections enable row level security;
 
+drop policy if exists "own selections: read" on public.workload_selections;
 create policy "own selections: read"
   on public.workload_selections for select to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "own selections: insert" on public.workload_selections;
 create policy "own selections: insert"
   on public.workload_selections for insert to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "own selections: update" on public.workload_selections;
 create policy "own selections: update"
   on public.workload_selections for update to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "own selections: delete" on public.workload_selections;
 create policy "own selections: delete"
   on public.workload_selections for delete to authenticated
   using (auth.uid() = user_id);
@@ -2704,6 +2770,7 @@ alter table public.document_history enable row level security;
 -- update, or delete policies: history rows are written only by the service
 -- role inside authenticated API routes, so a client cannot forge or erase
 -- events (and cannot insert rows for another user).
+drop policy if exists "own document history: read" on public.document_history;
 create policy "own document history: read"
   on public.document_history for select to authenticated
   using (auth.uid() = user_id);

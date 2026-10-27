@@ -1,22 +1,52 @@
 #!/usr/bin/env node
 /**
  * Regenerates supabase/bootstrap-all.sql from supabase/migrations/*.sql.
- * The single-paste file must NEVER drift behind the migration chain: a
- * stale copy (it once stopped at 0026) silently creates an incomplete
- * database for a fresh installation. Run: npm run db:bootstrap-sql
+ * The single-paste file must NEVER drift behind the migration chain, and it
+ * must be SAFE TO RUN MORE THAN ONCE: every statement is rewritten (OUTPUT
+ * ONLY - migrations themselves are never edited) to be idempotent.
+ * Run: npm run db:bootstrap-sql
  */
 import { readFileSync, writeFileSync, readdirSync } from "fs";
 
 const dir = "supabase/migrations";
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+const body = files
+  .map((f) => `\n-- ===================== ${f} =====================\n` + readFileSync(`${dir}/${f}`, "utf8"))
+  .join("");
+
+export function makeIdempotent(sql) {
+  let out = sql;
+  // CREATE TABLE -> IF NOT EXISTS
+  out = out.replace(/^create table (?!if not exists)/gim, "create table if not exists ");
+  // CREATE [UNIQUE] INDEX -> IF NOT EXISTS
+  out = out.replace(/^create (unique )?index (?!if not exists)/gim, (_m, uniq) => `create ${uniq || ""}index if not exists `);
+  // CREATE POLICY -> drop first (policies have no IF NOT EXISTS form)
+  out = out.replace(
+    /^create policy\s+("[^"]+"|[A-Za-z0-9_]+)\s+on\s+([A-Za-z0-9_."]+)/gim,
+    (m, name, table) => `drop policy if exists ${name} on ${table};\n${m}`
+  );
+  // CREATE TRIGGER -> drop first ("on <table>" can be on a later line)
+  out = out.replace(
+    /create trigger\s+([A-Za-z0-9_]+)([\s\S]{0,300}?)\bon\s+([A-Za-z0-9_."]+)/gi,
+    (_m, name, middle, table) => `drop trigger if exists ${name} on ${table};\ncreate trigger ${name}${middle}on ${table}`
+  );
+  // ALTER TABLE ... ADD CONSTRAINT -> drop the constraint first (4 sites)
+  out = out.replace(
+    /alter table\s+([A-Za-z0-9_."]+)\s+add constraint\s+([A-Za-z0-9_]+)/gi,
+    (_m, table, name) => `alter table ${table} drop constraint if exists ${name};\nalter table ${table} add constraint ${name}`
+  );
+  return out;
+}
+
+const idempotent = makeIdempotent(body);
 const header = `-- SOPHIRA COMPLETE DATABASE SETUP (regenerated ${new Date().toISOString().slice(0, 10)})
 -- Applies every migration in order (${files[0]} ... ${files[files.length - 1]}).
 -- Run this SINGLE file once in the Supabase SQL editor for a fresh
--- installation. Every migration is additive and idempotent (IF NOT EXISTS /
--- guarded DO blocks), so re-running is safe. After it succeeds, open
--- https://sophira.vercel.app/create-owner and create the owner account.
--- Regenerate with: npm run db:bootstrap-sql
+-- installation. It is SAFE TO RUN MORE THAN ONCE: every table, index,
+-- policy, trigger and constraint is guarded, so re-running is harmless.
+-- After it succeeds, open https://sophira.vercel.app/create-owner and
+-- create the owner account.
+-- Regenerate with: npm run db:bootstrap-sql (never edit by hand)
 `;
-const body = files.map((f) => `\n-- ===================== ${f} =====================\n` + readFileSync(`${dir}/${f}`, "utf8")).join("");
-writeFileSync("supabase/bootstrap-all.sql", header + body);
-console.log(`bootstrap-all.sql: wrote ${files.length} migrations (${files[0]} .. ${files[files.length - 1]})`);
+writeFileSync("supabase/bootstrap-all.sql", header + idempotent);
+console.log(`bootstrap-all.sql: ${files.length} migrations (${files[0]} .. ${files[files.length - 1]}), idempotent`);
