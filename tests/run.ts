@@ -3495,8 +3495,11 @@ async function runOwnerSetupTests(): Promise<void> {
       | { category: "auth-rejected" | "network" | "server-error" | "connection"; message: string }
       | null;
     setupChannel: "direct-postgres" | "management-api" | "none";
+    probeChannel: "direct" | "rest" | "none";
+    directProbeFailed: boolean;
   }
   const mk = (o: Partial<Probe>): Probe => ({
+    probeChannel: "none", directProbeFailed: false,
     supabaseConfigured: false, serviceRoleConfigured: false, aiConfigured: false,
     database: "unconfigured", migrationsPresent: null, ownerEmailConfigured: null, ownerAccount: "unknown",
     chainStarted: null, invitationsPresent: null, ownerBootstrapPresent: null, recoveryPresent: null,
@@ -3557,6 +3560,33 @@ async function runOwnerSetupTests(): Promise<void> {
   }));
   assert(e.ready === false, "setup: owner email configured but no account => not ready");
   assert(e.ownerCreation.possible === true, "setup: owner creation possible regardless of how the email restriction is set");
+  // 2026-10-27 production defect: Vercel cannot reach Supabase's direct
+  // Postgres port, yet the app + owner flow use PostgREST successfully.
+  // The probe must FALL BACK to REST instead of declaring "cannot check".
+  const rest = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: true, database: "checked", probeChannel: "rest",
+    directProbeFailed: true, migrationsPresent: true, ownerAccount: "none", invitationsPresent: true,
+    chainState: undefined as never,
+  } as Partial<Probe>));
+  assert(rest.ownerCreation.possible === true && rest.ownerCreation.url === "/create-owner",
+    "setup: REST-checked database with no owner still offers /create-owner (the live Vercel case)");
+  assert(rest.guidance.some((g) => /reachable through Sophira's own API/i.test(g) && /pooled connection/i.test(g)),
+    "setup: degraded direct-Postgres channel is explained in plain language, not hidden");
+  assert(rest.probe.directProbeFailed === true && rest.probe.probeChannel === "rest",
+    "setup: the diagnostic states which channel answered and that direct failed");
+
+  const deadBoth = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: false, database: "unreachable",
+    directProbeFailed: true, databaseError: { category: "connection", message: "direct database probe failed and no service-role key is configured" },
+  } as Partial<Probe>));
+  assert(deadBoth.ownerCreation.possible === null,
+    "setup: when BOTH channels fail, owner creation is honestly null (never a false yes)");
+
+  const { readFileSync: rfs } = require("fs") as typeof import("fs");
+  const setupSrc = rfs("src/lib/owner-setup.ts", "utf8");
+  const directBlock = setupSrc.slice(setupSrc.indexOf("if (directPostgresConfigured())"), setupSrc.indexOf("if (!probe.serviceRoleConfigured)"));
+  assert(directBlock.includes("probe.directProbeFailed = true") && !/if \(!dp\.ok\) \{\s*probe\.database = "unreachable"/.test(directBlock),
+    "setup: a failed direct probe never short-circuits the REST fallback (root-cause regression pin)");
   assert(e.guidance.some((g) => g.includes("/create-owner")), "setup: guidance points at the in-app owner registration");
   const ownerStep = e.steps.find((s) => s.label.includes("Owner account initialized"));
   assert(ownerStep !== undefined && ownerStep.detail.includes("no predefined or default password"), "setup: uninitialized owner step explains the owner chooses their own password");

@@ -206,3 +206,24 @@ Applied at: middleware (pages), the API guard (`requireUser` /
 owner checks in RPCs like `network_stats()`). Migrations: 0001 (roles),
 0005 (status + owner management), 0008 (fail-closed owner bootstrap),
 0019 (revocation audit trail).
+
+## 2026-10-27: setup diagnostic no longer blocks owner creation
+
+Symptom seen live on Vercel: the app worked (/login, /create-owner, /install
+all loaded) but /setup and /api/setup-status said "cannot be fully checked",
+database "unreachable", and offered no owner-creation action.
+
+Cause: probeOwnerSetup() in src/lib/owner-setup.ts used the DIRECT Postgres
+channel as primary and RETURNED when it failed. Vercel cannot reach
+Supabase's IPv6-only direct port, so it never fell back to the service-role
+PostgREST queries the app actually uses.
+
+Fix: a failed direct probe now sets directProbeFailed and falls through to
+REST. Status reports probeChannel ("direct" | "rest"), keeps migration REPAIR
+honestly marked unavailable, and explains the situation in plain language.
+Owner creation, sign-in and normal use need nothing else.
+
+To enable automatic migration repair later, reconnect the Supabase
+integration in Vercel or provide a pooled connection string (port 6543).
+Regression pins live in tests/run.ts (REST-checked + no owner -> /create-owner;
+both channels down -> honest null; direct-failure never short-circuits).

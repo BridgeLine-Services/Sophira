@@ -67,6 +67,10 @@ export interface OwnerSetupProbe {
    *  the setup UI can diagnose the exact missing infrastructure capability
    *  instead of a vague "administrator connection". Categorical only. */
   setupChannel: "direct-postgres" | "management-api" | "none";
+  /** 2026-10-27: which channel actually produced `database`. */
+  probeChannel: "direct" | "rest" | "none";
+  /** Direct channel configured but unreachable; REST probing continued. */
+  directProbeFailed: boolean;
 }
 
 export interface OwnerSetupStep {
@@ -152,6 +156,8 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     connectionEnvNames: connectionEnvNames(),
     connectionTarget: connectionTarget(),
     setupChannel: setupChannel(),
+    probeChannel: "none",
+    directProbeFailed: false,
     databaseError: null,
   };
   // ---- 2026-10-07 live finding: the admin API key can be a restricted
@@ -161,11 +167,16 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
   if (directPostgresConfigured()) {
     const dp = await probeSchemaStateDirect();
     if (!dp.ok) {
-      probe.database = "unreachable";
-      probe.databaseError = { category: "connection", message: "direct database probe failed" };
-      return probe;
-    }
+      // 2026-10-27 production finding: Vercel cannot reach Supabase's
+      // IPv6-only DIRECT port, but the app talks to PostgREST with the
+      // service role. Returning here reported "cannot check" and blocked
+      // the owner from creating the first account even though REST worked.
+      // Fall through to the REST probe; only DDL automation is lost.
+      probe.directProbeFailed = true;
+      probe.migrationAutomationConfigured = setupChannel() === "management-api";
+    } else {
     probe.database = "checked";
+    probe.probeChannel = "direct";
     // Same semantics as the PostgREST path below, one source of truth.
     if (dp.appConfig === false || dp.appConfig === null) {
       return { ...probe, chainStarted: false, migrationsPresent: false };
@@ -195,9 +206,16 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
       probe.ownerAccount = dp.ownerActive === true ? "active" : "revoked";
     }
     return probe;
+    }
   }
 
-  if (!probe.serviceRoleConfigured) return probe;
+  if (!probe.serviceRoleConfigured) {
+    if (probe.directProbeFailed) {
+      probe.database = "unreachable";
+      probe.databaseError = { category: "connection", message: "direct database probe failed and no service-role key is configured" };
+    }
+    return probe;
+  }
 
   try {
     const admin = createSupabaseClient(
@@ -218,6 +236,7 @@ export async function probeOwnerSetup(): Promise<OwnerSetupProbe> {
     if (configErr)
       return { ...probe, database: "unreachable", databaseError: categorizeDbError(configErr) };
     probe.database = "checked";
+    probe.probeChannel = "rest";
     probe.chainStarted = true;
     probe.migrationsPresent = true;
     probe.ownerEmailConfigured = Array.isArray(configRows) && configRows.length > 0; // row for key='owner_email' actually present
@@ -465,6 +484,9 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
   }
   if (probe.ownerAccount === "active") {
     guidance.push("Owner account initialized. Sign in at /login; use 'Forgot your password?' (/reset-password) if you ever need to recover it.");
+  }
+  if (probe.directProbeFailed) {
+    guidance.push("The database is reachable through Sophira's own API, so the app works normally and the owner account can be created. Automatic migration REPAIR is temporarily unavailable because the hosting platform cannot reach Supabase's direct database port. If /setup ever needs to repair the database, reconnect the Supabase integration in Vercel or set a pooled connection string (port 6543); no other action is needed.");
   }
   if (!probe.aiConfigured) {
     guidance.push("Optional but required for remote AI features: preferred no-billing path is Gemini free tier (set GEMINI_API_KEY, model gemini-2.5-flash) or Offline/local AI (no key needed). The paid OpenAI fallback (OPENAI_API_KEY + SOPHIRA_MODEL) is optional and DISABLED by default - enable only by setting ALLOW_PAID_AI=true or MONTHLY_AI_BUDGET_USD>0.");
