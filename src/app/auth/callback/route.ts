@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "../../../lib/supabase/server";
+import { safeNextPath } from "../../../lib/auth-redirect";
 
 /** Handles email-confirmation and password-recovery links (code → session). */
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
-  const next = searchParams.get("next");
+  // 2026-10-27: only a fixed same-origin path may win after the exchange -
+  // "//evil.example" previously passed a naive startsWith("/") check.
+  const next = safeNextPath(searchParams.get("next"));
 
   if (!code) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -18,7 +21,13 @@ export async function GET(request: NextRequest) {
   // never echoed into a redirect URL. An expired, malformed, already-used,
   // or tampered code fails here — safely and generically (the error
   // message reveals nothing about which account the link belonged to).
-  const supabase = createClient();
+  let supabase: ReturnType<typeof createClient>;
+  try {
+    supabase = createClient();
+  } catch {
+    // Unconfigured deployment: the same friendly path as an invalid link.
+    return NextResponse.redirect(new URL("/login?error=auth", request.url));
+  }
   let error;
   try {
     ({ error } = await supabase.auth.exchangeCodeForSession(code));
@@ -46,7 +55,7 @@ export async function GET(request: NextRequest) {
   // Role routing (2026-10-07): an owner confirming their email for the
   // first time lands on /owner; everyone else on /dashboard. An explicit
   // ?next= target always wins (it is validated to be a same-origin path).
-  if (next && next.startsWith("/")) {
+  if (next) {
     return NextResponse.redirect(new URL(next, request.url));
   }
   const { data: userData } = await supabase.auth.getUser();

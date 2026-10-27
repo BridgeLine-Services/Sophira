@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { authCallbackUrl } from "@/lib/auth-redirect";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Badge } from "@/components/ui";
 import { Sparkles, MailCheck } from "lucide-react";
@@ -41,10 +42,25 @@ function SignUpForm() {
     }
     setBusy(true);
     setError(null);
+    // 2026-10-27: the confirmation email must return to PRODUCTION, never
+    // to the dashboard Site URL default (the local dev address). Same helper
+    // as owner signup; an unsafe/unset address fails truthfully instead of
+    // sending a dead link.
+    const confirmUrl = authCallbackUrl("/dashboard", window.location.origin);
+    if (!confirmUrl) {
+      setBusy(false);
+      setError(
+        "Sophira's public web address is not configured on the server (NEXT_PUBLIC_SITE_URL), so the confirmation email could not link back here. Ask the owner to set it to https://sophira.vercel.app and redeploy."
+      );
+      return;
+    }
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: invitation.email,
       password,
-      options: { data: { display_name: fullName.trim() } },
+      options: {
+        data: { display_name: fullName.trim() },
+        emailRedirectTo: confirmUrl,
+      },
     });
     if (signUpError) {
       setBusy(false);

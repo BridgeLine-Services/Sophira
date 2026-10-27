@@ -139,3 +139,24 @@ for a specific email, so this does not open the app to strangers.
 2. Enter your Resend SMTP host, port 465, username `resend`, and your API key as the password.
 3. Set the sender to an address on a domain you have verified at resend.com.
 4. Ask your friend to sign up again.
+
+## Confirmation link opens a local address (ERR_CONNECTION_REFUSED)
+
+**What was wrong:** both signup calls created the account without telling
+Supabase where to send the confirmation email, so Supabase used the project's
+dashboard Site URL. If that is still the default (`http://localhost:3000`),
+the email link opens the owner's own computer instead of Sophira.
+
+**Fixed in the app (2026-10-27):** owner signup and invited signup now pass a
+validated `emailRedirectTo` built from `NEXT_PUBLIC_SITE_URL` and always
+ending at `/auth/callback`. Production can never produce a loopback link; if
+the address is missing the page says so instead of sending a dead link.
+
+**Still required in Supabase (one-time, owner action):**
+1. Supabase dashboard -> Authentication -> URL Configuration.
+2. Site URL: `https://sophira.vercel.app`
+3. Redirect URLs: add `https://sophira.vercel.app/**` (keep any existing ones).
+4. Save. New confirmation and reset emails use the correct address immediately.
+
+Do **not** turn off "Confirm email" to work around this. If you prefer to keep
+it off for a small private network, that is a separate, deliberate choice.
