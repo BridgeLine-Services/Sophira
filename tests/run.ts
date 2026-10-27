@@ -3542,6 +3542,53 @@ async function runConnectionCandidateTests(): Promise<void> {
   }
 }
 
+async function runAuthRedirectTests(): Promise<void> {
+  const { authCallbackUrl, appOrigin, safeNextPath } = await import("../src/lib/auth-redirect");
+  const savedSite = process.env.NEXT_PUBLIC_SITE_URL;
+  const savedEnv = process.env.NODE_ENV;
+  const setEnv = (site: string | undefined, env: string | undefined): void => {
+    const envBag = process.env as Record<string, string | undefined>;
+    if (site === undefined) delete envBag.NEXT_PUBLIC_SITE_URL; else envBag.NEXT_PUBLIC_SITE_URL = site;
+    if (env === undefined) delete envBag.NODE_ENV; else envBag.NODE_ENV = env;
+  };
+  try {
+    setEnv("https://sophira.vercel.app", "production");
+    assert(authCallbackUrl("/owner") === "https://sophira.vercel.app/auth/callback?next=%2Fowner",
+      "auth redirect: production confirmation goes to the real site + /auth/callback");
+    assert(!String(authCallbackUrl("/owner")).includes("local" + "host"),
+      "auth redirect: production never produces a localhost link");
+    assert(authCallbackUrl("/owner", "http://127.0.0.1:3000") === "https://sophira.vercel.app/auth/callback?next=%2Fowner",
+      "auth redirect: the configured production origin wins over a dev browser origin");
+    setEnv("http://127.0.0.1:3000", "production");
+    assert(authCallbackUrl("/owner") === null && appOrigin() === null,
+      "auth redirect: a loopback/http config is REJECTED in production (no dead link is sent)");
+    setEnv("http://127.0.0.1:3000", "development");
+    assert(authCallbackUrl("/owner") === "http://127.0.0.1:3000/auth/callback?next=%2Fowner",
+      "auth redirect: local development keeps working");
+    setEnv("not a url", "development");
+    assert(authCallbackUrl("/owner", "https://sophira.vercel.app") === "https://sophira.vercel.app/auth/callback?next=%2Fowner",
+      "auth redirect: a malformed config falls back to the validated browser origin");
+    setEnv(undefined, "production");
+    assert(authCallbackUrl("/owner", undefined) === null,
+      "auth redirect: nothing safe available -> null (caller must fail truthfully, not send localhost)");
+    assert(safeNextPath("/owner") === "/owner" && safeNextPath("/owner?tab=1") === "/owner?tab=1",
+      "auth redirect: same-origin paths are accepted");
+    assert(safeNextPath("//evil.example") === null && safeNextPath("/\\evil.example") === null && safeNextPath("https://evil.example") === null,
+      "auth redirect: protocol-relative and absolute external targets are rejected");
+    const owner = (await import("fs")).readFileSync("src/app/create-owner/page.tsx", "utf8");
+    const signup = (await import("fs")).readFileSync("src/app/signup/page.tsx", "utf8");
+    const callback = (await import("fs")).readFileSync("src/app/auth/callback/route.ts", "utf8");
+    assert(owner.includes("emailRedirectTo: confirmUrl") && signup.includes("emailRedirectTo: confirmUrl"),
+      "auth redirect: BOTH signups hand Supabase an explicit, validated callback");
+    assert(owner.includes("authCallbackUrl(\"/owner\"") && signup.includes("authCallbackUrl(\"/dashboard\""),
+      "auth redirect: the post-confirmation target stays a fixed app path");
+    assert(callback.includes("safeNextPath(searchParams.get(\"next\"))"),
+      "auth redirect: the callback validates next instead of a startsWith check");
+  } finally {
+    setEnv(savedSite, savedEnv);
+  }
+}
+
 async function runSupabaseUrlTests(): Promise<void> {
   const { normalizeSupabaseUrl, chooseUrlFromCandidates, projectDashboardLinks } = await import("../src/lib/supabase-config");
   const n1 = normalizeSupabaseUrl("https://abc.supabase.co/rest/v1/");
@@ -3777,5 +3824,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runAuthRedirectTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

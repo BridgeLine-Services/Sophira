@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { authCallbackUrl } from "@/lib/auth-redirect";
 import { createClient } from "@/lib/supabase/client";
 import { classifyAuthError } from "@/lib/auth-errors";
 
@@ -110,7 +111,21 @@ export default function CreateOwnerPage() {
     setBusy(true);
     try {
       const supabase = createClient();
-      const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+      // 2026-10-27: without emailRedirectTo Supabase uses the project's
+      // dashboard Site URL (commonly the local dev address), so the confirmation
+      // email dead-ended at ERR_CONNECTION_REFUSED. Never send a broken link.
+      const confirmUrl = authCallbackUrl("/owner", window.location.origin);
+      if (!confirmUrl) {
+        setError(
+          "Sophira's public web address is not configured on the server (NEXT_PUBLIC_SITE_URL), so the confirmation email could not link back here. Ask whoever deployed Sophira to set it to https://sophira.vercel.app and redeploy, then try again."
+        );
+        return;
+      }
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: confirmUrl },
+      });
       if (signUpError) {
         // The database rejects a lost race and any non-invited signup
         // with the honest invitation message - surface it plainly,
