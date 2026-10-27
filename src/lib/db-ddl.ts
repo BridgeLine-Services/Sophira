@@ -49,6 +49,18 @@ export function directPostgresConfigured(): boolean {
  * Supabase project ref (derived from the public project URL) must appear
  * in the connection's hostname.
  */
+/** Same-project rule, applied to ANY candidate URL (never weakened). */
+export function sameProjectUrl(url: string): boolean {
+  const ref = supabaseProjectRef();
+  if (!ref) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.host.includes(ref) || decodeURIComponent(parsed.username).includes(ref);
+  } catch {
+    return false;
+  }
+}
+
 export function connectionTarget(): "same-project" | "foreign" | "none" {
   const url = rawConnectionString();
   if (!url) return "none";
@@ -140,10 +152,88 @@ function rawConnectionString(): string | null {
 
 /** The VERIFIED connection string: only a direct connection that points at
  *  THIS project's own Supabase database (see connectionTarget) is used. */
+/** Every same-project connection candidate, BEST-FIRST: IPv4-reachable
+ *  pooler hosts first, unknown hosts next, direct "db.<ref>" hosts LAST
+ *  (they are IPv6-only and unreachable from Vercel - live finding). */
+export function connectionCandidates(): string[] {
+  const urls: string[] = [];
+  for (const name of CONNECTION_ENV_NAMES) {
+    if (present(name)) urls.push(process.env[name]!);
+  }
+  const derived = rawConnectionString();
+  if (derived && !urls.includes(derived)) urls.push(derived);
+  const seen = new Set<string>();
+  const ok = urls.filter((u) => {
+    if (seen.has(u)) return false;
+    seen.add(u);
+    return sameProjectUrl(u);
+  });
+  const pooled = ok.filter((u) => u.includes(".pooler.supabase.com"));
+  const direct = ok.filter((u) => {
+    if (u.includes(".pooler.supabase.com")) return false;
+    try { return new URL(u).host.startsWith("db."); } catch { return false; }
+  });
+  const middle = ok.filter((u) => !pooled.includes(u) && !direct.includes(u));
+  return [...pooled, ...middle, ...direct];
+}
+
+const CONNECT_TIMEOUT_MS = 5000;
+const WINNER_TTL_MS = 5 * 60_000;
+const ALL_FAILED_TTL_MS = 20_000;
+let winner: { index: number; at: number } | null = null;
+let allFailedAt = 0;
+
+/** Short category only - never a URL, host, or credential. */
+function classifyConnectError(err: unknown): string {
+  const m = String((err as { message?: string } | null)?.message ?? err);
+  if (/timeout|ETIMEDOUT|timeout expired/i.test(m)) return "timeout";
+  if (/ECONNREFUSED|refused/i.test(m)) return "refused";
+  if (/password|authentication|SASL|28000|28P01/i.test(m)) return "auth";
+  if (/ssl|certificate/i.test(m)) return "ssl";
+  if (/ENOTFOUND|EAI_AGAIN|dns/i.test(m)) return "dns";
+  return "network";
+}
+
+/** Test seam: clear the connection cache (additive; used by tests only). */
+export function resetConnectionCache(): void {
+  winner = null;
+  allFailedAt = 0;
+}
+
+/** Connect using the first REACHABLE same-project candidate. */
+export async function connectFirstWorking(): Promise<{ client: Client; index: number } | null> {
+  const candidates = connectionCandidates();
+  if (candidates.length === 0) return null;
+  if (allFailedAt && Date.now() - allFailedAt < ALL_FAILED_TTL_MS) return null;
+  const order = candidates.map((_, i) => i);
+  if (winner && Date.now() - winner.at < WINNER_TTL_MS && winner.index < candidates.length) {
+    const at = order.indexOf(winner.index);
+    if (at > 0) { order.splice(at, 1); order.unshift(winner.index); }
+  }
+  for (const index of order) {
+    const url = candidates[index];
+    const client = new Client({
+      connectionString: stripSslmode(url),
+      ssl: sslConfigFor(url),
+      connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+    });
+    try {
+      await client.connect();
+      winner = { index, at: Date.now() };
+      allFailedAt = 0;
+      return { client, index };
+    } catch (err) {
+      try { await client.end(); } catch { /* already closed */ }
+      console.error(`db: connection candidate ${index} failed (${classifyConnectError(err)})`);
+    }
+  }
+  allFailedAt = Date.now();
+  return null;
+}
+
 export function connectionString(): string | null {
-  const raw = rawConnectionString();
-  if (raw === null) return null;
-  return connectionTarget() === "same-project" ? raw : null;
+  const candidates = connectionCandidates();
+  return candidates.length > 0 ? candidates[0] : null;
 }
 
 /**
@@ -251,11 +341,10 @@ export async function probeSchemaStateDirect(): Promise<DirectSchemaProbe> {
     studentMemories: null, ownerBootstrap: null, invitations: null,
     schemaVersionRow: null, ownerExists: null, ownerActive: null,
   };
-  const url = connectionString();
-  if (!url) return out;
-  const client = new Client({ connectionString: stripSslmode(url), ssl: sslConfigFor(url) });
+  const connected = await connectFirstWorking();
+  if (!connected) return out;
+  const client = connected.client;
   try {
-    await client.connect();
     out.ok = true;
     const exists = (rel: string) =>
       oneBool(client, `select to_regclass('${rel}') is not null as v`);
@@ -312,11 +401,10 @@ export async function applyMigrationChainDirect(): Promise<{
    *  migration failures stay fully categorical). */
   detail?: string;
 }> {
-  const url = connectionString();
-  if (!url) return { ok: false, applied: 0 };
-  const client = new Client({ connectionString: stripSslmode(url), ssl: sslConfigFor(url) });
+  const connected = await connectFirstWorking();
+  if (!connected) return { ok: false, applied: 0 };
+  const client = connected.client;
   try {
-    await client.connect();
     // 1. PROBE: which migrations are already applied (marker objects).
     //    Failure-tolerant BY DESIGN (live-deployment finding 2026-10-07):
     //    a marker like `conrelid = 'public.profiles'::regclass` THROWS
@@ -361,7 +449,7 @@ export async function applyMigrationChainDirect(): Promise<{
         // connection string or credentials). Never returned to users.
         console.error(
           `[setup] migration ${entry.name} failed (${categorizeFailure(err)}):`,
-          String((err as { message?: string })?.message ?? "unknown error").replace(url, "[connection]")
+          String((err as { message?: string })?.message ?? "unknown error").replace(/postgres(ql)?:\/\/\S+/g, "[connection]")
         );
         try {
           await client.query("ROLLBACK;");
@@ -383,7 +471,7 @@ export async function applyMigrationChainDirect(): Promise<{
     // Categorical only: never leak connection details or driver errors.
     console.error(
       "[setup] migration chain connection phase failed:",
-      String((err as { message?: string })?.message ?? "unknown error").replace(url, "[connection]")
+      String((err as { message?: string })?.message ?? "unknown error").replace(/postgres(ql)?:\/\/\S+/g, "[connection]")
     );
     try {
       await client.end();

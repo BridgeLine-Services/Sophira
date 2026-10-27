@@ -3503,6 +3503,40 @@ async function runResearchModeTests(): Promise<void> {
   }
 }
 
+async function runConnectionCandidateTests(): Promise<void> {
+  const { connectionCandidates, sameProjectUrl, connectFirstWorking, resetConnectionCache } = await import("../src/lib/db-ddl");
+  const saved: Record<string, string | undefined> = {};
+  const names = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL", "POSTGRES_URL_NON_POOLING", "POSTGRES_URL", "SUPABASE_DB_URL_NON_POOLING", "SUPABASE_DB_URL", "SUPABASE_DB_PASSWORD", "DATABASE_URL"];
+  for (const n of names) saved[n] = process.env[n];
+  try {
+    const ref = "abcdefghijklmnop";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = `https://${ref}.supabase.co`;
+    process.env.SUPABASE_URL = `https://${ref}.supabase.co`;
+    process.env.POSTGRES_URL_NON_POOLING = `postgresql://postgres:pw@db.${ref}.supabase.co:5432/postgres`;
+    process.env.POSTGRES_URL = `postgresql://postgres.${ref}:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres`;
+    process.env.SUPABASE_DB_URL_NON_POOLING = `postgresql://postgres:pw@db.otherprojectref.supabase.co:5432/postgres`;
+    delete process.env.SUPABASE_DB_URL;
+    delete process.env.SUPABASE_DB_PASSWORD;
+    delete process.env.DATABASE_URL;
+    const cands = connectionCandidates();
+    assert(cands.length > 0 && cands[0].includes(".pooler.supabase.com"),
+      "db: the IPv4-reachable pooler URL is tried FIRST when both forms are configured");
+    assert(cands[cands.length - 1].includes(`db.${ref}.supabase.co`),
+      "db: the IPv6-only direct host is tried LAST, never first");
+    assert(!cands.some((u) => u.includes("otherprojectref")),
+      "db: a connection string for a DIFFERENT project is still rejected (same-project rule unchanged)");
+    resetConnectionCache();
+    const failed = await connectFirstWorking();
+    assert(failed === null, "db: when no candidate is reachable, connectFirstWorking returns null (honest, no throw)");
+  } finally {
+    for (const n of names) {
+      if (saved[n] === undefined) delete process.env[n];
+      else process.env[n] = saved[n];
+    }
+    resetConnectionCache();
+  }
+}
+
 async function runSupabaseUrlTests(): Promise<void> {
   const { normalizeSupabaseUrl, chooseUrlFromCandidates, projectDashboardLinks } = await import("../src/lib/supabase-config");
   const n1 = normalizeSupabaseUrl("https://abc.supabase.co/rest/v1/");
@@ -3738,5 +3772,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

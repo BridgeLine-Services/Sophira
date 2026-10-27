@@ -212,7 +212,7 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "ddl: the direct runtime path applies the repository's own embedded chain, one transaction per migration, with rollback - fail-loud, never silent");
   assert(ddlSrc.includes("directPostgresConfigured") && ddlSrc.includes("POSTGRES_URL_NON_POOLING") && ddlSrc.includes("SUPABASE_DB_PASSWORD"),
     "ddl: the zero-configuration credentials auto-provisioned by the Vercel Supabase Integration are used automatically");
-  assert(ddlSrc.includes("console.error") && ddlSrc.includes(".replace(url, \"[connection]\")"),
+  assert(ddlSrc.includes("console.error") && ddlSrc.includes('.replace(/postgres(ql)?:\\/\\/\\S+/g, "[connection]")'),
     "ddl: migration failures ARE logged server-side for developers (requirement 1) with the connection string scrubbed");
   assert(!/console\.(log|info|warn|debug|trace)\(/.test(ddlSrc),
     "ddl: no casual logging levels - only error-level developer diagnostics");

@@ -17,8 +17,7 @@
  *   - nothing here is ever imported by client code.
  */
 
-import { Client } from "pg";
-import { directPostgresConfigured, connectionString, sslConfigFor, stripSslmode } from "./db-ddl";
+import { directPostgresConfigured, connectionString, connectFirstWorking } from "./db-ddl";
 import { publicSupabaseUrl } from "./supabase-config";
 
 const DB_FUNCTIONS = new Set(["revoke_all_sessions"] as const);
@@ -41,11 +40,10 @@ async function withClient<T>(
   fn: (client: { query: (q: string, p?: unknown[]) => Promise<{ rows: unknown[] }> }) => Promise<T>
 ): Promise<T | null> {
   if (!directPostgresConfigured()) return null;
-  const url = connectionString();
-  if (!url) return null;
-  const client = new Client({ connectionString: stripSslmode(url), ssl: sslConfigFor(url) });
+  const connected = await connectFirstWorking();
+  if (!connected) return null;
+  const client = connected.client;
   try {
-    await client.connect();
     return await fn(client as unknown as Parameters<typeof fn>[0]);
   } catch {
     return null;
@@ -133,6 +131,20 @@ export async function listProfileIds(): Promise<string[] | null> {
 /** Server-fingerprint for this module in diagnostics (never any secret). */
 export function privilegedChannelConfigured(): boolean {
   return directPostgresConfigured();
+}
+
+/** TRUE only when a candidate actually CONNECTS right now (used to decide
+ *  whether to attempt the direct path or go straight to the working
+ *  PostgREST fallback). Never returns a client or any connection detail. */
+export async function privilegedChannelReachable(): Promise<boolean> {
+  const connected = await connectFirstWorking();
+  if (!connected) return false;
+  try {
+    await connected.client.end();
+  } catch {
+    /* already closed */
+  }
+  return true;
 }
 
 /** Convenience: the GoTrue admin endpoint base (used together with the
