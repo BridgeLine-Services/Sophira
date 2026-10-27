@@ -60,9 +60,19 @@ export async function sendInvitationEmail(opts: {
     if (res.ok && json.id) {
       return { status: "sent", providerId: json.id };
     }
+    // 2026-10-27: Resend's default sender (onboarding@resend.dev) only accepts
+    // the account owner's own address until a domain is verified - that
+    // rejection is otherwise cryptic. Status values are unchanged.
+    const providerMessage = String(json.message ?? "");
+    if (res.status === 403 || /domain|testing/i.test(providerMessage)) {
+      return {
+        status: "failed",
+        reason: "Your email service only allows sending to your own address until you verify a domain. Use the copy link instead.",
+      };
+    }
     return {
       status: "failed",
-      reason: `The email provider rejected the send${json.message ? ` (${String(json.message).slice(0, 120)})` : ""}. Share the invitation link below.`,
+      reason: `The email provider rejected the send${providerMessage ? ` (${providerMessage.slice(0, 120)})` : ""}. Share the invitation link below.`,
     };
   } catch {
     return {

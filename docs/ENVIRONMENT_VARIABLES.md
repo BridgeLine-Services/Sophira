@@ -120,3 +120,16 @@ this token the page shows the exact manual Run-workflow link instead.
 - `SOPHIRA_INVITE_FROM_EMAIL` — the From address (e.g.
   `Sophira <invitations@yourdomain.com>`). The provider requires the domain
   to be verified first; until then the provider default is used.
+
+## Why friend invites may not email (plain English)
+
+Resend's default sender (`onboarding@resend.dev`) is only allowed to email the
+address that owns the Resend account until you verify a domain. So an invite to
+a friend can be rejected even though everything is configured correctly.
+
+The copy link always works and needs no email service at all: after generating
+an invitation, press **Copy invitation link** and send it to your friend by text
+or any messaging app. They open it, choose a password, and they are in.
+
+To make invites email automatically, verify a domain at resend.com and set
+`INVITE_FROM_EMAIL` to an address on that domain.

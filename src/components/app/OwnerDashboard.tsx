@@ -29,6 +29,9 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
+  // 2026-10-27: when the provider cannot email (default Resend sender can only
+  // reach the owner's own address), the COPY LINK becomes the primary result.
+  const [inviteEmailBlocked, setInviteEmailBlocked] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<NetworkMemberStats | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -73,6 +76,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
       if (res.ok) {
         setInviteLink(json.data.link);
         setInviteNote(json.data.email_note ?? null);
+        setInviteEmailBlocked(json.data.email_status === "not_configured" || json.data.email_status === "failed");
         setInviteEmail("");
         await refresh();
       } else {
@@ -290,6 +294,16 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                 {inviteBusy ? "Creating…" : "Generate invitation link"}
               </Button>
             </form>
+            {inviteLink && inviteEmailBlocked && (
+              <div className="mt-3 rounded-card border border-accent/40 bg-accent-soft/50 p-4">
+                <p className="text-sm font-medium text-ink">
+                  Send this link to your friend by text or any messaging app. They open it, choose a password, and they&apos;re in.
+                </p>
+                <Button className="mt-3 w-full sm:w-auto" onClick={() => copy(inviteLink)}>
+                  <Copy className="h-4 w-4" /> Copy invitation link
+                </Button>
+              </div>
+            )}
             {inviteLink && (
               <div className="mt-3 flex items-center gap-2 rounded-card border border-accent/30 bg-accent-soft/40 p-2">
                 <code className="min-w-0 flex-1 truncate text-xs text-accent">{inviteLink}</code>
