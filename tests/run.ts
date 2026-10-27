@@ -3585,6 +3585,20 @@ async function runOwnerSetupTests(): Promise<void> {
   }));
   assert(e.ready === false, "setup: owner email configured but no account => not ready");
   assert(e.ownerCreation.possible === true, "setup: owner creation possible regardless of how the email restriction is set");
+  // 2026-10-27 live case: schema missing AND direct Postgres unreachable AND
+  // no management token. The old copy promised an automatic repair that
+  // cannot run; the guidance must give the two paths that DO work.
+  const missSchema = evaluateOwnerSetup(mk({
+    supabaseConfigured: true, serviceRoleConfigured: true, database: "checked",
+    migrationsPresent: false, ownerAccount: "none", ownerBootstrapPresent: false,
+    migrationAutomationConfigured: true, setupChannel: "direct-postgres",
+    directProbeFailed: true, probeChannel: "rest",
+  }));
+  assert(missSchema.guidance.some((g) => g.includes("bootstrap-all.sql") && g.includes("SQL Editor")),
+    "setup: missing schema + unreachable direct pg gives the paste-the-SQL path, not a repair button that would fail");
+  assert(!missSchema.guidance.some((g) => g.includes("it prepares the database automatically, entirely from the app")),
+    "setup: no false promise of automatic repair when the platform cannot reach the database");
+
   // 2026-10-27 production defect: Vercel cannot reach Supabase's direct
   // Postgres port, yet the app + owner flow use PostgREST successfully.
   // The probe must FALL BACK to REST instead of declaring "cannot check".

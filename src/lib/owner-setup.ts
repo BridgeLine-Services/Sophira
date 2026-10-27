@@ -472,7 +472,13 @@ export function evaluateOwnerSetup(probe: OwnerSetupProbe): OwnerSetupStatus {
   }
   if (probe.database === "checked") {
     if (probe.migrationsPresent === false) {
-      if (probe.migrationAutomationConfigured) {
+      if (probe.directProbeFailed && probe.setupChannel !== "management-api") {
+        // 2026-10-27: in this deployment the automatic repair CANNOT run
+        // (the host cannot reach Supabase's direct Postgres port and no
+        // management token is configured). Never promise a button that
+        // would fail: give the two paths that actually work.
+        guidance.push("The Sophira tables are missing and automatic repair cannot run from this hosting platform yet. Fastest fix: open your Supabase dashboard, choose SQL Editor, paste the complete contents of supabase/bootstrap-all.sql from the repository and click Run, then reload /create-owner. Alternative: set SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF on the deployment, redeploy, then use Set Up Sophira in /setup.");
+      } else if (probe.migrationAutomationConfigured) {
         guidance.push("Open /setup and use Set Up Sophira - it prepares the database automatically, entirely from the app. No manual SQL, no tokens, no database editing.");
       } else {
         guidance.push("Open /setup and use Set Up Sophira - it prepares the database automatically, entirely from the app. If the action is unavailable, reconnect the Vercel project to its Supabase project (the official Supabase integration provisions the connection automatically); no tokens, no repository secrets, no manual SQL are ever needed.");
