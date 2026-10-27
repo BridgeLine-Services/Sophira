@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { selectRow, updateProfileColumns, callDbFunction, privilegedChannelConfigured } from "@/lib/db-privileged";
+import { selectRow, updateProfileColumns, callDbFunction, privilegedChannelConfigured, privilegedChannelReachable } from "@/lib/db-privileged";
 import { requireOwner } from "@/lib/supabase/guard";
 
 export const runtime = "nodejs";
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   // database channel (restricted new-style admin keys cannot read
   // PostgREST tables); the admin client is only the fallback for
   // deployments without a direct connection.
-  const direct = privilegedChannelConfigured();
+  const direct = await privilegedChannelReachable();
   const admin = direct ? null : createAdminClient();
   const target = direct
     ? await selectRow("profiles", "id", user_id)

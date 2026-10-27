@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { publicSupabaseUrl, serviceRoleKey } from "../../../lib/supabase-config";
 import { createClient } from "../../../lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { callDbFunction, privilegedChannelConfigured, provisionSignedInUser, ensureAuthRedirectConfig } from "../../../lib/db-privileged";
+import { callDbFunction, privilegedChannelConfigured, privilegedChannelReachable, provisionSignedInUser, ensureAuthRedirectConfig } from "../../../lib/db-privileged";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
   //   owner belongs to a different REAL account -> honest 409.
   // The user id is the SERVER-verified session id; the repair runs over
   // the verified direct channel, never from browser input.
-  if (privilegedChannelConfigured()) {
+  if (await privilegedChannelReachable()) {
     // PASSWORD-RESET LINK FIX (fire-and-forget): corrects the Supabase Auth
     // Site URL / redirect allow-list when they point at a dead domain.
     void ensureAuthRedirectConfig();
