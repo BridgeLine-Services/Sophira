@@ -120,3 +120,22 @@ Fix:
 4. Restart the dev server after editing `.env.local`.
 Non-AI features keep working; Sophira will not silently call a paid
 cloud provider as a substitute.
+
+## Friend can't sign up (no confirmation email)
+
+Supabase's built-in email sender only delivers to members of the Supabase
+project and is heavily rate-limited, so a friend usually never receives the
+confirmation message. Two fixes, both in the Supabase dashboard:
+
+**Fix A — turn confirmation off (simplest, recommended for a private invite-only app).**
+1. Supabase dashboard → Authentication → Providers → Email.
+2. Turn OFF "Confirm email" and save.
+3. Ask your friend to sign up again with the same invitation link.
+Invitations already verify the address, because only the owner can create one
+for a specific email, so this does not open the app to strangers.
+
+**Fix B — use your own email service.**
+1. Supabase dashboard → Authentication → SMTP Settings.
+2. Enter your Resend SMTP host, port 465, username `resend`, and your API key as the password.
+3. Set the sender to an address on a domain you have verified at resend.com.
+4. Ask your friend to sign up again.

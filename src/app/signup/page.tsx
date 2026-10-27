@@ -113,6 +113,10 @@ function SignUpForm() {
           <p className="mt-2 text-sm text-ink-soft">
             Confirm your email via the link we sent to {invitation.email}, then sign in.
           </p>
+          <p className="mt-2 text-xs text-ink-soft">
+            If no email arrives within a few minutes, ask the person who invited you to check that email
+            confirmation is turned off in their Supabase settings, or to send you a new link.
+          </p>
           <Link href="/login" className="mt-4 inline-block text-sm text-accent hover:underline">
             Go to sign in
           </Link>
