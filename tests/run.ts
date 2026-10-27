@@ -3480,7 +3480,7 @@ async function runMemoryTests(): Promise<void> {
 // secrets, never imply a predefined owner password, and reports honestly.
 // ---------------------------------------------------------------------------
 async function runSupabaseUrlTests(): Promise<void> {
-  const { normalizeSupabaseUrl, chooseUrlFromCandidates } = await import("../src/lib/supabase-config");
+  const { normalizeSupabaseUrl, chooseUrlFromCandidates, projectDashboardLinks } = await import("../src/lib/supabase-config");
   const n1 = normalizeSupabaseUrl("https://abc.supabase.co/rest/v1/");
   assert(n1.url === "https://abc.supabase.co" && (n1.reason ?? "").includes("path removed"),
     "supabase url: a /rest/v1 suffix is stripped to the bare origin (caused 'Invalid path specified in request URL' in production)");
@@ -3493,6 +3493,21 @@ async function runSupabaseUrlTests(): Promise<void> {
   assert(normalizeSupabaseUrl("http://127.0.0.1:54321").url === "http://127.0.0.1:54321",
     "supabase url: loopback dev URLs are allowed outside production");
   assert(normalizeSupabaseUrl("not a url").url === null, "supabase url: garbage is rejected");
+  const links = projectDashboardLinks("https://abcdefghijklmnop.supabase.co/rest/v1");
+  assert(links.sqlEditorUrl === "https://supabase.com/dashboard/project/abcdefghijklmnop/sql/new",
+    "setup links: the SQL editor URL is derived from the public project URL (path stripped)");
+  assert(links.integrationsUrl !== null && links.integrationsUrl.includes("/integrations/vercel"),
+    "setup links: the Vercel integration deep link exists for the one-click path");
+  assert(projectDashboardLinks(null).sqlEditorUrl === null && projectDashboardLinks("nonsense").sqlEditorUrl === null,
+    "setup links: no link is fabricated without a valid project URL");
+  {
+    const { readFileSync } = await import("fs");
+    const wizard = readFileSync("src/app/setup/SetupWizard.tsx", "utf8");
+    assert(wizard.includes('channel === "direct-postgres"') && wizard.includes("sqlEditorUrl") && wizard.includes("one-time setup file"),
+      "setup UI: the unreachable-direct-database state offers the real SQL-editor + setup-file path (not just 'open diagnostics')");
+    assert(wizard.includes('onClick={() => router.refresh()}'),
+      "setup UI: Check again re-runs the real status probe after the owner acts");
+  }
   const c1 = chooseUrlFromCandidates({ classic: "https://ok.supabase.co", newStyle: "https://ok.supabase.co/rest/v1", dbRef: "ok" });
   assert(c1.url === "https://ok.supabase.co" && c1.issues.length >= 1,
     "supabase url: a malformed variable is normalized, not passed through as-is");

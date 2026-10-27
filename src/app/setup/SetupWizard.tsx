@@ -25,12 +25,16 @@ export default function SetupWizard({
   needsDatabase,
   channel,
   supabaseIntegrationsUrl,
+  sqlEditorUrl,
+  setupSqlUrl,
 }: {
   available: boolean;
   reason: string;
   needsDatabase: boolean;
   channel: "direct-postgres" | "management-api" | "none";
   supabaseIntegrationsUrl: string | null;
+  sqlEditorUrl: string | null;
+  setupSqlUrl: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -83,7 +87,7 @@ export default function SetupWizard({
           ? "Sophira can prepare everything for you automatically. This usually takes under a minute."
           : channel === "none"
             ? "Sophira needs a one-time connection to prepare your database automatically. Open your Sophira database dashboard with the button below, choose Vercel, press Connect project, and pick your Sophira - then come back and press Check again. That single connection is the only step; no passwords to copy, no SQL, nothing else."
-            : "Automatic setup is temporarily unavailable - open Advanced diagnostics below for the exact state."}
+            : "Sophira could not reach your database directly from this hosting platform, so the one-click setup cannot run here. The manual path below takes about two minutes and needs no technical knowledge."}
       </p>
       {available && (
         <button
@@ -114,6 +118,45 @@ export default function SetupWizard({
           >
             Check again
           </button>
+        </div>
+      )}
+      {!available && channel === "direct-postgres" && (
+        <div className="mt-4 space-y-3 text-sm">
+          <ol className="list-decimal space-y-2 pl-5">
+            <li>
+              Open{" "}
+              {sqlEditorUrl ? (
+                <a className="font-medium text-accent underline" href={sqlEditorUrl} target="_blank" rel="noopener noreferrer">
+                  your Supabase SQL editor
+                </a>
+              ) : (
+                "your Supabase project's SQL editor"
+              )}{" "}
+              in a new tab.
+            </li>
+            <li>
+              Open the{" "}
+              <a className="font-medium text-accent underline" href={setupSqlUrl} target="_blank" rel="noopener noreferrer">
+                one-time setup file
+              </a>
+              , select all of it (Ctrl+A / Cmd+A), copy, and paste it into the SQL editor.
+            </li>
+            <li>
+              Press <strong>Run</strong> in Supabase. It finishes in a few seconds and never deletes anything.
+            </li>
+            <li>
+              Return here and press <strong>Check again</strong>.
+            </li>
+          </ol>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="rounded-lg bg-accent px-5 py-2.5 font-medium text-white"
+            >
+              Check again
+            </button>
+          </div>
         </div>
       )}
       {step >= 0 && step < PROGRESS_STEPS.length && (

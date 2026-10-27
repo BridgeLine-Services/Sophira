@@ -163,6 +163,26 @@ export function chooseUrlFromCandidates(input: { classic: string | null; newStyl
   return { source: null, url: null, issues };
 }
 
+
+/**
+ * Dashboard deep links derived from the PUBLIC project URL (no secret).
+ * Used by /setup so a non-technical owner gets one-click destinations
+ * instead of instructions to "find the project ref".
+ */
+export function projectDashboardLinks(publicUrl: string | null): {
+  sqlEditorUrl: string | null;
+  integrationsUrl: string | null;
+} {
+  const normalized = publicUrl ? normalizeSupabaseUrl(publicUrl) : null;
+  if (!normalized || !normalized.url) return { sqlEditorUrl: null, integrationsUrl: null };
+  const ref = urlProjectRef(normalized.url);
+  if (!ref) return { sqlEditorUrl: null, integrationsUrl: null };
+  return {
+    sqlEditorUrl: `https://supabase.com/dashboard/project/${ref}/sql/new`,
+    integrationsUrl: `https://supabase.com/dashboard/project/${ref}/integrations/vercel`,
+  };
+}
+
 export function publicSupabaseUrl(): string | null {
   return choosePublicUrl().url;
 }
