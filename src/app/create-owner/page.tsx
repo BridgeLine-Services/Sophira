@@ -49,6 +49,20 @@ export default function CreateOwnerPage() {
   const [repairing, setRepairing] = useState(false);
   const [repairResult, setRepairResult] = useState<string | null>(null);
 
+  // 2026-10-28: when the database still needs its first-owner pieces, the
+  // page repairs it on arrival. The owner never clicks "Check again" and
+  // never needs to understand why it was needed.
+  const [autoRepairTried, setAutoRepairTried] = useState(false);
+  useEffect(() => {
+    if (autoRepairTried) return;
+    if (status?.state === "SETUP_REQUIRED" && status.repair?.available) {
+      setAutoRepairTried(true);
+      void repair();
+    }
+  }, [status, autoRepairTried]);
+
+
+
   const refreshStatus = useCallback(async () => {
     try {
       const r = await fetch("/api/setup-status", { cache: "no-store" });
