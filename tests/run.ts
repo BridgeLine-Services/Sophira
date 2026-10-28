@@ -3542,6 +3542,26 @@ async function runConnectionCandidateTests(): Promise<void> {
   }
 }
 
+async function runOwnerFlowSimplicityTests(): Promise<void> {
+  const { readFileSync } = await import("fs");
+  const setup = readFileSync("src/app/setup/page.tsx", "utf8");
+  const owner = readFileSync("src/app/create-owner/page.tsx", "utf8");
+  const email = readFileSync("src/lib/invitations/email.ts", "utf8");
+  const mig = readFileSync("supabase/migrations/0008_invitation_only_signup.sql", "utf8");
+  assert(setup.includes('hint: "Initializing your workspace..."'),
+    "setup: the database step says 'Initializing your workspace...' in plain language");
+  assert(setup.includes("const supabaseIntegrationsUrl: string | null = null") && setup.includes("const sqlEditorUrl: string | null = null"),
+    "setup: the owner flow never sends people to the Supabase/Vercel dashboards");
+  assert(setup.includes("Advanced (for administrators/maintenance)"),
+    "setup: developer diagnostics stay available behind the Advanced toggle");
+  assert(owner.includes("autoRepairTried") && owner.includes("void repair();"),
+    "owner: an unready database is repaired automatically on arrival (no 'Check again')");
+  assert(email.includes("Copy the invitation link below and send it"),
+    "invitations: with no email provider the owner is told to copy the real link");
+  assert(mig.includes("owner_email") && /raise exception/i.test(mig),
+    "security: migration 0008 still enforces owner_email + invitation-only signup (untouched)");
+}
+
 async function runAutoSetupTests(): Promise<void> {
   const { readFileSync } = await import("fs");
   const w = readFileSync("src/app/setup/SetupWizard.tsx", "utf8");
@@ -3855,5 +3875,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runAuthRedirectTests()).then(() => runAutoSetupTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

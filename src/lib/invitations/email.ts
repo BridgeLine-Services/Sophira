@@ -29,7 +29,7 @@ export async function sendInvitationEmail(opts: {
   if (!apiKey) {
     return {
       status: "not_configured",
-      reason: "No email provider is configured yet (RESEND_API_KEY). Share the invitation link below.",
+      reason: "Sophira cannot send email yet. Copy the invitation link below and send it to your friend by text or any messaging app.",
     };
   }
   const from = process.env.SOPHIRA_INVITE_FROM_EMAIL?.trim() || "Sophira <onboarding@resend.dev>";

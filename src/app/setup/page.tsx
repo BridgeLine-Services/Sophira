@@ -25,10 +25,13 @@ export default async function SetupPage() {
   // project URL - no secret involved). The official integration then
   // provisions the direct database connection automatically.
   const dashboard = projectDashboardLinks(process.env.NEXT_PUBLIC_SUPABASE_URL ?? null);
-  const supabaseIntegrationsUrl = dashboard.integrationsUrl;
+  // 2026-10-28: the owner never gets sent to a Supabase/Vercel dashboard from
+  // the normal flow. The app prepares the database itself; the manual paths
+  // stay reachable without dashboard links (setup text + automatic recheck).
+  const supabaseIntegrationsUrl: string | null = null;
   // 2026-10-27: the SQL-editor link is the reliable manual path when the
   // hosting platform cannot reach the database directly (live Vercel case).
-  const sqlEditorUrl = dashboard.sqlEditorUrl;
+  const sqlEditorUrl: string | null = null;
   const setupSqlUrl = "/api/setup-sql";
   const creation = status.ownerCreation;
   const connected = status.probe.supabaseConfigured;
@@ -37,7 +40,7 @@ export default async function SetupPage() {
 
   const checklist: { label: string; done: boolean; hint: string }[] = [
     { label: "Connect Sophira", done: connected, hint: "Sophira isn't connected to its private database yet - the exact missing variables are named in Advanced diagnostics below." },
-    { label: "Prepare your private database", done: databaseReady, hint: "Your Sophira database needs to be initialized." },
+    { label: "Prepare your private database", done: databaseReady, hint: "Initializing your workspace..." },
     { label: "Create your owner account", done: ownerReady, hint: "The first account you create becomes the owner." },
     { label: "Finish setup", done: status.ready === true, hint: "Your private Sophira is almost ready." },
   ];
@@ -125,8 +128,7 @@ export default async function SetupPage() {
 
       {/* ---------- Advanced diagnostics (collapsible, technical) ---------- */}
       <details className="mt-8 rounded-xl border p-6">
-        <summary className="cursor-pointer text-sm font-medium text-ink-soft">
-          Advanced diagnostics (for administrators/maintenance)
+        <summary className="cursor-pointer text-sm font-medium text-ink-soft">Advanced (for administrators/maintenance)
         </summary>
         <div className="mt-4 space-y-4">
           <p className="text-sm text-ink-soft">

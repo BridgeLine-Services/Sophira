@@ -1,3 +1,9 @@
+/**
+ * SECURITY NOTE (2026-10-28): `app_config.owner_email` (and the invitation-only
+ * signup trigger in migration 0008) are operator-controlled values. They are
+ * set only by the operator/database bootstrap - never written from this module
+ * and never exposed by any UI. The interface reports presence, never the value.
+ */
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
 import { setupChannel, connectionTarget, directPostgresConfigured, probeSchemaStateDirect } from "./db-ddl";
