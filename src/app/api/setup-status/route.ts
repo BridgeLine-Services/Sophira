@@ -25,7 +25,7 @@ export async function GET() {
   // the wizard had NO anon/authenticated grants — categorical only.
   const grants = await checkAuthenticatedGrants();
   // Invitation delivery capabilities (booleans only - never values).
-  const { emailProviderConfigured, smsConfigured } = await import("@/lib/invitations/delivery");
+  const { emailProviderConfigured, smsConfigured, deliveryDiagnostics } = await import("@/lib/invitations/delivery");
   const delivery = {
     email: emailProviderConfigured(),
     sms: smsConfigured(),
@@ -37,7 +37,7 @@ export async function GET() {
   };
   return Response.json({
     ok: true,
-    delivery,
+    delivery: { ...delivery, detail: deliveryDiagnostics() },
     name: "sophira-setup",
     state: status.state,
     // The precise missing infrastructure capability (requirement K/L) -

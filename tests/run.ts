@@ -3562,6 +3562,48 @@ async function runOwnerFlowSimplicityTests(): Promise<void> {
     "security: migration 0008 still enforces owner_email + invitation-only signup (untouched)");
 }
 
+async function runDeliveryCapabilityTests(): Promise<void> {
+  const { deliveryDiagnostics } = await import("../src/lib/invitations/delivery.js");
+  const { readFileSync } = await import("fs");
+  const keys = ["RESEND_API_KEY","SOPHIRA_INVITE_FROM_EMAIL","EMAIL_API_URL","EMAIL_API_KEY","EMAIL_FROM","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER"];
+  const saved: Record<string,string|undefined> = {};
+  for (const k of keys) { saved[k] = process.env[k]; delete process.env[k]; }
+  try {
+    const none = deliveryDiagnostics();
+    assert(!none.email.configured && none.email.provider === null && none.email.missing.length > 0,
+      "delivery: with NO email provider the diagnostics say not configured and name what is missing");
+    assert(!none.sms.configured && none.sms.missing.length === 3 && none.manualLink,
+      "delivery: with NO Twilio config all three variables are named, and the copy link stays available");
+    process.env.RESEND_API_KEY = "re_test_key_value";
+    process.env.SOPHIRA_INVITE_FROM_EMAIL = "Sophira <invites@example.com>";
+    const resend = deliveryDiagnostics();
+    assert(resend.email.configured && resend.email.provider === "resend",
+      "delivery: RESEND_API_KEY alone selects the Resend provider");
+    assert(!JSON.stringify(resend).includes("re_test_key_value"),
+      "delivery: diagnostics never echo the credential value");
+    delete process.env.RESEND_API_KEY;
+    process.env.EMAIL_API_URL = "https://postmark.example/email";
+    process.env.EMAIL_API_KEY = "generic_secret_value";
+    const partial = deliveryDiagnostics();
+    assert(!partial.email.configured && partial.email.missing.includes("EMAIL_FROM"),
+      "delivery: a partial generic provider names the one missing variable instead of claiming readiness");
+    process.env.EMAIL_FROM = "Sophira <invites@example.com>";
+    assert(deliveryDiagnostics().email.provider === "generic" && deliveryDiagnostics().email.configured,
+      "delivery: the generic provider is usable once URL, key and sender are present");
+    process.env.TWILIO_ACCOUNT_SID = "AC_test"; process.env.TWILIO_AUTH_TOKEN = "tok_test"; process.env.TWILIO_PHONE_NUMBER = "+15550000000";
+    assert(deliveryDiagnostics().sms.configured && deliveryDiagnostics().sms.missing.length === 0,
+      "delivery: all three Twilio variables make SMS available");
+    const manifest = readFileSync("src/config/env.manifest.json", "utf8");
+    for (const n of ["SOPHIRA_INVITE_FROM_EMAIL","EMAIL_API_URL","EMAIL_API_KEY","EMAIL_FROM","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER"])
+      assert(manifest.includes(`"name": "${n}"`), `delivery: ${n} is declared in the authoritative manifest`);
+    const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+    assert(dash.includes("disabled={cap ? !cap.sms : false}") && dash.includes("Text not configured"),
+      "dashboard: a channel that cannot deliver is disabled and labelled, never a button that pretends to send");
+  } finally {
+    for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]!; }
+  }
+}
+
 async function runDeliveryEnvTests(): Promise<void> {
   const { readFileSync } = await import("fs");
   const manifest = readFileSync("src/config/env.manifest.json", "utf8");
@@ -4030,5 +4072,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

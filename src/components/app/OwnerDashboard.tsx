@@ -32,6 +32,31 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   // 2026-10-28: delivery channels (email / text / both) for one invitation.
   const [invitePhone, setInvitePhone] = useState("");
   const [inviteChannel, setInviteChannel] = useState<"email" | "sms" | "both">("email");
+  // 2026-10-28: never offer a channel Sophira cannot actually deliver on.
+  const [cap, setCap] = useState<{
+    email: boolean;
+    sms: boolean;
+    detail?: { email: { missing: string[] }; sms: { missing: string[] } };
+  } | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/setup-status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!live || !j?.delivery) return;
+        const d = j.delivery;
+        setCap({ email: Boolean(d.email), sms: Boolean(d.sms), detail: d.detail });
+        // A channel that cannot deliver must not stay selected.
+        if (d.email) setInviteChannel("email");
+        else if (d.sms) setInviteChannel("sms");
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  const smsReady = cap ? cap.sms : false;
+  const emailReady = cap ? cap.email : false;
   const [inviteDelivery, setInviteDelivery] = useState<string | null>(null);
   // 2026-10-27: when the provider cannot email (default Resend sender can only
   // reach the owner's own address), the COPY LINK becomes the primary result.
@@ -310,6 +335,19 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
               </div>
               <div>
                 <Label htmlFor="invite-channel">Send by</Label>
+                {cap && (
+                  <p className="mb-1 text-[11px] text-ink-soft">
+                    {emailReady ? "Email ready" : "Email not configured"} ·{" "}
+                    {smsReady ? "Text ready" : "Text not configured"}
+                    {!emailReady && cap.detail?.email.missing.length
+                      ? ` — email needs ${cap.detail.email.missing.join(", ")}`
+                      : ""}
+                    {!smsReady && cap.detail?.sms.missing.length
+                      ? ` — text needs ${cap.detail.sms.missing.join(", ")}`
+                      : ""}
+                    . The invitation link always works without either.
+                  </p>
+                )}
                 <select
                   id="invite-channel"
                   className="h-10 w-full rounded-lg border border-ink/15 bg-white px-3 text-sm text-ink sm:w-44"
@@ -317,8 +355,8 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                   onChange={(e) => setInviteChannel(e.target.value as "email" | "sms" | "both")}
                 >
                   <option value="email">Email</option>
-                  <option value="sms">Text message</option>
-                  <option value="both">Email and text</option>
+                  <option value="sms" disabled={cap ? !cap.sms : false}>Text message</option>
+                  <option value="both" disabled={cap ? !(cap.sms && cap.email) : false}>Email and text</option>
                 </select>
               </div>
               {inviteChannel !== "email" && (

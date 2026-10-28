@@ -28,6 +28,29 @@ export function emailProviderConfigured(): boolean {
   return Boolean((process.env.EMAIL_API_URL ?? "").trim() && (process.env.EMAIL_API_KEY ?? "").trim());
 }
 
+/** Categorical capability report - names and booleans only, never values. */
+export function deliveryDiagnostics(): {
+  email: { configured: boolean; provider: "resend" | "generic" | null; missing: string[] };
+  sms: { configured: boolean; missing: string[] };
+  manualLink: boolean;
+} {
+  const has = (n: string) => Boolean((process.env[n] ?? "").trim());
+  const resendReady = has("RESEND_API_KEY");
+  const genericReady = has("EMAIL_API_URL") && has("EMAIL_API_KEY");
+  const provider: "resend" | "generic" | null = resendReady ? "resend" : genericReady ? "generic" : null;
+  const emailMissing: string[] = [];
+  if (!resendReady && !genericReady) emailMissing.push("RESEND_API_KEY (_or_ EMAIL_API_URL + EMAIL_API_KEY)");
+  if (!resendReady && genericReady && !has("EMAIL_FROM")) emailMissing.push("EMAIL_FROM");
+  const smsMissing: string[] = [];
+  for (const n of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"]) if (!has(n)) smsMissing.push(n);
+  return {
+    email: { configured: emailMissing.length === 0, provider, missing: emailMissing },
+    sms: { configured: smsMissing.length === 0, missing: smsMissing },
+    // The copy-link path needs no provider at all - always available.
+    manualLink: true,
+  };
+}
+
 export function smsConfigured(): boolean {
   return Boolean(
     (process.env.TWILIO_ACCOUNT_SID ?? "").trim() &&
@@ -68,7 +91,10 @@ export async function sendEmail(opts: {
   fetchImpl?: FetchLike;
 }): Promise<ChannelResult> {
   const f = opts.fetchImpl ?? fetch;
-  const from = (process.env.EMAIL_FROM ?? "").trim() || EMAIL_FROM_DEFAULT;
+  const from =
+    (process.env.SOPHIRA_INVITE_FROM_EMAIL ?? "").trim() ||
+    (process.env.EMAIL_FROM ?? "").trim() ||
+    EMAIL_FROM_DEFAULT;
   const subject = "Your invitation to Sophira";
   const html = invitationHtml(opts.link, opts.siteUrl);
   const text = `You're invited to Sophira. Create your account: ${opts.link}`;
