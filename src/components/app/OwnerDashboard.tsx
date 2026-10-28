@@ -29,6 +29,10 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
+  // 2026-10-28: delivery channels (email / text / both) for one invitation.
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviteChannel, setInviteChannel] = useState<"email" | "sms" | "both">("email");
+  const [inviteDelivery, setInviteDelivery] = useState<string | null>(null);
   // 2026-10-27: when the provider cannot email (default Resend sender can only
   // reach the owner's own address), the COPY LINK becomes the primary result.
   const [inviteEmailBlocked, setInviteEmailBlocked] = useState(false);
@@ -70,12 +74,26 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
       const res = await fetch("/api/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail.trim(), expires_days: inviteExpires }),
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          phone: invitePhone.trim() || undefined,
+          channel: inviteChannel,
+          expires_days: inviteExpires,
+        }),
       });
       const json = await res.json();
       if (res.ok) {
         setInviteLink(json.data.link);
         setInviteNote(json.data.email_note ?? null);
+        setInviteDelivery(
+          json.data.delivery === "sent"
+            ? "Invitation sent."
+            : json.data.delivery === "partially_sent"
+              ? "Sent on one channel, not the other - see below and retry the failed one."
+              : json.data.delivery === "not_configured"
+                ? "Automatic sending is not configured yet. Share the link below."
+                : "Sending failed. Retry, or share the link below."
+        );
         setInviteEmailBlocked(json.data.email_status === "not_configured" || json.data.email_status === "failed");
         setInviteEmail("");
         await refresh();
@@ -290,8 +308,34 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                   <option value={90}>90 days</option>
                 </select>
               </div>
+              <div>
+                <Label htmlFor="invite-channel">Send by</Label>
+                <select
+                  id="invite-channel"
+                  className="h-10 w-full rounded-lg border border-ink/15 bg-white px-3 text-sm text-ink sm:w-44"
+                  value={inviteChannel}
+                  onChange={(e) => setInviteChannel(e.target.value as "email" | "sms" | "both")}
+                >
+                  <option value="email">Email</option>
+                  <option value="sms">Text message</option>
+                  <option value="both">Email and text</option>
+                </select>
+              </div>
+              {inviteChannel !== "email" && (
+                <div>
+                  <Label htmlFor="invite-phone">Phone (with country code)</Label>
+                  <input
+                    id="invite-phone"
+                    className="h-10 w-full rounded-lg border border-ink/15 bg-white px-3 text-sm text-ink sm:w-52"
+                    placeholder="+1 555 123 4567"
+                    value={invitePhone}
+                    onChange={(e) => setInvitePhone(e.target.value)}
+                    inputMode="tel"
+                  />
+                </div>
+              )}
               <Button type="submit" disabled={inviteBusy}>
-                {inviteBusy ? "Creating…" : "Generate invitation link"}
+                {inviteBusy ? "Sending…" : "Send Invitation"}
               </Button>
             </form>
             {inviteLink && inviteEmailBlocked && (
@@ -312,6 +356,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                 </Button>
               </div>
             )}
+      {inviteDelivery && <p className="mt-1 text-xs text-ink-soft">{inviteDelivery}</p>}
       {inviteNote && (
         <p className={"mt-1 text-xs " + (inviteNote.includes("Email sent to") ? "text-success" : "text-danger")}>{inviteNote}</p>
       )}

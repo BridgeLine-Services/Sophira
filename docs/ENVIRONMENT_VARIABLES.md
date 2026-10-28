@@ -133,3 +133,25 @@ or any messaging app. They open it, choose a password, and they are in.
 
 To make invites email automatically, verify a domain at resend.com and set
 `INVITE_FROM_EMAIL` to an address on that domain.
+
+## Invitation delivery (optional — the copy link always works)
+
+**Email.** Either provider works; nothing is required to invite someone,
+because the dashboard always shows a copyable invitation link.
+
+- `RESEND_API_KEY` — if you already use Resend. Its default sender only
+  reaches your own address until a domain is verified.
+- Or any transactional JSON API: `EMAIL_API_URL` (the endpoint),
+  `EMAIL_API_KEY`, and `EMAIL_FROM` (a verified sender such as
+  `Sophira <invitations@yourdomain.com>`).
+
+**Text message (SMS) — Twilio.**
+
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
+  (an SMS-capable Twilio number in E.164, e.g. `+15551234567`).
+  Trial accounts can only text verified numbers.
+
+All of these are server-side only. Check what is active without exposing
+values: `/api/setup-status` returns `delivery.email`, `delivery.sms` and
+`delivery.methods`. Invitations are always bound to the invited email
+address; SMS only changes how the link reaches the person.
