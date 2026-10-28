@@ -3562,6 +3562,80 @@ async function runOwnerFlowSimplicityTests(): Promise<void> {
     "security: migration 0008 still enforces owner_email + invitation-only signup (untouched)");
 }
 
+async function runInvitationDeliveryTests(): Promise<void> {
+  const { normalizePhone, deliverInvitation, emailProviderConfigured, smsConfigured } =
+    await import("../src/lib/invitations/delivery.js");
+  const saved = { ...process.env };
+  const setEnv = (k: string, v: string | undefined) => {
+    const bag = process.env as Record<string, string | undefined>;
+    if (v === undefined) delete bag[k]; else bag[k] = v;
+  };
+  const clearDelivery = () => {
+    for (const k of ["RESEND_API_KEY", "EMAIL_API_URL", "EMAIL_API_KEY", "EMAIL_FROM",
+      "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"]) setEnv(k, undefined);
+  };
+  const okFetch = (body: unknown) => (async () => new Response(JSON.stringify(body), { status: 200 })) as unknown as typeof fetch;
+  const badFetch = (status: number, body: unknown) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+  try {
+    // 6: number normalisation
+    assert(normalizePhone("+1 (555) 123-4567") === "+15551234567" && normalizePhone("+44 7700 900123") === "+447700900123", "invite: phone numbers normalise to E.164");
+    assert(normalizePhone("555-1234") === null && normalizePhone("") === null && normalizePhone(null) === null, "invite: invalid phone numbers are refused");
+
+    // 4: missing email configuration
+    clearDelivery();
+    assert(emailProviderConfigured() === false && smsConfigured() === false, "invite: no provider configured is reported as not configured");
+    const nc = await deliverInvitation({ channels: ["email"], email: "a@b.co", link: "https://sophira.vercel.app/signup?invite=t", siteUrl: "https://sophira.vercel.app" });
+    assert(nc.email.status === "not_configured" && /RESEND_API_KEY|EMAIL_API_URL/.test(nc.email.reason ?? ""), "invite: unconfigured email names the exact variables");
+
+    // 1: email-only happy path (generic provider)
+    setEnv("EMAIL_API_URL", "https://mail.example.test/send");
+    setEnv("EMAIL_API_KEY", "test-key-email");
+    const sent = await deliverInvitation({ channels: ["email"], email: "a@b.co", link: "https://x/signup?invite=t", siteUrl: "https://x", fetchImpl: okFetch({ id: "m1" }) });
+    assert(sent.email.status === "sent" && sent.overall === "sent", "invite: email-only invitation reports sent on provider acceptance");
+
+    // 7: provider rejection, actionable + no secrets leaked
+    const rej = await deliverInvitation({ channels: ["email"], email: "a@b.co", link: "https://x/s", siteUrl: "https://x", fetchImpl: badFetch(403, { message: "domain not verified" }) });
+    assert(rej.email.status === "failed" && /verify a sending domain/i.test(rej.email.reason ?? ""), "invite: email rejection gives an actionable domain message");
+    assert(!(rej.email.reason ?? "").includes("test-key-email"), "invite: secrets never appear in delivery reasons");
+
+    // 5 + 2: SMS configured, happy path
+    setEnv("TWILIO_ACCOUNT_SID", "ACtest"); setEnv("TWILIO_AUTH_TOKEN", "secret-token"); setEnv("TWILIO_PHONE_NUMBER", "+15550000000");
+    assert(smsConfigured() === true, "invite: Twilio configuration is detected");
+    const smsOk = await deliverInvitation({ channels: ["sms"], email: "a@b.co", phone: "+15551234567", link: "https://x/s", siteUrl: "https://x", fetchImpl: okFetch({ sid: "SM1" }) });
+    assert(smsOk.sms.status === "sent" && smsOk.overall === "sent", "invite: SMS-only invitation reports sent on provider acceptance");
+    assert(!JSON.stringify(smsOk).includes("secret-token") && !JSON.stringify(smsOk).includes("ACtest"), "invite: Twilio credentials never appear in results");
+
+    // 8: SMS rejection
+    const smsBad = await deliverInvitation({ channels: ["sms"], email: "a@b.co", phone: "+15551234567", link: "https://x/s", siteUrl: "https://x", fetchImpl: badFetch(400, { code: 21211, message: "invalid To" }) });
+    assert(smsBad.sms.status === "failed" && /invalid/i.test(smsBad.sms.reason ?? ""), "invite: SMS rejection is reported honestly");
+
+    // 3 + 9: combined channels, partial success
+    const partial = await deliverInvitation({ channels: ["email", "sms"], email: "a@b.co", phone: "+15551234567", link: "https://x/s", siteUrl: "https://x",
+      fetchImpl: (async (url: string) => String(url).includes("twilio")
+        ? new Response(JSON.stringify({ code: 20429 }), { status: 429 })
+        : new Response(JSON.stringify({ id: "m2" }), { status: 200 })) as unknown as typeof fetch });
+    assert(partial.email.status === "sent" && partial.sms.status === "failed" && partial.overall === "partially_sent", "invite: partial success is never reported as total failure");
+
+    // 10: retry after a failed channel
+    const retry = await deliverInvitation({ channels: ["sms"], email: "a@b.co", phone: "+15551234567", link: "https://x/s", siteUrl: "https://x", fetchImpl: okFetch({ sid: "SM2" }) });
+    assert(retry.sms.status === "sent", "invite: a failed channel can be retried independently");
+
+    // 12/14/15/16: source-level guarantees of the existing secure flow
+    const route = readFileSync("src/app/api/invitations/route.ts", "utf8");
+    const ui = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+    assert(route.includes('channel') && route.includes("normalizePhone(body.phone)") && route.includes("deliverInvitation"),
+      "invite: one route handles email/sms/both through the delivery layer");
+    assert(route.includes('.eq("status", "pending")') && route.includes("reused: Boolean(existing)"),
+      "invite: a pending invitation is REUSED, so retries never mint a second token");
+    assert(route.includes("ownerClient()"), "invite: only the owner can create invitations (server-side owner guard unchanged)");
+    assert(ui.includes('value="both"') && ui.includes("invitePhone") && ui.includes("Send Invitation"),
+      "invite: the owner form offers email, text, or both, and a phone field");
+    assert(!route.includes("sendInvitationEmail("), "invite: the old email-only send is fully replaced by the delivery layer");
+  } finally {
+    process.env = saved;
+  }
+}
+
 async function runFirstRunUXTests(): Promise<void> {
   const { readFileSync } = await import("fs");
   const wiz = readFileSync("src/app/setup/SetupWizard.tsx", "utf8");
@@ -3920,5 +3994,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

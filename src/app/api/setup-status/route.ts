@@ -24,8 +24,20 @@ export async function GET() {
   // Grants contract diagnostic (2026-10-08 root cause: tables created by
   // the wizard had NO anon/authenticated grants — categorical only.
   const grants = await checkAuthenticatedGrants();
+  // Invitation delivery capabilities (booleans only - never values).
+  const { emailProviderConfigured, smsConfigured } = await import("@/lib/invitations/delivery");
+  const delivery = {
+    email: emailProviderConfigured(),
+    sms: smsConfigured(),
+    methods: [
+      "link",
+      ...(emailProviderConfigured() ? ["email"] : []),
+      ...(smsConfigured() ? ["sms"] : []),
+    ],
+  };
   return Response.json({
     ok: true,
+    delivery,
     name: "sophira-setup",
     state: status.state,
     // The precise missing infrastructure capability (requirement K/L) -
