@@ -32,11 +32,20 @@ export async function POST(request: Request) {
 
   if (action === "migrations") {
     const result = await repairOwnerBootstrap();
+    // 2026-10-28: category 2BP01 (a leftover event-trigger dependency) is a
+    // retryable setup state, not a dead end. Never surface raw SQL.
+    const failureText = `${(result as { failure?: string }).failure ?? ""} ${(result as { detail?: string }).detail ?? ""}`;
+    const dependencyBlocked = /2BP01|dependent object|event trigger/i.test(failureText);
+    const friendlyMessage = result.ok
+      ? result.message
+      : dependencyBlocked
+        ? "A previous setup attempt left a database dependency in place. Sophira now clears it automatically - run Set Up Sophira once more and it will finish."
+        : result.message;
     return Response.json(
       {
         ok: result.ok,
         reason: result.ok ? null : result.reason,
-        message: result.message,
+        message: friendlyMessage,
         // Categorical developer diagnostics: which migration step failed
         // and what class of failure (never raw SQL, never identifiers).
         failedAt: result.ok ? null : (result as { failedAt?: string }).failedAt ?? null,
