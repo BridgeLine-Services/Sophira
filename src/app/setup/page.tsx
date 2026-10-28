@@ -82,11 +82,17 @@ export default async function SetupPage() {
           <Link href="/login" className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
             Continue setup: sign in
           </Link>
-        ) : databaseReady && !connected ? null : databaseReady ? (
-          <Link href="/create-owner" className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
-            Continue setup: create your owner account
-          </Link>
-        ) : null}
+        ) : (
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            {/* 2026-10-28: the owner is never parked here. /create-owner runs
+                the repair itself, so this link is a real path even while the
+                database is still being confirmed. */}
+            <Link href="/create-owner" className="inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+              Create owner account
+            </Link>
+            <Link href="/login" className="text-sm text-accent hover:underline">Sign in</Link>
+          </div>
+        )}
 
         <SetupWizard
           available={status.repair.available && status.repair.action === "migrations"}
