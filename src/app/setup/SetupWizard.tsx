@@ -89,6 +89,7 @@ export default function SetupWizard({
   //  2. When a real external prerequisite is missing, re-check on a timer so
   //     setup resumes by itself the moment the connection becomes available.
   const autoTried = useRef(false);
+  const [autoStopped, setAutoStopped] = useState(false);
   useEffect(() => {
     if (!needsDatabase) return;
     if (available && !autoTried.current) {
@@ -97,7 +98,19 @@ export default function SetupWizard({
       return;
     }
     if (!available) {
-      const t = setInterval(() => router.refresh(), 15000);
+      // Bounded: never spin forever on an unconfirmed workspace. Six
+      // attempts over ~90s, then the page states the truth and offers a path.
+      const LIMIT = 6;
+      let n = 0;
+      const t = setInterval(() => {
+        n += 1;
+        if (n >= LIMIT) {
+          clearInterval(t);
+          setAutoStopped(true);
+          return;
+        }
+        router.refresh();
+      }, 15000);
       return () => clearInterval(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,6 +158,13 @@ export default function SetupWizard({
             Check again
           </button>
         </div>
+      )}
+      {autoStopped && (
+        <p className="mt-4 rounded-lg border border-ink/15 bg-accent-soft/40 p-3 text-sm text-ink">
+          Sophira could not confirm the database on its own. That is not a dead end:
+          press <strong>Create owner account</strong> above and that page retries the setup for
+          you, or open <strong>Advanced</strong> below for the technical reason.
+        </p>
       )}
       {!available && channel === "direct-postgres" && (
         <div className="mt-4 space-y-3 text-sm">

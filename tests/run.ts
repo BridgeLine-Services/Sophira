@@ -3562,6 +3562,19 @@ async function runOwnerFlowSimplicityTests(): Promise<void> {
     "security: migration 0008 still enforces owner_email + invitation-only signup (untouched)");
 }
 
+async function runFirstRunUXTests(): Promise<void> {
+  const { readFileSync } = await import("fs");
+  const wiz = readFileSync("src/app/setup/SetupWizard.tsx", "utf8");
+  const page = readFileSync("src/app/setup/page.tsx", "utf8");
+  assert(wiz.includes("const LIMIT = 6") && wiz.includes("autoStopped"),
+    "first-run: automatic confirmation is BOUNDED - the page can never spin on 'Initializing' forever");
+  assert(wiz.includes("Create owner account") && wiz.includes("Advanced"),
+    "first-run: the terminal state gives a plain recovery path, not a dead end");
+  assert(page.includes('href="/create-owner"') && page.includes('href="/login"'),
+    "first-run: /setup always offers Create owner account and Sign in");
+  assert(!/POSTGRES_URL|SERVICE_ROLE|DATABASE_URL/.test(page.split("Advanced")[0]),
+    "first-run: no database credential names in the ordinary owner area");
+}
 async function runAutoSetupTests(): Promise<void> {
   const { readFileSync } = await import("fs");
   const w = readFileSync("src/app/setup/SetupWizard.tsx", "utf8");
@@ -3569,8 +3582,8 @@ async function runAutoSetupTests(): Promise<void> {
     "setup: the wizard prepares the database by itself when the app has the capability (no click required)");
   assert(w.includes('router.push("/create-owner")'),
     "setup: a verified database advances straight to owner registration");
-  assert(w.includes("setInterval(() => router.refresh(), 15000)"),
-    "setup: an outstanding external prerequisite is re-checked automatically (no 'press Check again')");
+  assert(w.includes("const LIMIT = 6") && w.includes("clearInterval(t)"),
+    "setup: an outstanding external prerequisite is re-checked automatically, and the polling is bounded so it cannot spin forever");
 }
 
 async function runOwnerRenderSafetyTests(): Promise<void> {
@@ -3584,8 +3597,8 @@ async function runOwnerRenderSafetyTests(): Promise<void> {
   assert(dash.includes("(m.subject_usage ?? []).map"),
     "owner: the usage badges render from a guaranteed array");
   const setup = readFileSync("src/app/setup/page.tsx", "utf8");
-  assert(setup.includes("Continue setup: create your owner account") && setup.includes("Continue setup: sign in"),
-    "setup: one prominent Continue setup action leads to the right next step");
+  assert(setup.includes("Create owner account") && setup.includes('href="/login"'),
+    "setup: one prominent action leads to the right next step (create the owner account, or sign in)");
   const reset = readFileSync("src/app/reset-password/page.tsx", "utf8");
   assert(reset.includes("NEXT_PUBLIC_SITE_URL") && reset.includes("/auth/callback?next=/reset-password"),
     "recovery: the emailed link is pinned to the production origin and returns through /auth/callback");
@@ -3907,5 +3920,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
