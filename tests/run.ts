@@ -3562,6 +3562,56 @@ async function runOwnerFlowSimplicityTests(): Promise<void> {
     "security: migration 0008 still enforces owner_email + invitation-only signup (untouched)");
 }
 
+async function runDiscoveryTests(): Promise<void> {
+  const { discoverConfiguration } = await import("../src/lib/config/discovery.js");
+  const { appOrigin } = await import("../src/lib/auth-redirect.js");
+  const { readFileSync } = await import("fs");
+  const bag = process.env as Record<string, string | undefined>;
+  const keep = { ...bag };
+  try {
+    delete bag.NEXT_PUBLIC_SITE_URL;
+    bag.NODE_ENV = "production";
+    bag.VERCEL_ENV = "production";
+    bag.VERCEL_PROJECT_PRODUCTION_URL = "sophira.vercel.app";
+    assert(appOrigin() === "https://sophira.vercel.app",
+      "discovery: the production site URL is derived from Vercel metadata when NEXT_PUBLIC_SITE_URL is unset");
+    bag.VERCEL_ENV = "preview";
+    bag.VERCEL_URL = "sophira-abc123.vercel.app";
+    assert(appOrigin() === "https://sophira-abc123.vercel.app",
+      "discovery: a preview deployment uses its own deployment URL");
+    bag.VERCEL_PROJECT_PRODUCTION_URL = "localhost:3000";
+    bag.VERCEL_URL = "localhost:3000";
+    assert(appOrigin() === null,
+      "discovery: a loopback deployment host is rejected in production, never used for email links");
+
+    const report = discoverConfiguration();
+    assert(Array.isArray(report.items) && report.items.length >= 5,
+      "discovery: reports every capability (supabase, site url, database, email, sms)");
+    assert(report.items.every((i) => ["verified", "missing", "partial", "unavailable"].includes(i.state)),
+      "discovery: each capability is categorical, never a bare boolean guess");
+    const sms = report.items.find((i) => i.key === "sms")!;
+    assert(sms.missing.length > 0 && sms.missing.includes("TWILIO_ACCOUNT_SID"),
+      "discovery: a missing channel names the exact variables that are absent");
+    const blob = JSON.stringify(report);
+    for (const secretName of ["TWILIO_AUTH_TOKEN", "RESEND_API_KEY"]) {
+      assert(!new RegExp(`${secretName}\\s*[:=]\\s*\\S{6,}`).test(blob),
+        `discovery: ${secretName} never appears with a value in the report`);
+    }
+    assert(report.actions.every((a) => ["initialize_database", "verify_setup", "create_owner_account"].includes(a)),
+      "discovery: only actions this build implements are advertised");
+    assert(report.blocked.length > 0 && report.blocked.every((b) => b.reason.length > 20),
+      "discovery: blocked automation states a real reason instead of failing silently");
+
+    const manifest = readFileSync("src/config/env.manifest.json", "utf8");
+    for (const v of ["VERCEL_ENV", "VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_URL", "SOPHIRA_INVITE_FROM_EMAIL"]) {
+      assert(manifest.includes(`"${v}"`), `discovery: ${v} is declared in the authoritative manifest`);
+    }
+  } finally {
+    for (const k of Object.keys(bag)) if (!(k in keep)) delete bag[k];
+    Object.assign(bag, keep);
+  }
+}
+
 async function runDeliveryCapabilityTests(): Promise<void> {
   const { deliveryDiagnostics } = await import("../src/lib/invitations/delivery.js");
   const { readFileSync } = await import("fs");
@@ -4072,5 +4122,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

@@ -9,6 +9,7 @@ Never paste a secret into chat or into a file in the repository.
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase dashboard → Project Settings → API → "Project URL" | No |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Same Supabase API page → "anon public" key | No (public by design; your data is protected by Row Level Security) |
+| `VERCEL_ENV`, `VERCEL_URL`, `VERCEL_PROJECT_PRODUCTION_URL` | Set by Vercel automatically. Sophira uses them to derive its public address when `NEXT_PUBLIC_SITE_URL` is absent (production domain preferred; loopback hosts are always rejected) | No |
 | `NEXT_PUBLIC_SITE_URL` | Your deployed address, e.g. `https://sophira.vercel.app` — **REQUIRED in production** (invitation links, password-reset links and Supabase auth redirect configuration all depend on it) | No |
 
 ## SERVER-ONLY (never put these in a `NEXT_PUBLIC_` variable, never print them)
