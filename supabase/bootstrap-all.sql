@@ -1,4 +1,4 @@
--- SOPHIRA COMPLETE DATABASE SETUP (regenerated 2026-10-27)
+-- SOPHIRA COMPLETE DATABASE SETUP (regenerated 2026-10-28)
 -- Applies every migration in order (0001_init.sql ... 0040_document_history.sql).
 -- Run this SINGLE file once in the Supabase SQL editor for a fresh
 -- installation. It is SAFE TO RUN MORE THAN ONCE: every table, index,
@@ -2710,6 +2710,11 @@ grant execute on function public.network_stats() to authenticated;
 --    Nothing in the application or migrations invokes it; RLS belongs to
 --    migrations/deployments. Clients must never execute it. If a copy
 --    exists in this database, remove it (idempotent).
+--    2BP01 fix: Supabase provisions an "ensure_rls" EVENT TRIGGER that calls
+--    this function. Dropping the function first fails with
+--    "cannot drop function ... because other objects depend on it".
+--    Drop the dependent trigger first (IF EXISTS keeps this idempotent).
+drop event trigger if exists ensure_rls;
 drop function if exists public.rls_auto_enable();
 
 commit;

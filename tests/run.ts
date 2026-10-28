@@ -3593,6 +3593,38 @@ async function runOwnerRenderSafetyTests(): Promise<void> {
     "recovery: no bare browser-origin redirect can bake a preview host into the email link");
 }
 
+async function runSetupDependencyAndLearningTests(): Promise<void> {
+  const { readFileSync } = await import("fs");
+  // --- Task 1: 2BP01 (dependent event trigger) ---
+  const boot = readFileSync("supabase/bootstrap-all.sql", "utf8");
+  const mig = readFileSync("supabase/migrations/0039_supabase_security_hardening.sql", "utf8");
+  const idxTrigger = boot.indexOf("drop event trigger if exists ensure_rls;");
+  const idxDrop = boot.indexOf("drop function if exists public.rls_auto_enable();");
+  assert(idxTrigger > -1 && idxDrop > idxTrigger,
+    "setup: the event trigger is dropped BEFORE the function, so a manual paste cannot fail with 2BP01");
+  assert(mig.includes("drop event trigger if exists ensure_rls;"),
+    "setup: the source migration carries the same fix (regeneration keeps it)");
+  const repair = readFileSync("src/app/api/setup-repair/route.ts", "utf8");
+  assert(repair.includes("2BP01") && repair.includes("friendlyMessage"),
+    "setup: a dependency failure returns a retryable plain-language message, never raw SQL");
+
+  // --- Task 3: academic-only learning ---
+  const { isAcademicContent, checkAcademicContent } = await import("../src/lib/learning/academic-gate");
+  assert(isAcademicContent("confuses the denominator with the numerator in fractions"),
+    "learning: academic observations are still learned from");
+  assert(isAcademicContent("history essay outline for chapter 4") && isAcademicContent("physics lab report"),
+    "learning: subject vocabulary is recognised");
+  assert(!isAcademicContent("my favourite netflix show and a recipe for dinner"),
+    "learning: non-academic content is refused");
+  assert(!isAcademicContent("   ") && checkAcademicContent("").reason === "empty",
+    "learning: empty input never becomes a pattern");
+  const solve = readFileSync("src/app/api/ai/solve/route.ts", "utf8");
+  assert(solve.includes("isAcademicContent") && solve.includes("if (!isAcademicContent(learningScope)) continue;"),
+    "learning: the persistence loop is gated, so no learning write happens for non-academic input");
+  assert(!/delete\(|delete from learning_patterns/i.test(solve),
+    "learning: the gate never deletes existing learning data");
+}
+
 async function runAuthRedirectTests(): Promise<void> {
   const { authCallbackUrl, appOrigin, safeNextPath } = await import("../src/lib/auth-redirect");
   const savedSite = process.env.NEXT_PUBLIC_SITE_URL;
@@ -3875,5 +3907,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
