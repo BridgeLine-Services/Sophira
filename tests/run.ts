@@ -3542,6 +3542,26 @@ async function runConnectionCandidateTests(): Promise<void> {
   }
 }
 
+async function runOwnerRenderSafetyTests(): Promise<void> {
+  const { readFileSync } = await import("fs");
+  const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  // 2026-10-28 regression: a null optional field must never throw during
+  // render (the owner saw the generic error screen on /owner, and
+  // /dashboard redirects owners straight back to /owner).
+  assert(!/m\.subject_usage\.length/.test(dash) && dash.includes("m.subject_usage?.length"),
+    "owner: an optional subject_usage field cannot crash the member row");
+  assert(dash.includes("(m.subject_usage ?? []).map"),
+    "owner: the usage badges render from a guaranteed array");
+  const setup = readFileSync("src/app/setup/page.tsx", "utf8");
+  assert(setup.includes("Continue setup: create your owner account") && setup.includes("Continue setup: sign in"),
+    "setup: one prominent Continue setup action leads to the right next step");
+  const reset = readFileSync("src/app/reset-password/page.tsx", "utf8");
+  assert(reset.includes("NEXT_PUBLIC_SITE_URL") && reset.includes("/auth/callback?next=/reset-password"),
+    "recovery: the emailed link is pinned to the production origin and returns through /auth/callback");
+  assert(!/redirectTo:\s*window\.location\.origin/.test(reset),
+    "recovery: no bare browser-origin redirect can bake a preview host into the email link");
+}
+
 async function runAuthRedirectTests(): Promise<void> {
   const { authCallbackUrl, appOrigin, safeNextPath } = await import("../src/lib/auth-redirect");
   const savedSite = process.env.NEXT_PUBLIC_SITE_URL;
@@ -3824,5 +3844,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runAuthRedirectTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runAuthRedirectTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
