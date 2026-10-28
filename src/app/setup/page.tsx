@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { evaluateOwnerSetup, probeOwnerSetup, type OwnerSetupStatus } from "@/lib/owner-setup";
 import { projectDashboardLinks } from "@/lib/supabase-config";
+import { discoverConfiguration } from "@/lib/config/discovery";
 import SetupDiagnostics from "./SetupDiagnostics";
 import SetupWizard from "./SetupWizard";
 
@@ -38,6 +39,10 @@ export default async function SetupPage() {
   const databaseReady = status.probe.migrationsPresent === true;
   const ownerReady = status.probe.ownerAccount === "active";
 
+  // 2026-10-28: what this deployment actually detected, in plain language.
+  // States + missing NAMES only - no credential values ever reach the browser.
+  const discovery = discoverConfiguration();
+
   const checklist: { label: string; done: boolean; hint: string }[] = [
     { label: "Connect Sophira", done: connected, hint: "Sophira isn't connected to its private database yet - the exact missing variables are named in Advanced diagnostics below." },
     { label: "Prepare your private database", done: databaseReady, hint: "Initializing your workspace..." },
@@ -49,6 +54,22 @@ export default async function SetupPage() {
     <main className="mx-auto max-w-2xl px-6 py-16">
       <h1 className="text-2xl font-semibold">Welcome to Sophira</h1>
       <p className="mt-2 text-ink-soft">Let&apos;s set up your private academic assistant.</p>
+
+      <section className="mt-6 rounded-xl border border-ink/10 p-4">
+        <h2 className="text-sm font-semibold text-ink">What Sophira detected</h2>
+        <ul className="mt-2 space-y-1">
+          {discovery.items.map((item) => (
+            <li key={item.key} className="text-sm text-ink-soft">
+              <span className={item.state === "verified" ? "text-success" : "text-ink-soft"}>
+                {item.state === "verified" ? "Ready" : item.state === "missing" ? "Not set" : "Unavailable"}
+              </span>
+              {" \u00b7 "}
+              {item.label}
+              {item.missing.length > 0 ? ` \u2014 needs ${item.missing.join(", ")}` : ""}
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {/* ---------- Guided checklist (plain language) ---------- */}
       <section className="mt-8 rounded-xl border bg-card p-6">

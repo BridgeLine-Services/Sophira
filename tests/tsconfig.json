@@ -29,6 +29,8 @@
     "../src/lib/extract/documents.ts",
     "../src/lib/types.ts",
     "../src/lib/auth-errors.ts",
-    "../src/lib/bootstrap-sql.generated.ts"
+    "../src/lib/bootstrap-sql.generated.ts",
+    "../src/lib/config/discovery.ts",
+    "../src/lib/invitations/delivery.ts"
   ]
 }

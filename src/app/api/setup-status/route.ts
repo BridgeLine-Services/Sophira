@@ -38,6 +38,10 @@ export async function GET() {
   return Response.json({
     ok: true,
     delivery: { ...delivery, detail: deliveryDiagnostics() },
+    // One authoritative discovery view: verified / missing / unavailable per
+    // capability, the exact missing variable NAMES, and only the actions this
+    // build actually implements. Never contains a credential value.
+    discovery: await (await import("@/lib/config/discovery")).discoverConfiguration(),
     name: "sophira-setup",
     state: status.state,
     // The precise missing infrastructure capability (requirement K/L) -

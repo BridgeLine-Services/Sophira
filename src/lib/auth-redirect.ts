@@ -19,13 +19,26 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "[::1]", "0.0.0.0"]);
 
 function isLoopback(hostname: string): boolean {
   const h = hostname.toLowerCase();
-  return LOOPBACK_HOSTS.has(h) || h === "loop" + "alhost" || h.endsWith(".local" + "host");
+  return LOOPBACK_HOSTS.has(h) || h === "local" + "host" || h.endsWith(".local" + "host");
 }
 
 /** Validated origin for auth links, or null when nothing safe is available. */
 export function appOrigin(fallbackOrigin?: string | null): string | null {
+  // 2026-10-28 (discovery): on Vercel the production domain is already known
+  // from deployment metadata, so a correctly hosted deployment does not NEED
+  // NEXT_PUBLIC_SITE_URL. Precedence: explicit config > Vercel's own
+  // production domain > the deployment URL > the browser origin. Every
+  // candidate still passes the https/loopback validation below.
   const configured = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
-  const candidates = [configured, (fallbackOrigin ?? "").trim()].filter(Boolean);
+  const vercelEnv = (process.env.VERCEL_ENV ?? "").trim();
+  const vercelProd = (process.env.VERCEL_PROJECT_PRODUCTION_URL ?? "").trim();
+  const vercelDeployment = (process.env.VERCEL_URL ?? "").trim();
+  const withScheme = (host: string) => (host ? (/^https?:\/\//.test(host) ? host : `https://${host}`) : "");
+  const derived =
+    vercelEnv === "production" && vercelProd
+      ? withScheme(vercelProd)
+      : withScheme(vercelDeployment || vercelProd);
+  const candidates = [configured, derived, (fallbackOrigin ?? "").trim()].filter(Boolean);
   const production = process.env.NODE_ENV === "production";
   for (const raw of candidates) {
     try {
