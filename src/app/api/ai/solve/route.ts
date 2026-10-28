@@ -1,3 +1,4 @@
+import { isAcademicContent } from "@/lib/learning/academic-gate";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
@@ -462,6 +463,14 @@ export async function POST(request: NextRequest) {
   if (mode === "check" || mode === "assignment") {
     const observed = normalizeObservedMistakes(observedMistakesRaw);
     for (const m of observed) {
+      // 2026-10-28 ACADEMIC-ONLY LEARNING: an observation may become a durable
+      // pattern only when the study scope or the observation itself carries an
+      // academic signal. Non-academic content is skipped entirely (no insert,
+      // no confidence bump, no memory update). Stored patterns are untouched.
+      const learningScope = [m.description, patternContext.subject, classification?.subject, course?.subject]
+        .filter(Boolean)
+        .join(" ");
+      if (!isAcademicContent(learningScope)) continue;
       const existing = learningPatterns.find(
         (p) => p.kind === "mistake" && matchesExistingPattern(p, m.description)
       );
