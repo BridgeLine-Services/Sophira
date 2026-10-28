@@ -392,9 +392,15 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                         · last active {timeAgo(m.last_active_at)} ·{" "}
                         {m.assignment_count} assignment{m.assignment_count === 1 ? "" : "s"} · {m.response_count} AI response{m.response_count === 1 ? "" : "s"}
                       </p>
-                      {m.subject_usage.length > 0 && (
+                      {/* 2026-10-28: a member row with a NULL subject_usage
+                          (fresh owner / older network_stats) threw
+                          "Cannot read properties of null (reading 'length')"
+                          during render - the generic "Something went wrong"
+                          screen, and /dashboard redirects owners right back
+                          here. Guard the optional field instead of crashing. */}
+                      {(m.subject_usage?.length ?? 0) > 0 && (
                         <p className="mt-1 flex flex-wrap gap-1">
-                          {m.subject_usage.map((s) => (
+                          {(m.subject_usage ?? []).map((s) => (
                             <Badge key={s.subject}>{s.subject} ×{s.count}</Badge>
                           ))}
                         </p>

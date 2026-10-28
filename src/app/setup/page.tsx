@@ -75,6 +75,16 @@ export default async function SetupPage() {
           </p>
         )}
 
+        {ownerReady ? (
+          <Link href="/login" className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+            Continue setup: sign in
+          </Link>
+        ) : databaseReady && !connected ? null : databaseReady ? (
+          <Link href="/create-owner" className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+            Continue setup: create your owner account
+          </Link>
+        ) : null}
+
         <SetupWizard
           available={status.repair.available && status.repair.action === "migrations"}
           channel={status.probe.setupChannel}
