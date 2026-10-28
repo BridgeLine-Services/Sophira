@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 /**
  * FIRST-LAUNCH SETUP WIZARD (2026-10-07).
@@ -59,7 +60,11 @@ export default function SetupWizard({
       clearInterval(ticker);
       if (d?.ok) {
         setStep(PROGRESS_STEPS.length);
-        setResult("Setup complete. Your private database is ready.");
+        setResult("Setup complete. Your private database is ready. Opening owner account creation…");
+        // 2026-10-28: advance automatically - the owner never has to guess
+        // the next step or press "Check again".
+        router.push("/create-owner");
+        router.refresh();
       } else {
         setStep(-1);
         setResult(
@@ -77,6 +82,26 @@ export default function SetupWizard({
     }
     setBusy(false);
   }
+
+  // 2026-10-28: automatic first-launch behaviour.
+  //  1. When the app CAN prepare the database itself, do it immediately -
+  //     no "Continue setup" click, no "Check again".
+  //  2. When a real external prerequisite is missing, re-check on a timer so
+  //     setup resumes by itself the moment the connection becomes available.
+  const autoTried = useRef(false);
+  useEffect(() => {
+    if (!needsDatabase) return;
+    if (available && !autoTried.current) {
+      autoTried.current = true;
+      void run();
+      return;
+    }
+    if (!available) {
+      const t = setInterval(() => router.refresh(), 15000);
+      return () => clearInterval(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsDatabase, available]);
 
   if (!needsDatabase) return null;
 
