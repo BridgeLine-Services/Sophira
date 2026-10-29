@@ -335,33 +335,39 @@ keeps the build untouched and removes the static-manifest question entirely.
 **Visual state of both themes: still unknown.** Four attempts, four harness bugs,
 zero screenshots.
 
-## 4l. Visual pass CAPTURED - /login, both themes (2026-10-29)
+## 4l. Fifth attempt: background captured, page EMPTY (2026-10-29)
 
-Fifth attempt, using the fix the fourth one's evidence pointed to: no `public/`
-directory at all. The snapshot is served by a separate `http.server` and its
-`/_next/` references point at the running Next server by absolute URL, so the
-build-time static manifest never enters the picture.
+Using the separate-static-server fix from 4k, the injection finally served
+(`force-dark`: True) and the captures came out different:
 
-Sequence: start Next -> fetch `/login` (200, 9016B) -> strip scripts ->
-rewrite assets -> serve from a second server -> assert `force-dark` is in the
-served body (**True**) -> capture.
+| Capture | Mean RGB | Unique colours | Stdev |
+|---|---|---|---|
+| login-light-1440 | `(248,248,250)` | **1** | **0.0** |
+| login-dark-1440 | `(33,23,53)` | **1** | **0.0** |
+| login-light-390 | `(248,248,250)` | **1** | **0.0** |
+| login-dark-390 | `(33,23,53)` | **1** | **0.0** |
 
-| Capture | Mean RGB | Reads as |
-|---|---|---|
-| login-light-1440 | `(248, 248, 250)` | light paper |
-| login-dark-1440 | `(33, 23, 53)` | dark violet |
-| login-light-390 | `(248, 248, 250)` | light paper |
-| login-dark-390 | `(33, 23, 53)` | dark violet |
+One unique colour and zero stdev is not a screenshot of a page - it is a solid
+rectangle. The exact match to `--c-paper` in both themes is the tell: **the tokens
+render and the page is empty.**
 
-**4 captures, 4 distinct pixel means**, committed at `docs/screenshots/`.
+Cause: `/login` is a client component whose SSR output is a background shell.
+Stripping the 20 `<script>` tags - carried over from the hydration hypothesis in
+attempts 1-3 - guarantees an empty page for every client-rendered route. The strip
+was the right instinct for a hydration bug and is fatal for these pages.
 
-**Proves:** the dark palette renders through the token layer and is visibly
-distinct from light at 1440 and 390. All four earlier failures were harness bugs.
+**Screenshots deleted, not committed.** Four images whose only content is a
+background colour would be shown as proof that the UI renders in dark mode. It
+would not be true.
 
-**Does NOT prove:** `/login` is public and does not render `AppShell`. Nothing here
-covers the shell, the 25 non-shell routes, or any authenticated page. The snapshot
-is static (scripts stripped), so it shows palette and layout, not interactivity or
-that the theme toggle persists.
+### What is now known
+- The token layer works: `(248,248,250)` vs `(33,23,53)` are exactly `--c-paper` in
+  each theme, applied through the compiled CSS in a real browser.
+- Every route in this app is client-rendered, so any future capture must run with
+  scripts ENABLED. CDP `Page.navigate` + `Emulation.setEmulatedMedia({prefers-color-scheme:dark})`
+  + `Page.captureScreenshot` is the path, and it needs no snapshot surgery at all.
+
+**Visual state of both themes remains unknown** - no screenshot of actual UI exists.
 
 ## 5. Risks recorded before Phase B
 
