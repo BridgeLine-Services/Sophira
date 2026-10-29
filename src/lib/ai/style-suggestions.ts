@@ -38,7 +38,11 @@ export function proposalRowFor(userId: string, profileId: string, s: StyleSugges
     target_id: profileId,
     change_summary: `Style suggestion: ${s.category.replace(/_/g, " ")} (${s.scope})`,
     proposed_changes: {
-      guidance_addition: description,
+      // The key is `guidance` because ProposalsPanel already applies writing
+      // proposals as an ADDENDUM on top of approved guidance. Reusing it means
+      // approvals work through the existing review UI with no new screen, and
+      // each approval takes a version snapshot like every other profile change.
+      guidance: description,
       suggestion_id: s.id,
       category: s.category,
       confidence: s.confidence,

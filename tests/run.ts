@@ -3079,8 +3079,12 @@ async function runStyleSuggestionTests(): Promise<void> {
   assert(row.payload === undefined, "style suggestions: no invented payload column is sent");
   const changes = row.proposed_changes as Record<string, unknown>;
   const ctx = row.context as Record<string, unknown>;
-  assert(typeof changes.guidance_addition === "string" && (changes.guidance_addition as string).length <= 600,
+  assert(typeof changes.guidance === "string" && (changes.guidance as string).length <= 600,
     "style suggestions: the proposed change is a bounded guidance addition");
+  // Must match the key ProposalsPanel actually applies, or approval is a no-op.
+  const panel = fs.readFileSync("src/components/app/ProposalsPanel.tsx", "utf8");
+  assert(panel.includes("proposed_changes.guidance") && changes.guidance !== undefined,
+    "style suggestions: payload key matches what the existing approval panel applies");
   assert(changes.source === "writing-profile-learning", "style suggestions: proposed change records its source");
   assert(ctx.requires_approval === true, "style suggestions: proposals are marked as needing approval");
 
