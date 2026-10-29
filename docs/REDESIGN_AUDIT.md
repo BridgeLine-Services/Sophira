@@ -57,6 +57,31 @@ That is a necessary condition, not a sufficient one: contrast maths says nothing
 about how the result looks across 60 pages. Adoption is Phase B and needs visual
 verification, which this session did not perform.
 
+## 4b. Phase B2 - dual theme shipped (2026-10-29)
+
+Owner decision recorded: **both themes are supported**; the OS preference applies
+until the user chooses explicitly, then the choice is stored per device
+(`localStorage["sophira-theme"]`, applied by a bootstrap script before first paint
+so dark users get no light flash).
+
+`tailwind.config.ts` now resolves every colour through
+`rgb(var(--c-{token}) / <alpha-value>)`. The `<alpha-value>` placeholder matters:
+without it `bg-ink/10` and friends would stop working on 60 pages. A pin fails if
+a literal hex appears in the colour block again.
+
+Light values are **byte-identical** to the previous palette (#f8f8fa / #252b3a /
+#5145e8 / #697386 / #0f766e / #b45309 / #b91c1c), pinned by test - light mode is
+unchanged by construction, not by inspection. Dark values are the violet
+direction, and the pins read the **shipped CSS**, not a TypeScript constant, then
+measure it: light and dark both clear WCAG AA on the pairs that matter.
+
+New semantic tokens added: `card`, `card-elevated`, `sidebar`, `topbar`, `line`.
+They are defined in both themes and unused so far - pages migrate onto them in
+Phase D rather than being restyled blind.
+
+**Not verified visually.** No browser pass was run this session; contrast maths is
+not a screenshot. Phase B4 (shell review at six widths) remains open.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the

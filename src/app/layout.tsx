@@ -32,6 +32,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <body>
+        {/* Applies a stored theme choice before first paint. Without this the
+            page would flash light for dark-mode users. Mirrors ThemeToggle's key. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{var t=localStorage.getItem("sophira-theme");if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t}}catch(e){}',
+          }}
+        />
         <ToastProvider>
           {children}
           <ServiceWorkerRegister />
