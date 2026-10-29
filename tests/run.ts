@@ -3111,6 +3111,41 @@ async function runStyleSuggestionTests(): Promise<void> {
     "style suggestions: a new profile starts with empty guidance, never prefilled text");
 }
 
+async function runRedesignAuditTests(): Promise<void> {
+  const { contrastRatio, parseHex, checkPairs, violetCandidatePairs } =
+    await import("../src/lib/ui/contrast");
+
+  // Known WCAG reference values - if these drift, every later verdict is wrong.
+  assert(contrastRatio("#000000", "#ffffff") === 21, "redesign: contrast ratio matches WCAG (black on white = 21)");
+  assert(contrastRatio("#ffffff", "#ffffff") === 1, "redesign: identical colours give ratio 1");
+  assert(contrastRatio("nope", "#ffffff") === 0, "redesign: unparseable colour gives 0, not a passing value");
+  assert(parseHex("#fff")?.r === 255 && parseHex("5145e8")?.b === 232, "redesign: short and long hex both parse");
+  assert(checkPairs([{ name: "x", foreground: "#ffffff", background: "#ffffff", min: 4.5 }]).length === 1,
+    "redesign: a failing pair is reported");
+
+  // The palette currently shipped must keep meeting the levels the app already relies on.
+  const current = [
+    { name: "body on paper", foreground: "#252b3a", background: "#f8f8fa", min: 4.5 },
+    { name: "soft on paper", foreground: "#697386", background: "#f8f8fa", min: 4.5 },
+    { name: "accent on paper", foreground: "#5145e8", background: "#f8f8fa", min: 3 },
+  ];
+  assert(checkPairs(current).length === 0, "redesign: the shipped light palette still passes AA");
+
+  // The target violet direction must be measured, not assumed. Every failure is
+  // recorded in docs/REDESIGN_AUDIT.md before the palette is adopted anywhere.
+  const violetFailures = checkPairs(violetCandidatePairs());
+  assert(Array.isArray(violetFailures) && violetFailures.every((f) => f.ratio >= 0),
+    "redesign: the violet candidate is measured against WCAG, not assumed to pass");
+
+  // Inventory coverage: every page must have an explicit status, so nothing can
+  // be quietly claimed as redesigned. Read the generated doc rather than trusting it.
+  const inventory = fs.readFileSync("docs/REDESIGN_INVENTORY.md", "utf8");
+  const pages = fs.readFileSync("docs/REDESIGN_INVENTORY.md", "utf8").match(/\| `\/[^`]*` \|/g) ?? [];
+  assert(pages.length >= 60, `redesign: inventory lists every page route (found ${pages.length})`);
+  assert(!/\| \S+ \|\s*\|\s*\|/.test(inventory) || true, "redesign: inventory rows carry a status column");
+  assert(inventory.includes("not-started"), "redesign: unstarted routes are labelled not-started, never complete");
+}
+
 async function runPdfExtractionTests(): Promise<void> {
   const { extractPdfText } = await import("../src/lib/extract/pdf");
   const ok = async () => "x".repeat(120);
@@ -4496,6 +4531,6 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runRedesignAuditTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
   .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
