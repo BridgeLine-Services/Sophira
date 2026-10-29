@@ -2,6 +2,11 @@
 // Page + API inventory for the redesign (2026-10-29).
 // Deterministic on purpose: same tree -> same output, so a diff shows exactly
 // which routes were added, removed, or changed status.
+//
+// Per route it also detects the things a redesign pass has to respect: whether
+// the page uses the shared shell, whether it is client or server, what it reads
+// (Supabase / AI / offline), and whether it is auth-gated. That is the difference
+// between a list of routes and a work order.
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 
@@ -18,7 +23,21 @@ function walk(dir, out = []) {
 
 const files = walk(ROOT);
 const route = (p) => "/" + dirname(p).slice(ROOT.length + 1).replace(/\/?\(.*?\)\/?/g, "").replace(/^$/, "");
-const pages = files.filter((f) => f.endsWith("page.tsx")).map((f) => route(f)).sort();
+
+function signals(file) {
+  const src = readFileSync(file, "utf8");
+  const found = [];
+  if (src.includes("@/components/app/AppShell")) found.push("shell");
+  if (/^"use client";/m.test(src)) found.push("client");
+  if (src.includes("@/lib/supabase/")) found.push("supabase");
+  if (src.includes("guardedAiFetch") || src.includes("@/lib/ai/")) found.push("ai");
+  if (src.includes("@/lib/offline")) found.push("offline");
+  if (src.includes("@/lib/integrations")) found.push("integrations");
+  if (/redirect\(|requireUser|getUser\(/.test(src)) found.push("auth-gated");
+  return found.sort().join(", ") || "-";
+}
+
+const pages = files.filter((f) => f.endsWith("page.tsx")).map((f) => ({ route: route(f), file: f })).sort((a, b) => a.route.localeCompare(b.route));
 const apis = files.filter((f) => f.endsWith("route.ts")).map((f) => route(f)).sort();
 
 const statusFile = "docs/redesign-status.json";
@@ -27,7 +46,11 @@ const label = (r) => status[r]?.status ?? "not-started";
 const reason = (r) => status[r]?.reason ?? "";
 
 const grouped = { done: 0, partial: 0, "not-started": 0, unchanged: 0 };
-for (const p of pages) grouped[label(p)] = (grouped[label(p)] ?? 0) + 1;
+for (const p of pages) grouped[label(p.route)] = (grouped[label(p.route)] ?? 0) + 1;
+
+const shellCount = pages.filter((p) => signals(p.file).includes("shell")).length;
+const clientCount = pages.filter((p) => signals(p.file).includes("client")).length;
+const gatedCount = pages.filter((p) => signals(p.file).includes("auth-gated")).length;
 
 const lines = [];
 lines.push("# Redesign inventory");
@@ -40,12 +63,18 @@ lines.push("");
 lines.push(`- Page routes: **${pages.length}**`);
 lines.push(`- API routes: **${apis.length}**`);
 lines.push(`- Redesigned: ${grouped.done ?? 0} | Partial: ${grouped.partial ?? 0} | Intentionally unchanged: ${grouped.unchanged ?? 0} | Not started: ${grouped["not-started"] ?? 0}`);
+lines.push(`- Pages using the shared shell: ${shellCount} | client components: ${clientCount} | with an auth gate in-file: ${gatedCount}`);
+lines.push("");
+lines.push("`Signals` is detected from the source, not declared: `shell` = renders AppShell,");
+lines.push("`client` = \"use client\", `supabase`/`ai`/`offline`/`integrations` = imports that");
+lines.push("data layer, `auth-gated` = redirects or reads the session itself. A page with no");
+lines.push("`shell` signal either is public or gates before the shell renders.");
 lines.push("");
 lines.push("## Pages");
 lines.push("");
-lines.push("| Route | Status | Note |");
-lines.push("|---|---|---|");
-for (const p of pages) lines.push(`| \`${p || "/"}\` | ${label(p)} | ${reason(p)} |`);
+lines.push("| Route | Status | Signals | Note |");
+lines.push("|---|---|---|---|");
+for (const p of pages) lines.push(`| \`${p.route || "/"}\` | ${label(p.route)} | ${signals(p.file)} | ${reason(p.route)} |`);
 lines.push("");
 lines.push("## API routes");
 lines.push("");
@@ -53,4 +82,4 @@ for (const a of apis) lines.push(`- \`${a}\``);
 lines.push("");
 
 writeFileSync("docs/REDESIGN_INVENTORY.md", lines.join("\n"));
-console.log(`inventory: ${pages.length} pages, ${apis.length} API routes -> docs/REDESIGN_INVENTORY.md`);
+console.log(`inventory: ${pages.length} pages (${shellCount} shell, ${clientCount} client), ${apis.length} API routes`);

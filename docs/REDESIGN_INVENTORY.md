@@ -8,71 +8,77 @@ never as complete.
 - Page routes: **60**
 - API routes: **76**
 - Redesigned: 0 | Partial: 0 | Intentionally unchanged: 0 | Not started: 60
+- Pages using the shared shell: 35 | client components: 30 | with an auth gate in-file: 22
+
+`Signals` is detected from the source, not declared: `shell` = renders AppShell,
+`client` = "use client", `supabase`/`ai`/`offline`/`integrations` = imports that
+data layer, `auth-gated` = redirects or reads the session itself. A page with no
+`shell` signal either is public or gates before the shell renders.
 
 ## Pages
 
-| Route | Status | Note |
-|---|---|---|
-| `/` | not-started |  |
-| `/access-denied` | not-started |  |
-| `/assignments/[id]` | not-started |  |
-| `/assignments/new` | not-started |  |
-| `/corrections` | not-started |  |
-| `/courses` | not-started |  |
-| `/courses/[id]` | not-started |  |
-| `/courses/english` | not-started |  |
-| `/courses/foreign-language` | not-started |  |
-| `/courses/foreign-language/language-selector` | not-started |  |
-| `/courses/health-education` | not-started |  |
-| `/courses/history-social-science` | not-started |  |
-| `/courses/math` | not-started |  |
-| `/courses/new` | not-started |  |
-| `/courses/other-subject` | not-started |  |
-| `/courses/science` | not-started |  |
-| `/courses/science/biology` | not-started |  |
-| `/courses/science/chemistry` | not-started |  |
-| `/courses/science/physics` | not-started |  |
-| `/create-owner` | not-started |  |
-| `/dashboard` | not-started |  |
-| `/downloads` | not-started |  |
-| `/essay` | not-started |  |
-| `/install` | not-started |  |
-| `/learning` | not-started |  |
-| `/library` | not-started |  |
-| `/license` | not-started |  |
-| `/local` | not-started |  |
-| `/login` | not-started |  |
-| `/math` | not-started |  |
-| `/math/practice` | not-started |  |
-| `/math/scan` | not-started |  |
-| `/math/test-prep` | not-started |  |
-| `/memories` | not-started |  |
-| `/notebooks` | not-started |  |
-| `/notebooks/[id]` | not-started |  |
-| `/notebooks/archive` | not-started |  |
-| `/offline` | not-started |  |
-| `/onboarding` | not-started |  |
-| `/online` | not-started |  |
-| `/owner` | not-started |  |
-| `/owner/health` | not-started |  |
-| `/owner/integrations` | not-started |  |
-| `/privacy` | not-started |  |
-| `/proposals` | not-started |  |
-| `/reset-password` | not-started |  |
-| `/settings` | not-started |  |
-| `/settings/integrations` | not-started |  |
-| `/setup` | not-started |  |
-| `/signup` | not-started |  |
-| `/teachers` | not-started |  |
-| `/teachers/[id]` | not-started |  |
-| `/teachers/new` | not-started |  |
-| `/terms` | not-started |  |
-| `/tutor` | not-started |  |
-| `/writing` | not-started |  |
-| `/writing/grammar` | not-started |  |
-| `/writing/new` | not-started |  |
-| `/writing/planning` | not-started |  |
-| `/writing/typing` | not-started |  |
+| Route | Status | Signals | Note |
+|---|---|---|---|
+| `/` | not-started | auth-gated |  |
+| `/access-denied` | not-started | client, supabase |  |
+| `/assignments/[id]` | not-started | auth-gated, shell, supabase |  |
+| `/assignments/new` | not-started | ai, auth-gated, client, shell, supabase |  |
+| `/corrections` | not-started | auth-gated |  |
+| `/courses` | not-started | client, shell, supabase |  |
+| `/courses/[id]` | not-started | auth-gated, shell, supabase |  |
+| `/courses/english` | not-started | - |  |
+| `/courses/foreign-language` | not-started | - |  |
+| `/courses/foreign-language/language-selector` | not-started | auth-gated, shell, supabase |  |
+| `/courses/health-education` | not-started | - |  |
+| `/courses/history-social-science` | not-started | - |  |
+| `/courses/math` | not-started | - |  |
+| `/courses/new` | not-started | auth-gated, client, shell, supabase |  |
+| `/courses/other-subject` | not-started | - |  |
+| `/courses/science` | not-started | - |  |
+| `/courses/science/biology` | not-started | - |  |
+| `/courses/science/chemistry` | not-started | - |  |
+| `/courses/science/physics` | not-started | - |  |
+| `/create-owner` | not-started | client, supabase |  |
+| `/dashboard` | not-started | auth-gated, shell, supabase |  |
+| `/downloads` | not-started | client |  |
+| `/essay` | not-started | client, shell |  |
+| `/install` | not-started | client |  |
+| `/learning` | not-started | auth-gated, shell, supabase |  |
+| `/library` | not-started | auth-gated, client, shell, supabase |  |
+| `/license` | not-started | - |  |
+| `/local` | not-started | - |  |
+| `/login` | not-started | client, supabase |  |
+| `/math` | not-started | client, shell |  |
+| `/math/practice` | not-started | client, shell, supabase |  |
+| `/math/scan` | not-started | client, shell |  |
+| `/math/test-prep` | not-started | client, shell, supabase |  |
+| `/memories` | not-started | auth-gated |  |
+| `/notebooks` | not-started | client, shell |  |
+| `/notebooks/[id]` | not-started | client, shell |  |
+| `/notebooks/archive` | not-started | client, shell |  |
+| `/offline` | not-started | ai, client, offline, shell |  |
+| `/onboarding` | not-started | auth-gated, client, shell, supabase |  |
+| `/online` | not-started | client, offline, shell |  |
+| `/owner` | not-started | ai, auth-gated, integrations, shell, supabase |  |
+| `/owner/health` | not-started | auth-gated, shell, supabase |  |
+| `/owner/integrations` | not-started | auth-gated, shell, supabase |  |
+| `/privacy` | not-started | - |  |
+| `/proposals` | not-started | auth-gated, shell, supabase |  |
+| `/reset-password` | not-started | client, supabase |  |
+| `/settings` | not-started | auth-gated, client, offline, shell, supabase |  |
+| `/settings/integrations` | not-started | auth-gated, shell, supabase |  |
+| `/setup` | not-started | - |  |
+| `/signup` | not-started | client, supabase |  |
+| `/teachers` | not-started | client, shell, supabase |  |
+| `/teachers/[id]` | not-started | auth-gated, shell, supabase |  |
+| `/teachers/new` | not-started | auth-gated, client, shell, supabase |  |
+| `/terms` | not-started | - |  |
+| `/tutor` | not-started | client, shell |  |
+| `/writing` | not-started | ai, client, shell, supabase |  |
+| `/writing/grammar` | not-started | client, shell |  |
+| `/writing/new` | not-started | auth-gated, client, shell, supabase |  |
+| `/writing/planning` | not-started | client, shell |  |
+| `/writing/typing` | not-started | auth-gated, shell, supabase |  |
 
 ## API routes
 

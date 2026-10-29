@@ -154,6 +154,54 @@ pixels: it cannot tell anyone that the violet direction looks right, that nothin
 overlaps at 360px, or that a contrast-safe pair is pleasant to read. Do not read
 this section as "dark mode works".
 
+## 4g. Inventory now carries per-route signals (2026-10-29)
+
+A list of 60 routes is not a work order, so `scripts/inventory.mjs` now detects,
+per route, what a redesign pass must respect: `shell` (renders AppShell),
+`client` ("use client"), `supabase` / `ai` / `offline` / `integrations` (imports
+that data layer), `auth-gated` (redirects or reads the session itself).
+
+Measured: **35 of 60 pages render the shared shell**, 30 are client components,
+22 gate the session in-file.
+
+That split is the single most important finding for Phase D. **25 routes do not use
+the shared shell**, so restyling `AppShell` cannot reach them, and a "the shell
+looks right" check would silently pass while a quarter of the app stayed unstyled.
+Fixing the shell first and calling the app redesigned would have been wrong.
+
+Routes with no shell import (each needs its own review to decide whether it is
+public, gates before rendering, or is a missing-shell defect):
+
+- `/`
+- `/access-denied`
+- `/corrections`
+- `/courses/english`
+- `/courses/foreign-language`
+- `/courses/health-education`
+- `/courses/history-social-science`
+- `/courses/math`
+- `/courses/other-subject`
+- `/courses/science`
+- `/courses/science/biology`
+- `/courses/science/chemistry`
+- `/courses/science/physics`
+- `/create-owner`
+- `/downloads`
+- `/install`
+- `/license`
+- `/local`
+- `/login`
+- `/memories`
+- `/privacy`
+- `/reset-password`
+- `/setup`
+- `/signup`
+- `/terms`
+
+A pin asserts every inventory row has a Signals column and that the shell count
+stays below the page count (i.e. the discrepancy cannot be papered over by
+regenerating the doc).
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
