@@ -1,4 +1,6 @@
+// pdf-parse ships no types for its deep entry point. Declaring it here keeps the
+// import STATIC (no webpack "critical dependency" warning) in both tsconfigs.
 declare module "pdf-parse/lib/pdf-parse.js" {
-  function pdfParse(buffer: Buffer): Promise<{ text: string; numpages?: number }>;
-  export default pdfParse;
+  const parse: (data: Buffer) => Promise<{ text?: string }>;
+  export default parse;
 }

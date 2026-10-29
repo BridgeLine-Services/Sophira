@@ -23,22 +23,20 @@ async function extractText(bytes: Buffer, mime: string, name: string): Promise<E
   }
 
   if (mime === "application/pdf" || lower.endsWith(".pdf")) {
-    try {
-      const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default as
-        (b: Buffer) => Promise<{ text: string }>;
-      const { text } = await pdfParse(bytes);
-      const clean = (text || "").trim();
-      if (clean.length < 80) {
-        return {
-          text: clean,
-          confidence: "low",
-          notes: "This PDF contained very little readable text. It may be a scanned image (no embedded text). Try exporting it as a text-based PDF, take a clear photo of the page, or paste the text.",
-        };
-      }
-      return { text: clean, confidence: "high", notes: "Text extracted from PDF. Layout, tables, and math formatting may be imperfect — please review." };
-    } catch {
+    const { extractPdfText } = await import("@/lib/extract/pdf");
+    const { text, via } = await extractPdfText(bytes);
+    const clean = (text || "").trim();
+    if (via === "none") {
       return { text: "", confidence: "failed", notes: "This PDF could not be read (it may be corrupted or password-protected). Try a different export or paste the text." };
     }
+    if (clean.length < 80) {
+      return {
+        text: clean,
+        confidence: "low",
+        notes: "This PDF contained very little readable text. It may be a scanned image (no embedded text). Try exporting it as a text-based PDF, take a clear photo of the page, or paste the text.",
+      };
+    }
+    return { text: clean, confidence: "high", notes: "Text extracted from PDF. Layout, tables, and math formatting may be imperfect - please review." };
   }
 
   if (mime.startsWith("image/")) {
@@ -119,7 +117,6 @@ async function extractText(bytes: Buffer, mime: string, name: string): Promise<E
 
   return { text: "", confidence: "failed", notes: `Unsupported file type${mime ? ` (${mime})` : ""}. I can read PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), CSV, plain text/Markdown, and images. You can always paste the text instead.` };
 }
-
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();

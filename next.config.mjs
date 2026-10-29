@@ -7,7 +7,7 @@ const nextConfig = {
   // is disabled outright. Re-enabling it is a conscious security decision
   // that must come with remotePatterns reviewed.
   images: { unoptimized: true },
-  serverExternalPackages: ["pdf-parse"],
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
   // The in-app legal pages read the REAL repository documents at request
   // time (single source of truth — never a duplicated copy). Standalone /
   // serverless deployments only include traced files, so the three documents
