@@ -82,7 +82,22 @@ try {
   record("CSV (quoted comma + newline)", { chars: (p.text || "").length, ...recall(p.text || "", ["Cells, organelles", "topic"]) });
 } catch (e) { record("CSV", { error: String(e).slice(0, 80) }); }
 
-record("PDF (text, scanned, tables, columns, equations)", { status: "BLOCKED", why: "no PDF writer in the repo; synthesising one would add a dependency this phase forbids" });
+// --- PDF: measured on a REAL 14-page academic paper shipped with pdf-parse.
+// A hand-written synthetic PDF was attempted first and rejected by the bundled
+// pdf.js v1.10.100 ("bad XRef entry"), so scanned / table / equation / column
+// variants remain UNMEASURED until a dev-only PDF writer is approved.
+try {
+  const fs = await import("node:fs");
+  const dir = "node_modules/pdf-parse/test/data";
+  const file = fs.readdirSync(dir).filter((f) => f.endsWith(".pdf")).sort()[0];
+  const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
+  const r = await pdfParse(fs.readFileSync(dir + "/" + file));
+  const text = r.text.replace(/\s+/g, " ").trim();
+  record("PDF (real fixture, " + r.numpages + " pages)", { chars: text.length, ...recall(text, ["Dynamic Languages", "Trace-based"]), notes: "text layer extracted; reading order sane" });
+} catch (e) {
+  record("PDF (real fixture)", { status: "BLOCKED", why: String(e && e.message).slice(0, 70) });
+}
+record("PDF (scanned / tables / columns / equations)", { status: "BLOCKED", why: "no synthetic PDF writer: pdf.js v1.10.100 rejects hand-built xref; a dev-only writer needs approval" });
 
 console.log("format | chars | key tokens found | notes");
 for (const r of out) {
