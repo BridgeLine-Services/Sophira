@@ -2898,7 +2898,7 @@ async function runAcceptanceDocTests(): Promise<void> {
 // ---------------------------------------------------------------------------
 // RELEASE GATE CONFORMANCE (2026-10-05) — §25.
 // docs/RELEASE_GATE.md + scripts/release-gate.mjs are the single
-// authoritative gate. Machine-check: the doc lists all 38 checks, states
+// authoritative gate. Machine-check: the doc lists all 41 checks, states
 // the GO/BLOCKED-only semantics and that NOT RUN is never PASS, the script
 // registers exactly 39 checks, its self-test passes, and the release
 // workflow runs the gate.
@@ -2928,14 +2928,15 @@ async function runReleaseGateTests(): Promise<void> {
       "Legal placeholders removed or explicitly blocked pending owner input",
       "Production environment variables verified", "No secrets committed", "npm test passes",
       "npm build passes", "Type checking passes", "Security tests pass", "Client bundle secret scan passes",
+      "Offline AI evaluation suite passes", "Information-scope boundary tests pass",
     ];
-    assert(requiredChecks.length === 39, "gate doc check list has exactly 39 entries");
+    assert(requiredChecks.length === 41, "gate doc check list has exactly 41 entries");
     for (const name of requiredChecks) {
       assert(doc.includes(name), `gate doc: lists required check "${name}"`);
     }
     const gate = fs.readFileSync(path.join(process.cwd(), "scripts", "release-gate.mjs"), "utf8");
     const checkCount = (gate.match(/^  check\(/gm) ?? []).length;
-    assert(checkCount === 39, `gate script: registers exactly 39 checks (found ${checkCount})`);
+    assert(checkCount === 41, `gate script: registers exactly 41 checks (found ${checkCount})`);
     assert(gate.includes("RELEASE STATUS: GO") && gate.includes("RELEASE STATUS: BLOCKED"),
       "gate script: emits exactly one final state GO or BLOCKED");
     assert(gate.includes("BLOCKERS:") && /process.exit\(go \? 0 : 1\)/.test(gate),
