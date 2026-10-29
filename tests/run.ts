@@ -3010,6 +3010,49 @@ async function runLintGateTests(): Promise<void> {
   assert(/react-hooks\/rules-of-hooks/.test(cfg), "lint: the hook rules the codebase cites are actually registered");
 }
 
+async function runWritingProfileLearningTests(): Promise<void> {
+  const { proposeStyleSuggestions } = await import("../src/lib/ai/writing-profile-learning");
+  const flat = "The study was good. The data was clear. The result was useful. The method was fair. The end was near. The work was done. The report was long. The point was made.";
+  const rich = "Photosynthesis converts light into chemical energy. However, the yield varies with wavelength, which the 2019 trials measured across six species. As a result, the Calvin cycle cannot be treated as a constant step.";
+
+  assert(proposeStyleSuggestions([], "undergraduate", "essay").length === 0,
+    "writing profile learning: empty input yields no invented advice");
+  assert(proposeStyleSuggestions(["Too short."], "undergraduate", "essay").length === 0,
+    "writing profile learning: under-powered samples yield nothing rather than a guess");
+
+  const one = proposeStyleSuggestions([flat], "high-school", "essay");
+  assert(one.length > 0, "writing profile learning: monotone prose produces at least one suggestion");
+  assert(one.every((s) => s.requiresApproval), "writing profile learning: every suggestion needs explicit approval");
+  assert(one.every((s) => s.scope === "temporary"),
+    "writing profile learning: ONE sample can only ever scope a temporary change");
+  assert(one.every((s) => s.confidence > 0 && s.confidence <= 1), "writing profile learning: confidence stays within 0-1");
+
+  const five = proposeStyleSuggestions([flat, rich, flat, rich, flat], "doctoral", "essay");
+  assert(five.every((s) => s.scope === "global"),
+    "writing profile learning: five consistent samples may propose a global change (still approval-gated)");
+  const two = proposeStyleSuggestions([flat, rich], "graduate", "essay");
+  assert(two.every((s) => s.scope === "course"),
+    "writing profile learning: two samples scope to the course, not the whole profile");
+
+  const runA = JSON.stringify(proposeStyleSuggestions([flat, rich], "graduate", "essay"));
+  const runB = JSON.stringify(proposeStyleSuggestions([flat, rich], "graduate", "essay"));
+  assert(runA === runB, "writing profile learning: the same samples always produce the same suggestions");
+  const ids = one.map((s) => s.id);
+  assert(new Set(ids).size === ids.length, "writing profile learning: suggestion ids are unique");
+
+  const text = JSON.stringify(proposeStyleSuggestions([flat, rich], "elementary", "essay"));
+  assert(!/human|authorship|detect|turnitin|typed by|AI[- ]generated/i.test(text),
+    "writing profile learning: no authorship or detection claim appears in any suggestion");
+  assert(!/access_token|refresh_token|Bearer/i.test(text), "writing profile learning: no token-shaped field appears");
+
+  // Levels come from academic-levels.ts, never a hardcoded list here.
+  const src = fs.readFileSync("src/lib/ai/writing-profile-learning.ts", "utf8");
+  assert(/from "\.\/academic-levels"/.test(src) && /resolveAcademicLevel/.test(src),
+    "writing profile learning: academic levels resolve through the existing source of truth");
+  assert(!/"(preschool|elementary|middle|high-school|undergraduate|graduate|doctoral)"\s*:/.test(src),
+    "writing profile learning: no new level names are hardcoded");
+}
+
 async function runPdfExtractionTests(): Promise<void> {
   const { extractPdfText } = await import("../src/lib/extract/pdf");
   const ok = async () => "x".repeat(120);
@@ -4395,6 +4438,6 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
   .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
