@@ -59,7 +59,9 @@ conflict against a throwaway document.
   steps above are not yet written out in it as a checklist.
 - No live-provider test harness exists, so the conflict paths are proven by
   unit-level simulation only.
-- `npm run lint` remains unavailable (eslint not installed) - pre-existing.
+- ~~`npm run lint` unavailable~~ **RESOLVED 2026-10-29**: eslint now installed with a
+  correctness-only ruleset. 0 errors, 107 warnings (102 unused vars, 5 hook deps),
+  frozen as a ratchet at `--max-warnings=107` so no new debt can land.
 
 ## Recommendation
 

@@ -13,6 +13,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm }
       - run: npm ci
+      - name: Lint (correctness rules only)
+        run: npm run lint
       - name: Unit and integration tests (offline)
         run: npm test
       - name: Deployment-verify script self-test (rules mirrored from src/lib/deployment.ts)

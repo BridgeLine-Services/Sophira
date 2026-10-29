@@ -566,7 +566,6 @@ function solveStats(expr: string): SolveResult {
       kind: "stats", solved: true, finalAnswer: String(math.format(val, { precision: 10 })), steps,
       checks: [{ kind: "stats", label: `${op}`, op, data: raw }],
     };
-    void median; void varr;
   } catch {
     return { kind: "stats", solved: false, finalAnswer: "", steps: [], checks: [], honestNote: "statistic could not be computed deterministically — needs review" };
   }
