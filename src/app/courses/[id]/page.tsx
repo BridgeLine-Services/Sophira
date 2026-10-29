@@ -57,7 +57,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               <Link
                 key={tool.label}
                 href={toolUrl(tool, course.id)}
-                className="group rounded-card border border-ink/10 bg-white p-4 transition hover:border-accent/40 hover:bg-accent/[0.03]"
+                className="group rounded-card border border-line bg-card p-4 transition hover:border-accent/40 hover:bg-accent/[0.03]"
               >
                 <p className="font-medium text-ink group-hover:text-accent">{tool.label}</p>
                 <p className="mt-1 text-xs text-ink-soft">{tool.description}</p>
@@ -97,7 +97,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Assignments in this course</h2>
           <p className="sr-only">Assignments opened from this course keep its course and teacher context attached.</p>
           {assignments?.length ? (
-            <div className="divide-y divide-ink/5 rounded-card border border-ink/10 bg-white">
+            <div className="divide-y divide-ink/5 rounded-card border border-line bg-card">
               {assignments.map((a) => (
                 <Link key={a.id} href={`/assignments/${a.id}`} className="flex items-center justify-between gap-3 p-4 transition hover:bg-ink/[0.02]">
                   <div className="min-w-0">

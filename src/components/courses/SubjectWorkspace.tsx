@@ -109,7 +109,7 @@ export async function SubjectWorkspace({ slug }: { slug: string }) {
             Your {node.label} courses
           </h2>
           {groupCourses.length === 0 ? (
-            <p className="rounded-lg border border-ink/10 bg-paper p-4 text-sm text-ink-soft">
+            <p className="rounded-lg border border-line bg-paper p-4 text-sm text-ink-soft">
               You have no {node.label.toLowerCase()} courses yet. The tools above work
               without one — add a course on the{" "}
               <Link href="/courses" className="text-accent underline">Courses page</Link>{" "}
@@ -124,7 +124,7 @@ export async function SubjectWorkspace({ slug }: { slug: string }) {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {c.subject ? <Badge tone="neutral">{c.subject}</Badge> : null}
-                    <Link href={`/courses/${c.id}`} className="inline-flex items-center rounded-md border border-ink/15 px-3 py-2 text-sm font-medium text-ink">
+                    <Link href={`/courses/${c.id}`} className="inline-flex items-center rounded-md border border-line px-3 py-2 text-sm font-medium text-ink">
                       Open course workspace
                     </Link>
                   </CardContent>

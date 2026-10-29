@@ -132,7 +132,7 @@ export default function NewWritingSamplePage() {
           <Label htmlFor="content">Your writing *</Label>
           <Textarea id="content" className="mt-1.5 min-h-64" value={form.content} onChange={(e) => set("content", e.target.value)} placeholder="Paste your writing here" />
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <label className="inline-flex h-11 cursor-pointer items-center rounded-lg border border-ink/15 px-4 text-sm font-medium text-ink hover:bg-ink/5">
+            <label className="inline-flex h-11 cursor-pointer items-center rounded-lg border border-line px-4 text-sm font-medium text-ink hover:bg-ink/5">
               {uploading ? <Spinner className="mr-2 h-4 w-4" /> : null}
               {uploading ? "Reading file…" : "…or upload a text file or PDF"}
               <input

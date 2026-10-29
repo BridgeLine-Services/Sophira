@@ -200,7 +200,7 @@ function EssayPageInner() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <pre className="whitespace-pre-wrap rounded-lg border border-ink/10 bg-muted/40 p-3 text-xs leading-5">{formatAssignmentPlan(session.plan)}</pre>
+                <pre className="whitespace-pre-wrap rounded-lg border border-line bg-muted/40 p-3 text-xs leading-5">{formatAssignmentPlan(session.plan)}</pre>
               </CardContent>
             </Card>
 
@@ -210,7 +210,7 @@ function EssayPageInner() {
                 <CardHeader><CardTitle>Outline — approve or edit before drafting</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   {outlineDraft.map((s, i) => (
-                    <div key={s.id} className="rounded-lg border border-ink/10 p-3">
+                    <div key={s.id} className="rounded-lg border border-line p-3">
                       <div className="flex items-center gap-2">
                         <Input value={s.title} onChange={(e) => setOutlineDraft(outlineDraft.map((o, j) => j === i ? { ...o, title: e.target.value } : o))} className="flex-1" />
                         <Button size="sm" variant="secondary" onClick={() => setOutlineDraft(outlineDraft.filter((_, j) => j !== i))}>Remove</Button>
@@ -248,7 +248,7 @@ function EssayPageInner() {
                     return <PacedSection key={s.id} sessionId={session.id} sectionId={s.id} title={meta?.title ?? s.id} draft={s.draft!} audits={s.audits} mode={session.output_mode} customWpm={session.custom_wpm} profile={profile} />;
                   })}
                   {session.final_verification && (
-                    <div className="rounded-lg border border-ink/10 p-3 text-sm">
+                    <div className="rounded-lg border border-line p-3 text-sm">
                       <Badge tone={session.final_verification.status === "VERIFIED" ? "success" : "warn"}>Final verification: {session.final_verification.status}</Badge>
                       <p className="mt-1 text-ink/70">{session.final_verification.note}</p>
                     </div>
@@ -332,7 +332,7 @@ function PacedSection({ sessionId, sectionId, title, draft, audits, mode, custom
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
   return (
-    <div className="rounded-lg border border-ink/10 p-3">
+    <div className="rounded-lg border border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="neutral">{title}</Badge>
         <Badge tone="accent">{OUTPUT_MODE_LABELS[wpm == null ? "instant" : mode].split(" —")[0]}</Badge>

@@ -15,7 +15,7 @@ const variants: Record<Variant, string> = {
   // disabled for every variant. Deep indigo hover (not a washed /90),
   // clear pressed feedback, ring focus for keyboards, calm disabled.
   primary: "bg-accent text-white shadow-[0_1px_2px_rgba(37,43,58,0.12)] hover:bg-accent-deep active:bg-accent-deep disabled:bg-accent/40 disabled:shadow-none",
-  secondary: "bg-card border border-ink/15 text-ink hover:border-accent/40 hover:text-accent active:bg-accent-soft disabled:opacity-50",
+  secondary: "bg-card border border-line text-ink hover:border-accent/40 hover:text-accent active:bg-accent-soft disabled:opacity-50",
   ghost: "text-ink-soft hover:bg-ink/5 hover:text-ink active:bg-ink/10 disabled:opacity-50",
   danger: "bg-card border border-danger/30 text-danger hover:border-danger/50 hover:bg-danger/5 active:bg-danger/10 disabled:opacity-50",
 };

@@ -67,7 +67,7 @@ function PlanningInner() {
             {plan.steps?.length ? (
               <Card><CardHeader><CardTitle>Steps</CardTitle></CardHeader><CardContent className="space-y-2">
                 {plan.steps.map((s) => (
-                  <div key={s.step} className="rounded-card border border-ink/10 p-3">
+                  <div key={s.step} className="rounded-card border border-line p-3">
                     <p className="text-sm font-medium text-ink">{s.step}. {s.title}</p>
                     {s.detail && <p className="mt-1 text-xs text-ink-soft">{s.detail}</p>}
                   </div>

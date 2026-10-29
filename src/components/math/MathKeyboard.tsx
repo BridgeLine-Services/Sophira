@@ -20,7 +20,7 @@ export function MathKeyboard({ onInsert, onClose }: { onInsert: (token: string) 
     { t: "sin", v: "sin(" }, { t: "cos", v: "cos(" }, { t: "tan", v: "tan(" }, { t: "⌫", v: "\b" },
   ];
   return (
-    <div className="rounded-lg border border-ink/15 bg-white p-3" role="group" aria-label="Math keyboard">
+    <div className="rounded-lg border border-line bg-card p-3" role="group" aria-label="Math keyboard">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-medium text-ink/60">Keyboard is open</span>
         <button type="button" onClick={onClose} aria-label="Close math keyboard" className="rounded p-1 text-ink/50 hover:bg-ink/5">
@@ -35,7 +35,7 @@ export function MathKeyboard({ onInsert, onClose }: { onInsert: (token: string) 
             aria-label={`Insert ${k.t}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onInsert(k.v)}
-            className="rounded-md border border-ink/10 bg-white px-2 py-2 text-sm font-medium text-ink hover:bg-accent-soft hover:text-accent"
+            className="rounded-md border border-line bg-card px-2 py-2 text-sm font-medium text-ink hover:bg-accent-soft hover:text-accent"
           >
             {k.t}
           </button>

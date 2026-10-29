@@ -222,7 +222,7 @@ export default function DownloadsPage() {
                               </div>
                               <a
                                 href={a.browser_download_url}
-                                className="inline-flex h-8 shrink-0 items-center rounded-lg border border-ink/15 bg-white px-3 text-sm font-medium text-ink transition-colors hover:bg-accent/5"
+                                className="inline-flex h-8 shrink-0 items-center rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink transition-colors hover:bg-accent/5"
                               >
                                 Download
                               </a>

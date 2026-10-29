@@ -95,7 +95,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </Link>
             <Link
               href="/assignments/new?mode=learn"
-              className="flex min-h-28 flex-col justify-center gap-1.5 rounded-card border border-ink/10 bg-white p-5 shadow-[0_1px_3px_rgba(37,43,58,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-md active:scale-[0.99]"
+              className="flex min-h-28 flex-col justify-center gap-1.5 rounded-card border border-line bg-card p-5 shadow-[0_1px_3px_rgba(37,43,58,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-md active:scale-[0.99]"
             >
               <span className="flex items-center gap-2 font-semibold text-ink">
                 <HelpCircle className="h-5 w-5 text-accent" /> Ask a question
@@ -117,7 +117,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <Link
               key={m.id}
               href={`/assignments/new?mode=${m.id}`}
-              className="flex min-h-16 items-center justify-center rounded-card border border-ink/10 bg-white p-2 text-center text-sm font-medium text-ink shadow-sm transition active:scale-[0.99] hover:border-accent/40"
+              className="flex min-h-16 items-center justify-center rounded-card border border-line bg-card p-2 text-center text-sm font-medium text-ink shadow-sm transition active:scale-[0.99] hover:border-accent/40"
             >
               {m.label}
             </Link>
@@ -285,7 +285,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <section>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Recent assignments</h2>
           {assignments?.length ? (
-            <div className="divide-y divide-ink/5 rounded-card border border-ink/10 bg-white">
+            <div className="divide-y divide-ink/5 rounded-card border border-line bg-card">
               {assignments.map((a) => (
                 <Link key={a.id} href={`/assignments/${a.id}`} className="flex items-center justify-between gap-3 p-4 transition hover:bg-ink/[0.02]">
                   <div className="min-w-0">
@@ -309,7 +309,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {recentFeedback && recentFeedback.length > 0 && (
           <section>
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Recent feedback</h2>
-            <div className="divide-y divide-ink/5 rounded-card border border-ink/10 bg-white">
+            <div className="divide-y divide-ink/5 rounded-card border border-line bg-card">
               {recentFeedback.map((f) => (
                 <div key={f.id} className="p-4">
                   <p className="truncate text-sm text-ink">{f.comment}</p>
@@ -325,7 +325,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         )}
 
         {/* Footer links */}
-        <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-ink/10 pt-5 text-sm text-ink-soft">
+        <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-5 text-sm text-ink-soft">
           <Link href="/library" className="flex items-center gap-1.5 hover:text-accent"><Library className="h-4 w-4" /> Library</Link>
           <Link href="/settings" className="flex items-center gap-1.5 hover:text-accent"><Settings className="h-4 w-4" /> Settings</Link>
           <Link href="/install" className="flex items-center gap-1.5 hover:text-accent"><Smartphone className="h-4 w-4" /> Install on your phone</Link>

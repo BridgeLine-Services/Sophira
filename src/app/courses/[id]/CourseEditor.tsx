@@ -108,7 +108,7 @@ export function CourseEditor({ course, teachers }: { course: Course; teachers: P
         <Label htmlFor="instructions">Course instructions</Label>
         <Textarea id="instructions" className="mt-1.5 min-h-24" value={form.instructions} onChange={(e) => set("instructions", e.target.value)} placeholder="Anything this course requires: formats, methods, tools…" />
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-ink/10 pt-4">
+      <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
         <Button type="button" variant="danger" onClick={() => setConfirmDelete(true)}>Delete course</Button>
         <Button type="submit" disabled={busy}>{busy ? "Saving…" : "Save changes"}</Button>
       </div>

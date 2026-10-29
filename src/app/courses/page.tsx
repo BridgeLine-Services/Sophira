@@ -64,7 +64,7 @@ export default function CoursesPage() {
                       {group.engines.map((eid: EngineId) => {
                         const subjectCourses = grouped.filter((c) => classifyEngine(c.subject) === eid);
                         return (
-                          <div key={eid} className="rounded-card border border-ink/10 p-3">
+                          <div key={eid} className="rounded-card border border-line p-3">
                             <p className="text-sm font-medium text-ink">{ENGINES[eid].label}</p>
                             <ul className="mt-2 space-y-2">
                               {subjectCourses.length === 0 && (

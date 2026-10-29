@@ -142,7 +142,7 @@ export default async function ProposalsPage({
         ) : (
           <ul className="space-y-2">
             {scopedDecisions.map((d) => (
-              <li key={d.id} className="rounded-card border border-ink/10 p-3">
+              <li key={d.id} className="rounded-card border border-line p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={d.status === "approved" ? "success" : "neutral"}>{d.status}</Badge>
                   <span className="text-sm font-medium text-ink">{d.target_type} profile</span>
@@ -163,7 +163,7 @@ export default async function ProposalsPage({
         ) : (
           <ul className="space-y-2">
             {scopedPatterns.map((p) => (
-              <li key={p.id} className="rounded-card border border-ink/10 p-3">
+              <li key={p.id} className="rounded-card border border-line p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {p.subject && <Badge tone="accent">{p.subject}</Badge>}
                   <Badge tone="neutral">{p.scope}</Badge>
@@ -186,7 +186,7 @@ export default async function ProposalsPage({
         ) : (
           <ul className="space-y-2">
             {scopedMemories.map((m) => (
-              <li key={m.id} className="rounded-card border border-ink/10 p-3">
+              <li key={m.id} className="rounded-card border border-line p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {m.subject && <Badge tone="accent">{m.subject}</Badge>}
                   <Badge tone="neutral">{m.category}</Badge>

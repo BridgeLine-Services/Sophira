@@ -67,7 +67,7 @@ function GrammarInner() {
             <label htmlFor="gtext" className="text-sm font-medium text-ink">Your text</label>
             <textarea
               id="gtext"
-              className="min-h-52 w-full rounded-card border border-ink/10 p-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+              className="min-h-52 w-full rounded-card border border-line p-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Paste or type the text you want checked…"
@@ -87,7 +87,7 @@ function GrammarInner() {
               )}
               <ul className="space-y-2">
                 {corrections.map((c) => (
-                  <li key={c.id} className="rounded-card border border-ink/10 p-3">
+                  <li key={c.id} className="rounded-card border border-line p-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {c.kind && <Badge tone="neutral">{c.kind}</Badge>}
                       <span className="text-sm text-ink-soft line-through decoration-red-400/60">{c.original}</span>

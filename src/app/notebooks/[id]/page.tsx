@@ -327,7 +327,7 @@ export default function NotebookWorkspace() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`rounded-md px-3 py-1.5 text-sm ${tab === t.id ? "bg-primary text-primary-foreground" : "border border-ink/15 text-ink/70 hover:bg-muted"}`}
+              className={`rounded-md px-3 py-1.5 text-sm ${tab === t.id ? "bg-primary text-primary-foreground" : "border border-line text-ink/70 hover:bg-muted"}`}
             >
               {t.label}
             </button>
@@ -498,7 +498,7 @@ export default function NotebookWorkspace() {
                     <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. effects of the 1929 stock market crash on European economies" />
                     <Button onClick={runResearch} disabled={researchBusy}>{researchBusy ? <Spinner /> : "Research this topic"}</Button>
                     {analysis && (
-                      <div className="rounded border border-ink/10 bg-muted/40 p-3 text-xs text-ink/70">
+                      <div className="rounded border border-line bg-muted/40 p-3 text-xs text-ink/70">
                         <p>{analysis.rationale}</p>
                         {analysis.requiredSourceTypes && <p className="mt-1">Required source types: {analysis.requiredSourceTypes.join("; ")}</p>}
                         {researchNotes.map((n, i) => <p key={i} className="text-ink/50">• {n}</p>)}
@@ -507,7 +507,7 @@ export default function NotebookWorkspace() {
                     {candidates.length > 0 && (
                       <div className="space-y-2">
                         {candidates.map((c) => (
-                          <div key={c.url} className="rounded border border-ink/10 p-3 text-sm">
+                          <div key={c.url} className="rounded border border-line p-3 text-sm">
                             <label className="flex items-start gap-2">
                               <input
                                 type="checkbox"
@@ -641,7 +641,7 @@ function AnswerPanel({ answer, onOpen, sourceById, compact }: {
 }) {
   if (!answer?.statements) return null;
   return (
-    <div className={`space-y-2 ${compact ? "" : "rounded-md border border-ink/10 bg-muted/30 p-3"}`}>
+    <div className={`space-y-2 ${compact ? "" : "rounded-md border border-line bg-muted/30 p-3"}`}>
       {answer.statements.map((st, i) => (
         <div key={i} className="text-sm">
           <span className={`mr-2 inline-block rounded border px-1.5 py-0.5 text-xs ${LABEL_TONE[st.label] ?? ""}`}>{st.label}</span>
@@ -757,7 +757,7 @@ function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
         type="button"
         onClick={() => doExport("docx")}
         disabled={busy !== null}
-        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+        className="rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
       >
         {busy === "docx" ? "Exporting…" : "Export DOCX"}
       </button>
@@ -765,7 +765,7 @@ function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
         type="button"
         onClick={() => doExport("pdf")}
         disabled={busy !== null}
-        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+        className="rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
       >
         {busy === "pdf" ? "Exporting…" : "Export PDF"}
       </button>
@@ -773,7 +773,7 @@ function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
         type="button"
         onClick={() => doExport("pptx")}
         disabled={busy !== null}
-        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+        className="rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
       >
         {busy === "pptx" ? "Exporting…" : "Export PPTX"}
       </button>
@@ -781,7 +781,7 @@ function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
         type="button"
         onClick={() => void saveToProvider("microsoft")}
         disabled={busy !== null}
-        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+        className="rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
       >
         {busy === "microsoft" ? "Saving…" : "Save to Word"}
       </button>
@@ -789,7 +789,7 @@ function ExportButtons({ artifact }: { artifact: ArtifactRow }) {
         type="button"
         onClick={() => void saveToProvider("google")}
         disabled={busy !== null}
-        className="rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+        className="rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50"
       >
         {busy === "google" ? "Saving…" : "Save to Google Docs"}
       </button>

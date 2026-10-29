@@ -249,7 +249,7 @@ function LibraryPageInner() {
           </p>
         )}
         {showNoteForm && (
-          <form onSubmit={saveNote} className="space-y-3 rounded-card border border-ink/10 bg-white p-4">
+          <form onSubmit={saveNote} className="space-y-3 rounded-card border border-line bg-card p-4">
             <div>
               <Label htmlFor="ntitle">Note title</Label>
               <Input id="ntitle" className="mt-1.5" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} />

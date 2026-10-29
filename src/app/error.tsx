@@ -36,7 +36,7 @@ export default function ErrorBoundary({
         </button>
         <Link
           href="/dashboard"
-          className="rounded-button border border-ink/10 bg-white px-4 py-2 text-sm font-medium text-ink shadow-sm"
+          className="rounded-button border border-line bg-card px-4 py-2 text-sm font-medium text-ink shadow-sm"
         >
           Go to dashboard
         </Link>

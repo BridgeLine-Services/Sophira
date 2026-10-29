@@ -234,13 +234,13 @@ export default function OnboardingPage() {
                 <h2 className="text-lg font-semibold text-ink">You&apos;re set up</h2>
                 <p className="text-sm text-ink-soft">A few things you can do next — none are required.</p>
                 <div className="grid gap-2">
-                  <Link href="/writing" className="flex items-center gap-2 rounded-lg border border-ink/10 p-3 text-sm font-medium text-ink hover:border-accent/40">
+                  <Link href="/writing" className="flex items-center gap-2 rounded-lg border border-line p-3 text-sm font-medium text-ink hover:border-accent/40">
                     <PenLine className="h-4 w-4 text-accent" /> Add writing samples so my writing sounds like you
                   </Link>
-                  <Link href="/settings" className="flex items-center gap-2 rounded-lg border border-ink/10 p-3 text-sm font-medium text-ink hover:border-accent/40">
+                  <Link href="/settings" className="flex items-center gap-2 rounded-lg border border-line p-3 text-sm font-medium text-ink hover:border-accent/40">
                     <Gauge className="h-4 w-4 text-accent" /> Retake the typing test or change your paced-writing baseline
                   </Link>
-                  <Link href="/install" className="flex items-center gap-2 rounded-lg border border-ink/10 p-3 text-sm font-medium text-ink hover:border-accent/40">
+                  <Link href="/install" className="flex items-center gap-2 rounded-lg border border-line p-3 text-sm font-medium text-ink hover:border-accent/40">
                     <Smartphone className="h-4 w-4 text-accent" /> Install Sophira on your phone
                   </Link>
                 </div>

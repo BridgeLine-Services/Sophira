@@ -150,7 +150,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
 
   const toolRows = (slug: string, engines: (typeof SUBJECT_TREE)[number]["engines"], id: string) => (
     open[id] && (
-      <div className="ml-8 space-y-0.5 border-l border-ink/10 pl-1">
+      <div className="ml-8 space-y-0.5 border-l border-line pl-1">
         {subjectTools(engines).map((tool) => {
           const base = tool.path.split("?")[0];
           const toolParams = new URLSearchParams(tool.path.split("?")[1] ?? "");
@@ -189,7 +189,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
         <ChevronDown aria-hidden className={cn("h-4 w-4 transition-transform", open.courses && "rotate-180")} />
       </button>
       {open.courses && (
-        <div id="nav-courses-children" className="ml-3 space-y-0.5 border-l border-ink/10 pl-2">
+        <div id="nav-courses-children" className="ml-3 space-y-0.5 border-l border-line pl-2">
           {SUBJECT_TREE.map((node) => (
             <div key={node.key} className="space-y-0.5">
               <div className="flex items-center justify-between gap-1">
@@ -205,7 +205,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
                 {chevron(!!open[node.key], node.key)}
               </div>
               {node.children ? (
-                <div className="ml-5 space-y-0.5 border-l border-ink/10 pl-1">
+                <div className="ml-5 space-y-0.5 border-l border-line pl-1">
                   {node.children.map((child) => (
                     <div key={child.key} className="space-y-0.5">
                       <div className="flex items-center justify-between gap-1">
@@ -442,7 +442,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
       {/* PERSISTENT SIDEBAR RAIL (lg+): brand, expandable Courses hierarchy,
           the section list, the online status chip, and sign out. */}
       <aside
-        className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-ink/10 bg-paper/95 backdrop-blur lg:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-line bg-paper/95 backdrop-blur lg:flex"
         aria-label="Primary"
       >
         <Link href={variant === "owner" ? "/owner" : isOwner ? "/owner" : "/dashboard"} className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
@@ -478,7 +478,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
           )}
           {onlineChip(false)}
         </nav>
-        <div className="border-t border-ink/10 p-3">
+        <div className="border-t border-line p-3">
           <div className="mb-2 px-2"><SyncStatus /></div>
           <button
             onClick={signOut}
@@ -493,7 +493,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         </div>
       </aside>
 
-      <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur lg:pl-60">
+      <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur lg:pl-60">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
           <button
             ref={menuBtnRef}
@@ -601,7 +601,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             tabIndex={-1}
             onTouchStart={onDrawerTouchStart}
             onTouchEnd={onDrawerTouchEnd}
-            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-ink/10 bg-paper pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-xl outline-none"
+            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-line bg-paper pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-xl outline-none"
           >
             <div className="flex items-center justify-between px-5 py-4">
               <span className="flex items-center gap-2 font-semibold text-ink">
@@ -639,7 +639,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
               )}
               {onlineChip(true)}
             </nav>
-            <div className="border-t border-ink/10 p-3">
+            <div className="border-t border-line p-3">
               <div className="mb-2 px-2"><SyncStatus /></div>
               <button
                 onClick={signOut}
@@ -656,7 +656,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
 
       {/* MOBILE BOTTOM BAR: quick top-level destinations (drawer has the full hierarchy). */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         aria-label="Main"
       >
         <div className="flex h-16 items-stretch gap-1 overflow-x-auto px-2" style={{ scrollbarWidth: "none" }}>

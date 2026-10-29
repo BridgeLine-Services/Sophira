@@ -324,7 +324,7 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
           {(docs[s.key] ?? []).length > 0 && (
             <div className="mb-3 space-y-2">
               {(docs[s.key] ?? []).map((d, i) => (
-                <details key={i} className={`rounded-lg border border-ink/10 bg-white p-3 ${d.archived ? "opacity-60" : ""}`}>
+                <details key={i} className={`rounded-lg border border-line bg-card p-3 ${d.archived ? "opacity-60" : ""}`}>
                   <summary className="cursor-pointer text-sm font-medium text-ink">
                     {d.title}
                     {d.archived && <Badge tone="warn" className="ml-2">Archived — not applied</Badge>}
@@ -357,7 +357,7 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
           )}
 
           {openDocForm === s.key && (
-            <div className="space-y-3 rounded-lg border border-ink/10 bg-white p-4">
+            <div className="space-y-3 rounded-lg border border-line bg-card p-4">
               <div>
                 <Label>Document title *</Label>
                 <Input

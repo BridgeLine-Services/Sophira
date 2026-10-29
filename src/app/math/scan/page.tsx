@@ -188,9 +188,9 @@ function MathScanInner() {
             </div>
             {preprocessInfo && <p className="text-xs text-ink/50">{preprocessInfo}</p>}
             {detect && <p className={`text-xs ${detect.startsWith("Expression detected") ? "text-success" : "text-warn"}`}>{detect}</p>}
-            {imageDataUrl && <img src={imageDataUrl} alt="scanned problem" className="max-h-64 rounded border border-ink/10" />}
+            {imageDataUrl && <img src={imageDataUrl} alt="scanned problem" className="max-h-64 rounded border border-line" />}
 
-            <div className="rounded-lg border border-ink/10 bg-ink/[0.02] p-4">
+            <div className="rounded-lg border border-line bg-ink/[0.02] p-4">
               <p className="text-sm font-medium">Prefer to type?</p>
               <p className="text-xs text-ink/60">Enter a problem in the dedicated Type to Solve workspace.</p>
               <a href="/math" className="mt-2 inline-block rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white">Open Type to Solve</a>

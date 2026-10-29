@@ -55,7 +55,7 @@ export default function TeachersPage() {
       }
     >
       {node && (
-        <p className="mb-4 rounded-lg border border-ink/10 bg-paper p-3 text-sm text-ink-soft">
+        <p className="mb-4 rounded-lg border border-line bg-paper p-3 text-sm text-ink-soft">
           Subject workspace view — {node.label}. Teachers who teach your {node.label} courses are
           tagged below; every teacher profile stays available because a teacher can mark work in
           more than one subject.

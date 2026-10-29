@@ -83,7 +83,7 @@ export function runSelfHealingProvisionTests(assert: (c: boolean, n: string) => 
   // persistent sidebar rail; tablet keeps the top nav; mobile keeps the
   // bottom bar. Every visible nav item navigates (real Links, no dead buttons).
   const appShell = readFileSync("src/components/app/AppShell.tsx", "utf8");
-  assert(appShell.includes('hidden w-60 flex-col border-r border-ink/10') && appShell.includes('aria-label="Primary"'),
+  assert(appShell.includes('hidden w-60 flex-col border-r border-line') && appShell.includes('aria-label="Primary"'),
     "nav: lg+ renders a persistent sidebar rail with the full section list");
   assert(appShell.includes("md:flex lg:hidden"),
     "nav: the tablet top-nav row is retired exactly when the sidebar takes over (lg+)");

@@ -43,7 +43,7 @@ export function PipelineView({ result, confirming, onConfirmChange, onConfirm }:
             <Badge tone={result.recognized.ocrEngine === "deterministic" ? "neutral" : "accent"}>{result.recognized.ocrEngine} OCR</Badge>
             <Badge tone={result.recognized.confidence >= 0.8 ? "success" : "warn"}>{(result.recognized.confidence * 100).toFixed(0)}% confidence</Badge>
           </div>
-          <p className="rounded-lg border border-ink/10 bg-muted/40 p-3 font-mono text-lg">{result.recognized.expression || "(nothing recognized)"}</p>
+          <p className="rounded-lg border border-line bg-muted/40 p-3 font-mono text-lg">{result.recognized.expression || "(nothing recognized)"}</p>
           {result.recognized.rawText && result.recognized.rawText !== result.recognized.expression && (
             <p className="text-xs text-ink/50">raw OCR text: {result.recognized.rawText}</p>
           )}
@@ -95,7 +95,7 @@ export function PipelineView({ result, confirming, onConfirmChange, onConfirm }:
             </p>
             <ul className="space-y-1">
               {result.multipleChoice.choices.map((c) => (
-                <li key={c.label} className={c.verdict === "correct" ? "rounded border border-success/40 bg-success/10 p-2 font-medium" : c.verdict === "cannot_determine" ? "rounded border border-warn/40 bg-warn/10 p-2" : "rounded border border-ink/10 p-2"}>
+                <li key={c.label} className={c.verdict === "correct" ? "rounded border border-success/40 bg-success/10 p-2 font-medium" : c.verdict === "cannot_determine" ? "rounded border border-warn/40 bg-warn/10 p-2" : "rounded border border-line p-2"}>
                   <strong>{c.label}.</strong> {c.text} — <em>{c.verdict === "correct" ? "Correct" : c.verdict === "incorrect" ? "Incorrect" : "Could not be established"}</em>: {c.reason}
                 </li>
               ))}

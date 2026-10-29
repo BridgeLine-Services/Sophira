@@ -243,8 +243,8 @@ function Wizard() {
                   type="button"
                   onClick={() => setMode(m.id)}
                   aria-pressed={mode === m.id}
-                  className={`rounded-card border bg-white p-4 text-left transition ${
-                    mode === m.id ? "border-accent ring-2 ring-accent" : "border-ink/10 hover:border-accent/40"
+                  className={`rounded-card border bg-card p-4 text-left transition ${
+                    mode === m.id ? "border-accent ring-2 ring-accent" : "border-line hover:border-accent/40"
                   }`}
                 >
                   <span className="flex items-center gap-2 font-medium text-ink">
@@ -305,7 +305,7 @@ function Wizard() {
             </div>
 
             <div>
-              <label className="inline-flex h-11 cursor-pointer items-center rounded-lg border border-ink/15 px-4 text-sm font-medium text-ink hover:bg-ink/5">
+              <label className="inline-flex h-11 cursor-pointer items-center rounded-lg border border-line px-4 text-sm font-medium text-ink hover:bg-ink/5">
                 {uploading ? <Spinner className="mr-2 h-4 w-4" /> : null}
                 {uploading ? "Reading files…" : "Attach files (PDF, text, or a photo — up to 10 MB each)"}
                 <input
@@ -321,7 +321,7 @@ function Wizard() {
                 <div className="mt-3 space-y-2">
                   {attachments.map((a, i) => (
                     <Fragment key={i}>
-                    <div className="flex items-start gap-2 rounded-lg border border-ink/10 bg-white p-3">
+                    <div className="flex items-start gap-2 rounded-lg border border-line bg-card p-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-ink">{a.file_name}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -350,7 +350,7 @@ function Wizard() {
                         {a.notes && <p className="text-xs text-ink-soft">{a.notes}</p>}
                         <Textarea
                           aria-label={`Correct the extracted text for ${a.file_name}`}
-                          className="min-h-28 bg-white"
+                          className="min-h-28 bg-card"
                           value={a.extracted_text}
                           onChange={(e) =>
                             setAttachments((list) =>

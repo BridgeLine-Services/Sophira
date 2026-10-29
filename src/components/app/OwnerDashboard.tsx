@@ -229,7 +229,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   return (
     <div className="space-y-8">
       {toastMsg && (
-        <div className="rounded-card border border-ink/10 bg-accent-soft/60 p-3 text-sm text-ink">{toastMsg}</div>
+        <div className="rounded-card border border-line bg-accent-soft/60 p-3 text-sm text-ink">{toastMsg}</div>
       )}
 
       {/* Overview tiles — aggregate activity only, never academic content */}
@@ -323,7 +323,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                 <Label htmlFor="invite-expires">Expires in</Label>
                 <select
                   id="invite-expires"
-                  className="h-11 w-full rounded-lg border border-ink/15 bg-white px-3 text-base text-ink"
+                  className="h-11 w-full rounded-lg border border-line bg-card px-3 text-base text-ink"
                   value={inviteExpires}
                   onChange={(e) => setInviteExpires(Number(e.target.value))}
                 >
@@ -338,7 +338,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                 <Label htmlFor="invite-channel">Send by</Label>
                 <select
                   id="invite-channel"
-                  className="h-11 w-full rounded-lg border border-ink/15 bg-white px-3 text-base text-ink"
+                  className="h-11 w-full rounded-lg border border-line bg-card px-3 text-base text-ink"
                   value={inviteChannel}
                   onChange={(e) => setInviteChannel(e.target.value as "email" | "sms" | "both")}
                 >
@@ -353,7 +353,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                   id="invite-phone"
                   type="tel"
                   inputMode="tel"
-                  className="h-11 w-full rounded-lg border border-ink/15 bg-white px-3 text-base text-ink disabled:bg-ink/5"
+                  className="h-11 w-full rounded-lg border border-line bg-card px-3 text-base text-ink disabled:bg-ink/5"
                   placeholder="+1 555 123 4567"
                   value={invitePhone}
                   onChange={(e) => setInvitePhone(e.target.value)}

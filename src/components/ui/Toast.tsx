@@ -25,7 +25,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               "mb-2 rounded-card border px-4 py-3 text-sm shadow-lg " +
               (t.kind === "success" ? "border-success/30 bg-card text-success"
               : t.kind === "error" ? "border-danger/30 bg-card text-danger"
-              : "border-ink/10 bg-card text-ink")}
+              : "border-line bg-card text-ink")}
             role="status"
           >
             {t.text}
