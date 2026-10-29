@@ -3603,8 +3603,27 @@ async function runDocBenchTests(): Promise<void> {
   assert(doc.includes("BLOCKED") && doc.includes("PDF"),
     "doc-bench: the unmeasured PDF gap is recorded, never silently treated as passing");
   assert(doc.includes("No adoption"), "doc-bench: no parser swap is claimed without measured evidence");
-  assert(!/pdf-lib|docling|markitdown/.test(fs2.readFileSync("package.json", "utf8")),
-    "doc-bench: no candidate parser dependency was added");
+  // 2026-10-29: the owner approved pdf-lib as a DEV-ONLY fixture writer, so the
+  // pin now forbids candidate PARSERS everywhere and the writer outside devDeps.
+  {
+    const pkg2 = JSON.parse(fs2.readFileSync("package.json", "utf8"));
+    const prodDeps = Object.keys(pkg2.dependencies || {}).join(" ");
+    assert(!/docling|markitdown|pdf-parse2|pdfjs-dist/.test(prodDeps),
+      "doc-bench: no candidate parser dependency was added to production");
+    assert(!pkg2.dependencies["pdf-lib"] && pkg2.devDependencies["pdf-lib"],
+      "doc-bench: the fixture writer is dev-only");
+  }
+}
+
+async function runPdfFragilityPins(): Promise<void> {
+  const fs = require("fs");
+  const doc = fs.readFileSync("docs/DOCUMENT_EXTRACTION_BASELINE.md", "utf8");
+  const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+  assert(doc.includes("bad XRef entry") && /non-deterministic/i.test(doc),
+    "bench: the modern-PDF failure of the bundled pdf.js is recorded, not hidden");
+  assert(/no parser has been adopted/i.test(doc), "bench: no adoption is claimed on partial evidence");
+  assert(pkg.devDependencies["pdf-lib"] && !pkg.dependencies["pdf-lib"],
+    "bench: the PDF fixture writer stays DEV-only, never in the production bundle");
 }
 
 async function runOfflineEvalTests(): Promise<void> {
@@ -4227,5 +4246,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

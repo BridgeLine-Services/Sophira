@@ -78,3 +78,46 @@ preference:
 Until one of those is approved, **no parser replacement is justified**: the one
 format with real evidence already works, and the formats that might benefit have
 no measurement at all.
+
+## UPDATE (same day): the synthetic PDF attempt found a REAL defect
+
+With `pdf-lib` approved as a **dev-only** writer, synthetic cases were run
+through the production parser (`pdf-parse` -> bundled **pdf.js v1.10.100**).
+The corpus could not be measured, because the parser is unstable on
+modern-library PDFs:
+
+- Compressed object streams: `Unknown compression method in flate stream`.
+- Uncompressed output: `bad XRef entry` for most cases.
+- **Non-deterministic**: the SAME byte-identical file failed twice and then
+  parsed correctly on the third attempt in one process (verified by hand).
+
+This is not a benchmark artefact. It is a defect in Sophira's production PDF
+path: a student PDF produced by a modern library can fail outright, and can
+*intermittently* succeed. A retry-shaped workaround would hide it.
+
+### Consequence for Prompt 3
+
+The measured position is now:
+
+| Case | Evidence |
+|---|---|
+| Plain-text PDF (real 14-page paper) | works: 82,400 chars, 2/2 tokens |
+| pdf-lib text / table / columns | intermittent failure (`bad XRef entry`) |
+| Scanned PDF, tables, columns, equations | still UNMEASURED |
+
+So: **no parser has been adopted**, and none should be on this evidence. But
+"keep the current parser" is no longer defensible either - the current parser
+demonstrably rejects valid modern PDFs.
+
+### Recommended next step (needs approval)
+
+1. Replace `pdf-parse@1.1.1` (pdf.js v1.10.100, ~2016) with a current
+   `pdfjs-dist`, keeping the same `{ text }` contract and the same
+   `serverExternalPackages` entry, then re-run this benchmark.
+2. Only if that still loses structure (tables, columns) evaluate Docling as a
+   **separate service** - not inline in the Next.js runtime.
+3. Keep `pdf-lib` (devDependency) as the fixture generator for the regression
+   test that pins the modern-PDF case.
+
+`pdf-lib` is a devDependency only: it is never imported by application code and
+never enters the production bundle.
