@@ -22,7 +22,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = "Confirm", 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-ink/30" onClick={onCancel} />
-      <div className="relative w-full max-w-sm rounded-card bg-white p-6 shadow-xl">
+      <div className="relative w-full max-w-sm rounded-card bg-card p-6 shadow-xl">
         <h2 className="text-lg font-semibold text-ink">{title}</h2>
         <div className="mt-2 text-sm leading-relaxed text-ink-soft">{message}</div>
         <div className="mt-6 flex justify-end gap-2">

@@ -134,7 +134,7 @@ function CourseTree({ userId, pathname, onNavigate }: {
   const subjectActive = (slug: string) => linkActive(`/courses/${slug}`);
   const rowCls = (active: boolean) =>
     cn("flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium",
-      active ? "bg-accent-soft text-accent font-medium shadow-[inset_3px_0_0_#5145e8]" : "text-ink-soft hover:bg-ink/5 hover:text-ink");
+      active ? "bg-accent-soft text-accent font-medium shadow-[inset_3px_0_0_rgb(var(--c-accent))]" : "text-ink-soft hover:bg-ink/5 hover:text-ink");
 
   const chevron = (expanded: boolean, label: string) => (
     <button
@@ -435,7 +435,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
     <div className="flex min-h-dvh flex-col">
       <a
         href="#main-content"
-        className="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:font-semibold focus:text-ink focus:shadow-lg"
+        className="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-card focus:px-4 focus:py-3 focus:font-semibold focus:text-ink focus:shadow-lg"
       >
         Skip to main content
       </a>
