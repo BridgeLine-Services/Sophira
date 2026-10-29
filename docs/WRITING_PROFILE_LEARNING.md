@@ -65,6 +65,10 @@ proposal -> approval machinery:
 - With `accept: [ids]`, files PENDING rows in `profile_update_proposals`
   (`target_type: "writing"`). It never updates a profile and never writes
   `guidance`; a new profile row is created empty.
+- Columns follow the REAL schema: `change_summary`, `proposed_changes`,
+  `context`, `status`. An earlier version used one `payload` key that is not a
+  column, so PostgREST would have rejected every insert at runtime. The keys are
+  now pinned by a test (`row.payload === undefined`) so the drift cannot return.
 - Unknown or duplicate ids are dropped server-side, so a client cannot approve a
   suggestion the server never produced.
 

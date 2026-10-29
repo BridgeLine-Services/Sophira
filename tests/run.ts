@@ -3068,13 +3068,21 @@ async function runStyleSuggestionTests(): Promise<void> {
   assert(pickAccepted(sugg, [sugg[0].id, sugg[0].id]).length === 1, "style suggestions: duplicate accepts collapse to one");
   assert(pickAccepted(sugg, []).length === 0, "style suggestions: empty accept writes nothing");
 
-  const row = proposalRowFor("user-1", "profile-1", sugg[0]);
+  const row = proposalRowFor("user-1", "profile-1", sugg[0]) as unknown as Record<string, unknown>;
   assert(row.target_type === "writing" && row.target_id === "profile-1" && row.user_id === "user-1",
     "style suggestions: proposals target the existing writing profile");
-  assert(row.payload.requires_approval === true && row.payload.source === "writing-profile-learning",
-    "style suggestions: proposals are marked as pending approval and carry their source");
-  assert(row.payload.description !== undefined && String(row.payload.description).length <= 600,
-    "style suggestions: payload description is bounded");
+  // Column names are pinned against the real schema: a single `payload` key
+  // would be rejected by PostgREST and every insert would fail silently.
+  assert(typeof row.change_summary === "string" && (row.change_summary as string).length > 0,
+    "style suggestions: proposals carry the required change_summary column");
+  assert(row.status === "pending", "style suggestions: proposals land as pending, never approved");
+  assert(row.payload === undefined, "style suggestions: no invented payload column is sent");
+  const changes = row.proposed_changes as Record<string, unknown>;
+  const ctx = row.context as Record<string, unknown>;
+  assert(typeof changes.guidance_addition === "string" && (changes.guidance_addition as string).length <= 600,
+    "style suggestions: the proposed change is a bounded guidance addition");
+  assert(changes.source === "writing-profile-learning", "style suggestions: proposed change records its source");
+  assert(ctx.requires_approval === true, "style suggestions: proposals are marked as needing approval");
 
   const blob = JSON.stringify(row) + JSON.stringify(sugg);
   assert(!/access_token|refresh_token|Bearer|user_id.*token/i.test(blob),
