@@ -270,6 +270,39 @@ capture the URL Chrome actually loaded (CDP `Page.navigate` + `Page.captureScree
 removes the public-directory question entirely). Until a capture shows a dark mean
 near `(33,23,53)`, treat the visual state of both themes as **unknown**.
 
+## 4j. Visual pass, third attempt: root cause FOUND (2026-10-29)
+
+This attempt checked the HTTP status before capturing, which the first two skipped.
+That check is what finally explained all three failures.
+
+- `/login` -> **200**, 9,016 bytes (real page)
+- `/pv-dark.html` -> **200**, but the served body contained **no** `force-dark`
+  injection: `False`
+
+A 200 whose body is not the file I wrote means Next never served
+`public/pv-dark.html`. The request fell through to the application's catch-all and
+returned the app page, styled light, for **both** preview URLs - which is why every
+"dark" capture was pixel-identical to its light twin: they were the same page. The
+200 was the trap; a 404 would have pointed at the answer immediately.
+
+Captures: light `(246,245,249)` and dark `(246,245,249)` at 1440; `(239,238,247)`
+both at 390. Deleted, not committed.
+
+### The fix, now known
+Write the preview files into `public/` **before** starting the server (the static
+directory is resolved at startup), or better, drop the public-directory approach
+entirely and use CDP `Page.navigate` + `Page.setDocumentContent` +
+`Page.captureScreenshot`. Either way, assert the injection is present in the served
+body before believing a screenshot.
+
+Compiled CSS is *not* the problem: `.bg-paper` resolves
+`rgb(var(--c-paper)/var(--tw-bg-opacity,1))`, so the variables are live at runtime
+and a token override genuinely can work. Dark mode is not architecturally broken;
+my harness was.
+
+**Visual state of both themes: still unknown.** Three attempts, one root cause, and
+it was mine each time.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
