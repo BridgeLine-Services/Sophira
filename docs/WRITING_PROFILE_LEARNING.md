@@ -51,6 +51,26 @@ wanted for a real reason - a long document the user wants to watch being
 inserted, with pause and stop - that is a UX request and can be built honestly,
 with no fabricated typos and no fake revision count.
 
+## Proposal wiring (2026-10-29)
+
+`POST /api/ai/style-suggestions` connects the analyser to the existing
+proposal -> approval machinery:
+
+- Runs the same `requireUser` guard chain as `analyze-writing`.
+- Reads the user's own `writing_samples` only (RLS applies); 20 most recent,
+  excluding samples marked `not_representative`.
+- **Requires no AI provider** - the analysis is local and rule-based, so it works
+  on the free tier with no key set. `npm run verify` and the route both stay
+  honest about that.
+- With `accept: [ids]`, files PENDING rows in `profile_update_proposals`
+  (`target_type: "writing"`). It never updates a profile and never writes
+  `guidance`; a new profile row is created empty.
+- Unknown or duplicate ids are dropped server-side, so a client cannot approve a
+  suggestion the server never produced.
+
+`src/lib/ai/style-suggestions.ts` holds the pure helpers (`proposalRowFor`,
+`pickAccepted`, disclaimers) so all of this is testable with no database.
+
 ## Commands
 
 ```
