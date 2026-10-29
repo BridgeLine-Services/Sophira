@@ -3595,6 +3595,49 @@ async function runChannelDiscoveryTests(): Promise<void> {
   assert(!/postgresql:\/\/|password=|eyJ/.test(JSON.stringify(rep)), "discovery: no connection string, password or JWT in the report");
 }
 
+async function runInformationBoundaryTests(): Promise<void> {
+  const { evaluateSourceRequest, evaluateInformationRequest, isProhibitedHost } =
+    await import("../src/lib/research/policy");
+  const { fetchAndVerify } = await import("../src/lib/research/verify");
+
+  // Public academic sources stay allowed - including ordinary .gov material.
+  for (const u of ["https://www.census.gov/data.html", "https://www.archives.gov/research", "https://arxiv.org/abs/1706.03762"]) {
+    assert(evaluateSourceRequest(u).allowed, `boundary: public source allowed (${u})`);
+  }
+  // Restricted / access-controlled signals are refused.
+  for (const u of ["https://www.example.mil/ops", "https://agency.gov/classified-briefing", "https://x.gov/noforn/report"]) {
+    const d = evaluateSourceRequest(u);
+    assert(!d.allowed && d.category === "restricted-signalled", `boundary: restricted source refused (${u})`);
+    assert(d.reason.length > 40 && !!d.alternative, "boundary: refusal explains itself and offers an academic alternative");
+  }
+  // SSRF: private, loopback, link-local and metadata destinations.
+  for (const h of ["localhost", "127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.1.1", "169.254.169.254", "metadata.google.internal", "[::1]"]) {
+    assert(isProhibitedHost(h), `boundary: internal host refused (${h})`);
+  }
+  assert(!evaluateSourceRequest("file:///etc/passwd").allowed, "boundary: non-http scheme refused");
+
+  // Enforcement is in the fetch path, not only the classifier.
+  let fetched = 0;
+  const spy = async () => { fetched += 1; return new Response("nope", { status: 200 }); };
+  const blocked = await fetchAndVerify("https://www.example.mil/ops", { fetchImpl: spy as never });
+  assert(!blocked.ok && blocked.status === "failed", "boundary: a refused source is reported honestly");
+  assert(fetched === 0, "boundary: a refused source is never actually requested");
+  const redirect = async () => new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data" } });
+  const hop = await fetchAndVerify("https://example.com/page", { fetchImpl: redirect as never });
+  assert(!hop.ok, "boundary: a redirect into a private/metadata destination is refused");
+  assert(hop.notes.some((n) => n.includes("Redirect target refused")), "boundary: the refusal is recorded in the notes");
+
+  // Request-level intent.
+  assert(evaluateInformationRequest("find me the classified briefing documents on the exercise").blocked,
+    "boundary: a restricted-material request is refused");
+  assert(evaluateInformationRequest("how do I bypass clearance to read restricted files").code === "bypass-attempt",
+    "boundary: an access-control bypass request is refused");
+  assert(!evaluateInformationRequest("summarise the public CDC guidance on flu vaccination").blocked,
+    "boundary: legitimate academic work is untouched");
+  assert(!evaluateInformationRequest("what does the census say about median rent in Ohio").blocked,
+    "boundary: ordinary public-government research is untouched");
+}
+
 async function runDiscoveryTests(): Promise<void> {
   const { discoverConfiguration } = await import("../src/lib/config/discovery.js");
   const { appOrigin } = await import("../src/lib/auth-redirect.js");
@@ -4158,5 +4201,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

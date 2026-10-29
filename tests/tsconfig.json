@@ -31,6 +31,8 @@
     "../src/lib/auth-errors.ts",
     "../src/lib/bootstrap-sql.generated.ts",
     "../src/lib/config/discovery.ts",
+    "../src/lib/research/policy.ts",
+    "../src/lib/research/verify.ts",
     "../src/lib/invitations/delivery.ts"
   ]
 }

@@ -143,6 +143,8 @@ export function titlesCorrespond(listed: string, actual: string): boolean {
  * recorded. Returns an honest verification record — dead pages, error
  * pages, and login/paywall walls are detected and reported, never hidden.
  */
+import { evaluateSourceRequest } from "./policy";
+
 export async function fetchAndVerify(url: string, opts: VerifyOptions = {}): Promise<VerifiedPage> {
   const doFetch = opts.fetchImpl ?? fetch;
   const maxRedirects = opts.maxRedirects ?? 6;
@@ -158,6 +160,20 @@ export async function fetchAndVerify(url: string, opts: VerifyOptions = {}): Pro
       notes: ["URL rejected: not an http(s) URL (never fabricated into one)."],
     };
   }
+
+  // 2026-10-29 (Prompt 2): server-side information boundary + SSRF gate.
+  // Enforced HERE, before any network call, and again on every redirect hop
+  // below - prompt wording alone is never treated as enforcement.
+  const gate = evaluateSourceRequest(url);
+  if (!gate.allowed) {
+    return {
+      originalUrl: url, finalUrl: "", redirectCount: 0, httpStatus: 0, ok: false, contentType: "",
+      domain: "", title: "", author: null, publicationDate: null, canonicalUrl: "",
+      text: "", textChars: 0, hash: "", status: "failed",
+      notes: [`Source not retrieved (${gate.code}): ${gate.reason}`],
+    };
+  }
+
 
   let current = url;
   let redirectCount = 0;
@@ -189,6 +205,12 @@ export async function fetchAndVerify(url: string, opts: VerifyOptions = {}): Pro
       let next: string;
       try { next = new URL(loc, current).toString(); } catch { notes.push("Invalid redirect target."); response = res; break; }
       if (!/^https?:\/\//i.test(next)) { notes.push("Redirect left http(s) — refused."); response = res; break; }
+      const hopGate = evaluateSourceRequest(next);
+      if (!hopGate.allowed) {
+        notes.push(`Redirect target refused (${hopGate.code}): ${hopGate.reason}`);
+        response = res;
+        break;
+      }
       redirectCount++;
       current = next;
       continue;
