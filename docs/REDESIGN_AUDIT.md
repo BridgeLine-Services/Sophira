@@ -425,6 +425,37 @@ capture shows none of the interactions - toggle persistence, focus rings, hover
 states, or the reduced-motion path. Contrast pairs are covered by the token pins, not
 by these images.
 
+## 4o. The 25 shell-less routes cannot be reviewed without a session (2026-10-29)
+
+`/courses/math` is a 7-line file: `export const dynamic = "force-dynamic"` and
+`<SubjectWorkspace slug="math" />`. It contains no redirect of its own, which is why
+it looked capturable.
+
+It is not. Requesting it returns **200** but the final URL is **`/login`**: the gate
+lives inside `SubjectWorkspace` and fires on the client, so the HTTP status tells you
+nothing. The tell is in the pixels - the "math" captures were statistically identical
+to the login captures:
+
+| Capture | Distinct colours | Stdev | Dominant |
+|---|---|---|---|
+| math-light-1440 | 414 | 15.4 | `(248,248,250)` |
+| login-live-1440 | 414 | 15.4 | `(248,248,250)` |
+| math-dark-1440 | 440 | 17.2 | `(33,23,53)` |
+| login-dark-1440 | 440 | 17.2 | `(33,23,53)` |
+
+Identical counts are the same page. Those two captures were deleted rather than
+filed as subject-tool evidence.
+
+**What this means for Phase D:** `/courses/*` and the other gated routes cannot be
+visually reviewed from outside. A screenshot harness needs an authenticated session,
+which is not something a capture script can invent - it is a credential decision.
+Either a test account exists on the target Supabase project, or a session cookie is
+seeded in a local profile, or those routes stay reviewable only by a human with a
+login.
+
+Recorded as a blocker rather than worked around: capturing behind an auth gate by
+bypassing the gate would produce evidence of a page nobody will ever see.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
