@@ -335,6 +335,34 @@ keeps the build untouched and removes the static-manifest question entirely.
 **Visual state of both themes: still unknown.** Four attempts, four harness bugs,
 zero screenshots.
 
+## 4l. Visual pass CAPTURED - /login, both themes (2026-10-29)
+
+Fifth attempt, using the fix the fourth one's evidence pointed to: no `public/`
+directory at all. The snapshot is served by a separate `http.server` and its
+`/_next/` references point at the running Next server by absolute URL, so the
+build-time static manifest never enters the picture.
+
+Sequence: start Next -> fetch `/login` (200, 9016B) -> strip scripts ->
+rewrite assets -> serve from a second server -> assert `force-dark` is in the
+served body (**True**) -> capture.
+
+| Capture | Mean RGB | Reads as |
+|---|---|---|
+| login-light-1440 | `(248, 248, 250)` | light paper |
+| login-dark-1440 | `(33, 23, 53)` | dark violet |
+| login-light-390 | `(248, 248, 250)` | light paper |
+| login-dark-390 | `(33, 23, 53)` | dark violet |
+
+**4 captures, 4 distinct pixel means**, committed at `docs/screenshots/`.
+
+**Proves:** the dark palette renders through the token layer and is visibly
+distinct from light at 1440 and 390. All four earlier failures were harness bugs.
+
+**Does NOT prove:** `/login` is public and does not render `AppShell`. Nothing here
+covers the shell, the 25 non-shell routes, or any authenticated page. The snapshot
+is static (scripts stripped), so it shows palette and layout, not interactivity or
+that the theme toggle persists.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
