@@ -51,3 +51,30 @@ improvement to be assumed.
 Add a PDF writer as a **dev-only** dependency (e.g. `pdf-lib`) to synthesise
 text, table and multi-column PDFs, then re-run this harness against all three
 parsers. Only after that can a swap be justified or rejected on evidence.
+
+## PDF: measured (partially)
+
+`pdf-parse` (bundled pdf.js v1.10.100) extracts a **real 14-page academic paper**
+completely: 82,400 characters, 2/2 key tokens, sane reading order (title, then
+authors, then body). The PDF text path therefore **works** and needs no
+replacement for plain text PDFs.
+
+Still UNMEASURED, and honestly so:
+
+- **Scanned PDFs** (no text layer) - the important failure mode for students.
+  The route must report low confidence rather than "extracted".
+- **Tables, multi-column layouts, equations** - structure loss is unmeasured.
+
+Why: a dependency-free synthetic PDF writer was attempted (raw objects + xref)
+and was **rejected by the bundled pdf.js v1.10.100** with `bad XRef entry`, even
+with byte-exact offsets and 20-byte CRLF xref entries. Options, in order of
+preference:
+
+1. Add a **dev-only** PDF writer (e.g. `pdf-lib`) to `devDependencies`, used only
+   by the benchmark, then re-run this table. Production bundle unaffected.
+2. Keep using third-party fixtures (as here) and accept that scanned/table cases
+   stay unmeasured.
+
+Until one of those is approved, **no parser replacement is justified**: the one
+format with real evidence already works, and the formats that might benefit have
+no measurement at all.
