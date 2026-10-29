@@ -13,7 +13,7 @@
  * Exit codes (enforcement mode): 0 = RELEASE STATUS: GO, 1 = BLOCKED/FAIL,
  * 2 = usage error. Every check is PASS | FAIL | BLOCKED | NOT RUN.
  * NOT RUN and BLOCKED are never treated as PASS: the release is GO only
- * when ALL 39 checks PASS.
+ * when ALL 41 checks PASS.
  */
 
 import { spawnSync } from "node:child_process";
@@ -46,7 +46,7 @@ function hasSupabaseTest() {
 }
 
 // ---------------------------------------------------------------------------
-// check registry — the 39 required checks, in the documented order
+// check registry — the 41 required checks, in the documented order
 // ---------------------------------------------------------------------------
 const results = []; // { id, name, status, detail }
 
@@ -395,6 +395,22 @@ function runGate() {
     if (live.status !== "PASS") return { status: "BLOCKED", detail: `security suites pass offline; ${live.status === "BLOCKED" ? live.detail : "live matrix failed"}` };
     return { status: "PASS", detail: "offline security conformance + live RLS + live invitation matrices all pass" };
   });
+
+  // 40 offline academic evaluation corpus (deterministic, no model, no network)
+  check("ai-evals", "Offline AI evaluation suite passes", () => {
+    const r = run(["node", "scripts/run-ai-evals.mjs"]);
+    if (r.code === 3) return { status: "BLOCKED", detail: "eval suite not compiled yet — run npm test once, then re-run the gate" };
+    if (r.code !== 0) return { status: "FAIL", detail: String(r.stderr || r.stdout || "").slice(0, 300) };
+    return { status: "PASS", detail: "deterministic academic corpus passes; live-model cases are skipped, never counted as passes" };
+  });
+
+  // 41 information-scope boundary (restricted material + SSRF, enforced in code)
+  check("info-scope", "Information-scope boundary tests pass", () => {
+    const r = run(["node", "scripts/run-ai-evals.mjs", "--boundary"]);
+    if (r.code === 3) return { status: "BLOCKED", detail: "eval suite not compiled yet — run npm test once, then re-run the gate" };
+    if (r.code !== 0) return { status: "FAIL", detail: `boundary cases failed: ${String(r.stderr || "").slice(0, 300)}` };
+    return { status: "PASS", detail: "restricted government material and SSRF destinations are refused in code; lawful .gov research still allowed" };
+  });
 }
 
 // db-migrations runs asynchronously — hoist it out of the sync registry
@@ -503,12 +519,12 @@ function selfTest() {
     ["doc declares GO/BLOCKED final state", doc.includes("RELEASE STATUS: GO") && doc.includes("RELEASE STATUS: BLOCKED")],
     ["doc states NOT RUN is never PASS", /NOT RUN.*never.*PASS|never.*treated as PASS/i.test(doc)],
     ["doc lists all four statuses", ["PASS", "FAIL", "BLOCKED", "NOT RUN"].every((s) => doc.includes(`**${s}**`) || doc.includes(s))],
-    ["gate implements exactly the 39 checks", true],
+    ["gate implements exactly the 41 checks", true],
   ];
   // count the checks the gate would run (registry count via a dry parse)
   const src = fs.readFileSync(new URL(import.meta.url), "utf8");
   const checkCount = (src.match(/^  check\(/gm) || []).length;
-  checks.push(["gate registers 39 checks", checkCount === 39]);
+  checks.push(["gate registers 41 checks", checkCount === 41]);
   let failed = 0;
   for (const [name, ok] of checks) {
     console.log(`${ok ? "✓" : "✗"} ${name}`);

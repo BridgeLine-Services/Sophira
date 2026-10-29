@@ -100,6 +100,8 @@ code inspection.
 | 36 | npm build passes | `next build` executed |
 | 37 | Type checking passes | `tsc --noEmit` executed |
 | 38 | Security tests pass | both security suites' self-tests + offline conformance + the live matrices when configured |
+| 40 | Offline AI evaluation suite passes | `scripts/run-ai-evals.mjs` — deterministic academic corpus; live-model cases are skipped, never counted as passes |
+| 41 | Information-scope boundary tests pass | restricted government material and SSRF destinations refused in code (`src/lib/research/policy.ts`), lawful `.gov` research still allowed |
 | 39 | Client bundle secret scan passes | `scripts/secret-scan.mjs` scans built client artifacts (`.next/static`, service worker, Capacitor/Tauri asset bundles) for `OPENAI_API_KEY` / `GEMINI_API_KEY` / `SEARCH_API_KEY` / `SUPABASE_SERVICE_ROLE_KEY` and fails if any appears |
 
 ## Blocker policy
