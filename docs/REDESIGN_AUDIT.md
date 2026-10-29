@@ -235,6 +235,41 @@ with the desktop screenshot tool.
 Until one of those runs, the **visual state of both themes is unknown**. Every
 claim in 4b-4g rests on tests, compiled CSS and a served build - not on pixels.
 
+## 4i. Visual pass, second attempt: still not captured (2026-10-29)
+
+Narrowed the failure but did not solve it. Recorded because the negative result is
+the useful part.
+
+**The renderer is fine.** A red-canary page (`background:#ff0000`) screenshotted as
+mean RGB `(255, 0, 0)`, so headless Chrome renders and the PNG reader (filter-aware,
+rewritten after the first attempt's broken decoder) reads correctly.
+
+**The preview page is the problem.** All three attempts produced light/dark pairs
+with identical pixel means: `(246,245,249)` at 1440 and `(239,238,247)` at 390 -
+i.e. the light paper colour in both. Attempts, in order:
+
+1. `<html data-theme="dark">` on the served HTML. Identical output.
+2. Same, with all 20 `<script>` tags stripped (ruling out React hydration). Identical.
+3. A `<style>` block forcing every dark token plus `background:#211735!important`,
+   injected at `</body>`. Identical. (The first injection targeted `</head>`, which
+   Next's streamed HTML does not contain - a silent no-op, because the replace was
+   not asserted. That was my bug, found only on re-reading.)
+
+Three different injection strategies cannot all render the same pixels if the
+modified file is the one being rendered. The most likely explanation is that the
+preview URLs were never the pages I think they were - **their HTTP status was never
+checked**, only the screenshot. If Next returned its 404 page for
+`/pv-dark.html`, both captures would legitimately be the same styled page, which is
+exactly what the identical means show.
+
+**Screenshots deleted, not committed.** Nothing here shows the dark theme.
+
+### Next step, concretely
+Re-run with `curl -w "%{http_code}"` on the preview URL *before* capturing, and
+capture the URL Chrome actually loaded (CDP `Page.navigate` + `Page.captureScreenshot`
+removes the public-directory question entirely). Until a capture shows a dark mean
+near `(33,23,53)`, treat the visual state of both themes as **unknown**.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
