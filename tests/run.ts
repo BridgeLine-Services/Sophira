@@ -2975,6 +2975,11 @@ async function runPdfExtractionTests(): Promise<void> {
   const route = fs.readFileSync("src/app/api/extract/route.ts", "utf8");
   assert(route.includes("extractPdfText") && route.includes('via === "none"'),
     "pdf: the extract route reports failure from the helper instead of an inline parser call");
+  const rep = fs.readFileSync("docs/AI_CAPABILITY_IMPROVEMENT_FINAL_REPORT.md", "utf8");
+  assert(/BLOCKED/.test(rep) && /eslint is NOT installed/.test(rep) && /never reported as passing/i.test(rep),
+    "final report: records the blocked checks honestly instead of claiming PASS");
+  assert(/revert any one without touching data/i.test(rep), "final report: states a safe rollback path");
+  assert(!/RELEASE STATUS: GO/.test(rep), "final report: does not claim a GO release");
   const benchPdf = fs.readFileSync("scripts/doc-bench-pdf.mjs", "utf8");
   assert(benchPdf.includes("extractPdfText"),
     "doc-bench measures the shipped PDF path (the same helper the API route calls)");

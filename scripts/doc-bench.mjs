@@ -97,7 +97,10 @@ try {
 } catch (e) {
   record("PDF (real fixture)", { status: "BLOCKED", why: String(e && e.message).slice(0, 70) });
 }
-record("PDF (scanned / tables / columns / equations)", { status: "BLOCKED", why: "no synthetic PDF writer: pdf.js v1.10.100 rejects hand-built xref; a dev-only writer needs approval" });
+// Superseded: the synthetic PDF corpus now lives in scripts/doc-bench-pdf.mjs,
+// which uses the approved dev-only pdf-lib writer and the SHIPPED extractPdfText.
+// Kept as a pointer so this table never claims a gap that no longer exists.
+console.log("synthetic PDF cases: run scripts/doc-bench-pdf.mjs (measured, 5/5 cases)");
 
 console.log("format | chars | key tokens found | notes");
 for (const r of out) {
