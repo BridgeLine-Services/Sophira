@@ -14,7 +14,7 @@
 import { supabaseConfigStatus } from "../supabase-config";
 import { appOrigin } from "../auth-redirect";
 import { deliveryDiagnostics } from "../invitations/delivery";
-import { setupChannel } from "../db-ddl";
+import { setupChannel, connectionEnvNames, directPostgresConfigured } from "../db-ddl";
 
 export type DiscoveryState = "verified" | "missing" | "partial" | "unavailable";
 
@@ -71,6 +71,27 @@ export function discoverConfiguration(): DiscoveryReport {
       note: channel === "none"
         ? "No privileged channel exists, so Sophira cannot create its own tables from code."
         : `Automatic initialization is available via ${channel}.`,
+    },
+    {
+      key: "database_channel",
+      label: "Automatic database preparation",
+      // 2026-10-29: WHICH channel exists matters more than whether one exists.
+      // Vercel cannot reach the IPv6-only "db.<ref>.supabase.co" host, so a
+      // direct-only deployment needs a pooler URL or a management token
+      // before Sophira can initialize itself.
+      state: channel === "none" ? "missing" : "verified",
+      missing:
+        channel === "none"
+          ? ["POSTGRES_POOLER_URL (or SUPABASE_DB_URL) - IPv4 pooler", "SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF"]
+          : [],
+      note:
+        channel === "direct-postgres"
+          ? `Connection variables present: ${connectionEnvNames().join(", ") || "none"}. Pooler hosts are tried first; IPv6-only direct hosts last.`
+          : channel === "management-api"
+            ? "A Supabase management token is available, so migrations can be applied through the API."
+            : directPostgresConfigured()
+              ? "A connection string exists but points at another project, so it is refused."
+              : "Sophira cannot initialize the database by itself yet; the setup page can still apply the migrations once a channel exists.",
     },
     {
       key: "email",
