@@ -3562,6 +3562,27 @@ async function runOwnerFlowSimplicityTests(): Promise<void> {
     "security: migration 0008 still enforces owner_email + invitation-only signup (untouched)");
 }
 
+async function runInviteFormTests(): Promise<void> {
+  const { readFileSync } = await import("fs");
+  const ui = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  assert(!/<option value="sms" disabled|<option value="both" disabled/.test(ui),
+    "invite form: all three delivery choices are always selectable");
+  assert(/<option value="sms">Text message<\/option>/.test(ui) && /<option value="both">Email and text<\/option>/.test(ui),
+    "invite form: Text message and Email and text are real options, not disabled placeholders");
+  assert(ui.includes("grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3"),
+    "invite form: responsive grid (1 / 2 / 3 columns) replaces the single squeezed row");
+  assert(ui.includes("h-11") && ui.includes("text-base"),
+    "invite form: controls are 44px tall with 16px text (no iOS zoom, readable)");
+  assert(ui.includes("min-w-0"), "invite form: grid children cannot overflow");
+  assert(ui.includes('id="invite-phone"') && ui.includes('type="tel"'),
+    "invite form: the phone field exists and is tel-typed");
+  assert(ui.includes('disabled={inviteChannel === "email"}'),
+    "invite form: the phone field stays visible and is enabled for text delivery");
+  assert(ui.includes("copy the link to send it yourself"),
+    "invite form: the status line states the manual link always works");
+  assert(ui.includes('setInviteEmailBlocked(json.data.delivery !== "sent")'),
+    "invite form: any non-sent outcome reveals the copy-link fallback");
+}
 async function runDiscoveryTests(): Promise<void> {
   const { discoverConfiguration } = await import("../src/lib/config/discovery.js");
   const { appOrigin } = await import("../src/lib/auth-redirect.js");
@@ -3647,8 +3668,11 @@ async function runDeliveryCapabilityTests(): Promise<void> {
     for (const n of ["SOPHIRA_INVITE_FROM_EMAIL","EMAIL_API_URL","EMAIL_API_KEY","EMAIL_FROM","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER"])
       assert(manifest.includes(`"name": "${n}"`), `delivery: ${n} is declared in the authoritative manifest`);
     const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-    assert(dash.includes("disabled={cap ? !cap.sms : false}") && dash.includes("Text not configured"),
-      "dashboard: a channel that cannot deliver is disabled and labelled, never a button that pretends to send");
+    // 2026-10-29 (owner request): choices are NO LONGER disabled. The owner may
+    // always pick a channel; an unconfigured channel creates the invitation and
+    // reveals the copy link, and the status line names what is missing.
+    assert(dash.includes("Text messaging is not configured.") && !dash.includes("disabled={cap ? !cap.sms : false}"),
+      "dashboard: an unavailable channel is labelled in plain text and still selectable, with the link fallback");
   } finally {
     for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]!; }
   }
@@ -4122,5 +4146,5 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
