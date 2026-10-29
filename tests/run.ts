@@ -3238,6 +3238,36 @@ async function runPrimitiveTokenTests(): Promise<void> {
   assert(btn.includes("text-white") === false || true, "theme: primary button contrast is checked by the palette pins");
 }
 
+async function runRepoWideThemeTests(): Promise<void> {
+  const walk = (dir: string): string[] => {
+    const out: string[] = [];
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) out.push(...walk(p));
+      else if (p.endsWith(".tsx")) out.push(p);
+    }
+    return out;
+  };
+  const files = walk("src");
+  assert(files.length >= 60, `theme: scanned the whole component tree (${files.length} tsx files)`);
+
+  // A white surface is invisible-as-white in dark mode; the token is the fix.
+  const white = files.filter((f) => /bg-white|text-black/.test(fs.readFileSync(f, "utf8")));
+  assert(white.length === 0, `theme: no page or component hardcodes a white surface (${white.slice(0, 3).join(", ")})`);
+
+  // Literal hex in a component bypasses the theme entirely.
+  const hex = files.filter((f) => /#[0-9a-fA-F]{6}/.test(fs.readFileSync(f, "utf8")));
+  assert(hex.length === 1 && hex[0] === "src/app/layout.tsx",
+    `theme: only the static themeColor metadata carries a hex (${hex.join(", ")})`);
+
+  // Dividers/borders must come from the line token so they stay visible on dark.
+  const legible = files.filter((f) => /border-ink\/(10|15)/.test(fs.readFileSync(f, "utf8")));
+  assert(legible.length === 0, "theme: borders use the line token, not a 10% ink wash");
+
+  const styled = files.filter((f) => fs.readFileSync(f, "utf8").includes("bg-card")).length;
+  assert(styled >= 20, `theme: card surfaces are tokenised across the app (${styled} files)`);
+}
+
 async function runPdfExtractionTests(): Promise<void> {
   const { extractPdfText } = await import("../src/lib/extract/pdf");
   const ok = async () => "x".repeat(120);
@@ -4623,6 +4653,6 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runRedesignAuditTests()).then(() => runThemeTokenTests()).then(() => runPrimitiveTokenTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runRedesignAuditTests()).then(() => runThemeTokenTests()).then(() => runPrimitiveTokenTests()).then(() => runRepoWideThemeTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
   .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

@@ -55,7 +55,7 @@ export default async function SetupPage() {
       <h1 className="text-2xl font-semibold">Welcome to Sophira</h1>
       <p className="mt-2 text-ink-soft">Let&apos;s set up your private academic assistant.</p>
 
-      <section className="mt-6 rounded-xl border border-ink/10 p-4">
+      <section className="mt-6 rounded-xl border border-line p-4">
         <h2 className="text-sm font-semibold text-ink">What Sophira detected</h2>
         <ul className="mt-2 space-y-1">
           {discovery.items.map((item) => (

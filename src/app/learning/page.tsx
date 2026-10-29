@@ -163,14 +163,14 @@ export default async function LearningPage({
           </p>
           <ul className="grid gap-2 sm:grid-cols-2">
             {setupItems.map((item) => (
-              <li key={item.href + item.label} className="flex items-start justify-between gap-2 rounded-card border border-ink/10 p-3">
+              <li key={item.href + item.label} className="flex items-start justify-between gap-2 rounded-card border border-line p-3">
                 <div>
                   <p className="text-sm font-medium text-ink">{item.label}</p>
                   <p className="text-xs text-ink-soft">{item.note}</p>
                 </div>
                 <Link
                   href={item.href}
-                  className="shrink-0 rounded-lg border border-ink/10 px-3 py-1.5 text-xs font-medium text-ink hover:bg-ink/5"
+                  className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink hover:bg-ink/5"
                 >
                   {item.done ? "Review" : "Set up"}
                 </Link>
@@ -203,7 +203,7 @@ export default async function LearningPage({
           disable it, or permanently forget it.
         </p>
         {subjectScope && (
-          <p className="rounded-lg border border-ink/10 bg-paper p-3 text-sm text-ink-soft">
+          <p className="rounded-lg border border-line bg-paper p-3 text-sm text-ink-soft">
             Subject workspace view: memories narrowed to {subjectScope.label} plus intentionally
             global memories. <Link href="/learning" className="text-accent underline">View all memories</Link>
           </p>
@@ -228,14 +228,14 @@ export default async function LearningPage({
           configuration changes. Subject-specific changes stay in each subject workspace.
         </p>
         {(changeHistory ?? []).length === 0 ? (
-          <p className="rounded-lg border border-ink/10 bg-paper p-3 text-sm text-ink-soft">
+          <p className="rounded-lg border border-line bg-paper p-3 text-sm text-ink-soft">
             No decided changes yet. When you approve a proposed correction or profile update,
             it is recorded here with its reason and timestamp — nothing is invented.
           </p>
         ) : (
           <ul className="space-y-2">
             {(changeHistory ?? []).map((d: { id: string; target_type: string | null; change_summary: string | null; status: string | null; decided_at: string | null }) => (
-              <li key={d.id} className="rounded-lg border border-ink/10 bg-paper p-3">
+              <li key={d.id} className="rounded-lg border border-line bg-paper p-3">
                 <p className="text-sm font-medium text-ink">{d.change_summary ?? "Profile update"}</p>
                 <p className="text-xs text-ink-soft">
                   {d.target_type ? `${d.target_type} · ` : ""}{d.status ?? "decided"}

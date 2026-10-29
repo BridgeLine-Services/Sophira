@@ -183,7 +183,7 @@ export default function ResetPasswordPage() {
       </div>
 
       {mode === "request" && !sent && (
-        <form onSubmit={onRequest} className="rounded-card border border-ink/10 bg-white p-5 shadow-sm" noValidate>
+        <form onSubmit={onRequest} className="rounded-card border border-line bg-card p-5 shadow-sm" noValidate>
           <div className="space-y-4">
             <div>
               <Label htmlFor="email">Email</Label>
@@ -219,7 +219,7 @@ export default function ResetPasswordPage() {
       )}
 
       {mode === "request" && sent && (
-        <div className="rounded-card border border-ink/10 bg-white p-5 text-center shadow-sm">
+        <div className="rounded-card border border-line bg-card p-5 text-center shadow-sm">
           <p className="text-sm text-ink-soft">
             If that email has a Sophira account, a reset link is on its way. Open it and you can set a new password here.
           </p>
@@ -227,7 +227,7 @@ export default function ResetPasswordPage() {
       )}
 
       {mode === "set" && (
-        <form onSubmit={onSet} className="rounded-card border border-ink/10 bg-white p-5 shadow-sm" noValidate>
+        <form onSubmit={onSet} className="rounded-card border border-line bg-card p-5 shadow-sm" noValidate>
           <div className="space-y-4">
             <div>
               <Label htmlFor="password">New password</Label>
@@ -264,7 +264,7 @@ export default function ResetPasswordPage() {
       )}
 
       {mode === "done" && (
-        <div className="rounded-card border border-ink/10 bg-white p-5 text-center shadow-sm">
+        <div className="rounded-card border border-line bg-card p-5 text-center shadow-sm">
           <p className="text-sm text-ink-soft">Your password has been updated. You can sign in with it now.</p>
         </div>
       )}

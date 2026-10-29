@@ -62,7 +62,7 @@ function TestPrepInner() {
                 <div className="mt-1.5 flex flex-wrap gap-2">
                   {materials.map((m) => (
                     <button key={m.id} type="button"
-                      className={`rounded-lg border px-3 py-1.5 text-xs ${picked.includes(m.id) ? "border-accent bg-accent/10 text-accent" : "border-ink/10 text-ink-soft hover:bg-ink/5"}`}
+                      className={`rounded-lg border px-3 py-1.5 text-xs ${picked.includes(m.id) ? "border-accent bg-accent/10 text-accent" : "border-line text-ink-soft hover:bg-ink/5"}`}
                       onClick={() => setPicked((p) => (p.includes(m.id) ? p.filter((x) => x !== m.id) : [...p, m.id]))}>
                       {m.title || "Untitled"}
                     </button>
@@ -81,7 +81,7 @@ function TestPrepInner() {
             {prep.concepts?.length ? (
               <Card><CardHeader><CardTitle>Concept review</CardTitle></CardHeader><CardContent className="space-y-2">
                 {prep.concepts.map((c, i) => (
-                  <div key={i} className="rounded-card border border-ink/10 p-3">
+                  <div key={i} className="rounded-card border border-line p-3">
                     <p className="text-sm font-medium text-ink">{c.concept}</p>
                     {c.review && <p className="mt-1 text-xs text-ink-soft">{c.review}</p>}
                   </div>
@@ -91,7 +91,7 @@ function TestPrepInner() {
             {prep.study_plan?.length ? (
               <Card><CardHeader><CardTitle>Study plan</CardTitle></CardHeader><CardContent className="space-y-2">
                 {prep.study_plan.map((s) => (
-                  <div key={s.session} className="rounded-card border border-ink/10 p-3">
+                  <div key={s.session} className="rounded-card border border-line p-3">
                     <p className="text-sm font-medium text-ink"><Badge tone="accent">Session {s.session}</Badge> {s.focus}</p>
                     {s.activities && <p className="mt-1 text-xs text-ink-soft">{s.activities}</p>}
                   </div>

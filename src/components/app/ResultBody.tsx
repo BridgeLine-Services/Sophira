@@ -71,7 +71,7 @@ export function ResultBody({ content }: { content: string }) {
 
     // hr
     if (/^\s*(---|\*\*\*|___)\s*$/.test(line)) {
-      blocks.push(<hr key={key++} className="my-4 border-ink/10" />);
+      blocks.push(<hr key={key++} className="my-4 border-line" />);
       i++;
       continue;
     }

@@ -49,7 +49,7 @@ export function LanguageSelector({ initial }: { initial: LanguagePreference | nu
         <label className="block text-sm font-medium text-ink">
           Target language
           <select
-            className="mt-1 w-full rounded-md border border-ink/15 bg-paper px-3 py-2"
+            className="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2"
             value={target}
             onChange={(e) => { setTarget(e.target.value); save({ target_language: e.target.value }); }}
           >
@@ -60,7 +60,7 @@ export function LanguageSelector({ initial }: { initial: LanguagePreference | nu
         <label className="block text-sm font-medium text-ink">
           Explanation language
           <select
-            className="mt-1 w-full rounded-md border border-ink/15 bg-paper px-3 py-2"
+            className="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2"
             value={explanation}
             onChange={(e) => { setExplanation(e.target.value); save({ explanation_language: e.target.value }); }}
           >
@@ -71,7 +71,7 @@ export function LanguageSelector({ initial }: { initial: LanguagePreference | nu
         <label className="block text-sm font-medium text-ink">
           Proficiency level
           <select
-            className="mt-1 w-full rounded-md border border-ink/15 bg-paper px-3 py-2"
+            className="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2"
             value={level}
             onChange={(e) => { setLevel(e.target.value); save({ proficiency: e.target.value }); }}
           >

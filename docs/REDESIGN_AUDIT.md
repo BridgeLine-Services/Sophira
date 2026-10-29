@@ -100,6 +100,34 @@ Still open: the ~60 page modules that use these primitives have not been reviewe
 in either theme, and no browser pass has been run. `src/components/app/*` beyond
 the shell (ProposalsPanel, ProfileVersionHistory, etc.) is untouched.
 
+## 4d. Phase D0 - repo-wide surface sweep (2026-10-29)
+
+Left unchecked, 35 `bg-white` surfaces in 17 files would have rendered as white
+panels in dark mode. Swept across all of `src`: **49 files changed**, and now:
+
+| Before | After | Count |
+|---|---|---|
+| `bg-white` | `bg-card` | 35 |
+| `border-ink/10`, `border-ink/15` | `border-line` | 123 |
+| literal hex in a component | none | 0 (1 remains: `themeColor` metadata) |
+
+The remaining hex is `themeColor: "#4f46e5"` in `layout.tsx` - static browser-chrome
+metadata that Next.js reads at build time and that CSS variables cannot reach. It
+is allowlisted **by name and file** in a pin, not by pattern, so a second stray hex
+still fails the suite.
+
+Pins now scan every `.tsx` in `src` (60+ files): no `bg-white`/`text-black`, no
+`border-ink/10|15` dividers, at most the one allowlisted hex, and at least 20 files
+carrying `bg-card`.
+
+**A pre-existing pin broke and was corrected, not deleted.** The nav pin asserted
+the literal string `border-r border-ink/10`; the structural intent (persistent
+rail, bordered) is unchanged, so the assertion now expects `border-r border-line`.
+That is the honest update: the class moved, the guarantee did not.
+
+Still not done: no browser pass in either theme, and no per-route review. Token
+migration is not the same as a redesigned page.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the

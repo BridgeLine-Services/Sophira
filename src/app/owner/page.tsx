@@ -84,7 +84,7 @@ export default async function OwnerPage() {
         <>
         <Link
           href="/owner/health"
-          className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-ink shadow-sm hover:border-accent/40"
+          className="flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs font-medium text-ink shadow-sm hover:border-accent/40"
           title="Your live AI service mode — details on the System Health page"
         >
           <span className={"h-2 w-2 rounded-full " + (pageDiag.activeProvider ? "bg-emerald-500" : "bg-amber-400")} aria-hidden />
@@ -281,7 +281,7 @@ function ProviderDiagnosticsCard() {
         <Gauge className="h-4 w-4 text-accent" />
         AI provider diagnostics
       </div>
-      <div className="overflow-x-auto rounded-lg border border-ink/10">
+      <div className="overflow-x-auto rounded-lg border border-line">
       <table className="data-table">
         <tbody>
           {rows.map(([k, v]) => (

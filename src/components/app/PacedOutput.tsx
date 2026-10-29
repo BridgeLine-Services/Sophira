@@ -180,7 +180,7 @@ export function PacedOutput({ text, responseId }: { text: string; responseId: st
       <ResultBody content={visible} />
 
       {!hasBaseline && (
-        <p className="rounded-lg border border-ink/10 bg-ink/5 px-3 py-2 text-sm text-ink-soft">
+        <p className="rounded-lg border border-line bg-ink/5 px-3 py-2 text-sm text-ink-soft">
           Paced reveal needs your typing calibration first — Sophira never invents a speed.{" "}
           <Link href="/settings" className="text-accent hover:underline">Take the one-minute typing test</Link>{" "}
           and your baseline will be used here automatically.

@@ -160,7 +160,7 @@ export default function SetupWizard({
         </div>
       )}
       {autoStopped && (
-        <p className="mt-4 rounded-lg border border-ink/15 bg-accent-soft/40 p-3 text-sm text-ink">
+        <p className="mt-4 rounded-lg border border-line bg-accent-soft/40 p-3 text-sm text-ink">
           Sophira could not confirm the database on its own. That is not a dead end:
           press <strong>Create owner account</strong> above and that page retries the setup for
           you, or open <strong>Advanced</strong> below for the technical reason.

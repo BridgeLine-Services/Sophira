@@ -340,7 +340,7 @@ export function ResearchPanel({
                 )}
               </div>
               {reverify && (
-                <div className="rounded-lg border border-ink/10 bg-muted/40 p-3 text-sm">
+                <div className="rounded-lg border border-line bg-muted/40 p-3 text-sm">
                   <p className="font-medium">Citation re-verification (12-step invariant)</p>
                   <div className="mt-1 flex flex-wrap gap-2">
                     <Badge tone="success">{reverify.summary.verified} VERIFIED</Badge>
@@ -367,7 +367,7 @@ export function ResearchPanel({
                 </p>
               )}
               {data.queries.length > 0 && (
-                <details className="rounded-lg border border-ink/10 p-3">
+                <details className="rounded-lg border border-line p-3">
                   <summary className="cursor-pointer text-sm font-medium">Search queries</summary>
                   <ul className="mt-2 space-y-1 text-sm text-ink-soft">
                     {data.queries.map((q) => (
@@ -378,7 +378,7 @@ export function ResearchPanel({
               )}
               <ul className="space-y-2">
                 {data.sources.map((s) => (
-                  <li key={s.id} className="rounded-lg border border-ink/10 p-3 text-sm">
+                  <li key={s.id} className="rounded-lg border border-line p-3 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={VERIF_TONE[s.verification_status]}>{s.verification_status.replace(/_/g, " ")}</Badge>
                       <a href={s.final_url || s.original_url} target="_blank" rel="noreferrer" className="font-medium text-ink underline decoration-ink/20 hover:decoration-ink">
@@ -428,7 +428,7 @@ export function ResearchPanel({
           )}
 
           {audit && (
-            <div className="space-y-2 rounded-lg border border-ink/10 p-3 text-sm">
+            <div className="space-y-2 rounded-lg border border-line p-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={audit.pass ? "success" : "warn"}>{audit.pass ? "citation audit passed" : `${audit.problems.length} problem(s)`}</Badge>
                 {audit.ai_assessed && <Badge tone="neutral">semantic checks AI-assessed</Badge>}

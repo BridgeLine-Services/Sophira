@@ -332,7 +332,7 @@ export default function SettingsPage() {
                 <Button type="submit" disabled={reqBusy}>{reqBusy ? "Sending…" : "Send request"}</Button>
               </form>
               {requests.length > 0 && (
-                <div className="divide-y divide-ink/5 rounded-lg border border-ink/10">
+                <div className="divide-y divide-ink/5 rounded-lg border border-line">
                   {requests.map((r) => (
                     <div key={r.id} className="flex flex-wrap items-center gap-2 p-3">
                       <div className="min-w-0 flex-1">

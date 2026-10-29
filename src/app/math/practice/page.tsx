@@ -83,7 +83,7 @@ function PracticeInner() {
                 <div className="mt-1.5 flex flex-wrap gap-2">
                   {materials.map((m) => (
                     <button key={m.id} type="button"
-                      className={`rounded-lg border px-3 py-1.5 text-xs ${picked.includes(m.id) ? "border-accent bg-accent/10 text-accent" : "border-ink/10 text-ink-soft hover:bg-ink/5"}`}
+                      className={`rounded-lg border px-3 py-1.5 text-xs ${picked.includes(m.id) ? "border-accent bg-accent/10 text-accent" : "border-line text-ink-soft hover:bg-ink/5"}`}
                       onClick={() => setPicked((p) => (p.includes(m.id) ? p.filter((x) => x !== m.id) : [...p, m.id]))}>
                       {m.title || "Untitled"}
                     </button>
@@ -116,7 +116,7 @@ function PracticeInner() {
                 </div>
               )}
               {revealed.includes(p.id) && p.answer && (
-                <div className="rounded-card border border-ink/10 p-3 text-sm">
+                <div className="rounded-card border border-line p-3 text-sm">
                   <p className="font-medium text-ink">Answer: {p.answer}</p>
                   {p.steps?.length ? (
                     <ol className="mt-2 list-inside list-decimal space-y-1 text-xs text-ink-soft">

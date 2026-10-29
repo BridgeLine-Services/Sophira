@@ -220,7 +220,7 @@ export default function OfflinePage() {
               const st = modelStates[m.id];
               const state = st?.state ?? "unknown";
               return (
-                <div key={m.id} className="rounded border border-ink/10 p-3">
+                <div key={m.id} className="rounded border border-line p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <p className="font-medium">{m.label}</p>
@@ -288,14 +288,14 @@ export default function OfflinePage() {
               {busyModel === "task" ? <Spinner /> : "Run offline"}
             </Button>
             {result && (
-              <div className="rounded border border-ink/10 bg-paper p-3 text-sm">
+              <div className="rounded border border-line bg-paper p-3 text-sm">
                 <div className="mb-1 flex items-center justify-between">
                   <ProvenanceBadge provenance={result.provenance} />
                 </div>
                 <pre className="whitespace-pre-wrap">{result.output || result.error}</pre>
               </div>
             )}
-            <div className="rounded border border-ink/10 p-3 text-xs text-ink/60">
+            <div className="rounded border border-line p-3 text-xs text-ink/60">
               <p className="font-medium text-ink/80">Online-only (honest):</p>
               {ONLINE_ONLY_TASKS.map((t) => <p key={t.kind}>• {t.kind} — {t.why}</p>)}
             </div>

@@ -118,7 +118,7 @@ function MathTypePageInner() {
             { label: "Teach Me How to Solve", href: subjectSlug ? `/math?mode=teach&subject=${subjectSlug}` : "/math?mode=teach", active: teachMode },
           ].map((m) => (
             <a key={m.label} href={m.href} aria-current={m.active ? "page" : undefined}
-              className={`rounded-full border px-3 py-1.5 font-medium transition ${m.active ? "border-accent bg-accent-soft text-accent" : "border-ink/10 bg-white text-ink-soft hover:border-accent/40 hover:text-accent"}`}>
+              className={`rounded-full border px-3 py-1.5 font-medium transition ${m.active ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-ink-soft hover:border-accent/40 hover:text-accent"}`}>
               {m.label}
             </a>
           ))}
@@ -138,7 +138,7 @@ function MathTypePageInner() {
             <Card>
               <CardHeader><CardTitle>Your problem</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <div className="inline-flex rounded-lg border border-ink/10 p-1" role="tablist" aria-label="Input mode">
+                <div className="inline-flex rounded-lg border border-line p-1" role="tablist" aria-label="Input mode">
                   <button type="button" role="tab" aria-selected={inputMode === "editor"}
                     onClick={() => setInputMode("editor")}
                     className={`rounded-md px-3 py-1.5 text-sm font-medium ${inputMode === "editor" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5"}`}>
@@ -155,7 +155,7 @@ function MathTypePageInner() {
                   <math-field
                     ref={(el: unknown) => { mfRef.current = el; }}
                     aria-label="Math expression editor"
-                    className="block w-full rounded-lg border border-ink/15 bg-white p-3 text-lg"
+                    className="block w-full rounded-lg border border-line bg-card p-3 text-lg"
                     style={{ minHeight: "6rem" }}
                     onInput={(e: unknown) => {
                       const el = e as { target?: { value?: string } };
@@ -170,7 +170,7 @@ function MathTypePageInner() {
                     onChange={(e) => setExpr(e.target.value)}
                     aria-label="Math expression in plain text"
                     placeholder="e.g. 2x + 5 = 17"
-                    className="block w-full rounded-lg border border-ink/15 bg-white p-3 text-lg"
+                    className="block w-full rounded-lg border border-line bg-card p-3 text-lg"
                     rows={3}
                   />
                 )}

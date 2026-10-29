@@ -266,7 +266,7 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
           Retake any time — the baseline only changes when you choose an attempt.
         </p>
       ) : (
-        <p className="rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm text-ink-soft">
+        <p className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink-soft">
           No baseline yet. Take the test and pick an attempt — paced writing uses your chosen speed, and until then it stays honest and uses instant mode.
         </p>
       )}
@@ -284,7 +284,7 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="whitespace-pre-wrap rounded-lg border border-ink/10 bg-ink/5 px-3 py-2 font-mono text-sm text-ink">{passage?.text}</p>
+            <p className="whitespace-pre-wrap rounded-lg border border-line bg-ink/5 px-3 py-2 font-mono text-sm text-ink">{passage?.text}</p>
             <textarea
               className="w-full rounded-lg border border-ink/20 p-3 font-mono text-sm focus:border-accent focus:outline-none"
               rows={5}
@@ -312,7 +312,7 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
-                <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink-soft">
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-soft">
                   <th className="py-2 pr-3">Date</th>
                   <th className="py-2 pr-3">Gross WPM</th>
                   <th className="py-2 pr-3">Final accuracy</th>

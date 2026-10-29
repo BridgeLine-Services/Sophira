@@ -522,7 +522,7 @@ export function Workspace({
         <Card>
           <CardContent className="p-5">
             <PacedOutput key={latestResponse.id} text={latestResponse.content} responseId={latestResponse.id} />
-            <div className="mt-5 flex flex-wrap gap-2 border-t border-ink/10 pt-4">
+            <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
               <Button variant="secondary" size="sm" onClick={copyResult}>
                 <Copy className="h-4 w-4" /> Copy
               </Button>
@@ -548,7 +548,7 @@ export function Workspace({
                 className={`rounded-full border px-3.5 py-2 text-sm font-medium transition ${
                   feedbackKind === f.kind
                     ? "border-accent bg-accent-soft text-accent"
-                    : "border-ink/15 text-ink hover:bg-ink/5"
+                    : "border-line text-ink hover:bg-ink/5"
                 }`}
               >
                 {f.label}
@@ -571,7 +571,7 @@ export function Workspace({
                   </label>
                   <select
                     id="feedback-scope"
-                    className="w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm text-ink"
+                    className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink"
                     value={feedbackScope}
                     onChange={(e) => setFeedbackScope(e.target.value)}
                   >
@@ -630,7 +630,7 @@ export function Workspace({
                 key={q}
                 type="button"
                 onClick={() => setFollowUp(q)}
-                className="rounded-full border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-accent/50 hover:text-accent"
+                className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:border-accent/50 hover:text-accent"
               >
                 {q}
               </button>

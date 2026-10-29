@@ -141,7 +141,7 @@ export function RubricAuditPanel({
             </div>
             <ul className="space-y-1.5">
               {audit.audit.results.map((r) => (
-                <li key={r.id} className="rounded-lg border border-ink/10 p-2.5 text-sm">
+                <li key={r.id} className="rounded-lg border border-line p-2.5 text-sm">
                   <div className="flex items-start gap-2">
                     {r.status === "satisfied" ? (
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />

@@ -58,7 +58,7 @@ export function MathEditor({ onCanonicalChange }: { onCanonicalChange: (canonica
       </div>
       {plainMode ? (
         <input
-          className="w-full rounded border border-ink/15 bg-white px-3 py-2 font-mono text-sm"
+          className="w-full rounded border border-line bg-card px-3 py-2 font-mono text-sm"
           value={plain}
           placeholder="e.g. ∫ 3x^2 dx, x^2 - 5x + 6 = 0"
           aria-label="Plain math input"
