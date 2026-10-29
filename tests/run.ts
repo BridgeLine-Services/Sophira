@@ -3053,6 +3053,52 @@ async function runWritingProfileLearningTests(): Promise<void> {
     "writing profile learning: no new level names are hardcoded");
 }
 
+async function runStyleSuggestionTests(): Promise<void> {
+  const { proposeStyleSuggestions } = await import("../src/lib/ai/writing-profile-learning");
+  const { proposalRowFor, pickAccepted, noSamplesMessage, suggestionDisclaimer } =
+    await import("../src/lib/ai/style-suggestions");
+  const flat = "The study was good. The data was clear. The result was useful. The method was fair. The end was near. The work was done. The report was long. The point was made.";
+  const sugg = proposeStyleSuggestions([flat], "high-school", "essay");
+  assert(sugg.length > 0, "style suggestions: fixture produces at least one suggestion");
+
+  const picked = pickAccepted(sugg, [sugg[0].id, "not-a-real-id"]);
+  assert(picked.length === 1 && picked[0].id === sugg[0].id,
+    "style suggestions: unknown ids are dropped (a client cannot approve an unoffered suggestion)");
+  assert(pickAccepted(sugg, "nope").length === 0, "style suggestions: non-array accept is ignored, not coerced");
+  assert(pickAccepted(sugg, [sugg[0].id, sugg[0].id]).length === 1, "style suggestions: duplicate accepts collapse to one");
+  assert(pickAccepted(sugg, []).length === 0, "style suggestions: empty accept writes nothing");
+
+  const row = proposalRowFor("user-1", "profile-1", sugg[0]);
+  assert(row.target_type === "writing" && row.target_id === "profile-1" && row.user_id === "user-1",
+    "style suggestions: proposals target the existing writing profile");
+  assert(row.payload.requires_approval === true && row.payload.source === "writing-profile-learning",
+    "style suggestions: proposals are marked as pending approval and carry their source");
+  assert(row.payload.description !== undefined && String(row.payload.description).length <= 600,
+    "style suggestions: payload description is bounded");
+
+  const blob = JSON.stringify(row) + JSON.stringify(sugg);
+  assert(!/access_token|refresh_token|Bearer|user_id.*token/i.test(blob),
+    "style suggestions: no token-shaped field appears in a proposal or suggestion");
+  assert(!/human-authored|undetectable|turnitin/i.test(blob),
+    "style suggestions: no evasion or authorship claim is embedded in the payload");
+
+  assert(noSamplesMessage().includes("your own writing"), "style suggestions: empty-state message points at the user's own samples");
+  assert(/does not simulate typing/i.test(suggestionDisclaimer()),
+    "style suggestions: the disclaimer states plainly that typing is not simulated");
+
+  const route = fs.readFileSync("src/app/api/ai/style-suggestions/route.ts", "utf8");
+  assert(/requireUser\(supabase\)/.test(route), "style suggestions: route runs the full authorization guard");
+  assert(!/aiConfigured|aiChat/.test(route), "style suggestions: the route works with no AI provider configured");
+  // A new profile row is created with EMPTY guidance; nothing may ever be written into it here.
+  assert(/\.from\("profile_update_proposals"\)/.test(route),
+    "style suggestions: accepted suggestions are filed as proposals");
+  const guidanceWrites = route.split("guidance").length - 1;
+  assert(!route.includes(".update(") && guidanceWrites === 1,
+    "style suggestions: route never updates a profile row and mentions guidance only when creating an empty one");
+  assert(route.includes('guidance: ""'),
+    "style suggestions: a new profile starts with empty guidance, never prefilled text");
+}
+
 async function runPdfExtractionTests(): Promise<void> {
   const { extractPdfText } = await import("../src/lib/extract/pdf");
   const ok = async () => "x".repeat(120);
@@ -4438,6 +4484,6 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
   .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
