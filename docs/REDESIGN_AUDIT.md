@@ -397,6 +397,34 @@ Chrome with `--remote-debugging-port`, `Page.navigate` to the login page,
 `Page.captureScreenshot`. Then `/courses/math`, which is one of the 25 routes that
 never gets the shell.
 
+## 4n. Dark mode CONFIRMED in a real browser (2026-10-29)
+
+`globals.css` applies the dark palette two ways: `[data-theme="dark"]` and, for a
+first visit, `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`.
+That second path needs no toggle and no CDP - Chrome can be told to emulate the OS
+preference - so the dark theme was captured the way a real dark-OS visitor hits it.
+
+Verification is against the token values themselves, not "it looks dark":
+
+| Capture | Distinct colours | Stdev | Dominant colour | Token match |
+|---|---|---|---|---|
+| login-dark-1440 | 440 | 17.2 | `(33,23,53)` | **exact** `--c-paper` |
+| login-dark-390 | 445 | 31.9 | `(33,23,53)` | **exact** `--c-paper` |
+| card surface | - | - | `(56,34,84)` | **exact** `--c-card` |
+
+440+ distinct colours at stdev 17 rules out the solid-fill trap that produced four
+fake "captures" earlier. Light theme, same page: `(248,248,250)` paper, `(255,255,255)`
+card, `(81,69,232)` accent. Both themes are now committed under `docs/screenshots/`.
+
+**Proves:** the dark palette renders in a real browser, both surfaces paint the exact
+token values, and layout is populated at 1440 and 390.
+
+**Does NOT prove:** `/login` only. It is public and renders no `AppShell`, so the
+shell, the 25 non-shell routes, and every authenticated page remain unseen. Static
+capture shows none of the interactions - toggle persistence, focus rings, hover
+states, or the reduced-motion path. Contrast pairs are covered by the token pins, not
+by these images.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
