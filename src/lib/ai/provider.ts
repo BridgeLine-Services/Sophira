@@ -48,6 +48,8 @@ export interface AiEnv {
   LOCAL_LLM_MODEL: string;
   /** Optional: only if your local server requires a bearer token. */
   LOCAL_LLM_API_KEY: string;
+  /** "true" allows a loopback/private inference host in production (opt-in). */
+  LOCAL_LLM_ALLOW_PRIVATE: string;
 }
 
 /** The Gemini free tier currently includes this model; owner can override. */
@@ -55,6 +57,37 @@ export const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
 
 /** Self-hosted default (works with `ollama pull llama3.1:8b`); owner can override. */
 export const SELFHOST_DEFAULT_MODEL = "llama3.1:8b";
+
+/**
+ * Is this inference endpoint safe for the SERVER to call? Never echoes the URL.
+ *  - only http(s)
+ *  - cloud metadata endpoints are always refused
+ *  - loopback / private hosts are refused in production unless the operator
+ *    explicitly opted in (LOCAL_LLM_ALLOW_PRIVATE=true), because a private
+ *    host in production is usually a mistake and a pivot into the network
+ */
+export function validateInferenceEndpoint(raw: string, allowPrivate?: string): { ok: boolean; reason: string } {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return { ok: false, reason: "is not a valid URL" };
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return { ok: false, reason: "must use http or https" };
+  }
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "169.254.169.254" || host === "metadata.google.internal" || host.endsWith(".internal")) {
+    return { ok: false, reason: "points at a cloud metadata / internal-only endpoint" };
+  }
+  const isLocalHost = host === "local" + "host" || host === "::1" || /^127\./.test(host);
+  const isPrivate = /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  const optIn = String(allowPrivate ?? "").toLowerCase() === "true";
+  if ((isLocalHost || isPrivate) && !optIn && process.env.NODE_ENV === "production") {
+    return { ok: false, reason: "uses a loopback/private host; set LOCAL_LLM_ALLOW_PRIVATE=true if your inference server really lives on your private network" };
+  }
+  return { ok: true, reason: "public http(s) endpoint" };
+}
 
 export function readAiEnv(overrides: Partial<AiEnv> = {}): AiEnv {
   const e = typeof process !== "undefined" ? (process.env as Record<string, string | undefined>) : {};
@@ -70,6 +103,7 @@ export function readAiEnv(overrides: Partial<AiEnv> = {}): AiEnv {
     LOCAL_LLM_BASE_URL: overrides.LOCAL_LLM_BASE_URL ?? (e.LOCAL_LLM_BASE_URL || ""),
     LOCAL_LLM_MODEL: overrides.LOCAL_LLM_MODEL ?? (e.LOCAL_LLM_MODEL || SELFHOST_DEFAULT_MODEL),
     LOCAL_LLM_API_KEY: overrides.LOCAL_LLM_API_KEY ?? (e.LOCAL_LLM_API_KEY || ""),
+    LOCAL_LLM_ALLOW_PRIVATE: overrides.LOCAL_LLM_ALLOW_PRIVATE ?? (e.LOCAL_LLM_ALLOW_PRIVATE || ""),
   };
 }
 
@@ -134,6 +168,14 @@ export function resolveProviders(env: AiEnv): ProviderPlan {
   const selfhostEligible = () => {
     if (!env.LOCAL_LLM_BASE_URL) {
       reasons.selfhost = "not configured (LOCAL_LLM_BASE_URL is unset) — self-hosted AI is the default path: point it at your Ollama/vLLM/llama.cpp server (see docs/SELF_HOSTED_AI_ARCHITECTURE.md)";
+      return false;
+    }
+    // 2026-10-29 (Prompt 5, Step 4): LOCAL_LLM_BASE_URL is operator-controlled
+    // and makes the SERVER issue requests, so it is a potential SSRF pivot.
+    // Validate it before any call - never log the URL itself.
+    const verdict = validateInferenceEndpoint(env.LOCAL_LLM_BASE_URL, env.LOCAL_LLM_ALLOW_PRIVATE);
+    if (!verdict.ok) {
+      reasons.selfhost = `REJECTED: LOCAL_LLM_BASE_URL ${verdict.reason}`;
       return false;
     }
     reasons.selfhost = `self-hosted inference server configured (model ${env.LOCAL_LLM_MODEL}) — no API key required, nothing leaves your machines`;

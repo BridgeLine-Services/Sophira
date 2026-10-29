@@ -141,3 +141,17 @@ Local processing first; no unnecessary external transmission; no student
 documents to third-party AI providers when the self-hosted path is used;
 no AI credentials in the browser or the mobile shell; the inference
 endpoint is configurable per environment; Vercel functions only relay.
+
+## Endpoint safety (2026-10-29)
+
+`LOCAL_LLM_BASE_URL` is operator-controlled and makes the **server** issue the
+request, so it is validated before any call:
+
+- only `http(s)` is accepted;
+- cloud metadata and `.internal` hosts are always refused;
+- **loopback/private hosts are refused in production** unless you set
+  `LOCAL_LLM_ALLOW_PRIVATE=true` - a private target in production is usually a
+  mistake, and otherwise lets configuration pivot into your network.
+
+Development is unaffected: `http://127.0.0.1:11434/v1` works locally as before.
+Nothing about the URL is logged or returned in diagnostics.
