@@ -143,3 +143,22 @@ Design notes:
   so it never lands in the client bundle (asserted by a test).
 - Still unmeasured: tables, multi-column fidelity, equations. The parser
   question is settled for `text`; structure is a separate, unproven claim.
+
+## Synthetic PDF corpus, measured through the shipped code path
+
+`scripts/doc-bench-pdf.mjs` now calls `extractPdfText()` - the same helper the
+API route uses - so the benchmark measures what ships, not a side path.
+
+| Case | chars | key tokens | notes |
+|---|---|---|---|
+| Text + heading | 102 | 3/3 | reading order sane |
+| Table 3x3 | 41 | 3/3 | row adjacency preserved |
+| Two columns | 60 | 2/2 | columns kept separate |
+| Equations (WinAnsi-safe) | 44 | 2/2 | symbols survive as text |
+| Scanned (no text layer) | 0 | n/a | correct: empty, so the route reports low confidence |
+
+This is text-level fidelity only. It does **not** claim layout reconstruction:
+a 3x3 table is flattened to a line of text with row adjacency intact, which is
+enough for search and citation but not for rebuilding a spreadsheet. Docling
+remains a candidate **only** if layout reconstruction is required - and that
+decision now has a measured baseline to compare against.

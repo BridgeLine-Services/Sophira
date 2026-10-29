@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SYNTHETIC PDF benchmark (Prompt 3). Writer: pdf-lib, devDependency only.
 const { PDFDocument, StandardFonts } = await import("pdf-lib");
-const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
+const { extractPdfText } = await import("../tests-dist/src/lib/extract/pdf.js");
 
 const rows = [];
 const norm = (t) => t.replace(/\s+/g, " ").trim();
@@ -34,7 +34,7 @@ const cases = [
 
 for (const [name, lines, toks] of cases) {
   try {
-    const t = norm((await pdfParse(await build(lines))).text);
+    const t = norm((await extractPdfText(await build(lines))).text);
     const extra = name === "two columns"
       ? (t.indexOf("Left three") < t.indexOf("Right one") ? "columns kept separate" : "COLUMNS INTERLEAVED")
       : name === "table 3x3" ? ("row adjacency kept=" + /Term\s+Value/.test(t)) : "";
@@ -46,7 +46,7 @@ try {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]);
   page.drawRectangle({ x: 80, y: 600, width: 400, height: 120 });
-  const t = norm((await pdfParse(Buffer.from(await doc.save({ useObjectStreams: false })))).text);
+  const t = norm((await extractPdfText(Buffer.from(await doc.save({ useObjectStreams: false })))).text);
   rows.push({ format: "PDF synthetic: scanned (no text layer)", chars: t.length, tokens: "n/a",
     notes: "0 chars = correct; the route must signal low confidence, not 'extracted'" });
 } catch (e) { rows.push({ format: "PDF synthetic: scanned", error: String(e.message).slice(0, 60) }); }
