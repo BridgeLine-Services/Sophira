@@ -359,6 +359,18 @@ export function assessSourceAuthority(
   if (evidence_quality > 0) score += evidence_quality;
   if (evidence_quality === 0) reasons.push("Thin snippet — lower evidence-quality signal.");
 
+  // INSTITUTIONAL REPOSITORY signal (2026-10-29, measured defect): with no
+  // teacher requirement, a Medium blog outranked the FDR Presidential Library
+  // because neither host matched an authority tier and only snippet scoring
+  // separated them. Host-based ONLY - a blog post with "archive" in its title
+  // gains nothing - and it outranks ordinary commentary, never a peer-reviewed
+  // journal, which already carries a real tier.
+  const hostSignalsArchive = /(library|archiv|museum|collection|repository|jstor)/i.test(domain);
+  if (hostSignalsArchive) {
+    score += 3;
+    reasons.push("Institutional archive or repository — primary-source collections.");
+  }
+
   // Transport sanity (same policy as the existing generic ranker).
   if (hit.url.startsWith("http://")) { score -= 5; reasons.push("Plain HTTP — downranked."); }
   if (!hit.url.startsWith("http")) score -= 10; // invalid → filtered out
