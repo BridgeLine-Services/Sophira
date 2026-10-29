@@ -369,6 +369,34 @@ would not be true.
 
 **Visual state of both themes remains unknown** - no screenshot of actual UI exists.
 
+## 4m. First real UI capture - /login, light theme (2026-10-29)
+
+Captured the LIVE page (scripts enabled, no snapshot surgery) at 1440 and 390.
+
+Pixel evidence, sampled every 5px:
+
+| Surface | Colour | Sampled pixels (1440) |
+|---|---|---|
+| Page background | `(248,248,250)` - matches `--c-paper` | 144,107 |
+| Card | `(255,255,255)` - matches `--c-card` | 8,423 |
+| Violet accent | `(81,69,232)` - the primary action | 1,828 |
+
+That is a rendered page, not a fill: a paper background, a white card, and the violet
+primary button, at both widths. Committed at `docs/screenshots/`.
+
+**Why the earlier blanks happened:** every previous attempt stripped all 20
+`<script>` tags to beat a hydration mismatch. These routes are client components, so
+stripping the scripts guaranteed an empty page for every route in the app. The strip
+was right for the problem it was aimed at and fatal for the thing being measured.
+
+### Still dark-free
+**No dark-mode screenshot exists.** Setting the theme needs either the in-app toggle
+(no click without CDP) or `Emulation.setEmulatedMedia` (CDP). Next session: launch
+Chrome with `--remote-debugging-port`, `Page.navigate` to the login page,
+`Emulation.setEmulatedMedia({features:[{name:'prefers-color-scheme',value:'dark'}]})`,
+`Page.captureScreenshot`. Then `/courses/math`, which is one of the 25 routes that
+never gets the shell.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
