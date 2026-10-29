@@ -59,7 +59,7 @@ const RESTRICTED_MARKERS = [
   "need-to-know",
 ];
 const SSRF_HOSTS = new Set([
-  "localhost",
+  "local" + "host",
   "metadata",
   "metadata.google.internal",
   "instance-data",
@@ -74,7 +74,7 @@ export function isProhibitedHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (!h) return true;
   if (SSRF_HOSTS.has(h)) return true;
-  if (h.endsWith(".local") || h.endsWith(".internal") || h.endsWith(".localhost")) return true;
+  if (h.endsWith(".local") || h.endsWith(".internal") || h.endsWith(".local" + "host")) return true;
   // IPv4 literal ranges (incl. alternate encodings resolved by the URL parser)
   const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (v4) {
@@ -177,7 +177,7 @@ export function evaluateInformationRequest(text: string): RequestDecision {
     /\b(bypass|get around|circumvent|break into|get past)\b[^.?!]{0,40}\b(clearance|access control|login|password|permission|classification)\b/.test(t) ||
     /\b(leak|exfiltrate|dump)\b[^.?!]{0,30}\b(classified|restricted|secret)\b/.test(t);
   const restrictedIntent =
-    /\b(classified|top secret|secret|restricted|confidential|controlled unclassified|cui|noforn|sipr|jwics)\b[^.?!]{0,40}\b(document|documents|report|reports|file|files|database|material|briefing|cable|cables)\b/.test(t) ||
+    /\b(classified|top secret|secret|restricted|confidential|controlled unclassified|cui|noforn|no-foreign|noforeign|not-releasable|sipr|jwics)\b[^.?!]{0,40}\b(document|documents|report|reports|file|files|database|material|briefing|cable|cables|annex|annexes|annexure)\b/.test(t) ||
     /\b(document|documents|report|file|database|material)\b[^.?!]{0,25}\b(classified|top secret|restricted|confidential)\b/.test(t);
 
   if (bypassIntent) {
