@@ -128,6 +128,32 @@ That is the honest update: the class moved, the guarantee did not.
 Still not done: no browser pass in either theme, and no per-route review. Token
 migration is not the same as a redesigned page.
 
+## 4e. Verified against a served build (2026-10-29)
+
+Tests prove intent; a served build proves delivery. `next start` on the production
+output, then fetched `/login` and its stylesheet:
+
+| Observation | Result |
+|---|---|
+| `/login` response | **200**, 9,018 bytes |
+| Stylesheet | `3c3a4fb4b7fbb833.css`, 43,696 bytes |
+| `--c-paper` values served | `248 248 250` (light) **and** `33 23 53` (dark) |
+| Theme selectors compiled | `[data-theme=dark]`, `[data-theme=light]`, `prefers-color-scheme:dark` |
+| `.bg-card` compiled | `rgb(var(--c-card)/var(--tw-bg-opacity,1))` - alpha works |
+| `.border-line` compiled | `rgb(var(--c-line)/var(--tw-border-opacity,1))` |
+| Theme bootstrap in served HTML | present (`sophira-theme`) |
+
+So the dual palette survives the real build and reaches the browser, and the
+alpha-value form compiles - `bg-card/60` is not silently broken.
+
+## 4f. Still NOT verified
+
+**No screenshot, no visual pass.** The served build has never been looked at in a
+browser at any width, in either theme. The table above is text and CSS, not
+pixels: it cannot tell anyone that the violet direction looks right, that nothing
+overlaps at 360px, or that a contrast-safe pair is pleasant to read. Do not read
+this section as "dark mode works".
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
