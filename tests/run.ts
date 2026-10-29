@@ -2929,6 +2929,9 @@ async function runPdfExtractionTests(): Promise<void> {
   const route = fs.readFileSync("src/app/api/extract/route.ts", "utf8");
   assert(route.includes("extractPdfText") && route.includes('via === "none"'),
     "pdf: the extract route reports failure from the helper instead of an inline parser call");
+  const benchPdf = fs.readFileSync("scripts/doc-bench-pdf.mjs", "utf8");
+  assert(benchPdf.includes("extractPdfText"),
+    "doc-bench measures the shipped PDF path (the same helper the API route calls)");
   const cfg = fs.readFileSync("next.config.mjs", "utf8");
   assert(/serverExternalPackages[\s\S]*pdfjs-dist/.test(cfg),
     "pdf: the modern parser is externalised for the server bundle (not bundled into the client)");
