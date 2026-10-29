@@ -44,3 +44,24 @@ is an open question for the owner, not something this audit should silently
 Claim-to-evidence verification (`verify.ts`, `claims.ts`), dead-link and
 access-refusal handling, and the boundary behaviour on real search results.
 These need live or recorded fixtures, not synthetic hits.
+
+## CORRECTION and FIX (2026-10-29, same day)
+
+Re-measured with **realistic snippets** (the first fixtures gave every candidate
+the same 18-character snippet, which zeroed the evidence-quality signal and
+invalidated the comparison):
+
+- **Finding 1 - CONFIRMED and FIXED.** A Medium blog did outrank the FDR
+  Presidential Library archive on a no-requirement search. Cause: neither host
+  matched an authority tier, so thin-snippet-era scoring decided it. Fix: a
+  host-based institutional-repository signal (+3) in `assessSourceAuthority`.
+  Measured after: `fdrlibrary.org score=11` vs `medium.com score=8`.
+- **Finding 2 - RETRACTED, my error.** Teacher source types do **not** remove
+  non-satisfying sources; they demote them. The single-result output came from
+  the `score > -4` usability cutoff acting on the unrealistic fixtures. With
+  real snippets the same case returns all three, teacher-required first.
+
+Guardrails added: the signal is **host-based only** (a blog with "archive" in
+its title gains nothing), it never outranks a satisfied teacher requirement, and
+four pins lock that behaviour. No vector database, no framework, no change to
+source verification or citation records.
