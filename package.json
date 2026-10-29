@@ -28,7 +28,8 @@
     "db:migrate": "node scripts/apply-migrations.mjs",
     "db:migrate:check": "node scripts/apply-migrations.mjs --check-only",
     "doctor": "node scripts/doctor.mjs",
-    "db:bootstrap-sql": "node scripts/gen-bootstrap-sql.mjs"
+    "db:bootstrap-sql": "node scripts/gen-bootstrap-sql.mjs",
+    "integrations:doctor": "node scripts/integrations-doctor.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
