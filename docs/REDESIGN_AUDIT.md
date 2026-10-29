@@ -202,6 +202,39 @@ A pin asserts every inventory row has a Signals column and that the shell count
 stays below the page count (i.e. the discrepancy cannot be papered over by
 regenerating the doc).
 
+## 4h. Visual pass attempted and FAILED (2026-10-29)
+
+Attempted the promised screenshot pass with headless `google-chrome` (the only
+browser available; no Playwright/Puppeteer in the repo).
+
+1. Served the production build, fetched `/login` (200, 9,018 bytes).
+2. Wrote preview copies with `<html data-theme="dark">` into `public/`.
+3. Captured `/login` at 1440 and 390 in both themes.
+
+**Light and dark screenshots came back byte-identical** (md5 `72434ec6...` for
+both 1440 shots, `a028679c...` for both 390 shots). Two different themes cannot
+render identically - the frame was blank or the attribute never applied. A second
+run stripped all 20 `<script>` tags to rule out React hydration reconciling
+`<html data-theme>` back to its server-rendered value; identical hashes again.
+
+A pixel-mean check was attempted and is **not trustworthy**: the hand-rolled PNG
+decoder ignored per-row filters, so its numbers are meaningless and are not
+reported as measurements.
+
+**The screenshots were deleted, not committed.** Two identical images labelled
+"light" and "dark" would be fabricated evidence.
+
+### What actually unblocks it
+`--screenshot` on this Chrome build returns a blank frame. The reliable path is
+Chrome DevTools Protocol: launch with `--remote-debugging-port`, then
+`Emulation.setEmulatedMedia({features:[{name:'prefers-color-scheme',value:'dark'}]})`
+and `Page.captureScreenshot` - which also sidesteps hydration, because the theme is
+set after navigation. Alternative: drive the shared Chromium session and capture
+with the desktop screenshot tool.
+
+Until one of those runs, the **visual state of both themes is unknown**. Every
+claim in 4b-4g rests on tests, compiled CSS and a served build - not on pixels.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
