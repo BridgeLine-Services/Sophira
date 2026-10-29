@@ -2918,6 +2918,37 @@ async function runResearchBenchPinTests(): Promise<void> {
     "research: no retrieval framework or vector store was added");
 }
 
+async function runInferenceEndpointTests(): Promise<void> {
+  const { validateInferenceEndpoint, resolveProviders, readAiEnv } =
+    await import("../src/lib/ai/provider");
+  // Endpoint safety (server-side SSRF guard on operator-controlled config)
+  const envRef = process.env as Record<string, string | undefined>;
+  const dev = envRef.NODE_ENV;
+  envRef.NODE_ENV = "production";
+  assert(!validateInferenceEndpoint("http://169.254.169.254/latest").ok,
+    "ai-endpoint: cloud metadata endpoint refused");
+  assert(!validateInferenceEndpoint("http://127.0.0.1:11434/v1").ok,
+    "ai-endpoint: loopback refused in production without opt-in");
+  assert(validateInferenceEndpoint("http://127.0.0.1:11434/v1", "true").ok,
+    "ai-endpoint: loopback allowed when the operator opts in");
+  assert(validateInferenceEndpoint("https://ai.example.edu/v1").ok,
+    "ai-endpoint: a public https endpoint is allowed");
+  assert(!validateInferenceEndpoint("file:///etc/passwd").ok,
+    "ai-endpoint: non-http schemes refused");
+  assert(!validateInferenceEndpoint("not a url").ok, "ai-endpoint: malformed URL refused");
+  const refused = resolveProviders(readAiEnv({ LOCAL_LLM_BASE_URL: "http://169.254.169.254/v1" }));
+  assert(!refused.candidates.includes("selfhost"),
+    "ai-endpoint: an unsafe endpoint is not selectable even when configured");
+  assert(String(refused.reasons.selfhost).startsWith("REJECTED"),
+    "ai-endpoint: the refusal is explained, without echoing the URL");
+  // Billing safeguards must survive (Prompt 5 Step 3)
+  assert(!resolveProviders(readAiEnv({ OPENAI_API_KEY: "k" })).candidates.includes("openai"),
+    "ai-policy: a paid key alone never enables OpenAI");
+  assert(resolveProviders(readAiEnv({ OPENAI_API_KEY: "k", ALLOW_PAID_AI: "true", MONTHLY_AI_BUDGET_USD: "10" }))
+    .candidates.includes("openai"), "ai-policy: explicit paid opt-in enables OpenAI");
+  envRef.NODE_ENV = dev;
+}
+
 async function runPdfExtractionTests(): Promise<void> {
   const { extractPdfText } = await import("../src/lib/extract/pdf");
   const ok = async () => "x".repeat(120);
@@ -4298,6 +4329,6 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
   .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
