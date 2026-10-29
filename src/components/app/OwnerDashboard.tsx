@@ -119,7 +119,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                 ? "Automatic sending is not configured yet. Share the link below."
                 : "Sending failed. Retry, or share the link below."
         );
-        setInviteEmailBlocked(json.data.email_status === "not_configured" || json.data.email_status === "failed");
+        setInviteEmailBlocked(json.data.delivery !== "sent");
         setInviteEmail("");
         await refresh();
       } else {
@@ -306,23 +306,24 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
         </h2>
         <Card>
           <CardContent className="p-4">
-            <form onSubmit={createInvitation} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="flex-1">
+            <form onSubmit={createInvitation} className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="min-w-0 md:col-span-2 xl:col-span-1">
                 <Label htmlFor="invite-email">Their email</Label>
                 <Input
                   id="invite-email"
                   type="email"
                   required
+                  className="h-11 w-full text-base"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="friend@example.com"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="invite-expires">Expires in</Label>
                 <select
                   id="invite-expires"
-                  className="h-10 w-full rounded-lg border border-ink/15 bg-white px-3 text-sm text-ink sm:w-36"
+                  className="h-11 w-full rounded-lg border border-ink/15 bg-white px-3 text-base text-ink"
                   value={inviteExpires}
                   onChange={(e) => setInviteExpires(Number(e.target.value))}
                 >
@@ -333,48 +334,56 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                   <option value={90}>90 days</option>
                 </select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="invite-channel">Send by</Label>
-                {cap && (
-                  <p className="mb-1 text-[11px] text-ink-soft">
-                    {emailReady ? "Email ready" : "Email not configured"} ·{" "}
-                    {smsReady ? "Text ready" : "Text not configured"}
-                    {!emailReady && cap.detail?.email.missing.length
-                      ? ` — email needs ${cap.detail.email.missing.join(", ")}`
-                      : ""}
-                    {!smsReady && cap.detail?.sms.missing.length
-                      ? ` — text needs ${cap.detail.sms.missing.join(", ")}`
-                      : ""}
-                    . The invitation link always works without either.
-                  </p>
-                )}
                 <select
                   id="invite-channel"
-                  className="h-10 w-full rounded-lg border border-ink/15 bg-white px-3 text-sm text-ink sm:w-44"
+                  className="h-11 w-full rounded-lg border border-ink/15 bg-white px-3 text-base text-ink"
                   value={inviteChannel}
                   onChange={(e) => setInviteChannel(e.target.value as "email" | "sms" | "both")}
                 >
                   <option value="email">Email</option>
-                  <option value="sms" disabled={cap ? !cap.sms : false}>Text message</option>
-                  <option value="both" disabled={cap ? !(cap.sms && cap.email) : false}>Email and text</option>
+                  <option value="sms">Text message</option>
+                  <option value="both">Email and text</option>
                 </select>
               </div>
-              {inviteChannel !== "email" && (
-                <div>
-                  <Label htmlFor="invite-phone">Phone (with country code)</Label>
-                  <input
-                    id="invite-phone"
-                    className="h-10 w-full rounded-lg border border-ink/15 bg-white px-3 text-sm text-ink sm:w-52"
-                    placeholder="+1 555 123 4567"
-                    value={invitePhone}
-                    onChange={(e) => setInvitePhone(e.target.value)}
-                    inputMode="tel"
-                  />
-                </div>
+              <div className="min-w-0 md:col-span-2 xl:col-span-1">
+                <Label htmlFor="invite-phone">Phone (with country code)</Label>
+                <input
+                  id="invite-phone"
+                  type="tel"
+                  inputMode="tel"
+                  className="h-11 w-full rounded-lg border border-ink/15 bg-white px-3 text-base text-ink disabled:bg-ink/5"
+                  placeholder="+1 555 123 4567"
+                  value={invitePhone}
+                  onChange={(e) => setInvitePhone(e.target.value)}
+                  disabled={inviteChannel === "email"}
+                  aria-describedby="invite-phone-hint"
+                />
+                <p id="invite-phone-hint" className="mt-1 text-sm leading-relaxed text-ink-soft">
+                  {inviteChannel === "email"
+                    ? "Only needed when you send by text message."
+                    : "Use the full international number, e.g. +1 555 123 4567."}
+                </p>
+              </div>
+              {cap && (
+                <p className="min-w-0 text-sm leading-relaxed text-ink-soft md:col-span-2 xl:col-span-3">
+                  {emailReady ? "Email is ready to send." : "Email is not configured."}{" "}
+                  {smsReady ? "Text messaging is ready to send." : "Text messaging is not configured."}
+                  {!emailReady && cap.detail?.email.missing.length
+                    ? ` Email needs: ${cap.detail.email.missing.join(", ")}.`
+                    : ""}
+                  {!smsReady && cap.detail?.sms.missing.length
+                    ? ` Text needs: ${cap.detail.sms.missing.join(", ")}.`
+                    : ""}{" "}
+                  Either way you can still create the invitation and copy the link to send it yourself.
+                </p>
               )}
-              <Button type="submit" disabled={inviteBusy}>
-                {inviteBusy ? "Sending…" : "Send Invitation"}
-              </Button>
+              <div className="min-w-0 md:col-span-2 xl:col-span-3">
+                <Button type="submit" className="h-11 w-full sm:w-auto" disabled={inviteBusy}>
+                  {inviteBusy ? "Sending…" : "Send Invitation"}
+                </Button>
+              </div>
             </form>
             {inviteLink && inviteEmailBlocked && (
               <div className="mt-3 rounded-card border border-accent/40 bg-accent-soft/50 p-4">
