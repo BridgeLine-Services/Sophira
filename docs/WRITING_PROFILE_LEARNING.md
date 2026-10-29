@@ -75,6 +75,17 @@ proposal -> approval machinery:
 `src/lib/ai/style-suggestions.ts` holds the pure helpers (`proposalRowFor`,
 `pickAccepted`, disclaimers) so all of this is testable with no database.
 
+## Approval needs no new screen (2026-10-29)
+
+`src/components/app/ProposalsPanel.tsx` already reviews `target_type: "writing"`
+proposals: it applies `proposed_changes.guidance` as an ADDENDUM on approved
+guidance, snapshots a version first, and is mounted on the writing page next to
+the analyze button. So the payload key is `guidance`, deliberately matching that
+consumer, and approvals get the existing version history and RLS for free.
+
+A pin reads `ProposalsPanel.tsx` and fails if the key it applies drifts from the
+key this module emits - otherwise approval would silently do nothing.
+
 ## Commands
 
 ```
