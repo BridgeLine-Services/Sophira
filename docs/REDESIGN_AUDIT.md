@@ -303,6 +303,38 @@ my harness was.
 **Visual state of both themes: still unknown.** Three attempts, one root cause, and
 it was mine each time.
 
+## 4k. Visual pass, fourth attempt: `public/` is not served (2026-10-29)
+
+Fourth attempt fixed the ordering my earlier diagnosis blamed (previews written into
+`public/` before the server started), then asserted the served body - and it failed
+again:
+
+```
+login 200 9016
+pv-light 200   pv-dark 200   injection served: False   data-theme attr: False
+```
+
+Both preview URLs return **200 with none of my markup**. Writing the files before
+start changed nothing, so the ordering was not the cause. `next start` in this app
+does not serve `public/` dynamically at all: the static directory is resolved at
+BUILD time, so anything added afterwards is invisible and the request falls through
+to the app catch-all - which returns the login page, styled light, for every preview
+URL. That single fact explains all four failures.
+
+**A real leak from this attempt:** the assert aborted the capture but the shell
+continued into `git commit`, which committed `public/pv-light.html` and
+`public/pv-dark.html` (commit eb12a75). They were removed in the next commit. The
+lesson is mundane and worth writing down: a guard that aborts a script does not stop
+the commands that follow it, so cleanup must not live downstream of an assert.
+
+### The fix this evidence points to
+Do not use `public/` at all. Serve the snapshot from a separate static server and
+point its `/_next/` references at the running Next server by absolute URL. That
+keeps the build untouched and removes the static-manifest question entirely.
+
+**Visual state of both themes: still unknown.** Four attempts, four harness bugs,
+zero screenshots.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
