@@ -176,3 +176,21 @@ the repository:
 4. Connect a real account, then verify: create → read → section insertion →
    conflict (edit in the provider between read and write) → history events →
    compare → recovery copy → Word eTag replacement refusal.
+
+## Owner checklist (2026-10-29)
+
+Run `npm run integrations:doctor` first. It is offline and read-only: it lists
+which credentials exist and the **exact redirect URI to register**, and it
+refuses to call anything "verified" - a client ID is not a working integration.
+
+1. `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` set in Vercel (never in source).
+2. `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` set in Vercel.
+3. Google Cloud: enable Docs + Drive APIs, publish the consent screen, register
+   the redirect URI the doctor prints, `drive.file` scope only.
+4. Microsoft Entra: delegated `Files.ReadWrite` + `offline_access`, same redirect URI.
+5. Connect both accounts once in Integrations, then perform ONE real edit and ONE
+   real conflict (edit the file elsewhere first) on a throwaway document.
+
+Only step 5 turns "ready to connect" into "verified". Until then the
+integrations are documented as unverified in
+`docs/INTEGRATIONS_VERIFICATION_REPORT.md`.
