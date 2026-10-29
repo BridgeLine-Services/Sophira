@@ -82,6 +82,24 @@ Phase D rather than being restyled blind.
 **Not verified visually.** No browser pass was run this session; contrast maths is
 not a screenshot. Phase B4 (shell review at six widths) remains open.
 
+## 4c. Phase B3 - shared surfaces migrated (2026-10-29)
+
+The shell and the shared primitives no longer hardcode a surface colour. Seven
+files moved onto tokens: `Button`, `Card`, `Input`, `Toast`, `ConfirmDialog`,
+`EmptyState`, `AppShell`. `bg-white` became `bg-card`, `border-ink/10|15` became
+`border-line`, the Card shadow's literal `rgba(37,43,58,0.05)` became
+`rgb(var(--c-ink)/0.05)`, and the active-nav rail's inline `#5145e8` became
+`rgb(var(--c-accent))`.
+
+Because the light token values are identical to the old literals, light mode is
+unchanged; dark mode now has real surfaces to sit on. A pin scans those seven
+files and fails on `bg-white`, `text-black`, or any literal hex - so the next
+component cannot quietly reintroduce one.
+
+Still open: the ~60 page modules that use these primitives have not been reviewed
+in either theme, and no browser pass has been run. `src/components/app/*` beyond
+the shell (ProposalsPanel, ProfileVersionHistory, etc.) is untouched.
+
 ## 5. Risks recorded before Phase B
 
 1. **Light theme removal.** Preserving light mode while adding dark doubles the
