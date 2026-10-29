@@ -3146,6 +3146,76 @@ async function runRedesignAuditTests(): Promise<void> {
   assert(inventory.includes("not-started"), "redesign: unstarted routes are labelled not-started, never complete");
 }
 
+async function runThemeTokenTests(): Promise<void> {
+  const css = fs.readFileSync("src/app/globals.css", "utf8");
+  const cfg = fs.readFileSync("tailwind.config.ts", "utf8");
+  const theme = fs.readFileSync("src/components/app/ThemeToggle.tsx", "utf8");
+  const shell = fs.readFileSync("src/components/app/AppShell.tsx", "utf8");
+  const layout = fs.readFileSync("src/app/layout.tsx", "utf8");
+
+  const grab = (start: string): Record<string, string> => {
+    const i = css.indexOf(start);
+    if (i === -1) return {};
+    const body = css.slice(i, css.indexOf("}", i));
+    const out: Record<string, string> = {};
+    for (const m of body.matchAll(/--c-([a-z-]+):\s*(\d+)\s+(\d+)\s+(\d+)/g)) {
+      out[m[1]] = `#${[m[2], m[3], m[4]].map((n) => Number(n).toString(16).padStart(2, "0")).join("")}`;
+    }
+    return out;
+  };
+  const light = grab(":root {");
+  const dark = grab('[data-theme="dark"]');
+
+  // LIGHT IS UNCHANGED. These are the exact pre-migration values; if a token
+  // drifts, light mode has regressed even when the build is green.
+  assert(light.paper === "#f8f8fa" && light.ink === "#252b3a" && light.accent === "#5145e8",
+    "theme: light token values are identical to the previously shipped palette");
+  assert(light["ink-soft"] === "#697386" && light.success === "#0f766e" && light.danger === "#b91c1c",
+    "theme: light status and secondary colours are unchanged");
+
+  // DARK IS THE VIOLET DIRECTION, and the shipped CSS (not a constant) is measured.
+  assert(dark.paper === "#211735" && dark.card === "#382254" && dark.accent === "#7865ff",
+    "theme: dark tokens implement the violet design direction");
+  assert(Object.keys(light).length >= 14 && Object.keys(dark).length >= 14,
+    "theme: both themes define the full token set");
+  assert(Object.keys(light).sort().join() === Object.keys(dark).sort().join(),
+    "theme: light and dark define exactly the same tokens (no theme-only colour)");
+
+  const { contrastRatio } = await import("../src/lib/ui/contrast");
+  const pairs: [string, string, string, number][] = [
+    ["body text on paper", dark.ink, dark.paper, 4.5],
+    ["body text on card", dark.ink, dark.card, 4.5],
+    ["secondary text on card", dark["ink-soft"], dark.card, 4.5],
+    ["secondary text on paper", dark["ink-soft"], dark.paper, 4.5],
+    ["accent on paper", dark.accent, dark.paper, 3],
+    ["accent on card", dark.accent, dark.card, 3],
+    ["danger on card", dark.danger, dark.card, 3],
+    ["success on card", dark.success, dark.card, 3],
+    ["light body on paper", light.ink, light.paper, 4.5],
+    ["light accent on paper", light.accent, light.paper, 3],
+  ];
+  const failing = pairs.filter(([, fg, bg, min]) => contrastRatio(fg, bg) < min);
+  assert(failing.length === 0,
+    `theme: shipped light and dark pairs meet WCAG AA (failures: ${failing.map((f) => f[0]).join(", ")})`);
+
+  // Opacity modifiers must keep working: every themed colour goes through the
+  // rgb(var(--c-...) / <alpha-value>) form, or `bg-ink/10` silently breaks.
+  const colourBlock = cfg.slice(cfg.indexOf("colors:"), cfg.indexOf("fontFamily:"));
+  assert(!/#[0-9a-f]{3,6}/i.test(colourBlock), "theme: no literal hex survives in the Tailwind colour block");
+  assert((colourBlock.match(/token\(/g) ?? []).length >= 12, "theme: every colour resolves through a token");
+
+  // The switch itself: explicit choice wins, OS preference until then.
+  assert(theme.includes('"sophira-theme"') && theme.includes("prefers-color-scheme: dark"),
+    "theme: toggle persists an explicit choice and falls back to the OS preference");
+  assert(theme.includes("localStorage.setItem") && theme.includes("dataset.theme"),
+    "theme: toggle writes both the stored choice and the applied attribute");
+  assert(/aria-label=\{label\}/.test(theme) && theme.includes("h-11 w-11"),
+    "theme: toggle is labelled and meets the 44px touch target");
+  assert(shell.includes("<ThemeToggle />"), "theme: the toggle is mounted in the shared shell");
+  assert(layout.includes("sophira-theme") && layout.includes("dataset.theme"),
+    "theme: a stored choice is applied before first paint (no light flash)");
+}
+
 async function runPdfExtractionTests(): Promise<void> {
   const { extractPdfText } = await import("../src/lib/extract/pdf");
   const ok = async () => "x".repeat(120);
@@ -4531,6 +4601,6 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runRedesignAuditTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runRedesignAuditTests()).then(() => runThemeTokenTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
   .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

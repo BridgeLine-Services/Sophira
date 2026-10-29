@@ -12,6 +12,7 @@ import { BookOpen, Brain, Briefcase, ChevronDown, GraduationCap, Home, Library, 
 import { Gauge, Keyboard } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
+import { ThemeToggle } from "@/components/app/ThemeToggle";
 
 // Active subject/course scope indicator (course-aware engines round):
 // shows the real subject or course this engine is working within.
@@ -520,6 +521,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
           )}
           <h1 className="flex-1 truncate text-[17px] font-semibold text-ink">{title}</h1>
           <ScopeChip />
+          <ThemeToggle />
           <span className="mr-1 hidden sm:inline-flex"><SyncStatus /></span>
           {actions}
           <button
