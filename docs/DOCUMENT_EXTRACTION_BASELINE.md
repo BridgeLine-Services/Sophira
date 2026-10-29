@@ -121,3 +121,25 @@ demonstrably rejects valid modern PDFs.
 
 `pdf-lib` is a devDependency only: it is never imported by application code and
 never enters the production bundle.
+
+## RESOLVED (owner approval, same day): modern parser added as a FALLBACK
+
+`pdfjs-dist@4` is now a declared runtime dependency, used **only** when the
+existing parser throws or returns almost nothing. The old parser stays first, so
+PDFs that already worked are untouched (verified: the 14-page fixture still
+comes from `pdf-parse`, 82,756 chars).
+
+| Case | Before | After |
+|---|---|---|
+| Modern PDF (pdf-lib output) | `bad XRef entry`, **intermittent** (failed 2/3 attempts on one file) | deterministic, 3/3 attempts, via `pdfjs` |
+| Real 14-page paper | 82,400 chars | 82,756 chars, still via `pdf-parse` |
+| Scanned PDF (no text layer) | low confidence | low confidence, still empty (no invented text) |
+| Corrupt bytes | `failed` | `failed`, `via: none` |
+| Garbage/glyph noise | - | not promoted: the fallback must add >20 chars |
+
+Design notes:
+- `extractPdfText()` returns `via`, so nothing claims a parser it did not use.
+- The fallback is externalised in `next.config.mjs` (`serverExternalPackages`),
+  so it never lands in the client bundle (asserted by a test).
+- Still unmeasured: tables, multi-column fidelity, equations. The parser
+  question is settled for `text`; structure is a separate, unproven claim.

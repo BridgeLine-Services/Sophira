@@ -2903,6 +2903,39 @@ async function runAcceptanceDocTests(): Promise<void> {
 // registers exactly 39 checks, its self-test passes, and the release
 // workflow runs the gate.
 // ---------------------------------------------------------------------------
+async function runPdfExtractionTests(): Promise<void> {
+  const { extractPdfText } = await import("../src/lib/extract/pdf");
+  const ok = async () => "x".repeat(120);
+  const throws = async () => { throw new Error("bad XRef entry"); };
+  const empty = async () => "";
+  const shorter = async () => "short";
+  const longer = async () => "y".repeat(150);
+
+  const primaryWins = await extractPdfText(Buffer.from("pdf"), { primary: ok, fallback: longer });
+  assert(primaryWins.via === "pdf-parse" && primaryWins.text.length === 120,
+    "pdf: a working primary extraction is never downgraded by the fallback");
+
+  const rescued = await extractPdfText(Buffer.from("pdf"), { primary: throws, fallback: longer });
+  assert(rescued.via === "pdfjs" && rescued.text.length === 150 && rescued.primaryError === "bad XRef entry",
+    "pdf: a modern PDF the old parser rejects is rescued, and the failure is recorded not hidden");
+
+  const scanned = await extractPdfText(Buffer.from("pdf"), { primary: empty, fallback: shorter });
+  assert(scanned.text === "" , "pdf: a scanned PDF with no text layer stays empty (no invented text)");
+
+  const bothFail = await extractPdfText(Buffer.from("pdf"), { primary: throws, fallback: throws });
+  assert(bothFail.via === "none" && bothFail.text === "",
+    "pdf: when both parsers fail the result is honestly empty, never a fabricated success");
+
+  const route = fs.readFileSync("src/app/api/extract/route.ts", "utf8");
+  assert(route.includes("extractPdfText") && route.includes('via === "none"'),
+    "pdf: the extract route reports failure from the helper instead of an inline parser call");
+  const cfg = fs.readFileSync("next.config.mjs", "utf8");
+  assert(/serverExternalPackages[\s\S]*pdfjs-dist/.test(cfg),
+    "pdf: the modern parser is externalised for the server bundle (not bundled into the client)");
+  const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+  assert(Boolean(pkg.dependencies["pdfjs-dist"]), "pdf: the fallback parser is a declared runtime dependency");
+}
+
 async function runReleaseGateTests(): Promise<void> {
   section("25. Release gate — single authoritative GO/BLOCKED gate");
   {
@@ -3608,7 +3641,9 @@ async function runDocBenchTests(): Promise<void> {
   {
     const pkg2 = JSON.parse(fs2.readFileSync("package.json", "utf8"));
     const prodDeps = Object.keys(pkg2.dependencies || {}).join(" ");
-    assert(!/docling|markitdown|pdf-parse2|pdfjs-dist/.test(prodDeps),
+    // pdfjs-dist is an approved RUNTIME fallback (owner decision 2026-10-29);
+    // whole-document-replacement PARSERS remain forbidden in production.
+    assert(!/docling|markitdown/.test(prodDeps),
       "doc-bench: no candidate parser dependency was added to production");
     assert(!pkg2.dependencies["pdf-lib"] && pkg2.devDependencies["pdf-lib"],
       "doc-bench: the fixture writer is dev-only");
@@ -4245,6 +4280,6 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
   .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
