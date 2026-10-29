@@ -13,31 +13,41 @@ export interface ProposalRow {
   user_id: string;
   target_type: "writing";
   target_id: string;
-  payload: Record<string, unknown>;
+  change_summary: string;
+  proposed_changes: Record<string, unknown>;
+  context: Record<string, unknown>;
+  status: "pending";
 }
 
 const MAX_DESCRIPTION = 600;
 
 /**
- * Turn an accepted suggestion into a PENDING proposal row. It is never applied
- * here; approval is a separate, user-driven step (same pattern as teacher rules).
+ * Turn an accepted suggestion into a PENDING proposal row.
+ *
+ * Column names follow the real `profile_update_proposals` schema
+ * (0001_init.sql): change_summary / proposed_changes / context / status. An
+ * earlier version of this file used a single `payload` key, which is not a
+ * column - PostgREST would have rejected every insert. Fixed here, and the
+ * exact keys are pinned by a test so it cannot drift again.
  */
 export function proposalRowFor(userId: string, profileId: string, s: StyleSuggestion): ProposalRow {
+  const description = s.description.slice(0, MAX_DESCRIPTION);
   return {
     user_id: userId,
     target_type: "writing",
     target_id: profileId,
-    payload: {
+    change_summary: `Style suggestion: ${s.category.replace(/_/g, " ")} (${s.scope})`,
+    proposed_changes: {
+      guidance_addition: description,
       suggestion_id: s.id,
       category: s.category,
-      description: s.description.slice(0, MAX_DESCRIPTION),
       confidence: s.confidence,
       scope: s.scope,
-      // Recorded with the proposal so the audit trail stays honest later: this is
-      // advice about the user's own prose, not a claim about who wrote anything.
       source: "writing-profile-learning",
-      requires_approval: true,
     },
+    // Kept in context, not proposed_changes: this is provenance, not a profile field.
+    context: { requires_approval: true, origin: "writing-profile-learning" },
+    status: "pending",
   };
 }
 
