@@ -35,6 +35,9 @@ const CDN_URL = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSF
 export async function loadTransformers(): Promise<TransformersApi> {
   if (typeof window === "undefined") {
     // Node: eval keeps webpack from tracing onnxruntime-node's binaries
+    // Deliberate: eval("require") keeps webpack from tracing onnxruntime-node
+    // binaries into the client bundle. Replacing it breaks offline loading.
+    // eslint-disable-next-line no-eval
     const req = eval("require") as (id: string) => unknown;
     return req("@huggingface/transformers") as TransformersApi;
   }

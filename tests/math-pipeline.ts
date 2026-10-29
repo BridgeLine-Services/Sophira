@@ -251,6 +251,7 @@ export async function runMathPipelineTests(assert: Assert, section: Section): Pr
 
 function near(a: number, b: number, tol = 1e-4) { return Math.abs(a - b) <= tol * Math.max(1, Math.abs(b)); }
 function evalStr(s: string): number {
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  // Test-only arithmetic evaluator: never shipped, never fed untrusted input.
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
   return Function(`"use strict"; return (${s});`)() as number;
 }
