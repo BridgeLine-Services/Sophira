@@ -31,7 +31,8 @@
     "db:bootstrap-sql": "node scripts/gen-bootstrap-sql.mjs",
     "integrations:doctor": "node scripts/integrations-doctor.mjs",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
-    "verify:production": "node scripts/production-verification.mjs"
+    "verify:production": "node scripts/production-verification.mjs",
+    "preserve:members": "node scripts/member-preservation.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
