@@ -4,6 +4,8 @@ on:
   push:
     branches: [master]
   pull_request:
+  # Manual run, so a branch can be verified before it reaches master.
+  workflow_dispatch:
 
 # npm registry flake protection. These apply to tarball/metadata fetches; the
 # onnxruntime binary download is handled by ONNXRUNTIME_NODE_INSTALL below.
