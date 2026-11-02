@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app/AppShell";
 import { Workspace } from "./Workspace";
+import CanvasAssignmentContext from "@/components/app/CanvasAssignmentContext";
+import { loadCanvasContext } from "@/lib/integrations/canvas-rubric";
 import type { AiResponse, Assignment, Course, Teacher, WorkSession } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +37,13 @@ export default async function AssignmentWorkspacePage({ params }: { params: Prom
       .limit(10),
   ]);
 
+  // Canvas details for THIS student's assignment only (RLS plus an explicit user filter).
+  // Null for every assignment that did not come from Canvas, which is the common case.
+  const canvasContext = await loadCanvasContext(supabase, user.id, assignment.id);
+
   return (
     <AppShell title={assignment.title} backHref="/dashboard">
+      {canvasContext && <CanvasAssignmentContext context={canvasContext} />}
       <Workspace
         assignment={assignment as Assignment}
         course={(courseRes.data as Course) ?? null}

@@ -307,3 +307,56 @@ for Canvas, Google, Microsoft, AI, or research.
 (label mapper added), `src/app/api/health/route.ts` (delegates to the shared probe),
 `src/app/setup/page.tsx` (section added), `scripts/smoke-runtime.mjs` (+1 page), tests. No migration,
 no data change, no external configuration change.
+
+---
+
+# PART I — PHASE 4.3: CANVAS RUBRIC DISPLAY
+
+## I1. The gap
+
+The Canvas sync has stored `rubric` since migration `0041`, and `canvas_assignments` links to the
+Sophira assignment via `sophira_assignment_id`, but no screen ever showed any of it. A student saw
+a title and a due date and had to open Canvas to discover what the teacher was actually grading.
+No migration was needed: the data and the link already existed.
+
+## I2. What changed
+
+- `src/lib/integrations/canvas-rubric.ts` (new) — turns stored, untrusted Canvas JSON into a bounded
+  plain-text model, and loads one student's Canvas details with both an RLS policy and an explicit
+  `user_id` filter.
+- `src/components/app/CanvasAssignmentContext.tsx` (new) — shows due date, points, submission type,
+  rubric criteria with their performance levels, attachment names, and a link to the original Canvas
+  assignment.
+- `src/components/app/LocalDateTime.tsx` (new) — renders due dates in the student's own timezone.
+  The server runs in UTC, so formatting there would have shown the wrong due time to anyone outside it.
+- `src/app/assignments/[id]/page.tsx` — loads the context and renders it above the existing
+  workspace. Nothing about the workspace itself was touched.
+- 29 new assertions (`tests/canvas-rubric.ts`), 4,522 total.
+
+## I3. Honesty rules enforced by test
+
+- **No invented rubric.** An absent, empty, or unusable payload yields no criteria. There is no
+  default set, no generated performance level, and the component contains no AI or suggestion call.
+- **Unknown is not zero.** Negative or non-numeric points become "unknown" rather than `0`, which
+  would look like a real zero-point criterion.
+- **No partial totals.** If any criterion has unknown points, no total is shown, because a partial
+  sum would understate the assignment.
+- **Third-party markup stays text.** HTML is stripped and entities decoded before rendering.
+- **Bounded.** 40 criteria, 10 levels each, 600 characters per description, 160 per title.
+- **Attachments are listed, not claimed.** The screen says Sophira has not downloaded them. That is
+  accurate: the sync stores names only, and Stage 4.4 is where retrieval belongs.
+- **A removed assignment says so.** When Canvas no longer lists it, the student is told their teacher
+  may have removed it and that their work is still saved.
+
+## I4. Verification
+
+`npm test` 4,522 passed / 0 failed; lint 0 errors (107 pre-existing warnings, unchanged); `tsc` clean;
+build compiled; `verify` PASS; secret scan CLEAN; runtime smoke 31/31.
+
+Not verified: no real Canvas account has been used. The parser is tested against payloads shaped like
+Canvas's documented responses, which is a **mocked** test and is not reported as a live integration test.
+
+## I5. Rollback
+
+`git revert` the commit. Three new files, one page wiring line, one test file, one doc. No migration,
+no data change, no external configuration.
