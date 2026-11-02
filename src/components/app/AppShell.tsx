@@ -4,7 +4,7 @@ import { SignOutButton } from "./SignOutButton";
 import { usePathname, useRouter } from "next/navigation";
 import { SyncStatus } from "@/components/app/SyncStatus";
 import { purgeOfflineOnLogout } from "@/lib/offline/client";
-import { CloudOff, ScanLine } from "lucide-react";
+import { Bell, CloudOff, ScanLine } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -22,6 +22,7 @@ const NAV = [
   { href: "/courses", label: "Courses", icon: BookOpen },
   { href: "/notebooks", label: "Notebooks", icon: NotebookPen },
   { href: "/learning", label: "Learning / Memory", icon: Brain },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/offline", label: "Offline", icon: CloudOff },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

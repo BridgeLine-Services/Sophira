@@ -360,3 +360,57 @@ Canvas's documented responses, which is a **mocked** test and is not reported as
 
 `git revert` the commit. Three new files, one page wiring line, one test file, one doc. No migration,
 no data change, no external configuration.
+
+---
+
+# PART J — PHASE 8: NOTIFICATION CENTRE (DURABLE LIST)
+
+## J1. The gap
+
+Stage 5 reported notifications as *partial*: in-app toasts and email digests existed, but
+nothing persisted. A student who closed the tab lost the message, and there was no place to
+find "your teacher changed the deadline" later. Migration `0042` adds the durable list.
+
+## J2. What changed
+
+- `supabase/migrations/0042_member_notifications.sql` — two new tables (`member_notifications`,
+  `notification_preferences`), RLS scoped to `auth.uid() = user_id`, no admin policy, no DELETE
+  policy (history survives), and `unique (user_id, dedupe_key)` so a retried sync reports an
+  event once. Additive; no existing table touched.
+- `src/lib/notifications/store.ts` — the rules: a fixed event set, a derived category, bounded
+  text, in-app links only, dedupe normalisation, preferences defaulting to on.
+- `src/app/api/notifications/route.ts` — read list and unread count, mark one or all read, save
+  preferences. `requireUser` plus an explicit `user_id` filter plus RLS: three independent
+  isolation guarantees.
+- `src/app/notifications/page.tsx` + `NotificationActions.tsx` + a navigation entry — unread
+  first-class, nothing deleted by opening the page, plain-language failures.
+- Registered in: shared marker table, `bootstrap-all.sql`, the wizard's embedded chain, and the
+  member data export (a member's own notices are their data).
+
+## J3. Rules pinned by test (34 new assertions)
+
+Unknown event kinds refused; untitled notices refused; meaningless dedupe keys refused; dedupe
+compared case-insensitively; title and body bounded to 140/600 characters; `/assignments/1`
+allowed but `https://evil.example`, `//evil.example`, `/javascript:` and backslash paths refused;
+absent preferences mean **on** and only an explicit `false` silences a category; every category
+has plain wording; RLS enabled on both tables; no owner policy; no delete policy.
+
+## J4. Deliberately NOT done
+
+- **No producer is wired yet.** Canvas sync still records only its own audit event, so the list
+  renders empty until a producer calls `raiseNotification`. That needs the service-role client
+  inside `canvas-sync.ts`, and doing it without a live Canvas account would be an untested change
+  to a working sync. Documented as the next step rather than half-done.
+- Push notifications: still optional and not implemented, as the brief allows.
+- Email digests and toasts: untouched and still working.
+
+## J5. Verification
+
+4,580 assertions pass (was 4,543; +37 including the generated-artifact checks). Lint 0 errors,
+107 pre-existing warnings unchanged. `tsc` clean, build compiled, `verify` PASS, secret scan
+CLEAN, runtime smoke 31/31.
+
+## J6. Rollback
+
+`git revert`. The migration is additive: dropping the two tables loses only the notification
+list and its preferences. Nothing else references them.

@@ -68,6 +68,9 @@ const USER_TABLES = [
   "student_memories",
   "subject_preferences",
   "student_memory_evidence",
+  // Added with 0042: a member's own notices and notification choices are their data.
+  "member_notifications",
+  "notification_preferences",
 ] as const;
 
 const ROW_CAP = 10000;
