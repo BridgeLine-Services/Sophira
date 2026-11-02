@@ -81,5 +81,8 @@
     "fast-glob": "3.3.3",
     "image-size": "2.0.4",
     "postcss": "8.5.29"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }
