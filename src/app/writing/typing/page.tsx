@@ -51,7 +51,7 @@ export default async function TypingCalibrationPage() {
             <p className="text-sm text-ink-soft">
               Paced writing reveals text at a speed calibrated to you. Take the test, then choose
               which valid attempt becomes your baseline — only your choice sets it, and you can
-              retake or replace it any time. Your attempts are private (row-level security) and the
+              retake or replace it any time. Your attempts are private, and the
               typed text itself is never stored.
             </p>
             <TypingTest />

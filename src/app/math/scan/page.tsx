@@ -178,7 +178,7 @@ function MathScanInner() {
                 <>
                   <div className="flex items-center gap-2">
                     <Label className="text-xs">rotate °</Label>
-                    <input type="range" min={0} max={359} value={rotation} onChange={(e) => setRotation(Number(e.target.value))} className="w-32" />
+                    <input aria-label="rotate °" type="range" min={0} max={359} value={rotation} onChange={(e) => setRotation(Number(e.target.value))} className="w-32" />
                     <span className="text-xs text-ink/50">{rotation}°</span>
                   </div>
                   <Button variant="secondary" onClick={preprocess}>Crop / rotate / deskew</Button>

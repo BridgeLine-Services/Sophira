@@ -259,7 +259,7 @@ export default function SettingsPage() {
           <CardHeader><CardTitle>Privacy</CardTitle></CardHeader>
           <CardContent>
             <ul className="list-disc space-y-1.5 pl-5 text-sm text-ink-soft">
-              <li>Your assignments, documents, writing samples, and profiles are stored privately and can only be read by your account (row-level security).</li>
+              <li>Your assignments, documents, writing samples, and profiles are stored privately, and only your account can read them.</li>
               <li>Nobody else — not even the owner — can browse your academic work in the app.</li>
               <li>Sophira never uses your data to personalize someone else&apos;s AI.</li>
               <li>Uploaded files live in a private storage bucket only you can open.</li>

@@ -217,7 +217,7 @@ export default function DocumentBrowser() {
         <div className="mt-3 rounded-md border p-3">
           <p className="text-sm font-medium">{chosen.title}</p>
           <p className="mt-1 text-xs text-muted-foreground">State the workload scope — e.g. &quot;Section A: introduction (first 3 paragraphs)&quot; or &quot;questions 4-6 only&quot;.</p>
-          <textarea className="mt-2 w-full rounded-md border p-2 text-sm" rows={2} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="Your assigned section, questions, or deliverables" />
+          <textarea aria-label="State the scope of your assigned workload" className="mt-2 w-full rounded-md border p-2 text-sm" rows={2} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="Your assigned section, questions, or deliverables" />
           <div className="mt-2 flex gap-2">
             <button type="button" className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50" disabled={busy} onClick={() => void confirmSelection()}>Confirm scope</button>
             <button type="button" className="rounded-md border px-3 py-1.5 text-sm" onClick={() => { setChosen(null); setScope(""); }}>Cancel</button>

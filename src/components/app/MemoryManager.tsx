@@ -207,7 +207,7 @@ export function MemoryManager({
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs text-ink-soft">Category</label>
-                <select
+                <select aria-label="Category"
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value as MemoryCategory)}
                   className="mt-1 h-9 w-full rounded-md border border-input bg-card px-2 text-sm"

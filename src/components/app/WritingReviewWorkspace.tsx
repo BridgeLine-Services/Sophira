@@ -148,13 +148,13 @@ export function WritingReviewWorkspace() {
           Add the readings your course gave you. Sophira compares your draft only with what you add here. It does not search the internet or any database.
         </p>
         <div className="mt-2 space-y-2">
-          <input
+          <input aria-label="Source title (for example: Smith 2023)"
             value={srcTitle}
             onChange={(e) => setSrcTitle(e.target.value)}
             placeholder="Source title (for example: Smith 2023)"
             className="w-full rounded-md border border-line bg-card px-3 py-2 text-sm"
           />
-          <textarea
+          <textarea aria-label="Paste the source text"
             value={srcBody}
             onChange={(e) => setSrcBody(e.target.value)}
             rows={4}

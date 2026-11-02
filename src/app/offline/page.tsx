@@ -267,13 +267,13 @@ export default function OfflinePage() {
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <Label>Model</Label>
-                <select className="w-full rounded border border-ink/20 p-2 text-sm" value={modelId} onChange={(e) => setModelId(e.target.value)}>
+                <select aria-label="Model" className="w-full rounded border border-ink/20 p-2 text-sm" value={modelId} onChange={(e) => setModelId(e.target.value)}>
                   {LOCAL_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </div>
               <div>
                 <Label>Task</Label>
-                <select className="w-full rounded border border-ink/20 p-2 text-sm" value={task} onChange={(e) => setTask(e.target.value)}>
+                <select aria-label="Task" className="w-full rounded border border-ink/20 p-2 text-sm" value={task} onChange={(e) => setTask(e.target.value)}>
                   <option value="write-assist">Writing assist (improve)</option>
                   <option value="rewrite">Rewrite</option>
                   <option value="generate">Generate</option>

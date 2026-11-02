@@ -233,7 +233,7 @@ export function TypingTest({ onBaselineChange }: { onBaselineChange?: (baseline:
               Adaptive pacing (follow the recommended pace — off by default)
             </label>
             <span className="text-ink-soft">Preferred pace (optional):</span>
-            <input
+            <input aria-label="Preferred pace in words per minute"
               className="w-20 rounded-md border border-line px-2 py-1"
               type="number"
               min={1}
