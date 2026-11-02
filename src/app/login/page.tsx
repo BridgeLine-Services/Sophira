@@ -315,9 +315,40 @@ function LoginForm() {
   );
 }
 
+/**
+ * Server-rendered placeholder (Stage 5 follow-up, 2026-11-02).
+ *
+ * `LoginForm` uses useSearchParams, so Next renders it on the client only. With no
+ * Suspense fallback the server sent an empty body: on a slow connection, or with
+ * JavaScript blocked, a student saw a blank page and had no idea what to do. This
+ * fallback is real text the server can send immediately.
+ */
+function LoginSkeleton() {
+  return (
+    <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 px-4">
+      <h1 className="text-xl font-semibold text-ink">Sign in to Sophira</h1>
+      <p className="text-sm text-ink-soft" role="status" aria-live="polite">
+        Loading your sign-in form…
+      </p>
+      <div className="space-y-3" aria-hidden="true">
+        <div className="h-10 animate-pulse rounded-md bg-ink/5" />
+        <div className="h-10 animate-pulse rounded-md bg-ink/5" />
+        <div className="h-10 w-32 animate-pulse rounded-button bg-ink/10" />
+      </div>
+      <noscript>
+        <p className="rounded-md border border-line bg-card p-3 text-sm text-ink">
+          Sophira needs JavaScript to sign you in securely. Turn JavaScript on in your
+          browser settings, then reload this page. If you cannot, ask whoever set up
+          your account for help.
+        </p>
+      </noscript>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<LoginSkeleton />}>
       <LoginForm />
     </Suspense>
   );

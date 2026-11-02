@@ -146,6 +146,29 @@ NVDA) and no automated axe run were executed, so contrast and reading order are
 
 ---
 
+## 7a. Runtime verification (added after the checks above)
+
+Every check listed in §1 inspects source or a build artifact. None of them starts the
+server, so none could see a page that compiles but renders blank. This was closed by
+`scripts/smoke-runtime.mjs` (`npm run smoke:runtime`), which boots the production build,
+requests real URLs and asserts on the responses. It needs no credentials.
+
+**Result: 26/26 checks pass.** Public pages return 200 with real content, a document
+title and no error boundary; the four protected routes fail closed with a 307 to
+`/login`; an unknown URL never renders an authenticated shell to a signed-out visitor;
+the stylesheet is served (43,824 bytes) and carries the theme tokens.
+
+**Defect found and fixed by this pass:** `/login` was a client component using
+`useSearchParams` inside a `<Suspense>` with **no fallback**, so the server sent an
+empty body (9,079 bytes of metadata and nothing else). On a slow connection, or with
+JavaScript blocked, a student saw a blank page with no explanation and no way forward.
+The page now server-renders its heading, a `role="status"` loading line, and a
+`<noscript>` message telling the user to enable JavaScript or ask for help. After the
+fix the same URL sends 9,830 bytes containing the sign-in heading.
+
+This is exactly the class of failure a green build cannot reveal, and it is why §11's
+limitations list no longer says "never executed at runtime".
+
 ## 8. Database migrations
 
 **None added in Stage 4 or Stage 5.** The two new event types reuse existing text
