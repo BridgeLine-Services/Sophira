@@ -2,6 +2,10 @@ import Link from "next/link";
 import { evaluateOwnerSetup, probeOwnerSetup, type OwnerSetupStatus } from "@/lib/owner-setup";
 import { projectDashboardLinks } from "@/lib/supabase-config";
 import { discoverConfiguration } from "@/lib/config/discovery";
+import { describeDeploymentCapabilities, capabilityLabel } from "@/lib/deployment";
+import { healthConfiguration } from "@/lib/env";
+import { searchProviderConfigured } from "@/lib/research/provider";
+import { deepChecks } from "@/lib/health-probe";
 import SetupDiagnostics from "./SetupDiagnostics";
 import SetupWizard from "./SetupWizard";
 
@@ -21,6 +25,14 @@ import SetupWizard from "./SetupWizard";
  */
 export default async function SetupPage() {
   const status: OwnerSetupStatus = evaluateOwnerSetup(await probeOwnerSetup());
+  // Phase 2 (2026-11-02): the SAME readiness rules the release gate checks, shown in
+  // the owner's words. "Ready" here means a check succeeded, not that a setting exists.
+  const capabilities = describeDeploymentCapabilities({
+    ok: true,
+    name: "sophira",
+    configuration: { ...healthConfiguration(), search: searchProviderConfigured() },
+    checks: await deepChecks(),
+  });
   // The non-technical fallback's ONE guided action: a direct deep link to
   // this project's Supabase integrations page (derived from the public
   // project URL - no secret involved). The official integration then
@@ -114,6 +126,29 @@ export default async function SetupPage() {
             <Link href="/login" className="text-sm text-accent hover:underline">Sign in</Link>
           </div>
         )}
+
+        {/* What Sophira checks. Plain language only: no variable names, no SQL, no
+            status codes. Anything technical stays in the Advanced diagnostics section. */}
+        <section aria-labelledby="capabilities-heading" className="mt-8 border-t pt-6">
+          <h2 id="capabilities-heading" className="text-lg font-semibold text-ink">What Sophira checks</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Everything is checked automatically. You do not need to do anything unless a line asks for attention.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {capabilities.map((capability) => (
+              <li key={capability.key} className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+                <span className="font-medium text-ink">{capability.label}</span>
+                <span className="text-sm text-ink-soft">
+                  <span className={capability.state === "ready" ? "font-medium text-success" : "font-medium text-ink"}>
+                    {capabilityLabel(capability.state)}
+                  </span>
+                  {" — "}
+                  {capability.message}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <SetupWizard
           available={status.repair.available && status.repair.action === "migrations"}

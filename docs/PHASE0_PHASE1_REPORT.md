@@ -237,3 +237,73 @@ until the next deployment reports a commit and a deep check passes.
 - **Existing data changed:** none.
 - **External service configuration changed:** none. No Vercel setting, Supabase setting, or secret
   was created, modified, or deleted by this phase.
+
+---
+
+# PART H — PHASE 2: THE OWNER'S SETUP SCREEN
+
+## H1. What changed
+
+The setup page (`/setup`) now carries a **"What Sophira checks"** section listing all nine
+capabilities with the six plain labels (Ready, Needs attention, Not connected, Not configured,
+Checking, Unable to verify) and one sentence each.
+
+Three properties matter more than the table itself:
+
+1. **It uses the same rules as the release gate.** The section calls
+   `describeDeploymentCapabilities`, the module the verification report uses. There is no second
+   definition of "ready", so the owner's screen cannot contradict the release evidence.
+2. **It runs the same real probe.** `deepChecks()` was extracted from `/api/health` into
+   `src/lib/health-probe.ts` and is now shared by both. Storage says Ready only after a real read;
+   sign-in says Ready only after the service answered.
+3. **It stays non-technical.** A test slices the capability block out of the page source and fails
+   if it contains `NEXT_PUBLIC`, `SUPABASE`, `process.env`, `SQL`, or `migration`. Everything
+   technical remains in the existing Advanced diagnostics component, untouched.
+
+## H2. Verification
+
+- 4,493 assertions pass (was 4,485; +8), including 8 new ones for the labels, the shared-rules
+  requirement, and the no-jargon rule inside the owner-facing block.
+- Runtime smoke now covers `/setup`: **31/31 checks**, versus 26/26 before. The check asserts the
+  page actually contains "What Sophira checks", not merely that it returns 200.
+- Build, lint (0 errors, 107 pre-existing warnings), `verify`, and the secret scan all pass.
+
+## H3. Production, measured after the Phase 1 deploy
+
+`npm run verify:production` against `https://sophira.vercel.app`:
+
+| Area | Result |
+|---|---|
+| Application | PASS — reachable and identifying itself |
+| Private storage | **PASS — a real check succeeded** |
+| Signing in | **PASS — a real check succeeded** |
+| Academic help | NEEDS SETUP — `ai: false`; offline help still works |
+| Online research | NOT CONNECTED (optional) |
+| Canvas / Google / Microsoft | PER STUDENT (not visible to a deployment check) |
+| Deployed commit | **`ba5986c` — MATCHES GitHub head** |
+| Release blockers | None found by this check |
+
+This resolves the two items Phase 1 had to leave "unverified": the deployment now reports its
+commit, and both storage and sign-in answered a real probe. Production is no longer *assumed*
+healthy; it is *measured* healthy for those two capabilities.
+
+Still unproven, and stated as such: the database schema is checked by
+`scripts/release-gate.mjs db-migrations`, not by this run; and no live provider call has been made
+for Canvas, Google, Microsoft, AI, or research.
+
+## H4. Owner actions (unchanged, one step each)
+
+1. Set the Vercel project's Node.js version to 22.x (the build already uses 22; this only clears
+   the warning).
+2. Decide on academic AI in production: add a provider key for online help, or accept offline-only.
+3. Optionally add a search provider for online research.
+4. Optionally register the Canvas, Google and Microsoft applications when those features should go live.
+5. Optionally add `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` so the Migrations workflow can
+   verify production instead of reporting BLOCKED.
+
+## H5. Rollback
+
+`git revert` the Phase 2 commit. Files touched: `src/lib/health-probe.ts` (new), `src/lib/deployment.ts`
+(label mapper added), `src/app/api/health/route.ts` (delegates to the shared probe),
+`src/app/setup/page.tsx` (section added), `scripts/smoke-runtime.mjs` (+1 page), tests. No migration,
+no data change, no external configuration change.

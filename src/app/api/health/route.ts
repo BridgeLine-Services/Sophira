@@ -34,54 +34,11 @@ export const dynamic = "force-dynamic";
  * "ready" / "unreachable" / "not_configured" per capability. Results are cached for a
  * minute so the public endpoint cannot be used to hammer the database.
  */
-type CheckResult = "ready" | "unreachable" | "not_configured";
-type DeepChecks = { database: CheckResult; auth: CheckResult };
-
-const CACHE_MS = 60_000;
-let cached: { at: number; value: DeepChecks } | null = null;
-
-async function probe(url: string, init: RequestInit): Promise<boolean> {
-  try {
-    const res = await fetch(url, { ...init, cache: "no-store", signal: AbortSignal.timeout(5000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function runDeepChecks(): Promise<DeepChecks> {
-  if (cached && Date.now() - cached.at < CACHE_MS) return cached.value;
-
-  // Only manifest-declared names: the environment audit forbids reading anything the
-  // variable catalog does not document (tests/env-manifest).
-  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-
-  let value: DeepChecks;
-  if (!base) {
-    value = { database: "not_configured", auth: "not_configured" };
-  } else {
-    const headers: Record<string, string> = {};
-    if (key) {
-      headers.apikey = key;
-      headers.Authorization = `Bearer ${key}`;
-    }
-    // A real read against a real table. RLS still applies to the anon key, so an
-    // empty result is a pass: the question is "does storage answer", not "what is in it".
-    const database: CheckResult = (await probe(`${base}/rest/v1/profiles?select=id&limit=1`, { headers }))
-      ? "ready"
-      : "unreachable";
-    const auth: CheckResult = (await probe(`${base}/auth/v1/health`, { headers })) ? "ready" : "unreachable";
-    value = { database, auth };
-  }
-
-  cached = { at: Date.now(), value };
-  return value;
-}
+import { deepChecks, type DeepChecks } from "../../../lib/health-probe";
 
 export async function GET(request: Request) {
   const deep = new URL(request.url).searchParams.get("deep") === "1";
-  const checks = deep ? await runDeepChecks() : undefined;
+  const checks: DeepChecks | undefined = deep ? await deepChecks() : undefined;
 
   return Response.json(
     {

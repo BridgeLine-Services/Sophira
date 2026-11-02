@@ -49,6 +49,18 @@ export interface DeploymentCapability {
   optional: boolean;
 }
 
+/** The owner-facing wording for each state. One place, so no screen invents its own. */
+export function capabilityLabel(state: CapabilityState): string {
+  switch (state) {
+    case "ready": return "Ready";
+    case "needs_attention": return "Needs attention";
+    case "not_connected": return "Not connected";
+    case "not_configured": return "Not configured";
+    case "checking": return "Checking";
+    default: return "Unable to verify";
+  }
+}
+
 export interface DeploymentReadiness {
   capabilities: DeploymentCapability[];
   ready: boolean;

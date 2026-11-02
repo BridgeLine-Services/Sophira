@@ -23,6 +23,8 @@ const PUBLIC_PAGES = [
   { path: "/login", expect: "sign", title: "Sophira" },
   { path: "/signup", expect: "account", title: "Sophira" },
   { path: "/privacy", expect: "privacy", title: "Sophira" },
+  // The owner's first screen. It must explain itself, not just render.
+  { path: "/setup", expect: "what sophira checks", title: "Sophira" },
 ];
 const PROTECTED = ["/dashboard", "/courses", "/settings", "/writing/review"];
 

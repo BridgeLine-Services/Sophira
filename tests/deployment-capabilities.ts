@@ -6,7 +6,8 @@
  * succeeded, an optional integration may never make the app look broken, and every
  * message must be readable by someone who has never heard of an API key.
  */
-import { describeDeploymentCapabilities, evaluateDeploymentReadiness } from "../src/lib/deployment";
+import { readFileSync } from "node:fs";
+import { describeDeploymentCapabilities, evaluateDeploymentReadiness, capabilityLabel } from "../src/lib/deployment";
 
 const STATES = ["ready", "needs_attention", "not_connected", "not_configured", "checking", "unable_to_verify"];
 const JARGON = /(supabase|apikey|api key|oauth|\bsql\b|\brls\b|row level|https?:\/\/|econn|pgrst|\b5\d\d\b|\b401\b|\b403\b)/i;
@@ -91,4 +92,31 @@ export function runDeploymentCapabilityTests(
     "readiness: a degraded deployment is still not ready (existing contract preserved)");
   assert(Array.isArray(full.capabilities) && full.capabilities.length === 9,
     "readiness: the evaluator exposes capabilities alongside the original fields");
+
+  section("deployment readiness (owner-facing setup screen)");
+
+  const labels = STATES.map((state) => capabilityLabel(state as never));
+  assert(labels.every((l) => typeof l === "string" && l.length > 3),
+    "setup screen: every capability state has an owner-facing label");
+  assert(new Set(labels).size === STATES.length,
+    "setup screen: the six states map to six distinct labels, so they cannot be confused");
+  assert(capabilityLabel("ready") === "Ready" && capabilityLabel("needs_attention") === "Needs attention",
+    "setup screen: labels are the plain words the brief asks for");
+
+  const page = readFileSync("src/app/setup/page.tsx", "utf8");
+  assert(page.includes("What Sophira checks"),
+    "setup screen: the owner sees a 'What Sophira checks' section");
+  assert(page.includes("describeDeploymentCapabilities") && page.includes("deepChecks"),
+    "setup screen: the section uses the shared readiness rules and the real probe, not its own copy");
+
+  // The owner-facing block must carry no configuration vocabulary. Everything technical
+  // belongs in Advanced diagnostics, which is a separate component.
+  const start = page.indexOf("capabilities-heading");
+  const end = page.indexOf("<SetupWizard", start);
+  const block = start >= 0 && end > start ? page.slice(start, end) : "";
+  assert(block.length > 200, "setup screen: the capability block is present and substantial");
+  assert(!/NEXT_PUBLIC|SUPABASE|process\.env|SQL|migration/i.test(block),
+    "setup screen: the capability block contains no variable names, SQL, or migration talk");
+  assert(/capabilityLabel/.test(block), "setup screen: statuses are rendered through the shared label mapper");
+
 }
