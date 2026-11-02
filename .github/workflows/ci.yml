@@ -4,6 +4,16 @@ on:
   push:
     branches: [master]
   pull_request:
+  # Manual run, so a branch can be verified before it reaches master.
+  workflow_dispatch:
+
+# npm registry flake protection. These apply to tarball/metadata fetches; the
+# onnxruntime binary download is handled by ONNXRUNTIME_NODE_INSTALL below.
+env:
+  npm_config_fetch_retries: "5"
+  npm_config_fetch_retry_maxtimeout: "120000"
+  npm_config_fetch_timeout: "300000"
+  NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
   test-build:
@@ -11,8 +21,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
-      - run: npm ci
+        with: { node-version: '22', cache: npm }
+
+      # Root cause of the 2026-10-29 failure (run 40939990299): on linux/x64,
+      # onnxruntime-node's postinstall downloads the CUDA 12 + TensorRT GPU
+      # providers from NuGet (script/install-metadata.js:
+      # requirements['linux/x64'] = ['cuda12']). It has no retry, so a single
+      # ETIMEDOUT to 154/150.x aborted `npm ci` before any test ran.
+      #
+      # GitHub runners have no GPU, so those three .so files are dead weight
+      # here. Measured on 2026-11-02: CPU inference via onnxruntime-node
+      # returned identical results ([11, 22]) with the providers present and
+      # removed, so skipping the download does not change behaviour. Real
+      # deployments keep the default install and still receive them.
+      #
+      # The retry loop covers the ordinary registry flake, which is a separate
+      # failure mode. It fails the step after 3 attempts; it does not mask errors.
+      - name: Install dependencies (retry on transient network)
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+        run: |
+          for attempt in 1 2 3; do
+            echo "::group::npm ci (attempt $attempt of 3)"
+            if npm ci; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::npm ci attempt $attempt failed; retrying"
+            sleep $((attempt * 15))
+          done
+          echo "::error::npm ci failed after 3 attempts"
+          exit 1
+
       - name: Lint (correctness rules only)
         run: npm run lint
       - name: Unit and integration tests (offline)
