@@ -16,6 +16,16 @@ import {
 } from "../src/lib/ai/context";
 import { routeSubject, routeMathTopic } from "../src/lib/ai/subjects";
 import {
+  runWritingReview, applyAcceptedChanges, citationFindings, reviewSummary,
+} from "../src/lib/writing/review";
+import {
+  runOriginalityReview, findExactOverlaps, findCloseParaphrases, findUnattributedQuotations,
+  findMissingCitations, originalityScopeNote, type OriginalitySource,
+} from "../src/lib/writing/originality";
+import {
+  checkUnsupportedClaims, checkFormatting, checkBibliography, checkRubric,
+} from "../src/lib/writing/quality-checks";
+import {
   normalizeInstanceUrl, canvasAuthorizeUrl, canvasConfigured, CANVAS_SCOPES,
   CANVAS_MAX_DESCRIPTION_CHARS, CANVAS_MAX_ATTACHMENT_BYTES,
   normalizeDueAt, clampText, normalizeAssignment, assignmentFingerprint,
@@ -3529,6 +3539,228 @@ async function runCanvasIntegrationTests(): Promise<void> {
     "canvas: the existing token store is reused rather than duplicated");
 }
 
+async function runWritingReviewTests(): Promise<void> {
+  section("writing review: originality, quality, citations (Stage 3)");
+
+  const SRC = "Smith 2023 study. Urban tree cover reduces surface temperature by up to 4 degrees during summer heat waves in dense neighbourhoods.";
+  const src: OriginalitySource = { id: "s1", title: "Smith (2023)", content: SRC, url: "https://example.org/smith" };
+  const original = "Cities everywhere are getting hotter every single year and nobody is doing very much about it at all.\n\nMy own view is that shade matters more than most people think it does for comfort.";
+
+  // --- originality: exact overlap is found WITH evidence ---
+  const copied = "Intro paragraph here.\n\nUrban tree cover reduces surface temperature by up to 4 degrees during summer heat waves in dense neighbourhoods.";
+  const exact = findExactOverlaps(copied, src);
+  assert(exact.length >= 1, "originality: a verbatim passage is detected");
+  assert(exact[0].sourceId === "s1" && exact[0].sourceTitle === "Smith (2023)",
+    "originality: the finding names the actual source");
+  assert(Boolean(exact[0].sourcePassage) && exact[0].sourcePassage!.includes("tree cover"),
+    "originality: the finding quotes the matching source passage");
+  assert(copied.slice(exact[0].draftStart, exact[0].draftEnd).toLowerCase().includes("tree cover"),
+    "originality: draft offsets point at the copied text, not somewhere else");
+
+  // --- a clean draft produces no overlap findings ---
+  const clean = runOriginalityReview(original, [src]);
+  assert(clean.every((f) => f.kind !== "exact_overlap"),
+    "originality: original wording produces no overlap findings");
+
+  // --- paraphrase: close but not verbatim ---
+  const para = "Urban tree cover lowers surface temperature by as much as four degrees in summer heat waves across dense neighbourhoods.";
+  const close = findCloseParaphrases(para, src);
+  assert(close.length >= 1, "originality: a close paraphrase is detected");
+  assert(!close[0].message.includes("%"), "originality: paraphrase wording carries no similarity percentage");
+
+  // --- unrelated text is not accused ---
+  assert(findCloseParaphrases("The mitochondria produce ATP through oxidative phosphorylation in eukaryotic cells.", src).length === 0,
+    "originality: an unrelated sentence is not flagged");
+
+  // --- quotations without a citation ---
+  const quoted = 'The report states "urban tree cover reduces surface temperature by up to four degrees during summer heat waves" in its opening.';
+  const unattr = findUnattributedQuotations(quoted);
+  assert(unattr.length === 1, "originality: an uncited quotation is flagged");
+  const citedQuote = 'The report states "urban tree cover reduces surface temperature by up to four degrees during summer heat waves" (Smith, 2023).';
+  assert(findUnattributedQuotations(citedQuote).length === 0,
+    "originality: the same quotation WITH a citation is not flagged");
+
+  // --- missing citation for factual claims ---
+  const factual = "Roughly 68% of students reported feeling more stressed during finals week.";
+  assert(findMissingCitations(factual, []).length === 1,
+    "originality: an uncited statistic is flagged");
+  assert(findMissingCitations("Roughly 68% of students reported feeling more stressed [1].", []).length === 0,
+    "originality: the same statistic with a marker is not flagged");
+  assert(findMissingCitations("I found finals week stressful.", []).length === 0,
+    "originality: a personal statement is not treated as a factual claim");
+
+  // --- honest scope note ---
+  const note = originalityScopeNote(2);
+  assert(note.includes("2 sources") && note.includes("did not search the internet"),
+    "originality: the scope note states what was NOT checked");
+  assert(!/similarity score of|\d+\s?%/.test(note), "originality: the scope note never states a percentage");
+
+  // --- quality: unsupported claims, formatting, bibliography, rubric ---
+  assert(checkUnsupportedClaims(factual).length === 1, "quality: unsupported claim surfaced in the panel");
+  const fmt = checkFormatting("This  has double spaces , and spaced punctuation.");
+  assert(fmt.length >= 1 && fmt.every((f) => typeof f.replacement === "string"),
+    "quality: mechanical fixes carry a deterministic replacement");
+  assert(checkFormatting("Clean sentence.").length === 0, "quality: clean text yields no formatting notes");
+  assert(checkBibliography("As shown [1] and [2].").length === 1,
+    "quality: numbered citations with no reference list are flagged");
+  assert(checkBibliography("As shown [1].\n\nReferences\n[1] Smith 2023.").length === 0,
+    "quality: a complete reference list passes");
+  const rubric = checkRubric("This essay discusses trees.", [{ text: "includes three peer-reviewed sources", keywords: ["peer-reviewed", "sources"] }]);
+  assert(rubric.length === 1 && (rubric[0].requirement ?? "").includes("peer-reviewed"),
+    "quality: an unmet rubric requirement names what the rubric asked for");
+
+  // --- review orchestration ---
+  const emptyResult = runWritingReview({ draft: "   " });
+  assert(emptyResult.empty && emptyResult.findings.length === 0,
+    "review: an empty draft returns no findings and says so");
+  assert(emptyResult.notes.some((n) => n.includes("no text to review")),
+    "review: the empty state explains itself in plain language");
+
+  const result = runWritingReview({ draft: copied, sources: [src] });
+  assert(result.findings.length >= 1 && result.counts.originality >= 1,
+    "review: originality findings reach the review result");
+  assert(result.findings.every((f) => !/\d+\s?%\s?(similar|match)/i.test(f.message)),
+    "review: no finding presents a similarity percentage");
+  assert(result.findings.every((f) => f.id.length > 0), "review: every finding has a stable id");
+  const again = runWritingReview({ draft: copied, sources: [src] });
+  assert(JSON.stringify(result.findings.map((f) => f.id)) === JSON.stringify(again.findings.map((f) => f.id)),
+    "review: ids are stable across runs, so accept/reject survives a re-run");
+
+  // --- accept / reject preserves the original ---
+  const messy = "This  sentence has  extra spaces.";
+  const messyResult = runWritingReview({ draft: messy });
+  const fixable = messyResult.findings.filter((f) => typeof f.replacement === "string");
+  assert(fixable.length >= 1, "review: the mechanical spacing fix is offered");
+  const acceptedOut = applyAcceptedChanges(messy, messyResult.findings, [fixable[0].id]);
+  assert(acceptedOut.text !== messy && !acceptedOut.text.includes("  "),
+    "review: accepting the fix produces corrected text");
+  const rejectedOut = applyAcceptedChanges(messy, messyResult.findings, []);
+  assert(rejectedOut.text === messy && rejectedOut.applied.length === 0,
+    "review: rejecting everything leaves the original byte-identical");
+  const adviceOnly = messyResult.findings.find((f) => typeof f.replacement !== "string");
+  if (adviceOnly) {
+    const partial = applyAcceptedChanges(messy, messyResult.findings, [adviceOnly.id]);
+    assert(partial.text === messy && partial.skipped.includes(adviceOnly.id),
+      "review: a judgement call is never auto-applied, even when accepted");
+  }
+
+  // --- goals: preserve terminology suppresses terminology notes ---
+  const termDraft = "We measured wellbeing and well-being in the group.";
+  const withTerms = runWritingReview({ draft: termDraft });
+  const withoutTerms = runWritingReview({ draft: termDraft, goals: ["preserve_terminology"] });
+  assert(withoutTerms.findings.filter((f) => f.kind === "inconsistent_terminology").length === 0,
+    "review: 'preserve terminology' suppresses terminology notes");
+  assert(withTerms.findings.length >= withoutTerms.findings.length,
+    "review: goals only ever reduce noise, never invent findings");
+  const serious = runWritingReview({
+    draft: "Roughly 68% of students reported feeling more stressed during finals week.",
+    goals: ["transitions"],
+  });
+  assert(serious.findings.some((f) => f.severity === "high"),
+    "review: a serious finding is never hidden because a different goal was chosen");
+
+  // --- citations: statuses are never upgraded ---
+  const cites = citationFindings([
+    { claim: "A", status: "VERIFIED" },
+    { claim: "B", status: "UNAVAILABLE" },
+    { claim: "C", status: "STALE" },
+    { claim: "D", status: "UNVERIFIED" },
+  ]);
+  assert(cites.length === 4, "citation: every citation gets a review entry");
+  assert(cites[0].severity === "low" && cites[0].message.includes("retrieved"),
+    "citation: VERIFIED is only reported when it truly is verified");
+  assert(cites[1].message.includes("could not be opened"),
+    "citation: UNAVAILABLE is shown as unconfirmed, not as verified");
+  assert(cites[2].message.includes("may have changed"),
+    "citation: STALE is shown as needing a re-check");
+  assert(!cites.slice(1).some((c) => c.message.includes("retrieved this source")),
+    "citation: an unavailable or stale source is never described as retrieved");
+
+  // --- privacy: personalisation stays per-user (source-level guarantees) ---
+  const originSrc = readFileSync("src/lib/writing/originality.ts", "utf8");
+  const reviewSrc = readFileSync("src/lib/writing/review.ts", "utf8");
+  const qualitySrc = readFileSync("src/lib/writing/quality-checks.ts", "utf8");
+  for (const [name, body] of [["originality", originSrc], ["review", reviewSrc], ["quality", qualitySrc]] as const) {
+    assert(!body.includes("createAdminClient"),
+      `privacy: ${name} never touches the service role, so RLS keeps samples per-user`);
+    assert(!body.includes("fetch(") && !body.includes("axios"),
+      `privacy: ${name} performs no network calls of its own`);
+  }
+  assert(!reviewSrc.includes("writing_samples"),
+    "privacy: review never reads another user's samples table directly");
+
+  // --- the existing writing-profile system is untouched ---
+  const profile = readFileSync("src/lib/ai/writing-profile-learning.ts", "utf8");
+  assert(profile.includes("proposeStyleSuggestions"),
+    "preserve: the existing writing-profile analysis API is intact");
+  const proposalsPanel = readFileSync("src/components/app/ProposalsPanel.tsx", "utf8");
+  assert(proposalsPanel.includes("guidance"),
+    "preserve: the proposal review panel still consumes the existing payload key");
+  const writingPage = readFileSync("src/app/writing/page.tsx", "utf8");
+  assert(writingPage.length > 0, "preserve: the existing writing page is untouched");
+  // The existing page keeps its own job (samples, profile, proposals) and merely
+  // links to the new workspace; replacing it would have been a rewrite.
+  assert(writingPage.includes("writing_samples") && writingPage.includes("ProfileVersionHistory") &&
+    writingPage.includes("ProposalsPanel"),
+    "preserve: the existing writing page keeps samples, versions and proposals");
+  assert(writingPage.includes('href="/writing/review"'),
+    "preserve: the existing page links to the new workspace instead of being rewritten");
+
+  // --- large and empty documents ---
+  const big = Array.from({ length: 900 }, (_, i) =>
+    `Paragraph ${i}. Urban tree cover reduces surface temperature by as much as four degrees in summer heat waves.`
+  ).join("\n\n");
+  const t0 = Date.now();
+  const bigResult = runWritingReview({ draft: big, sources: [src] });
+  const ms = Date.now() - t0;
+  assert(bigResult.findings.length > 0 && ms < 20000,
+    `review: a large document (~${Math.round(big.length / 1000)}k chars) completes in ${ms}ms`);
+
+  // --- API route: authorisation, no persistence, honest scope ---
+  const route = readFileSync("src/app/api/writing/review/route.ts", "utf8");
+  assert(route.includes("requireUser"), "route: the review endpoint authenticates the caller");
+  assert(!route.includes(".insert(") && !route.includes(".update(") && !route.includes(".delete("),
+    "route: reviewing a draft writes nothing to the database");
+  assert(route.includes("eq(\"user_id\", userId)"),
+    "route: saved sources are filtered to the signed-in student's own rows");
+  assert(route.includes("MAX_DRAFT_CHARS") && route.includes("413"),
+    "route: an oversized draft is refused with a plain explanation, not a timeout");
+  assert(route.includes("VALID_STATUSES") && route.includes("VALID_STATUSES.includes"),
+    "route: citation statuses are validated against the known vocabulary");
+  assert(route.includes("internetSearch: false") && route.includes("similarityPercent: null"),
+    "route: the payload itself states no internet search and no similarity percentage");
+
+  // --- review workspace page and UI ---
+  const page = readFileSync("src/app/writing/review/page.tsx", "utf8");
+  assert(page.includes("requireUser") && page.includes('redirect("/login")'),
+    "workspace: the page is gated for signed-in students only");
+  assert(page.includes("WritingReviewWorkspace"), "workspace: the page renders the review workspace");
+  assert(page.includes("does not run AI-detector"), "workspace: the page states what Sophira will not do");
+
+  const ui = readFileSync("src/components/app/WritingReviewWorkspace.tsx", "utf8");
+  assert(ui.includes("Accept") && ui.includes("Reject"),
+    "workspace: every finding can be accepted or rejected individually");
+  assert(ui.includes("Use this version"),
+    "workspace: a revision is only adopted when the student confirms it");
+  assert(ui.includes("Your original text is kept exactly as you wrote it"),
+    "workspace: the UI promises the original is preserved");
+  assert(ui.includes("You will need to make this edit yourself") ||
+    ui.includes("you will need to make this edit yourself"),
+    "workspace: an advice-only suggestion is not claimed to be applied automatically");
+  assert(!/\d+\s?%\s?(similar|match)/i.test(ui), "workspace: no similarity percentage is shown");
+  assert(!ui.includes("evade") && !ui.includes("undetectable"),
+    "workspace: no detection-evasion affordance exists");
+
+  // --- the existing writing-profile system still stands ---
+  assert(!route.includes("writing_profiles") && !ui.includes("writing_profiles"),
+    "preserve: the review feature never touches the writing-profile tables");
+
+  // --- summary text is plain language ---
+  const summary = reviewSummary(result);
+  assert(summary.includes("You decide what to keep."), "review: the summary hands control back to the student");
+  assert(!/api|json|http|regex/i.test(summary), "review: the summary contains no technical jargon");
+}
+
 async function runPdfExtractionTests(): Promise<void> {
   const { extractPdfText } = await import("../src/lib/extract/pdf");
   const ok = async () => "x".repeat(120);
@@ -4914,6 +5146,6 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runRedesignAuditTests()).then(() => runThemeTokenTests()).then(() => runPrimitiveTokenTests()).then(() => runRepoWideThemeTests()).then(() => runInventorySignalTests()).then(() => runCanvasIntegrationTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runWritingReviewTests()).then(() => runRedesignAuditTests()).then(() => runThemeTokenTests()).then(() => runPrimitiveTokenTests()).then(() => runRepoWideThemeTests()).then(() => runInventorySignalTests()).then(() => runCanvasIntegrationTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
   .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });

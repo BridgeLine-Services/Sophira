@@ -91,6 +91,11 @@ export default function WritingPage() {
   const usable = samples.filter((s) => s.representativeness !== "not_representative");
 
   return (
+    <>
+    <div className="mx-auto mb-3 max-w-3xl rounded-lg border border-line bg-card p-3 text-sm text-ink">
+      Want a line-by-line review of one draft?{" "}
+      <Link href="/writing/review" className="underline">Open the writing review workspace</Link>.
+    </div>
     <AppShell
       title="Writing Profile"
       actions={
@@ -219,5 +224,6 @@ export default function WritingPage() {
         />
       </div>
     </AppShell>
+    </>
   );
 }
