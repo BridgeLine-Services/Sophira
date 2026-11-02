@@ -175,6 +175,17 @@ export function runDocumentHistoryTests(assert: (c: boolean, n: string) => void,
 
   assert(G.remainingText("abcdef", 4) === "ef", "gradual: the remaining text starts where the provider confirmed");
   assert(G.remainingText("abcdef", 99) === "", "gradual: over-confirmed offsets never produce phantom text");
+  // Regression: the guarded write appends "\n", so the index must account for it.
+  assert(G.advanceInsertIndex(100, 10, 2) === 112,
+    "gradual: the next chunk starts after the newlines the provider actually wrote");
+  assert(G.advanceInsertIndex(100, 10, 0) === 110,
+    "gradual: with no completed chunks the index advances by text only");
+  assert(G.advanceInsertIndex(1, 0, 0) === 1, "gradual: the index never falls below the document start");
+  assert(G.advanceInsertIndex(100, 10, 3) > G.advanceInsertIndex(100, 10, 2),
+    "gradual: each completed chunk moves the index forward");
+  let idxOk = true;
+  for (let n = 0; n < 12; n++) if (G.advanceInsertIndex(50, n * 7, n) < 50) idxOk = false;
+  assert(idxOk, "gradual: the index is monotonic across a long insertion");
 
   // ---- the honesty guarantee, in the module's own words ----
   const gSrc = readFileSync("src/lib/integrations/gradual-insert.ts", "utf8");

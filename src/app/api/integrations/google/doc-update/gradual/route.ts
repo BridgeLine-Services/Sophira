@@ -6,7 +6,7 @@ import { googleConfigured, getGoogleDocSnapshot, locateSectionInsertion, buildGu
 import { refreshAccessToken } from "@/lib/integrations/google";
 import { needsRefresh } from "@/lib/integrations/oauth-state";
 import { recordHistoryEvent, fingerprintText } from "@/lib/integrations/history";
-import { planInsertionChunks, remainingText, recoveryNote } from "@/lib/integrations/gradual-insert";
+import { planInsertionChunks, remainingText, recoveryNote, advanceInsertIndex } from "@/lib/integrations/gradual-insert";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -146,7 +146,9 @@ export async function POST(request: NextRequest) {
   let lastError: string | null = null;
 
   for (const chunk of chunks.slice(0, maxChunks)) {
-    const payload = buildGuardedInsertRequest(chunk, insertIndex + confirmed, revisionId);
+    // Each write carries a trailing newline, so advance the document index by the
+    // applied length rather than the text length (see advanceInsertIndex).
+    const payload = buildGuardedInsertRequest(chunk, advanceInsertIndex(insertIndex, confirmed, doneChunks), revisionId);
     const result = await applyGoogleDocUpdate(accessToken, documentId, payload);
     if (result.conflict) {
       // The document moved under us. Write nothing further and keep the remainder.

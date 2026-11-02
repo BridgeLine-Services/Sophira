@@ -210,6 +210,27 @@ export function transitionGradual(
   return { ok: true, state: next, error: null };
 }
 
+/**
+ * Where the NEXT chunk goes.
+ *
+ * `buildGuardedInsertRequest` appends a newline to every write, so each confirmed
+ * chunk occupies `chunk.length + 1` positions in the document. Advancing by the
+ * chunk length alone would drift one character per write and, on a long insertion,
+ * splice later chunks into the middle of earlier ones. Progress reported to the
+ * student stays in TEXT characters; only the document index accounts for newlines.
+ */
+export function advanceInsertIndex(
+  startIndex: number,
+  confirmedChars: number,
+  chunksWritten: number,
+  appendedPerWrite = 1,
+): number {
+  const safeStart = Number.isFinite(startIndex) ? Math.max(1, Math.floor(startIndex)) : 1;
+  const safeChars = Number.isFinite(confirmedChars) ? Math.max(0, Math.floor(confirmedChars)) : 0;
+  const safeChunks = Number.isFinite(chunksWritten) ? Math.max(0, Math.floor(chunksWritten)) : 0;
+  return Math.max(1, safeStart + safeChars + safeChunks * Math.max(0, appendedPerWrite));
+}
+
 /** The text still to be written, given how much the provider confirmed. */
 export function remainingText(text: string, insertedChars: number): string {
   const clean = text.replace(/\r\n/g, "\n");
