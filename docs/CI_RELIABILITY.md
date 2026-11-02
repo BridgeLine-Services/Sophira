@@ -78,6 +78,26 @@ longer pulls ~274 MB of unusable GPU binaries.
 Local Node is 20.20.2, so install emits 45 `EBADENGINE` warnings here — that is the
 condition CI no longer has, not a new problem.
 
+## Verified in CI (not inferred)
+
+Run `41425210752` on branch `fix/ci-node22-onnx-retry`, dispatched manually:
+
+| Step | Previous run (40939990299) | This run (41425210752) |
+|---|---|---|
+| Install dependencies | **failure** | **success** (attempt 1 of 3) |
+| Lint | skipped | **success** — 107 problems, 0 errors |
+| Unit and integration tests | skipped | **success** — 4194 passed, 0 failed |
+| TypeScript strict check | skipped | **success** |
+| Production build | skipped | **success** — Compiled successfully |
+| Native projects intact | skipped | **success** |
+
+Log evidence: `EBADENGINE` occurrences **0** (was 45+ on Node 20), and the retry
+wrapper logged `npm ci (attempt 1 of 3)`, i.e. the install succeeded first time and
+no retry was needed.
+
+Note: `npm run verify` and `npm run scan:secrets` are not CI steps; they were run
+locally (PASS / CLEAN) and are recorded above.
+
 ## Files changed
 
 | File | Why |
