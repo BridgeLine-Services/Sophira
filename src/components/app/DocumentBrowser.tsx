@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { GradualInsertPanel } from "./GradualInsertPanel";
+import { describeHistoryEvent, describeProvenance, type HistoryEventType, type HistoryActor, type HistoryProvenance, type HistoryOutcome } from "@/lib/integrations/history-labels";
 
 /**
  * DOCUMENT BROWSER + WORKLOAD SELECTION (2026-10-12).
@@ -12,7 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 
 interface DiscoveredDoc { id: string; title: string; url: string | null; mime: string; shared: boolean; owner: string | null; access: "listed"; }
 interface Selection { id: string; provider: string; provider_document_id?: string | null; document_title: string | null; scope_description: string | null; status: string; }
-interface HistoryEvent { id: string; event_type: string; outcome: string; sequence: number; summary: string; provenance: string; recorded_at: string; provider_revision: string | null; target_section: string | null; has_snapshot: boolean; snapshot_truncated: boolean; }
+interface HistoryEvent { id: string; event_type: string; actor: string; outcome: string; sequence: number; summary: string; provenance: string; recorded_at: string; provider_revision: string | null; target_section: string | null; has_snapshot: boolean; snapshot_truncated: boolean; }
 interface CompareResult { ok: boolean; added: string[]; removed: string[]; unchangedCount: number; truncated: boolean; note: string; }
 interface MsVersion { id: string; lastModifiedDateTime: string | null; }
 
@@ -291,17 +293,35 @@ export default function DocumentBrowser() {
               <p className="mt-1 text-[10px] text-muted-foreground">Restoring replaces the current file content; it is refused if the file changed since this check.</p>
             </div>
           )}
+          {historyFor?.provider === "google" && historyFor.provider_document_id && (
+            <div className="mt-3">
+              <GradualInsertPanel documentId={historyFor.provider_document_id} documentTitle={historyFor.document_title} />
+            </div>
+          )}
           <ul className="mt-3 max-h-64 space-y-1.5 overflow-y-auto pr-1">
             {historyEvents.length === 0 && <li className="text-[10px] text-muted-foreground">No recorded events yet. Sophira records writes it performs and versions it observes — it cannot see every keystroke in Word or Google Docs.</li>}
             {historyEvents.map((e) => (
               <li key={e.id} className="rounded-md border p-2">
-                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                  <span className="rounded bg-muted px-1 py-0.5 uppercase">{e.event_type.replace(/_/g, " ")}</span>
-                  <span className={e.outcome === "confirmed" ? "text-emerald-600" : e.outcome === "conflicted" ? "text-amber-600" : "text-muted-foreground"}>{e.outcome}</span>
-                  <span className="text-muted-foreground">{new Date(e.recorded_at).toLocaleString()}</span>
-                  <span className="rounded bg-muted px-1 py-0.5">{e.provenance}</span>
-                </div>
-                <p className="mt-1 text-xs">{e.summary}</p>
+                {(() => {
+                  // Plain language first; the technical labels stay available below
+                  // for anyone who wants them, but a student never has to read them.
+                  const d = describeHistoryEvent({
+                    eventType: e.event_type as HistoryEventType,
+                    actor: e.actor as HistoryActor,
+                    provenance: e.provenance as HistoryProvenance,
+                    outcome: e.outcome as HistoryOutcome,
+                  });
+                  return (
+                    <>
+                      <p className="text-xs font-medium text-ink">{d.what}</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        {new Date(e.recorded_at).toLocaleString()} · {d.origin} {d.confirmation}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-ink-soft">{describeProvenance(e.provenance as HistoryProvenance)}</p>
+                    </>
+                  );
+                })()}
+                <p className="mt-1 text-[10px] text-muted-foreground">{e.summary}</p>
                 {e.target_section && <p className="text-[10px] text-muted-foreground">Section: {e.target_section}</p>}
                 {e.has_snapshot && historyFor.provider === "google" && (
                   <button type="button" className="mt-1 rounded-md border px-2 py-0.5 text-[10px] disabled:opacity-50" disabled={historyBusy} onClick={() => void createRecoveryCopy(e.id)}>

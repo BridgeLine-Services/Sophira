@@ -14,32 +14,14 @@
  */
 import { createHash } from "crypto";
 
-export type HistoryProvider = "google" | "microsoft";
 
-export const HISTORY_EVENT_TYPES = [
-  "document_discovered", "baseline_captured", "document_read", "draft_prepared",
-  "insertion_attempted", "insertion_confirmed", "document_created",
-  "replacement_attempted", "replacement_confirmed",
-  "external_change_observed", "conflict_detected",
-  "restore_attempted", "restore_completed", "restore_refused",
-] as const;
-export type HistoryEventType = (typeof HISTORY_EVENT_TYPES)[number];
 
-export const HISTORY_ACTORS = ["user", "sophira", "external", "provider"] as const;
-export type HistoryActor = (typeof HISTORY_ACTORS)[number];
 
-export const HISTORY_PROVENANCE = [
-  "sophira-generated", "sophira-inserted", "user-requested", "user-confirmed",
-  "external-observed", "provider-reported", "unknown",
-] as const;
-export type HistoryProvenance = (typeof HISTORY_PROVENANCE)[number];
+import type { HistoryProvider, HistoryEventType, HistoryActor, HistoryProvenance, HistoryOutcome } from "./history-labels";
+import { HISTORY_EVENT_TYPES, HISTORY_ACTORS, HISTORY_PROVENANCE, HISTORY_OUTCOMES } from "./history-labels";
 
-export const HISTORY_OUTCOMES = ["pending", "confirmed", "failed", "conflicted", "unavailable"] as const;
-export type HistoryOutcome = (typeof HISTORY_OUTCOMES)[number];
-
-export const HISTORY_DISCLAIMER =
-  "Document history records changes Sophira performed and versions it was able to observe. Some changes may have happened outside Sophira. Version history and writing-analysis tools cannot reliably prove who physically typed or originally authored every passage.";
-
+export * from "./history-labels";
+export type { HistoryProvider, HistoryEventType, HistoryActor, HistoryProvenance, HistoryOutcome } from "./history-labels";
 export const SNAPSHOT_MAX_CHARS = 60000;
 const DIFF_MAX_LINES = 800;
 
@@ -115,17 +97,6 @@ export function classifyProvenance(
   return "unknown";
 }
 
-export function describeProvenance(p: HistoryProvenance): string {
-  switch (p) {
-    case "sophira-generated": return "Sophira produced this content.";
-    case "sophira-inserted": return "Sophira inserted this into the document and the provider confirmed the write.";
-    case "user-requested": return "You asked Sophira to perform this operation.";
-    case "user-confirmed": return "You explicitly confirmed this operation.";
-    case "external-observed": return "The document changed outside a confirmed Sophira write, or the origin could not be established.";
-    case "provider-reported": return "The provider supplied this version metadata; it is not proof of who typed anything.";
-    case "unknown": return "The available evidence is not sufficient to classify the origin.";
-  }
-}
 
 /** Optimistic-concurrency decision for destructive writes. */
 export type PreconditionVerdict = "ok" | "stale" | "unknown";

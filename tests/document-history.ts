@@ -112,6 +112,126 @@ export function runDocumentHistoryTests(assert: (c: boolean, n: string) => void,
   assert(markers.includes("0040_document_history.sql") && generated.includes("0040_document_history.sql"),
     "migration: registered in the marker table and the generated bootstrap artifact");
 
+
+  // =====================================================================
+  // STAGE 4 (2026-11-02): gradual insertion, recovery copies, plain language.
+  // =====================================================================
+  section("stage 4: gradual insertion (pause / resume / stop, no simulation)");
+
+  const G = require("../src/lib/integrations/gradual-insert") as typeof import("../src/lib/integrations/gradual-insert");
+
+  // ---- chunk planning: never a half-written word between writes ----
+  const longPara = "Sentence one is here. ".repeat(30);
+  const chunks = G.planInsertionChunks(longPara, 200);
+  assert(chunks.length > 1, "gradual: a long text splits into several parts");
+  assert(chunks.join("") === longPara, "gradual: the parts reassemble into exactly the original text");
+  assert(chunks.every((c) => c.length <= 200), "gradual: no part exceeds the requested size");
+  assert(chunks.every((c) => !/^\w/.test(c) || c === chunks[0]), "gradual: later parts do not begin mid-word");
+  assert(G.planInsertionChunks("").length === 0, "gradual: empty text produces no chunks at all");
+  assert(G.planInsertionChunks("   \n  ").length === 0, "gradual: whitespace-only text produces no chunks");
+  assert(G.planInsertionChunks("short").length === 1, "gradual: short text stays one part");
+
+  // ---- state machine ----
+  let st = G.initialGradualState("abcdefghij", 4);
+  assert(st.status === "pending" && st.insertedChars === 0, "gradual: starts pending with nothing written");
+  const started = G.transitionGradual(st, "start");
+  assert(started.ok && started.state.status === "inserting", "gradual: start moves to inserting");
+  const progressed = G.transitionGradual(started.state, "progress", 4);
+  assert(progressed.ok && progressed.state.insertedChars === 4, "gradual: progress counts only confirmed characters");
+  const paused = G.transitionGradual(progressed.state, "pause");
+  assert(paused.ok && paused.state.status === "paused" && G.canResume(paused.state.status), "gradual: pause is resumable");
+  const resumed = G.transitionGradual(paused.state, "resume");
+  assert(resumed.ok && resumed.state.status === "inserting", "gradual: resume returns to inserting");
+  const completed = G.transitionGradual(resumed.state, "complete");
+  assert(completed.ok && completed.state.status === "completed" && completed.state.insertedChars === st.totalChars,
+    "gradual: completion records every character as written");
+  assert(!G.transitionGradual(completed.state, "resume").ok, "gradual: a finished insertion cannot be resumed");
+  assert(!G.transitionGradual(completed.state, "stop").ok, "gradual: a finished insertion cannot be stopped");
+
+  // Illegal transitions must be refused, not silently accepted.
+  assert(!G.transitionGradual(st, "pause").ok, "gradual: an insertion that never started cannot be paused");
+  assert(!G.transitionGradual(st, "complete").ok, "gradual: an insertion that never started cannot complete");
+  assert(!G.transitionGradual(progressed.state, "resume").ok, "gradual: resuming a running insertion is refused");
+  assert(!G.transitionGradual(started.state, "progress", 0).ok, "gradual: zero-character progress is refused");
+
+  const stopped = G.transitionGradual(progressed.state, "stop");
+  assert(stopped.ok && stopped.state.status === "stopped", "gradual: stop is allowed while inserting");
+  const cancelled = G.transitionGradual(progressed.state, "cancel");
+  assert(!cancelled.ok, "gradual: cancel is refused after writing began (only pause-then-cancel)");
+  const cancelledEarly = G.transitionGradual(paused.state, "cancel");
+  assert(cancelledEarly.ok && cancelledEarly.state.status === "cancelled", "gradual: cancel is allowed while paused");
+
+  const conflicted = G.transitionGradual(resumed.state, "conflict");
+  assert(conflicted.ok && conflicted.state.status === "conflicted", "gradual: a conflict ends the insertion");
+  assert(!G.transitionGradual(conflicted.state, "resume").ok, "gradual: a conflict cannot be resumed");
+
+  // ---- progress is reported honestly, never rounded up to "done" ----
+  const half = G.transitionGradual(progressed.state, "pause").state;
+  assert(G.insertionProgressLabel(half).includes("Paused at 40%"), "gradual: the label states the real percentage");
+  assert(!G.insertionProgressLabel(half).toLowerCase().includes("finished"), "gradual: a paused run never reads as finished");
+  assert(G.insertionProgressLabel(completed.state).toLowerCase().includes("finished"), "gradual: a completed run says so");
+  assert(G.recoveryNote(120).includes("120"), "gradual: the recovery note states how much text was kept");
+  assert(G.recoveryNote(0).toLowerCase().includes("nothing"), "gradual: an empty remainder says nothing was left");
+
+  assert(G.remainingText("abcdef", 4) === "ef", "gradual: the remaining text starts where the provider confirmed");
+  assert(G.remainingText("abcdef", 99) === "", "gradual: over-confirmed offsets never produce phantom text");
+
+  // ---- the honesty guarantee, in the module's own words ----
+  const gSrc = readFileSync("src/lib/integrations/gradual-insert.ts", "utf8");
+  const gradualRoute = readFileSync("src/app/api/integrations/google/doc-update/gradual/route.ts", "utf8");
+  assert(/does not imitate typing|not a simulation/i.test(G.GRADUAL_DISCLAIMER),
+    "gradual: the disclaimer states plainly that this is not typing simulation");
+  assert(!/setTimeout|sleep\(|delay\(/.test(gSrc + gradualRoute),
+    "gradual: no artificial delay exists to make writes look human");
+  assert(!/Math\.random/.test(gSrc + gradualRoute),
+    "gradual: no randomness (no injected typos or jitter)");
+  // Prose that DISCLAIMS typos is required; machinery that CREATES them is forbidden.
+  // So this looks for functions/identifiers, not for the word in a sentence.
+  assert(!/injectTypo|addTypo|typoFor|mistype|simulateTyping|fakeKeystroke/i.test(gSrc + gradualRoute),
+    "gradual: the module contains no typo or typing-simulation machinery");
+
+
+  // ---- route: guarded, owner-scoped, recovery-preserving ----
+  assert(gradualRoute.includes("requireUser"), "gradual route: authenticates the caller");
+  assert(gradualRoute.includes("requiredRevisionId") || gradualRoute.includes("buildGuardedInsertRequest"),
+    "gradual route: every write is revision-guarded, so a changed document is never overwritten");
+  assert(gradualRoute.includes("recovery_copy_created"),
+    "gradual route: stopping or conflicting stores a real recovery copy");
+  assert(gradualRoute.includes('provider: "google"'), "gradual route: events are scoped to the caller's own provider/document");
+  assert(!gradualRoute.includes("createAdminClient"),
+    "gradual route: no service-role client, so RLS stays authoritative");
+  assert(gradualRoute.includes("MAX_CHARS"), "gradual route: oversized insertions are refused up front");
+
+  // ---- UI wiring ----
+  const panel = readFileSync("src/components/app/GradualInsertPanel.tsx", "utf8");
+  for (const label of ["Pause", "Continue", "Stop and keep a copy", "Start"]) {
+    assert(panel.includes(label), `gradual UI: offers "${label}"`);
+  }
+  assert(panel.includes('role="progressbar"'), "gradual UI: progress is a real progressbar for screen readers");
+  assert(panel.includes("confirmed by Google"), "gradual UI: progress is described as provider-confirmed");
+  assert(panel.includes("does not imitate typing"), "gradual UI: the honesty note is shown to the student");
+  assert(!/setTimeout/.test(panel), "gradual UI: no artificial delay in the browser either");
+
+  const browser = readFileSync("src/components/app/DocumentBrowser.tsx", "utf8");
+  assert(browser.includes("GradualInsertPanel"), "gradual UI: the panel is reachable from the document browser");
+  assert(browser.includes("describeHistoryEvent"), "timeline: events render in plain language");
+
+  // ---- plain-language timeline ----
+  section("stage 4: activity timeline wording");
+  for (const t of H.HISTORY_EVENT_TYPES) {
+    const d = H.describeHistoryEvent({ eventType: t, actor: "sophira", provenance: "sophira-inserted", outcome: "confirmed" });
+    assert(d.what.length > 10 && !d.what.includes("_"), `timeline: "${t}" has a plain-language description`);
+  }
+  const externalEvent = H.describeHistoryEvent({ eventType: "external_change_observed", actor: "external", provenance: "external-observed", outcome: "unavailable" });
+  assert(/cannot tell who/i.test(externalEvent.origin),
+    "timeline: an outside change never claims to know who made it");
+  const pendingEvent = H.describeHistoryEvent({ eventType: "insertion_attempted", actor: "sophira", provenance: "sophira-inserted", outcome: "pending" });
+  assert(/not confirmed/i.test(pendingEvent.confirmation), "timeline: an unconfirmed write says it is unconfirmed");
+  const providerEvent = H.describeHistoryEvent({ eventType: "recovery_copy_created", actor: "provider", provenance: "provider-reported", outcome: "confirmed" });
+  assert(providerEvent.what.length > 10, "timeline: recovery copies are explained in the same plain language");
+  assert(H.HISTORY_EVENT_TYPES.includes("recovery_copy_created") && H.HISTORY_EVENT_TYPES.includes("insertion_stopped"),
+    "timeline: the two Stage 4 event types exist in the shared vocabulary");
+
   // ---- UI wiring ----
   const ui = readFileSync("src/components/app/DocumentBrowser.tsx", "utf8");
   assert(ui.includes("document-history?provider=") && ui.includes("Document history"), "ui: selections expose their document history");
