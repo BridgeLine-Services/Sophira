@@ -40,4 +40,5 @@ export const MARKERS = {
   "0039_supabase_security_hardening.sql":
     "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'touch_updated_at' and n.nspname = 'public' and p.proconfig::text like '%search_path%' and p.proconfig::text not like '%public, pg_temp%')",
   "0040_document_history.sql": "to_regclass('public.document_history') is not null",
+  "0041_canvas_integration.sql": "to_regclass('public.canvas_assignments') is not null",
 };

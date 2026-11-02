@@ -42,6 +42,12 @@ const USER_TABLES = [
   "provider_connections",
   "workload_selections",
   "document_history",
+  // Canvas integration (0041). Assignment metadata the student is entitled to;
+  // tokens live in provider_connections, which is already exported as metadata
+  // only (see the token-scrubbing below).
+  "canvas_courses",
+  "canvas_assignments",
+  "canvas_sync_events",
   "schedule_executions",
   "work_sessions",
   "rubric_audits",

@@ -156,3 +156,21 @@ All of these are server-side only. Check what is active without exposing
 values: `/api/setup-status` returns `delivery.email`, `delivery.sms` and
 `delivery.methods`. Invitations are always bound to the invited email
 address; SMS only changes how the link reaches the person.
+
+## CANVAS_CLIENT_ID / CANVAS_CLIENT_SECRET / CANVAS_BASE_URL (optional — Canvas assignment import)
+
+Server-side only. Set these once per school to turn on the Canvas integration;
+leave all three unset and the feature simply reports "not set up yet" and every
+other part of Sophira keeps working.
+
+1. In Canvas, open **Admin -> Developer Keys -> + Developer Key -> API Key**.
+2. Set the redirect URI to `https://<your-sophira-domain>/api/integrations/canvas/callback`.
+3. Copy the key's ID into `CANVAS_CLIENT_ID` and its secret into `CANVAS_CLIENT_SECRET`.
+4. Set `CANVAS_BASE_URL` to your school's Canvas address, for example
+   `https://school.instructure.com` (https only; Sophira refuses loopback hosts).
+
+Students never type any of this. They click **Connect your Canvas account** and
+approve the request inside Canvas. Tokens are stored server-side only; the
+browser never receives an access token. Watch out: the secret belongs in your
+hosting provider's environment settings, never in chat, a file, or a screenshot.
+Full guide: docs/CANVAS_INTEGRATION.md

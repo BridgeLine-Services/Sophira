@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
+import { CanvasPanel } from "@/components/app/CanvasPanel";
 import { IntegrationsPanel } from "@/components/app/IntegrationsPanel";
 import { AppShell } from "@/components/app/AppShell";
 import { redirect } from "next/navigation";
@@ -32,6 +33,9 @@ export default async function IntegrationsPage() {
           Connect a Microsoft or Google account to save documents directly into it. Your downloads (DOCX, PDF, PPTX) always work without a connection.
         </p>
         <IntegrationsPanel />
+        <div className="mt-4">
+          <CanvasPanel />
+        </div>
         <p className="mt-6 text-xs text-ink-soft">
           Setup guide for the owner: <a className="underline" href="https://github.com/BridgeLine-Services/Sophira/blob/master/docs/WORD_GOOGLE_DOCS_SETUP.md">docs/WORD_GOOGLE_DOCS_SETUP.md</a>.
           Tokens live only on Sophira&apos;s server, scoped to your account, and are removed the moment you disconnect.

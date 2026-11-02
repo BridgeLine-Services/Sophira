@@ -8,13 +8,18 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type Provider = "microsoft" | "google";
+// 'canvas' reuses this table (migration 0041 widened the check constraint)
+// because duplicating the token-storage model would mean two places that can
+// leak credentials. Canvas is per-institution, hence base_url below.
+export type Provider = "microsoft" | "google" | "canvas";
 
 export interface StoredConnection {
   provider: Provider;
   account_label: string | null;
   provider_account_id: string | null;
   granted_scopes: string | null;
+  /** Canvas instance origin; NULL for Google/Microsoft. */
+  base_url: string | null;
   access_token: string;
   refresh_token: string | null;
   expires_at: string | null;
@@ -24,7 +29,7 @@ export async function getConnection(userId: string, provider: Provider): Promise
   const admin = createAdminClient();
   const { data } = await admin
     .from("provider_connections")
-    .select("provider, account_label, provider_account_id, granted_scopes, access_token, refresh_token, expires_at")
+    .select("provider, account_label, provider_account_id, granted_scopes, base_url, access_token, refresh_token, expires_at")
     .eq("user_id", userId)
     .eq("provider", provider)
     .maybeSingle();
@@ -35,7 +40,14 @@ export async function getConnection(userId: string, provider: Provider): Promise
 export async function upsertConnection(
   userId: string,
   provider: Provider,
-  tokens: { access_token: string; refresh_token: string | null; expires_at: string | null; granted_scopes?: string | null },
+  tokens: {
+    access_token: string;
+    refresh_token: string | null;
+    expires_at: string | null;
+    granted_scopes?: string | null;
+    /** Required for Canvas (its OAuth endpoints are per-institution). */
+    base_url?: string | null;
+  },
 ): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin
@@ -48,6 +60,7 @@ export async function upsertConnection(
         refresh_token: tokens.refresh_token,
         expires_at: tokens.expires_at,
         granted_scopes: tokens.granted_scopes ?? null,
+        base_url: tokens.base_url ?? null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,provider" },

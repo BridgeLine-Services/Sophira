@@ -15,6 +15,13 @@ import {
   detectInjectionAttempt,
 } from "../src/lib/ai/context";
 import { routeSubject, routeMathTopic } from "../src/lib/ai/subjects";
+import {
+  normalizeInstanceUrl, canvasAuthorizeUrl, canvasConfigured, CANVAS_SCOPES,
+  CANVAS_MAX_DESCRIPTION_CHARS, CANVAS_MAX_ATTACHMENT_BYTES,
+  normalizeDueAt, clampText, normalizeAssignment, assignmentFingerprint,
+  planAssignmentSync, attachmentAllowed, describeSyncCounts,
+  type NormalizedAssignment,
+} from "../src/lib/integrations/canvas";
 import { runMachineChecks } from "../src/lib/ai/mathverify";
 import { normalizeMethodCompliance } from "../src/lib/ai/compliance";
 import { docxHtmlToStructuredText, parsePptx, parseSpreadsheet, parseCsv } from "../src/lib/extract/documents";
@@ -3289,6 +3296,239 @@ async function runInventorySignalTests(): Promise<void> {
     "redesign: no route claims a redesign until one has been verified");
 }
 
+async function runCanvasIntegrationTests(): Promise<void> {
+  section("canvas lms integration (Stage 2)");
+
+  // --- instance address safety (this is the SSRF / token-theft surface) ---
+  assert(normalizeInstanceUrl("https://school.instructure.com") === "https://school.instructure.com",
+    "canvas: a normal https instance is accepted");
+  assert(normalizeInstanceUrl("https://school.instructure.com/courses/1") === "https://school.instructure.com",
+    "canvas: a path is reduced to the bare origin");
+  assert(normalizeInstanceUrl("http://school.instructure.com") === null,
+    "canvas: plain http is refused, so a token is never sent unencrypted");
+  assert(normalizeInstanceUrl("http://localhost:3000") === null && normalizeInstanceUrl("https://127.0.0.1") === null,
+    "canvas: loopback instances are refused");
+  assert(normalizeInstanceUrl("not a url") === null && normalizeInstanceUrl(null) === null,
+    "canvas: junk and empty addresses are refused, never guessed");
+
+  // --- due dates: never invent one ---
+  assert(normalizeDueAt(null) === null, "canvas: no due date stays null rather than becoming today");
+  assert(normalizeDueAt("whenever the teacher says") === null, "canvas: an unparseable due date is null, not a guess");
+  assert(normalizeDueAt("2026-11-10T23:59:00Z") === "2026-11-10T23:59:00.000Z",
+    "canvas: a real due date is normalized to ISO");
+
+  // --- untrusted text is bounded ---
+  const huge = "x".repeat(CANVAS_MAX_DESCRIPTION_CHARS + 50);
+  const clamped = clampText(huge);
+  assert(clamped.length < huge.length && clamped.endsWith("[truncated]"),
+    "canvas: an oversized description is truncated and marked, not stored whole");
+
+  // --- normalization ---
+  const raw = {
+    id: 42, course_id: 7, name: "Lab 3", description: "Do the thing",
+    due_at: "2026-11-10T23:59:00Z", points_possible: 20, published: true,
+    submission_types: ["online_text_entry"],
+    attachments: [{ display_name: "grading.pdf", url: "https://files/x.pdf", size: 1000 }],
+  };
+  const n = normalizeAssignment(raw) as NormalizedAssignment;
+  assert(n.canvasId === "42" && n.courseId === "7", "canvas: stable ids are stringified for storage");
+  assert(n.attachments.length === 1 && n.attachments[0].name === "grading.pdf",
+    "canvas: attachments are captured as data");
+  assert(normalizeAssignment({} as never) === null, "canvas: a row with no id is dropped, not stored half-built");
+  assert(normalizeAssignment({ id: "abc" } as never) === null, "canvas: a non-numeric id is refused");
+
+  // --- fingerprints: change detection without false positives ---
+  const sameContent = normalizeAssignment({
+    ...raw, attachments: [{ display_name: "grading.pdf", url: "https://cdn/other", size: 9 }],
+  }) as NormalizedAssignment;
+  assert(sameContent.fingerprint === n.fingerprint,
+    "canvas: a rotating attachment URL alone does not look like a change");
+  const dueChanged = normalizeAssignment({ ...raw, due_at: "2026-11-11T23:59:00Z" }) as NormalizedAssignment;
+  assert(dueChanged.fingerprint !== n.fingerprint, "canvas: a changed due date is detected");
+  const textChanged = normalizeAssignment({ ...raw, description: "Do the OTHER thing" }) as NormalizedAssignment;
+  assert(textChanged.fingerprint !== n.fingerprint, "canvas: changed instructions are detected");
+  const rubricChanged = normalizeAssignment({ ...raw, rubric: [{ id: 1, description: "Accuracy" }] }) as NormalizedAssignment;
+  assert(rubricChanged.fingerprint !== n.fingerprint, "canvas: a new rubric is detected");
+  assert(n.fingerprint === (normalizeAssignment(raw) as NormalizedAssignment).fingerprint,
+    "canvas: fingerprints are deterministic");
+
+  // --- idempotent reconciliation (duplicate prevention) ---
+  const prev = [{ canvasId: "42", fingerprint: n.fingerprint, syncState: "active" as const }];
+  const rerun = planAssignmentSync(prev, [n]);
+  assert(rerun.toCreate.length === 0 && rerun.toUpdate.length === 0 && rerun.unchanged === 1,
+    "canvas: a repeated sync with unchanged content creates and updates nothing");
+  const { fingerprint: _fp, ...withoutPrint } = n;
+  assert(assignmentFingerprint(withoutPrint) === n.fingerprint,
+    "canvas: the stored fingerprint is reproducible from the normalized fields");
+
+  assert(planAssignmentSync([], [n]).toCreate.length === 1,
+    "canvas: a first sync creates the assignment once");
+  const upd = planAssignmentSync(prev, [textChanged]);
+  assert(upd.toUpdate.length === 1 && upd.toCreate.length === 0,
+    "canvas: changed instructions update the existing assignment instead of duplicating it");
+  assert(planAssignmentSync([], [n, n]).toCreate.length === 1,
+    "canvas: repeated rows from Canvas paging create one assignment, not two");
+  const gone = planAssignmentSync(prev, []);
+  assert(gone.toMarkMissing.length === 1 && gone.toCreate.length === 0,
+    "canvas: an assignment removed from Canvas is marked missing, never deleted");
+  const returned = planAssignmentSync(
+    [{ canvasId: "42", fingerprint: n.fingerprint, syncState: "missing" as const }], [n]);
+  assert(returned.toRestore.length === 1 && returned.toCreate.length === 0,
+    "canvas: an assignment that comes back is restored, not duplicated");
+
+  // --- attachments ---
+  assert(attachmentAllowed("https://files/x.pdf", 1000).ok, "canvas: a normal https attachment is allowed");
+  assert(!attachmentAllowed("http://files/x.pdf", 1000).ok, "canvas: plain http attachments are refused");
+  assert(!attachmentAllowed("https://files/x.pdf", CANVAS_MAX_ATTACHMENT_BYTES + 1).ok,
+    "canvas: oversized attachments are refused with a reason");
+  assert(!attachmentAllowed(null, null).ok, "canvas: a missing link is refused, not fetched blindly");
+
+  // --- plain language for non-technical students ---
+  const msg = describeSyncCounts({ created: 2, updated: 1, missing: 1, restored: 0 });
+  assert(msg.includes("2 new assignments") && msg.includes("1 updated"),
+    "canvas: the summary states what changed in plain words");
+  assert(describeSyncCounts({ created: 0, updated: 0, missing: 0, restored: 0 }) === "Everything is up to date.",
+    "canvas: an unchanged sync says so plainly");
+  assert(!/api|json|http|token/i.test(msg), "canvas: the summary never exposes API jargon");
+
+  // --- least-privilege scopes ---
+  assert(CANVAS_SCOPES.every((sc) => sc.startsWith("url:GET|")),
+    "canvas: only read scopes are requested");
+  assert(!CANVAS_SCOPES.some((sc) => /POST|PUT|DELETE/.test(sc)),
+    "canvas: Sophira never asks for permission to change anything in Canvas");
+  assert(!CANVAS_SCOPES.some((sc) => /students|accounts|grade/i.test(sc)),
+    "canvas: no administrative or grading scopes are requested");
+  assert(!canvasConfigured({ CANVAS_CLIENT_ID: "x" } as unknown as NodeJS.ProcessEnv),
+    "canvas: partially configured is reported as not configured");
+  assert(canvasConfigured({
+    CANVAS_CLIENT_ID: "x", CANVAS_CLIENT_SECRET: "y", CANVAS_BASE_URL: "https://s.instructure.com",
+  } as unknown as NodeJS.ProcessEnv), "canvas: fully configured is detected");
+  assert(canvasAuthorizeUrl("https://s.instructure.com", "cid", "https://app/cb", "st").includes("state=st"),
+    "canvas: the authorize URL carries CSRF state");
+
+  // --- route source pins (security behaviour, not just presence) ---
+  const route = (name: string) =>
+    readFileSync(`src/app/api/integrations/canvas/${name}/route.ts`, "utf8");
+  const names = ["authorize", "callback", "status", "disconnect", "sync"];
+  for (const name of names) {
+    assert(route(name).includes("requireUser"),
+      `canvas: ${name} authenticates through requireUser`);
+  }
+  assert(route("authorize").includes("CANVAS_BASE_URL") && !route("authorize").includes('searchParams.get("instance")'),
+    "canvas: the instance comes from server config, never from the request (no SSRF)");
+  assert(route("callback").includes("NextResponse.redirect"),
+    "canvas: the callback returns the student to Sophira instead of dumping JSON");
+  assert(route("callback").includes("verifyState") && route("callback").includes("verifyProfile"),
+    "canvas: the callback checks CSRF state and verifies with Canvas before claiming connected");
+  assert(route("disconnect").includes("deleteConnection"),
+    "canvas: disconnect really deletes the stored tokens");
+  assert(route("sync").includes("needsRefresh") && route("sync").includes("runCanvasSync"),
+    "canvas: sync refreshes an expiring token before using it");
+  // A route legitimately READS conn.refresh_token server-side; what must never
+  // happen is a token field inside a JSON payload sent to the browser. Parse the
+  // real payloads with paren balancing instead of grepping the whole file.
+  const payloads = (src: string): string[] => {
+    const out: string[] = [];
+    const needle = "NextResponse.json(";
+    let i = src.indexOf(needle);
+    while (i !== -1) {
+      let depth = 0, j = i + needle.length - 1;
+      for (; j < src.length; j += 1) {
+        if (src[j] === "(") depth += 1;
+        else if (src[j] === ")") { depth -= 1; if (depth === 0) break; }
+      }
+      out.push(src.slice(i, j + 1));
+      i = src.indexOf(needle, j + 1);
+    }
+    return out;
+  };
+  for (const name of ["status", "sync", "callback", "authorize", "disconnect"]) {
+    const sent = payloads(route(name));
+    const leaks = sent.filter((p) => p.includes("access_token") || p.includes("refresh_token"));
+    // The callback answers with a redirect rather than JSON, so a JSON count of 0
+    // is correct there; the guarantee is that NO response carries a token.
+    assert(leaks.length === 0,
+      `canvas: ${name} sends ${sent.length} JSON payload(s) and no token field reaches the browser`);
+  }
+
+  // --- student-facing UI (Stage 2 §7): plain language, no provider jargon ---
+  const panel = readFileSync("src/components/app/CanvasPanel.tsx", "utf8");
+  assert(panel.includes("Connect your Canvas account") && panel.includes("Check for assignments") && panel.includes("Disconnect"),
+    "canvas: the panel offers connect, sync and disconnect in plain words");
+  assert(panel.includes('role="status"') && panel.includes('role="alert"'),
+    "canvas: sync results are announced politely and failures as alerts (screen readers)");
+  assert(panel.includes("/assignments/${c.assignmentId}"),
+    "canvas: every discovered assignment links straight to its Sophira workspace");
+  assert(!panel.includes("statusText") && !panel.includes("err.stack") && !panel.includes("console.log"),
+    "canvas: no raw stack traces or debugging output reach the student");
+  const settingsPage = readFileSync("src/app/settings/integrations/page.tsx", "utf8");
+  assert(settingsPage.includes("CanvasPanel"),
+    "canvas: the panel is mounted where students configure integrations");
+
+  // --- sync result must name changes, with ids, and never delete student work ---
+  const syncSrc = readFileSync("src/lib/integrations/canvas-sync.ts", "utf8");
+  assert(syncSrc.includes('kind: restore ? "restored" : existed ? "updated" : "new"'),
+    "canvas: the sync result distinguishes new, updated and restored assignments");
+  assert(syncSrc.includes('mode: "assignment"'),
+    "canvas: discovered work is created through the existing assignments table as an assignment");
+  assert(!syncSrc.includes(".delete()"),
+    "canvas: sync never deletes assignments - a vanished item is marked missing instead");
+  const syncRoute = route("sync");
+  assert(syncRoute.includes("changes: summary.changes"),
+    "canvas: the sync route hands the change list to the browser");
+  assert(syncRoute.includes("has no due date") === false,
+    "canvas: due-date wording is chosen in the UI, not invented by the route");
+
+  // --- migration safety (§9): additive, owner-scoped, re-runnable ---
+  const migration = readFileSync("supabase/migrations/0041_canvas_integration.sql", "utf8");
+  for (const table of ["canvas_courses", "canvas_assignments", "canvas_sync_events"]) {
+    assert(migration.includes(`create table if not exists public.${table}`),
+      `canvas: ${table} is created additively (if not exists)`);
+    assert(migration.includes(`alter table public.${table} enable row level security`) &&
+           migration.includes(`on public.${table}`),
+      `canvas: ${table} has RLS enabled with an owner policy`);
+  }
+  assert(!/drop table/i.test(migration),
+    "canvas: the migration drops no existing table");
+  assert(migration.includes("'canvas'") && migration.includes("provider_connections_provider_check"),
+    "canvas: the provider constraint is widened to accept canvas, keeping google and microsoft");
+  assert(/user_id = auth.uid\(\)/.test(migration),
+    "canvas: every Canvas table is scoped to the authenticated owner");
+
+  const syncLib = readFileSync("src/lib/integrations/canvas-sync.ts", "utf8");
+  assert(!syncLib.includes("createAdminClient"),
+    "canvas: sync writes use the user-scoped client, so RLS enforces ownership");
+  assert(!syncLib.includes('.from("assignments").delete'),
+    "canvas: sync never deletes a student's assignments");
+  assert(syncLib.includes('mode: "assignment"'),
+    "canvas: discovered work is created as a normal assignment the student can edit");
+  assert(syncLib.includes("sync_state: \"missing\""),
+    "canvas: disappearing assignments are flagged, not removed");
+
+  const canvasLib = readFileSync("src/lib/integrations/canvas.ts", "utf8");
+  assert(!canvasLib.includes("submit"),
+    "canvas: nothing in the integration can submit work on the student's behalf");
+
+  // --- migration shape ---
+  const mig = readFileSync("supabase/migrations/0041_canvas_integration.sql", "utf8");
+  for (const t of ["canvas_courses", "canvas_assignments", "canvas_sync_events"]) {
+    assert(mig.includes(`alter table public.${t} enable row level security`),
+      `canvas: ${t} has RLS enabled`);
+  }
+  assert((mig.match(/using \(user_id = auth\.uid\(\)\)/g) ?? []).length >= 3,
+    "canvas: every new table carries an owner-only policy");
+  assert(mig.includes("check (provider in ('microsoft', 'google', 'canvas'))"),
+    "canvas: the provider constraint is widened, and Google/Microsoft keep working");
+  assert(!/drop table/i.test(mig), "canvas: the migration is additive — nothing is dropped");
+  assert(!/drop column/i.test(mig), "canvas: no existing column is dropped");
+  assert(mig.includes("add column if not exists base_url"),
+    "canvas: the instance address is stored per connection");
+
+  const conn = readFileSync("src/lib/integrations/connections.ts", "utf8");
+  assert(conn.includes('"microsoft" | "google" | "canvas"') && conn.includes("base_url"),
+    "canvas: the existing token store is reused rather than duplicated");
+}
+
 async function runPdfExtractionTests(): Promise<void> {
   const { extractPdfText } = await import("../src/lib/extract/pdf");
   const ok = async () => "x".repeat(120);
@@ -4674,6 +4914,6 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
-__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runRedesignAuditTests()).then(() => runThemeTokenTests()).then(() => runPrimitiveTokenTests()).then(() => runRepoWideThemeTests()).then(() => runInventorySignalTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
+__fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runRedesignAuditTests()).then(() => runThemeTokenTests()).then(() => runPrimitiveTokenTests()).then(() => runRepoWideThemeTests()).then(() => runInventorySignalTests()).then(() => runCanvasIntegrationTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
   .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(finish).catch((e) => { console.error(e); process.exit(1); });
