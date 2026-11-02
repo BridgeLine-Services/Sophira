@@ -104,3 +104,28 @@ migration is additive and re-runnable, the panel is mounted and accessible.
    remain valid rows in `assignments` and are unaffected.
 3. Unset the three environment variables to disable the feature immediately without
    touching data.
+
+## Verification record (2026-11-02)
+
+| Check | Result |
+|---|---|
+| Branch CI (run 41488029427) | **success** — all 11 steps, incl. lint, tests, tsc, build |
+| Merge CI (run 41488583533 on `4e16119`) | **success** |
+| Assertions | **4297 passed, 0 failed** |
+| Local | tsc clean, lint 107 problems / 0 errors, build compiled, verify PASS, secret-scan CLEAN |
+
+Three audits failed on the FIRST branch run and passed after the fix. They scan
+`git ls-files`, so they cannot see untracked files: run `npm test` **after**
+`git add`, or the source audits silently pass on code they never read.
+
+## What is NOT verified
+
+* No real Canvas account has been connected. The connect -> discover -> prepare path
+  is proven by unit tests, a production build and static routes, not by use.
+* No Canvas webhook subscriptions: detection is the student pressing
+  **Check for assignments** (the intended polling fallback). Canvas's
+  `/api/v1/courses/:id/assignments` is polled, never scraped.
+* Attachment **metadata** is imported (name, size, https check); files are not yet
+  downloaded into `assignment_files`.
+* Rubric text is stored as JSON but not yet rendered in the assignment workspace,
+  and no workspace is auto-prepared beyond creating the Sophira assignment row.
