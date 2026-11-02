@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+        with: { node-version: 22, cache: npm }
       - run: node scripts/apply-migrations.mjs --self-test
       - name: Probe and apply missing migrations (idempotent, fail-loud)
         env:
@@ -51,9 +51,12 @@ jobs:
               echo "- If this is a production release: run the /setup repair once (or configure the two secrets) and require the release gate's live db-migrations check to be PASS."
               echo "- Development/first-launch: acceptable — the deployed app initializes its own database from /setup via the Vercel Supabase Integration's direct connection."
             } >> "$GITHUB_STEP_SUMMARY"
+            echo "MIGRATIONS-LIVE-STATUS: BLOCKED_NO_CREDENTIALS (this job is the secondary net; a release is gated by scripts/release-gate.mjs db-migrations, which fails when the live schema is not verified)"
             exit 0
           fi
           npm run db:migrate
+          echo "MIGRATIONS-LIVE-STATUS: APPLIED_AND_VERIFIED"
+          echo "Live migration verification: PASS (production database reached and chain applied)" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify the live deployment serves the first-owner flow
         if: ${{ vars.SOPHIRA_APP_URL != '' }}
         run: |
