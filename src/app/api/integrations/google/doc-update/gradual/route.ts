@@ -127,6 +127,18 @@ export async function POST(request: NextRequest) {
     insertIndex = Math.max(1, (snap.endIndex ?? 2) - 1);
   }
 
+  // Record the request ONCE at the start of a run, as PENDING. The timeline then
+  // shows "requested, not confirmed yet" until a confirmed event arrives, instead
+  // of the run appearing only after it succeeds.
+  if (insertedChars === 0) {
+    await recordHistoryEvent({
+      ...baseEvent, eventType: "insertion_attempted", actor: "sophira",
+      provenance: "sophira-inserted", outcome: "pending",
+      targetSection: sectionHeading || null,
+      summary: `Gradual insertion requested for ${text.length.toLocaleString()} characters. Not confirmed yet.`,
+    });
+  }
+
   const chunks = planInsertionChunks(remaining);
   let confirmed = 0;
   let revisionId = snap.revisionId;

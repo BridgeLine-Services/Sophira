@@ -201,6 +201,9 @@ export function runDocumentHistoryTests(assert: (c: boolean, n: string) => void,
   assert(!gradualRoute.includes("createAdminClient"),
     "gradual route: no service-role client, so RLS stays authoritative");
   assert(gradualRoute.includes("MAX_CHARS"), "gradual route: oversized insertions are refused up front");
+  assert(gradualRoute.includes('outcome: "pending"') && gradualRoute.includes('"insertion_attempted"'),
+    "gradual route: the request is recorded as pending before any confirmation exists");
+  assert(gradualRoute.includes("targetSection"), "gradual route: the event records which section was targeted");
 
   // ---- UI wiring ----
   const panel = readFileSync("src/components/app/GradualInsertPanel.tsx", "utf8");
