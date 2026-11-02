@@ -79,7 +79,8 @@ export function runVercelConfigTests(assert: (c: boolean, n: string) => void, se
   const localhostHits = allSrc.filter(([, c]) => /(^|[^.A-Za-z])localhost(:|\/|$|\b)/.test(c))
     .filter(([f, c]) => !(f.includes("native-url") && c.includes("a release build cannot point at localhost"))
       && !(f.includes("lib/env") && c.includes("!opts.production"))
-      && !(f.includes("ServiceWorkerRegister") && c.includes("window.location.hostname")));
+      && !(f.includes("ServiceWorkerRegister") && c.includes("window.location.hostname"))
+      && !(f.includes("integrations/canvas") && c.includes("a Canvas instance can never be a loopback host")));
   assert(localhostHits.length === 0,
     "audit: no reachable hard-coded localhost URLs in web source (the only matches are the release guard that REJECTS localhost, the env validator's DEVELOPMENT-only allowance (gated on !opts.production), and the dev-only service-worker registration)");
   assert(!execSync2("git ls-files").some((f: string) => f.startsWith("Dockerfile") || f.startsWith("docker-compose")),

@@ -41,6 +41,8 @@ export function normalizeInstanceUrl(raw: string | null | undefined): string | n
   try {
     const u = new URL(raw.trim());
     if (u.protocol !== "https:") return null;
+    // a Canvas instance can never be a loopback host: this REJECTS such input,
+    // it is not a reachable address, so no request is ever made to it.
     if (/^(localhost|127\.|0\.0\.0\.0)/i.test(u.hostname)) return null;
     return u.origin;
   } catch {
