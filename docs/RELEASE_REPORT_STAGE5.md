@@ -166,6 +166,13 @@ The page now server-renders its heading, a `role="status"` loading line, and a
 `<noscript>` message telling the user to enable JavaScript or ask for help. After the
 fix the same URL sends 9,830 bytes containing the sign-in heading.
 
+A real browser pass (Chromium, not fetch) confirms the page **hydrates**: the heading,
+Email field, Password field and Sign in button all render, with no visible JavaScript
+error and no blank state. With no database configured in this environment the page also
+degrades correctly, showing "Sophira is not connected to its database yet. An
+administrator needs to finish the server configuration — nothing is wrong with your
+account" instead of a raw connection error.
+
 This is exactly the class of failure a green build cannot reveal, and it is why §11's
 limitations list no longer says "never executed at runtime".
 
