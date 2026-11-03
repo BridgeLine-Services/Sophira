@@ -74,7 +74,7 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
 
   // ---- The owner sidebar must reach every section that now exists --------------
   const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
-  for (const route of ["members", "activity", "status", "security", "ai-providers"]) {
+  for (const route of ["members", "invitations", "requests", "activity", "status", "security", "ai-providers"]) {
     assert(shell.includes(`"/owner/${route}"`),
       `nav: the owner sidebar links to the dedicated ${route} page`);
     assert(existsSync(`src/app/owner/${route}/page.tsx`),
@@ -94,4 +94,21 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
   const dashSource = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
   assert((dashSource.match(/api\/network\/members/g) ?? []).length === 0,
     "members: the mutation has one implementation, so the two screens cannot drift");
+
+  const actions = readFileSync("src/lib/owner/invitation-actions.ts", "utf8");
+  const dashInvites = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  assert(!dashInvites.includes('"/api/invitations"') && !dashInvites.includes("decision }"),
+    "invitations: the mutations have one implementation, so dashboard and pages cannot drift");
+  assert(dashInvites.includes("createInvitationRequest") && dashInvites.includes("decideInvitationRequest"),
+    "invitations: the dashboard calls the shared actions rather than its own fetch");
+  assert(actions.includes('delivery === "sent") return "Invitation sent."'),
+    "invitations: sent is only reported when the provider said sent");
+  assert(actions.includes("partially_sent") && actions.includes("not_configured"),
+    "invitations: partial and unconfigured delivery each get their own honest wording");
+  const invitePage = readFileSync("src/app/owner/invitations/page.tsx", "utf8");
+  assert(invitePage.includes("siteUrl") && invitePage.includes("InvitationsPanel"),
+    "invitations page: it carries the site URL so a copied link is usable");
+  const reqPanel = readFileSync("src/components/app/RequestsPanel.tsx", "utf8");
+  assert(!/auto[- ]?approve/i.test(reqPanel),
+    "requests: nothing is approved automatically");
 }

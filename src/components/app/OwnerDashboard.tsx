@@ -7,6 +7,13 @@ import { buildActivity } from "@/lib/owner-activity";
 import { buildStatusRows, statusIsHealthy, type StatusInput } from "@/lib/owner-status";
 import { buildTrends } from "@/lib/owner-trends";
 import { postMemberAction, type MemberAction } from "@/lib/owner/member-actions";
+import {
+  createInvitation as createInvitationRequest,
+  decideRequest as decideInvitationRequest,
+  deleteInvitation as deleteInvitationRequest,
+  deliveryMessage,
+  revokeInvitation as revokeInvitationRequest,
+} from "@/lib/owner/invitation-actions";
 import { Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Label, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
@@ -109,34 +116,21 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
     if (!inviteEmail.trim()) return;
     setInviteBusy(true);
     try {
-      const res = await fetch("/api/invitations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: inviteEmail.trim(),
-          phone: invitePhone.trim() || undefined,
-          channel: inviteChannel,
-          expires_days: inviteExpires,
-        }),
+      const result = await createInvitationRequest({
+        email: inviteEmail,
+        phone: invitePhone,
+        channel: inviteChannel,
+        expiresDays: inviteExpires,
       });
-      const json = await res.json();
-      if (res.ok) {
-        setInviteLink(json.data.link);
-        setInviteNote(json.data.email_note ?? null);
-        setInviteDelivery(
-          json.data.delivery === "sent"
-            ? "Invitation sent."
-            : json.data.delivery === "partially_sent"
-              ? "Sent on one channel, not the other - see below and retry the failed one."
-              : json.data.delivery === "not_configured"
-                ? "Automatic sending is not configured yet. Share the link below."
-                : "Sending failed. Retry, or share the link below."
-        );
-        setInviteEmailBlocked(json.data.delivery !== "sent");
+      if (result.ok) {
+        setInviteLink(result.link ?? null);
+        setInviteNote(result.emailNote ?? null);
+        setInviteDelivery(deliveryMessage(result.delivery));
+        setInviteEmailBlocked(result.delivery !== "sent");
         setInviteEmail("");
         await refresh();
       } else {
-        toast(json.error || "Could not create the invitation.");
+        toast(result.error || "Could not create the invitation.");
       }
     } finally {
       setInviteBusy(false);
@@ -146,11 +140,8 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   async function revokeInvitation(id: string) {
     setBusyId(id);
     try {
-      await fetch("/api/invitations", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+      const ok = await revokeInvitationRequest(id);
+      if (!ok) toast("That invitation could not be revoked. Reload and try again.");
       await refresh();
     } finally {
       setBusyId(null);
@@ -160,7 +151,8 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   async function deleteInvitation(id: string) {
     setBusyId(id);
     try {
-      await fetch(`/api/invitations?id=${id}`, { method: "DELETE" });
+      const ok = await deleteInvitationRequest(id);
+      if (!ok) toast("That invitation could not be deleted. Reload and try again.");
       await refresh();
     } finally {
       setBusyId(null);
@@ -170,14 +162,9 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   async function decideRequest(id: string, decision: "approve" | "reject") {
     setBusyId(id);
     try {
-      const res = await fetch("/api/invitation-requests", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, decision }),
-      });
-      const json = await res.json();
-      if (res.ok && json.data.link) setInviteLink(json.data.link);
-      else if (!res.ok) toast(json.error || "Could not record the decision.");
+      const result = await decideInvitationRequest(id, decision);
+      if (result.ok && result.link) setInviteLink(result.link);
+      else if (!result.ok) toast(result.error || "Could not record the decision.");
       await refresh();
     } finally {
       setBusyId(null);

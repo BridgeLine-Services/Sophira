@@ -4495,7 +4495,7 @@ async function runInviteFormTests(): Promise<void> {
     "invite form: the phone field stays visible and is enabled for text delivery");
   assert(ui.includes("copy the link to send it yourself"),
     "invite form: the status line states the manual link always works");
-  assert(ui.includes('setInviteEmailBlocked(json.data.delivery !== "sent")'),
+  assert(ui.includes('setInviteEmailBlocked(result.delivery !== "sent")'),
     "invite form: any non-sent outcome reveals the copy-link fallback");
 }
 async function runChannelDiscoveryTests(): Promise<void> {

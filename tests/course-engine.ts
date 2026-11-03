@@ -980,7 +980,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(api.includes("email_status") && api.includes("email_note"),
       "invitations: the response carries the honest email status and a human note");
     const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-    assert(dash.includes("json.data.email_note") && dash.includes("inviteNote"),
+    assert(dash.includes("result.emailNote") && dash.includes("inviteNote"),
       "invitations: the owner sees the actual email result next to the copy link");
     const mig = readFileSync("supabase/migrations/0036_invitation_email_status.sql", "utf8");
     assert(mig.includes("email_status") && mig.includes("add column if not exists"),

@@ -47,8 +47,8 @@ const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; la
     heading: "Network Management",
     items: [
       { href: "/owner/members", label: "Members", icon: Users },
-      { href: "/owner#invite", label: "Invite someone", icon: UserPlus },
-      { href: "/owner#requests", label: "Invitation requests", icon: MailQuestion },
+      { href: "/owner/invitations", label: "Invite someone", icon: UserPlus },
+      { href: "/owner/requests", label: "Invitation requests", icon: MailQuestion },
     ],
   },
   {
