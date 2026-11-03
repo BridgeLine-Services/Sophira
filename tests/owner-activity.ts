@@ -71,4 +71,16 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
     "status: a failed member load is reported as needing attention even when everything else is ready");
   assert(dbDown.every((r) => r.detail.length > 20 && !/undefined|null/.test(r.detail)),
     "status: every row explains itself in plain language");
+
+  // ---- The owner sidebar must reach every section that now exists --------------
+  const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  const dash2 = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  for (const anchor of ["activity", "status"]) {
+    assert(shell.includes(`/owner#${anchor}`),
+      `nav: the owner sidebar links to the ${anchor} section`);
+    assert(dash2.includes(`id="${anchor}"`),
+      `nav: the ${anchor} section exists under the id the sidebar links to`);
+  }
+  assert(shell.includes('heading: "Monitoring"'),
+    "nav: the new sections sit in their own group rather than being appended anywhere");
 }

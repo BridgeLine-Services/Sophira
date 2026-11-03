@@ -8,7 +8,7 @@ import { Bell, CloudOff, ScanLine } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { BookOpen, Brain, Briefcase, ChevronDown, GraduationCap, Home, Library, LogOut, MailQuestion, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, UserPlus, Users, Wifi, X } from "lucide-react";
+import { Activity, BookOpen, Brain, Briefcase, ChevronDown, GraduationCap, Home, Library, LogOut, MailQuestion, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, UserPlus, Users, Wifi, X } from "lucide-react";
 import { Gauge, Keyboard } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
@@ -49,6 +49,13 @@ const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; la
       { href: "/owner#members", label: "Members", icon: Users },
       { href: "/owner#invite", label: "Invite someone", icon: UserPlus },
       { href: "/owner#requests", label: "Invitation requests", icon: MailQuestion },
+    ],
+  },
+  {
+    heading: "Monitoring",
+    items: [
+      { href: "/owner#activity", label: "Recent activity", icon: Activity },
+      { href: "/owner#status", label: "System status", icon: ShieldCheck },
     ],
   },
   {
