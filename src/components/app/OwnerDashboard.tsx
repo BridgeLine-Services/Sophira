@@ -5,6 +5,7 @@ import { memberIdentity } from "@/lib/member-identity";
 import { MemberDirectory } from "@/components/app/MemberDirectory";
 import { buildActivity } from "@/lib/owner-activity";
 import { buildStatusRows, statusIsHealthy, type StatusInput } from "@/lib/owner-status";
+import { buildTrends } from "@/lib/owner-trends";
 import { Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Label, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
@@ -211,6 +212,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
 
   const activity = buildActivity({ members, invitations });
   const statusRows = buildStatusRows(status);
+  const trends = buildTrends({ members, invitations, requests });
   const activeMembers = members.filter((m) => m.status === "active");
   const isExpired = (i: Invitation) =>
     i.status === "pending" && new Date(i.expires_at).getTime() <= Date.now();
@@ -255,18 +257,22 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
         <Card><CardContent className="p-4">
           <p className="text-xs text-ink-soft">Total members</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{members.length}</p>
+          <p className="mt-1 text-xs text-ink-soft">{trends.members}</p>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <p className="text-xs text-ink-soft">Active members</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{activeMembers.length}</p>
+          <p className="mt-1 text-xs text-ink-soft">{trends.active}</p>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <p className="text-xs text-ink-soft">Pending invitations</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{pendingInvites.length}</p>
+          <p className="mt-1 text-xs text-ink-soft">{trends.invitations}</p>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <p className="text-xs text-ink-soft">Invite requests</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{pendingRequests.length}</p>
+          <p className="mt-1 text-xs text-ink-soft">{trends.requests}</p>
         </CardContent></Card>
       </div>
 
