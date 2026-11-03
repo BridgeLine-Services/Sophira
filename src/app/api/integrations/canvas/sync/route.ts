@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { raiseNotification } from "@/lib/notifications/store";
 import { requireUser } from "@/lib/supabase/guard";
 import { needsRefresh } from "@/lib/integrations/oauth-state";
 import { canvasConfigured, normalizeInstanceUrl, refreshAccessToken } from "@/lib/integrations/canvas";
@@ -72,7 +74,14 @@ export async function POST() {
     }
   }
 
-  const summary = await runCanvasSync(supabase, guard.data.user.id, baseUrl, accessToken);
+  // Notifications are written with the service-role client here, in the route, so the
+  // sync itself keeps writing only through the user-scoped client (RLS enforces ownership).
+  // If no service-role key is present the sync simply runs without notices.
+  const admin = createAdminClient();
+  const memberId = guard.data.user.id;
+  const summary = await runCanvasSync(supabase, memberId, baseUrl, accessToken, {
+    notify: admin ? (input) => raiseNotification(admin, memberId, input).then(() => undefined) : undefined,
+  });
 
   // Show the student what actually changed, newest first, without raw payloads.
   const { data: changed } = await supabase

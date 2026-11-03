@@ -414,3 +414,23 @@ CLEAN, runtime smoke 31/31.
 
 `git revert`. The migration is additive: dropping the two tables loses only the notification
 list and its preferences. Nothing else references them.
+
+---
+
+# PART K — PHASE 8b: THE NOTIFICATION PRODUCER
+
+Part J built the store, screen and rules, but nothing raised a notice, so the list stayed
+empty. The Canvas sync now raises one for three student-visible events: a new assignment,
+an assignment whose details changed, and an assignment that reappears after being missing.
+
+Two constraints shaped the design. The first attempt imported the service-role client into
+`canvas-sync.ts` and an existing test rejected it: sync writes must stay user-scoped so RLS
+enforces ownership. The sync now takes an injected notifier and the route, which is the
+only place holding service role, supplies it. Second, notifications are the last step and
+wrapped in try/catch with an early return when no notifier exists, so a missing key or a
+failed insert can never turn a good import into a failed sync.
+
+Dedupe keys derive from what changed, not when the sync ran: `canvas-new-<id>`, and
+`canvas-changed-<id>-<hash(title, due date)>`. Three pending edits: due-date reminders and
+research-complete notices still have no producer, and no live Canvas account has exercised
+any of this.

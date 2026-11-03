@@ -14,6 +14,7 @@
 //    instructions to Sophira, and never logged in full.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { canvasNewKey, canvasChangedKey, type NewNotification } from "@/lib/notifications/store";
 import {
   listCourses,
   listCourseAssignments,
@@ -24,6 +25,25 @@ import {
   type PreviousAssignmentState,
   type SyncPlan,
 } from "@/lib/integrations/canvas";
+
+/** A caller-supplied notifier. The sync itself never holds a service-role client:
+ *  every write it makes stays user-scoped so RLS enforces ownership (pinned by tests). */
+export type CanvasNotifier = (input: NewNotification) => Promise<void>;
+
+/**
+ * Raise a notice through the caller's notifier (2026-11-03).
+ *
+ * Wrapped in try/catch and always the LAST step: a notification is a convenience, the
+ * imported assignment is the student's work. Failure here must never fail the sync.
+ */
+async function safeNotify(notify: CanvasNotifier | undefined, input: NewNotification): Promise<void> {
+  if (!notify) return;
+  try {
+    await notify(input);
+  } catch {
+    // Deliberately silent: the sync result is what matters.
+  }
+}
 
 export interface SyncSummary {
   ok: boolean;
@@ -101,7 +121,8 @@ async function applyPlan(
   courseName: string | null,
   plan: SyncPlan,
   changes: SyncChange[],
-  titleById: Map<string, string>
+  titleById: Map<string, string>,
+  notify?: CanvasNotifier
 ): Promise<{ created: number; updated: number; missing: number; restored: number }> {
   let created = 0, updated = 0, missing = 0, restored = 0;
 
@@ -171,12 +192,33 @@ async function applyPlan(
       await recordEvent(supabase, userId, "assignment_updated", {
         canvas_assignment_id: a.canvasId, note: "available again",
       });
+      await safeNotify(notify, {
+        kind: "canvas_assignment_changed",
+        title: `Assignment available again: ${a.title}`,
+        body: "It is listed in Canvas again. Your work was kept while it was missing.",
+        link: sophiraAssignmentId ? `/assignments/${sophiraAssignmentId}` : "/dashboard",
+        dedupeKey: canvasChangedKey(a.canvasId, [a.title, "restored"]),
+      });
     } else if (existed) {
       updated++;
       await recordEvent(supabase, userId, "assignment_updated", { canvas_assignment_id: a.canvasId });
+      await safeNotify(notify, {
+        kind: "canvas_assignment_changed",
+        title: `Assignment updated in Canvas: ${a.title}`,
+        body: "Your teacher changed the details in Canvas. Your own work has not been touched.",
+        link: sophiraAssignmentId ? `/assignments/${sophiraAssignmentId}` : "/dashboard",
+        dedupeKey: canvasChangedKey(a.canvasId, [a.title, a.dueAt]),
+      });
     } else {
       created++;
       await recordEvent(supabase, userId, "assignment_new", { canvas_assignment_id: a.canvasId });
+      await safeNotify(notify, {
+        kind: "canvas_assignment_new",
+        title: `New assignment: ${a.title}`,
+        body: `${courseName}${a.dueAt ? " — it has a due date." : ""}`,
+        link: sophiraAssignmentId ? `/assignments/${sophiraAssignmentId}` : "/dashboard",
+        dedupeKey: canvasNewKey(a.canvasId),
+      });
     }
   };
 
@@ -210,7 +252,8 @@ export async function runCanvasSync(
   supabase: SupabaseClient,
   userId: string,
   baseUrl: string,
-  accessToken: string
+  accessToken: string,
+  options?: { notify?: CanvasNotifier }
 ): Promise<SyncSummary> {
   const empty: SyncSummary = {
     ok: false, message: "", courses: 0, created: 0, updated: 0, missing: 0,
@@ -282,7 +325,7 @@ export async function runCanvasSync(
     const plan = planAssignmentSync(previous, incoming);
     unchanged += plan.unchanged;
     const applied = await applyPlan(
-      supabase, userId, sophiraCourseId, name, plan, changes, titleById
+      supabase, userId, sophiraCourseId, name, plan, changes, titleById, options?.notify
     );
     created += applied.created;
     updated += applied.updated;

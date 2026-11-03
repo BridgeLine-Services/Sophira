@@ -172,6 +172,31 @@ export async function readPreferences(supabase: SupabaseClient, userId: string):
  * a retry harmless. Returns false when the member has turned this category off, so a caller
  * can skip work it would otherwise do (an email digest, for example).
  */
+/**
+ * DEDUPE KEYS for Canvas events (2026-11-03).
+ *
+ * A sync run can repeat (manual check, retries, a second device). The same Canvas change
+ * must produce ONE notification, so the key derives from what changed, not when.
+ */
+export function shortHash(input: string): string {
+  let h = 5381;
+  for (let i = 0; i < input.length; i++) h = ((h * 33) ^ input.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+export function canvasNewKey(canvasId: string): string {
+  return `canvas-new-${String(canvasId).trim()}`;
+}
+
+/**
+ * Changes are keyed by the values a student cares about: re-running a sync with the same
+ * title and due date is silent, while a genuinely different one is a new event.
+ */
+export function canvasChangedKey(canvasId: string, parts: ReadonlyArray<string | number | null | undefined>): string {
+  const material = parts.map((p) => (p === null || p === undefined ? "none" : String(p))).join("|");
+  return `canvas-changed-${String(canvasId).trim()}-${shortHash(material)}`;
+}
+
 export async function raiseNotification(
   admin: SupabaseClient,
   userId: string,
