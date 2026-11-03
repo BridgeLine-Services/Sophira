@@ -616,8 +616,12 @@ export default function NotebookWorkspace() {
       />
         {/* "Why this source?" dialog */}
         {whyFor && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setWhyFor(null)}>
-            <Card className="max-h-[80vh] w-full max-w-lg overflow-auto" onClick={undefined}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop split out of the wrapper (2026-11-03): the click-to-dismiss handler used
+                to sit on the element wrapping the dialog, which is both a mouse-only affordance and
+                a container that cannot be marked presentational. The dialog keeps its own Close. */}
+            <div className="absolute inset-0 bg-black/40" onClick={() => setWhyFor(null)} aria-hidden="true" />
+            <Card role="dialog" aria-modal="true" aria-label="Why this source?" className="relative max-h-[80vh] w-full max-w-lg overflow-auto">
               <CardHeader><CardTitle>Why this source? ({whyFor.label})</CardTitle></CardHeader>
               <CardContent className="space-y-1 text-sm">
                 {Object.entries(whyFor.data).map(([k, v]) => (

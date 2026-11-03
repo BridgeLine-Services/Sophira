@@ -68,6 +68,19 @@ function scanSource(f, src) {
         }
       }
 
+      // A <div onClick> is a control only a mouse can reach. Backdrops are the legitimate
+      // exception, and they say so by being presentational (aria-hidden or role="presentation"),
+      // so the rule checks for that rather than banning the pattern outright.
+      if (["div", "span", "li"].includes(tag) && attr(opening, "onClick")) {
+        const raw = opening.getText(sf);
+        const presentational = attr(opening, "aria-hidden") !== undefined
+          || /role\s*=\s*"(presentation|none)"/.test(raw);
+        const reachable = attr(opening, "role") !== undefined || attr(opening, "tabIndex") !== undefined;
+        if (!presentational && !reachable) {
+          found.push({ f, line: line(node), rule: "clickable element is not keyboard reachable" });
+        }
+      }
+
       if (tag === "button" && ts.isJsxElement(node)) {
         const named = [...ATTR_NAMES].some((n) => attr(opening, n));
         const text = node.children.map((c) => c.getText(sf)).join(" ").toLowerCase();
@@ -117,12 +130,15 @@ if (process.argv.includes("--self-test")) {
         <label>Name <input value={n} /></label>
         <button onClick={h} aria-label="Close"><X /></button>
         <Link href="/x"><Pencil /></Link>
+        <div onClick={k}>Row</div>
+        <div onClick={k} aria-hidden="true">Backdrop</div>
       </div>
     );`;
   const got = scanSource("fixture.tsx", bad);
   const rules = got.map((g) => g.rule).sort();
   const want = ["<input> without label", "<select> without label", "button without accessible name",
-                "dialog missing aria-modal or name", "link without accessible name"];
+                "dialog missing aria-modal or name", "link without accessible name",
+                "clickable element is not keyboard reachable"];
   const ok = JSON.stringify(rules) === JSON.stringify(want.sort());
   console.log(ok
     ? `a11y self-test: PASS (${got.length} planted defects found, none invented)`
@@ -145,7 +161,7 @@ if (process.argv.includes("--write")) {
   console.log(`a11y: recorded baseline of ${findings.length} findings`);
   process.exit(0);
 }
-console.log(`a11y: ${findings.length} findings across ${new Set(findings.map((x) => x.f)).size} files`);
+console.log(`a11y: ${findings.length} findings in ${new Set(findings.map((x) => x.f)).size} of ${files.length} files scanned`);
 for (const [r, c] of Object.entries(byRule)) console.log(`  ${String(c).padStart(3)}  ${r}`);
 if (process.argv.includes("--list")) for (const x of findings) console.log(`${x.f}:${x.line}  ${x.rule}`);
 

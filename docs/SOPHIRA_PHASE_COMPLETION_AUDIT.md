@@ -69,7 +69,8 @@ Accessibility is now covered by three gates that run in the suite, each with its
 | Gate | Covers | Does not cover |
 | --- | --- | --- |
 | `scripts/contrast.mjs` | WCAG AA ratio for every token pair, both themes | real rendered output, images, gradients |
-| `scripts/a11y-audit.mjs` | buttons with no accessible name, form controls with no label, dialogs without `aria-modal` and a name (TypeScript AST, self-tested against planted defects) | focus order, keyboard traps, ARIA misuse beyond these rules |
+| `scripts/a11y-audit.mjs` | controls with no accessible name (buttons **and** links), form controls with no label, dialogs without `aria-modal` and a name, and `<div onClick>` that only a mouse can reach unless it is marked presentational (TypeScript AST, 127 files, self-tested against 6 planted defects) | focus order, keyboard traps, ARIA misuse beyond these rules |
+| `src/app/global-error.tsx` | ships in the build (chunk verified) and is the only boundary Next uses for a root-layout crash — without it that crash showed a blank white page | a genuine layout crash has **not** been triggered here, so its rendered appearance is browser-verifiable work |
 | anonymous-API probe (in smoke) | 79 API routes POSTed an empty body signed-out: no 500s, no stack frames, module paths, DSNs or JWTs in any response | authenticated behaviour, and the 4 state-changing routes excluded from the probe |
 | `scripts/smoke-runtime.mjs` | one non-empty `h1` per public page, security headers, and: no page route outside an explicit public allowlist answers 200 signed-out (71 routes probed) | authenticated pages' content, which needs a signed-in session |
 
