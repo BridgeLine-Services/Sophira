@@ -3171,6 +3171,21 @@ async function runRedesignAuditTests(): Promise<void> {
   const inventory = fs.readFileSync("docs/REDESIGN_INVENTORY.md", "utf8");
   const pages = fs.readFileSync("docs/REDESIGN_INVENTORY.md", "utf8").match(/\| `\/[^`]*` \|/g) ?? [];
   assert(pages.length >= 60, `redesign: inventory lists every page route (found ${pages.length})`);
+  // The count in the file must match the tree, or the work list silently shrinks. The
+  // documented 60/76 figures were stale while the tree already had 62 pages and 84 APIs.
+  const appFiles = (fs.readdirSync("src/app", { recursive: true }) as string[]).map((f) => String(f));
+  const realPages = appFiles.filter((f) => f.endsWith("page.tsx")).length;
+  const realApis = appFiles.filter((f) => f.endsWith("route.ts")).length;
+  const docPages = Number((inventory.match(/Page routes: \*\*(\d+)\*\*/) ?? [])[1]);
+  const docApis = Number((inventory.match(/API routes: \*\*(\d+)\*\*/) ?? [])[1]);
+  assert(docPages === realPages,
+    `redesign: the inventory page count (${docPages}) matches the tree (${realPages}) — regenerate after adding routes`);
+  assert(docApis === realApis,
+    `redesign: the inventory API count (${docApis}) matches the tree (${realApis})`);
+  for (const route of ["/owner/members", "/owner/invitations", "/owner/requests", "/owner/activity", "/owner/status", "/owner/security", "/owner/ai-providers"]) {
+    assert(inventory.includes(`| \`${route}\` | partial |`),
+      `redesign: ${route} is recorded as partial, not complete, until it is visually reviewed`);
+  }
   assert(!/\| \S+ \|\s*\|\s*\|/.test(inventory) || true, "redesign: inventory rows carry a status column");
   assert(inventory.includes("not-started"), "redesign: unstarted routes are labelled not-started, never complete");
 }
@@ -3314,8 +3329,13 @@ async function runInventorySignalTests(): Promise<void> {
   assert(script.includes("AppShell") && script.includes("auth-gated") && script.includes("use client"),
     "redesign: signals are detected from source, not declared by hand");
   const statusJson = JSON.parse(fs.readFileSync("docs/redesign-status.json", "utf8"));
-  assert(typeof statusJson === "object" && Object.keys(statusJson).length === 0,
-    "redesign: no route claims a redesign until one has been verified");
+  const entries = Object.entries(statusJson) as Array<[string, { status?: string; reason?: string }]>;
+  assert(entries.every(([, e]) => e?.status !== "done"),
+    "redesign: no route may claim done until it is visually AND functionally verified");
+  assert(entries.every(([, e]) => typeof e?.reason === "string" && (e.reason?.length ?? 0) > 20),
+    "redesign: every recorded status carries a written reason, so a partial cannot be mistaken for finished");
+  assert(entries.every(([route]) => route.startsWith("/")),
+    "redesign: statuses are keyed by route");
 }
 
 async function runCanvasIntegrationTests(): Promise<void> {

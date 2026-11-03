@@ -1,1 +1,34 @@
-{}
+{
+  "/owner/members": {
+    "status": "partial",
+    "reason": "Dedicated route; actions reuse the shared member-actions module. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/invitations": {
+    "status": "partial",
+    "reason": "Dedicated route; mutations reuse the shared invitation-actions module and delivery wording is unchanged. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/requests": {
+    "status": "partial",
+    "reason": "Dedicated route; approving still requires the owner's click. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/activity": {
+    "status": "partial",
+    "reason": "Dedicated route reading stored timestamps through the existing buildActivity. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/status": {
+    "status": "partial",
+    "reason": "Dedicated route using the existing buildStatusRows. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/security": {
+    "status": "partial",
+    "reason": "Dedicated route reporting the server-side charge policy; it cannot change it. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/ai-providers": {
+    "status": "partial",
+    "reason": "Dedicated route reporting existing provider diagnostics; no key or token rendered. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner": {
+    "status": "partial",
+    "reason": "Still renders every management section. It has not yet been slimmed to an overview, which is the remaining Phase 1 step."
+  }
+}
