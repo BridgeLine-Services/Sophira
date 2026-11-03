@@ -35,7 +35,22 @@ const nextConfig = {
     const withHsts = process.env.NODE_ENV === "production"
       ? [...base, { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
       : base;
-    return [{ source: "/:path*", headers: withHsts }];
+    return [
+      { source: "/:path*", headers: withHsts },
+      // Private data must not sit in a shared cache (2026-11-03). These routes answer with a
+      // member's own academic work, and nothing told any intermediary not to keep a copy.
+      // no-store is the conservative choice: correctness over a marginal cache hit.
+      {
+        source: "/api/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store, private" }],
+      },
+      // Authenticated pages are also per-member; a cached copy served to the next visitor would
+      // be a data leak, so they are no-store too. Public pages keep their normal caching.
+      {
+        source: "/:path(dashboard|notebooks|assignments|essay|research|tutor|courses|writing|math|schedule|memory|extract|teachers|settings|notifications|owner)/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store, private" }],
+      },
+    ];
   },
   outputFileTracingIncludes: {
     "/terms": ["./docs/legal/TERMS_OF_SERVICE.md"],

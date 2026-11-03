@@ -108,6 +108,32 @@ console.log(`\nruntime smoke test against ${BASE}\n`);
     perms.includes("camera=()") && perms.includes("microphone=()"), perms || "(missing)");
 }
 
+// Private data must not be cached by an intermediary, and public pages must not lose their own
+// caching to an over-broad rule (2026-11-03). Both halves are asserted, because the cheap way to
+// satisfy the first half is to make everything no-store.
+{
+  const api = await fetch(BASE + "/api/notifications", { redirect: "manual" });
+  const apiCache = api.headers.get("cache-control") ?? "";
+  record("personal API responses are marked no-store, private",
+    /no-store/.test(apiCache) && /private/.test(apiCache), apiCache || "(no header)");
+
+  const memberPage = await fetch(BASE + "/dashboard", { redirect: "manual" });
+  const pageCache = memberPage.headers.get("cache-control") ?? "";
+  record("a member page is never kept by a shared cache",
+    /no-store|private/.test(pageCache), pageCache || "(no header)");
+
+  const publicPage = await fetch(BASE + "/terms", { redirect: "manual" });
+  const pubCache = publicPage.headers.get("cache-control") ?? "";
+  record("a public page keeps its normal caching (the rule is not applied blindly)",
+    pubCache !== "" && !/no-store/.test(pubCache), pubCache || "(no header)");
+
+  const robots = await fetch(BASE + "/robots.txt");
+  const robotsText = await robots.text();
+  record("crawler guidance disallows the private member areas",
+    robots.status === 200 && /Disallow: \/dashboard/.test(robotsText) && /Disallow: \/api\//.test(robotsText),
+    `status ${robots.status}`);
+}
+
 // No API route may crash on an anonymous request (2026-11-03). This probe found
 // /api/invitations/accept answering 500 to an empty signed-out POST - a crash where every other
 // route returned an honest 401 - and it is the kind of defect that only shows up when something
