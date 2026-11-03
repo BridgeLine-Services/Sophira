@@ -60,4 +60,19 @@ export function runMemberIdentityTests(assert: (cond: boolean, msg: string) => v
     '0043: phone numbers are readable only by the owner');
   assert(mig.includes('on conflict (id) do nothing'),
     '0043: the single-owner claim from 0025 is still present, not reverted');
+
+  // ---- Inviting happens in a dialog, without losing the ways to invite ---------
+  const owner = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  assert(owner.includes("inviteOpen") && owner.includes('role="dialog"') && owner.includes("aria-modal"),
+    "owner: the invite form opens as a labelled dialog rather than occupying the page");
+  assert(owner.includes("Invite member") && owner.includes("aria-haspopup=\"dialog\""),
+    "owner: an explicit Invite member button opens it");
+  assert(owner.includes('aria-label="Close invite form"'),
+    "owner: the dialog can be dismissed by a labelled control");
+  // Nothing may be lost in the move: every delivery path still exists.
+  for (const kept of ["createInvitation", "Copy invitation link", 'id="invite-phone"', "sms", "expires_days".slice(0, 8)]) {
+    assert(owner.includes(kept), `owner: the invite dialog still provides ${kept}`);
+  }
+  assert(owner.includes("deleteInvitation") && owner.includes("revokeInvitation"),
+    "owner: invitation deletion and revocation are untouched by the redesign");
 }

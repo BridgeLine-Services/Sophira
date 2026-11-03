@@ -67,6 +67,8 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   const [inviteEmailBlocked, setInviteEmailBlocked] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<NetworkMemberStats | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The invite form lives in a dialog so the directory stays the focus of the page.
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const toast = (msg: string) => {
@@ -310,9 +312,24 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
 
       {/* Direct invitations */}
       <section id="invite" className="scroll-mt-4">
-        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
-          <UserPlus className="h-5 w-5 text-accent" /> Invite someone
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="invite-heading" className="flex items-center gap-2 text-base font-semibold text-ink">
+            <UserPlus className="h-5 w-5 text-accent" /> Invite someone
+          </h2>
+          <Button onClick={() => setInviteOpen(true)} aria-haspopup="dialog">
+            <UserPlus className="h-4 w-4" /> Invite member
+          </Button>
+        </div>
+        {inviteOpen && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/40 p-4" role="dialog"
+               aria-modal="true" aria-labelledby="invite-heading">
+            <div className="mx-auto mt-8 w-full max-w-2xl rounded-card border border-line bg-surface shadow-lg">
+              <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                <p className="text-sm font-semibold text-ink">Invite a member</p>
+                <Button size="sm" variant="ghost" onClick={() => setInviteOpen(false)} aria-label="Close invite form">
+                  Close
+                </Button>
+              </div>
         <Card>
           <CardContent className="p-4">
             <form onSubmit={createInvitation} className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -422,6 +439,9 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
           </CardContent>
         </Card>
 
+            </div>
+          </div>
+        )}
         {invitations.length > 0 && (
           <div className="mt-3 space-y-2">
             {invitations.map((i) => (
