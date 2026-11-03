@@ -11,7 +11,7 @@ export function runProdFixTests(assert: (c: boolean, n: string) => void, section
   const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
   assert(!shell.includes('href: "#'),
     "nav: no hash-only owner links remain (a hash-only href resolves against the CURRENT route, which is why they did nothing on /owner/health)");
-  for (const href of ["/owner#overview", "/owner#requests", "/owner#invite", "/owner#members"]) {
+  for (const href of ["/owner#overview", "/owner#requests", "/owner#invite"]) {
     assert(shell.includes(`{ href: "${href}",`),
       `nav: ${href} navigates to the Owner Dashboard route FIRST, then applies the hash`);
   }

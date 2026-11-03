@@ -74,7 +74,7 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
 
   // ---- The owner sidebar must reach every section that now exists --------------
   const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
-  for (const route of ["activity", "status", "security", "ai-providers"]) {
+  for (const route of ["members", "activity", "status", "security", "ai-providers"]) {
     assert(shell.includes(`"/owner/${route}"`),
       `nav: the owner sidebar links to the dedicated ${route} page`);
     assert(existsSync(`src/app/owner/${route}/page.tsx`),
@@ -85,4 +85,13 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
   }
   assert(shell.includes('heading: "Monitoring"'),
     "nav: the new sections sit in their own group rather than being appended anywhere");
+
+  const panel = readFileSync("src/components/app/MembersPanel.tsx", "utf8");
+  assert(panel.includes("postMemberAction") && panel.includes("MemberDirectory"),
+    "members page: it reuses the directory and the shared action, not a second implementation");
+  assert(panel.includes('role="dialog"') && panel.includes("Yes, remove permanently"),
+    "members page: permanent removal stays separately confirmed, never one click");
+  const dashSource = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  assert((dashSource.match(/api\/network\/members/g) ?? []).length === 0,
+    "members: the mutation has one implementation, so the two screens cannot drift");
 }

@@ -6,6 +6,7 @@ import { MemberDirectory } from "@/components/app/MemberDirectory";
 import { buildActivity } from "@/lib/owner-activity";
 import { buildStatusRows, statusIsHealthy, type StatusInput } from "@/lib/owner-status";
 import { buildTrends } from "@/lib/owner-trends";
+import { postMemberAction, type MemberAction } from "@/lib/owner/member-actions";
 import { Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Label, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
@@ -186,13 +187,8 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   async function memberAction(member: NetworkMemberStats, action: string, value?: boolean) {
     setBusyId(member.user_id);
     try {
-      const res = await fetch("/api/network/members", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, user_id: member.user_id, value }),
-      });
-      const json = await res.json();
-      if (!res.ok) toast(json.error || "The action failed.");
+      const failure = await postMemberAction(action as MemberAction, member.user_id, value);
+      if (failure) toast(failure);
       await refresh();
     } finally {
       setBusyId(null);
