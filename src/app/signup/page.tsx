@@ -106,7 +106,7 @@ function SignUpForm() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
+    <div role="main" className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
       <div className="mb-8 flex flex-col items-center gap-2 text-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-on-accent">
           <Sparkles className="h-6 w-6" />
@@ -215,7 +215,7 @@ export default function SignUpPage() {
     // page until the bundle hydrates.
     <Suspense
       fallback={
-        <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10 text-center">
+        <div role="main" className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10 text-center">
           <h1 className="text-xl font-semibold text-ink">Create your Sophira account</h1>
           <p className="mt-2 text-sm text-ink-soft">Checking your invitation…</p>
         </div>

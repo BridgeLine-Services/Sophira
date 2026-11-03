@@ -24,6 +24,7 @@ const PUBLIC_PAGES = [
   { path: "/login", expect: "sign", title: "Sophira" },
   { path: "/signup", expect: "account", title: "Sophira" },
   { path: "/privacy", expect: "privacy", title: "Sophira" },
+  { path: "/downloads", expect: "download", title: "Sophira" },
   // The owner's first screen. It must explain itself, not just render.
   { path: "/setup", expect: "what sophira checks", title: "Sophira" },
   // Added 2026-11-03: these four also render without a session (probed against the built app),
@@ -208,6 +209,13 @@ for (const page of PUBLIC_PAGES) {
   const h1s = [...r.body.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1].replace(/<[^>]*>/g, "").trim());
   record(`${page.path} has exactly one h1`, h1s.length === 1, `${h1s.length} found`);
   record(`${page.path} h1 is not empty`, h1s.every((t) => t.length > 2), h1s[0]?.slice(0, 40) ?? "none");
+  // A page needs one main landmark so a screen reader can jump past the chrome (2026-11-03).
+  // Measured on the rendered HTML, because two of these pages serve their Suspense fallback
+  // during SSR - the form itself never appears in the first response, so only the skeleton can
+  // carry the landmark there. Five public pages had none at all: /login, /signup,
+  // /reset-password, /downloads and /install.
+  const landmarks = (r.body.match(/<main[\s>]|role="main"/g) ?? []).length;
+  record(`${page.path} has a main landmark`, landmarks === 1, `${landmarks} found`);
 }
 
 for (const path of PROTECTED) {

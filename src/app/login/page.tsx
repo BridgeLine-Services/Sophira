@@ -162,7 +162,7 @@ function LoginForm() {
 
   if (setupNeeded) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
+      <div role="main" className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-on-accent">
             <Sparkles className="h-6 w-6" />
@@ -185,7 +185,7 @@ function LoginForm() {
     );
   }
   return (
-    <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
+    <div role="main" className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
       <Link href="/install" className="mb-8 flex flex-col items-center gap-3 text-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-on-accent">
           <Sparkles className="h-6 w-6" />
@@ -325,7 +325,7 @@ function LoginForm() {
  */
 function LoginSkeleton() {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 px-4">
+    <div role="main" className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 px-4">
       <h1 className="text-xl font-semibold text-ink">Sign in to Sophira</h1>
       <p className="text-sm text-ink-soft" role="status" aria-live="polite">
         Loading your sign-in form…

@@ -93,7 +93,7 @@ export default function DownloadsPage() {
   const date = release ? new Date(release.published_at).toLocaleDateString() : null;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <div role="main" className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Download Sophira</h1>
         <p className="mt-1 text-sm text-muted-foreground">

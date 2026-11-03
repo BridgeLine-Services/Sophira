@@ -53,7 +53,7 @@ function InstallCard() {
 
   return (
     <>
-    <Card>
+    <Card role="main">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Download className="h-5 w-5 text-accent" />
