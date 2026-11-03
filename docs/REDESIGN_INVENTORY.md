@@ -60,7 +60,7 @@ data layer, `auth-gated` = redirects or reads the session itself. A page with no
 | `/offline` | not-started | ai, client, offline, shell |  |
 | `/onboarding` | not-started | auth-gated, client, shell, supabase |  |
 | `/online` | not-started | client, offline, shell |  |
-| `/owner` | partial | ai, auth-gated, integrations, shell, supabase | Still renders every management section. It has not yet been slimmed to an overview, which is the remaining Phase 1 step. |
+| `/owner` | partial | ai, auth-gated, integrations, shell, supabase | Now a real overview: four aggregate tiles that link to their pages, a status line, and cards to each management page. Automated tests pass; light/dark and mobile visual review not yet done, so it is not marked complete. |
 | `/owner/activity` | partial | shell | Dedicated route reading stored timestamps through the existing buildActivity. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete. |
 | `/owner/ai-providers` | partial | ai, integrations, shell | Dedicated route reporting existing provider diagnostics; no key or token rendered. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete. |
 | `/owner/health` | not-started | auth-gated, shell, supabase |  |

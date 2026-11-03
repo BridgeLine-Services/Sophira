@@ -29,6 +29,6 @@
   },
   "/owner": {
     "status": "partial",
-    "reason": "Still renders every management section. It has not yet been slimmed to an overview, which is the remaining Phase 1 step."
+    "reason": "Now a real overview: four aggregate tiles that link to their pages, a status line, and cards to each management page. Automated tests pass; light/dark and mobile visual review not yet done, so it is not marked complete."
   }
 }

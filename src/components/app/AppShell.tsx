@@ -39,7 +39,7 @@ const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; la
   {
     heading: "Overview",
     items: [
-      { href: "/owner#overview", label: "Dashboard overview", icon: Gauge },
+      { href: "/owner", label: "Dashboard overview", icon: Gauge },
       { href: "/owner/health", label: "System Health", icon: Gauge },
     ],
   },

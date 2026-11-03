@@ -22,7 +22,7 @@ export default async function OwnerMembersPage() {
             <h2 className="text-lg font-semibold text-ink">Everyone in your network</h2>
             <p className="mt-1 max-w-2xl text-sm text-ink-soft">
               Revoke access to switch someone off temporarily; you can restore them later. Removing
-              an account permanently is a separate action and asks for confirmation.
+              an account permanently is a separate action and asks for confirmation. Only the owner can grant, revoke, or reinstate access.
             </p>
           </div>
           <div className="flex gap-3 text-sm font-medium">

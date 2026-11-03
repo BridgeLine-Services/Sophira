@@ -97,15 +97,15 @@ export function InvitationsPanel({ initialInvitations, members, siteUrl }: {
 
   const fmt = (iso: string) => new Date(iso).toLocaleDateString();
   const isExpired = (i: Invitation) => new Date(i.expires_at).getTime() < Date.now() && i.status === "pending";
-  const joinedAs = (inviteEmail: string | null) =>
+  const joinedFor = (inviteEmail: string | null) =>
     members.find((m) => m.email && inviteEmail && m.email.toLowerCase() === inviteEmail.toLowerCase()) ?? null;
 
   return (
     <div className="space-y-5">
       <Card>
         <CardContent className="p-4">
-          <form onSubmit={submit} className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="min-w-0 md:col-span-2">
+          <form onSubmit={submit} className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="min-w-0 md:col-span-2 xl:col-span-1">
               <Label htmlFor="invite-email">Their email</Label>
               <Input id="invite-email" type="email" required className="h-11 w-full text-base"
                 value={email} onChange={(e) => setEmail(e.target.value)} placeholder="friend@example.com" />
@@ -139,7 +139,7 @@ export function InvitationsPanel({ initialInvitations, members, siteUrl }: {
                   : "Use the full international number, e.g. +1 555 123 4567."}
               </p>
             </div>
-            <div className="md:col-span-2 xl:col-span-2 flex items-end">
+            <div className="flex items-end md:col-span-2 xl:col-span-1">
               <Button type="submit" className="h-11 w-full sm:w-auto" disabled={busy}>
                 {busy ? "Sending…" : "Send invitation"}
               </Button>
@@ -189,7 +189,7 @@ export function InvitationsPanel({ initialInvitations, members, siteUrl }: {
       ) : (
         <div className="space-y-2">
           {invitations.map((i) => {
-            const joined = joinedAs(i.email);
+            const joined = joinedFor(i.email);
             return (
               <Card key={i.id}>
                 <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">

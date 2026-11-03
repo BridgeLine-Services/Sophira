@@ -53,9 +53,13 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
   const lib = readFileSync("src/lib/owner-activity.ts", "utf8");
   assert(!/Math\.random|Date\.now\(\)/.test(lib),
     "activity: no simulated or randomly generated events in the feed");
-  const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-  assert(dash.includes('id="activity"') && dash.includes("buildActivity({ members, invitations })"),
-    "activity: the owner dashboard renders the derived feed");
+  // 2026-11-03: the feed has its own page now; the derivation itself is unchanged.
+  const feed = readFileSync("src/app/owner/activity/page.tsx", "utf8");
+  assert(feed.includes("buildActivity({ members, invitations })"),
+    "activity: the activity page renders the derived feed");
+  const overview = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  assert(overview.includes('"/owner/activity"') && !overview.includes("buildActivity("),
+    "activity: the overview links to the feed instead of duplicating it");
 
   // ---- System status must never call an unconfigured service "working" ---------
   const off = buildStatusRows({ aiReady: false, microsoft: false, google: false, search: false, membersLoaded: true });
@@ -96,11 +100,13 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
     "members: the mutation has one implementation, so the two screens cannot drift");
 
   const actions = readFileSync("src/lib/owner/invitation-actions.ts", "utf8");
-  const dashInvites = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  const dashInvites = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8")
+    + readFileSync("src/components/app/InvitationsPanel.tsx", "utf8")
+    + readFileSync("src/components/app/RequestsPanel.tsx", "utf8");
   assert(!dashInvites.includes('"/api/invitations"') && !dashInvites.includes("decision }"),
-    "invitations: the mutations have one implementation, so dashboard and pages cannot drift");
-  assert(dashInvites.includes("createInvitationRequest") && dashInvites.includes("decideInvitationRequest"),
-    "invitations: the dashboard calls the shared actions rather than its own fetch");
+    "invitations: the mutations have one implementation, so the overview and the pages cannot drift");
+  assert(dashInvites.includes("createInvitationRequest") && dashInvites.includes("decideRequest"),
+    "invitations: the UI calls the shared actions rather than its own fetch");
   assert(actions.includes('delivery === "sent") return "Invitation sent."'),
     "invitations: sent is only reported when the provider said sent");
   assert(actions.includes("partially_sent") && actions.includes("not_configured"),

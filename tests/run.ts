@@ -130,6 +130,7 @@ import { runAccessibilityTests } from "./accessibility";
 import { runBackupIntegrityTests } from "./backup-integrity";
 import { runBackupToolTests } from "./backup-tool";
 import { runOwnerActivityTests } from "./owner-activity";
+import { readInviteUi, readOwnerUi } from "./owner-surface";
 import { runOwnerTrendTests } from "./owner-trends";
 import { runActivationReadinessTests } from "./activation-readiness";
 import { runMemberIdentityTests } from "./member-identity";
@@ -4106,8 +4107,7 @@ async function runAccessControlTests(): Promise<void> {
     assert(ownerPage.includes('profile.role !== "owner"'), "access: /owner is owner-only, checked server-side");
     // 2026-11-03: the member list moved into MemberDirectory (a table), so these pins read
     // both files. Behaviour is unchanged; only the presentation moved.
-    const ui = fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "OwnerDashboard.tsx"), "utf8")
-      + fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "MemberDirectory.tsx"), "utf8");
+    const ui = readOwnerUi();
     assert(ui.includes("Revoke access") && ui.includes("Restore"),
       "access: the Access Management area offers revoke/reinstate");
     assert(ui.includes("id.subtitle") && ui.includes("joined ") && ui.includes("revoked "),
@@ -4498,8 +4498,8 @@ async function runOwnerFlowSimplicityTests(): Promise<void> {
 }
 
 async function runInviteFormTests(): Promise<void> {
-  const { readFileSync } = await import("fs");
-  const ui = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  // 2026-11-03: the form now lives on /owner/invitations, so it is read there.
+  const ui = readInviteUi();
   assert(!/<option value="sms" disabled|<option value="both" disabled/.test(ui),
     "invite form: all three delivery choices are always selectable");
   assert(/<option value="sms">Text message<\/option>/.test(ui) && /<option value="both">Email and text<\/option>/.test(ui),
@@ -4511,11 +4511,11 @@ async function runInviteFormTests(): Promise<void> {
   assert(ui.includes("min-w-0"), "invite form: grid children cannot overflow");
   assert(ui.includes('id="invite-phone"') && ui.includes('type="tel"'),
     "invite form: the phone field exists and is tel-typed");
-  assert(ui.includes('disabled={inviteChannel === "email"}'),
+  assert(ui.includes('disabled={channel === "email"}'),
     "invite form: the phone field stays visible and is enabled for text delivery");
   assert(ui.includes("copy the link to send it yourself"),
     "invite form: the status line states the manual link always works");
-  assert(ui.includes('setInviteEmailBlocked(result.delivery !== "sent")'),
+  assert(ui.includes('setCopyFirst(result.delivery !== "sent")'),
     "invite form: any non-sent outcome reveals the copy-link fallback");
 }
 async function runChannelDiscoveryTests(): Promise<void> {
@@ -4703,12 +4703,11 @@ async function runDeliveryCapabilityTests(): Promise<void> {
     const manifest = readFileSync("src/config/env.manifest.json", "utf8");
     for (const n of ["SOPHIRA_INVITE_FROM_EMAIL","EMAIL_API_URL","EMAIL_API_KEY","EMAIL_FROM","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER"])
       assert(manifest.includes(`"name": "${n}"`), `delivery: ${n} is declared in the authoritative manifest`);
-    const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8")
-    + readFileSync("src/components/app/MemberDirectory.tsx", "utf8");
+    const dash = readOwnerUi();
     // 2026-10-29 (owner request): choices are NO LONGER disabled. The owner may
     // always pick a channel; an unconfigured channel creates the invitation and
     // reveals the copy link, and the status line names what is missing.
-    assert(dash.includes("Text messaging is not configured.") && !dash.includes("disabled={cap ? !cap.sms : false}"),
+    assert(dash.includes("Text messaging is not configured") && !dash.includes("disabled={cap ? !cap.sms : false}"),
       "dashboard: an unavailable channel is labelled in plain text and still selectable, with the link fallback");
   } finally {
     for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]!; }
@@ -4811,13 +4810,13 @@ async function runInvitationDeliveryTests(): Promise<void> {
 
     // 12/14/15/16: source-level guarantees of the existing secure flow
     const route = readFileSync("src/app/api/invitations/route.ts", "utf8");
-    const ui = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+    const ui = readInviteUi();
     assert(route.includes('channel') && route.includes("normalizePhone(body.phone)") && route.includes("deliverInvitation"),
       "invite: one route handles email/sms/both through the delivery layer");
     assert(route.includes('.eq("status", "pending")') && route.includes("reused: Boolean(existing)"),
       "invite: a pending invitation is REUSED, so retries never mint a second token");
     assert(route.includes("ownerClient()"), "invite: only the owner can create invitations (server-side owner guard unchanged)");
-    assert(ui.includes('value="both"') && ui.includes("invitePhone") && ui.includes("Send Invitation"),
+    assert(ui.includes('value="both"') && ui.includes('id="invite-phone"') && ui.includes("Send invitation"),
       "invite: the owner form offers email, text, or both, and a phone field");
     assert(!route.includes("sendInvitationEmail("), "invite: the old email-only send is fully replaced by the delivery layer");
   } finally {

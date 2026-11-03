@@ -25,15 +25,21 @@ export function runMemberIdentityTests(assert: (cond: boolean, msg: string) => v
   assert(single.subtitle === "No email on file", "identity: a missing email is stated, not left silent");
 
   const dashSrc = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8")
-    + readFileSync("src/components/app/MemberDirectory.tsx", "utf8");
+    + readFileSync("src/components/app/MemberDirectory.tsx", "utf8")
+    + readFileSync("src/components/app/InvitationsPanel.tsx", "utf8");
   assert(!dashSrc.includes("(no name)"), "dashboard: the (no name) placeholder no longer exists");
   assert(dashSrc.includes("memberIdentity"), "dashboard: rows use the tested identity helper");
   assert(dashSrc.includes("id.title") && dashSrc.includes("id.subtitle"), "dashboard: name and email are both rendered per member");
   assert(dashSrc.includes("confirmRevokeId") && dashSrc.includes("Confirm revoke"), "dashboard: revoking takes an explicit confirmation step");
-  assert(dashSrc.includes('id="invite-phone"') && dashSrc.includes("sms"), "dashboard: the SMS invite option is preserved, not removed");
-  // The table calls onAction; OwnerDashboard wires that prop to the same memberAction handler,
-  // so a restore still reaches the unchanged server route.
-  assert(dashSrc.includes('onAction(m, "restore")') && dashSrc.includes("onAction={memberAction}"),
+  // 2026-11-03: the invite form moved to /owner/invitations; the SMS option must survive there.
+  const inviteUi = readFileSync("src/components/app/InvitationsPanel.tsx", "utf8");
+  assert(inviteUi.includes('id="invite-phone"') && inviteUi.includes("sms"),
+    "invite: the SMS option is preserved, not removed");
+  // The table calls onAction; MembersPanel wires that prop to the shared member action, so a
+  // restore still reaches the unchanged server route.
+  const membersPanel = readFileSync("src/components/app/MembersPanel.tsx", "utf8");
+  assert(dashSrc.includes('onAction(m, "restore")') && membersPanel.includes("onAction={") &&
+    membersPanel.includes("postMemberAction"),
     "dashboard: reinstatement still reaches the unchanged action handler");
 
   const types = readFileSync("src/lib/types.ts", "utf8");
@@ -61,14 +67,18 @@ export function runMemberIdentityTests(assert: (cond: boolean, msg: string) => v
   assert(mig.includes('on conflict (id) do nothing'),
     '0043: the single-owner claim from 0025 is still present, not reverted');
 
-  // ---- Inviting happens in a dialog, without losing the ways to invite ---------
-  const owner = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-  assert(owner.includes("inviteOpen") && owner.includes('role="dialog"') && owner.includes("aria-modal"),
-    "owner: the invite form opens as a labelled dialog rather than occupying the page");
-  assert(owner.includes("Invite member") && owner.includes("aria-haspopup=\"dialog\""),
-    "owner: an explicit Invite member button opens it");
-  assert(owner.includes('aria-label="Close invite form"'),
-    "owner: the dialog can be dismissed by a labelled control");
+  // ---- Inviting has its own page, without losing the ways to invite -----------
+  // 2026-11-03: the form is no longer a dialog on the dashboard - it is the page's whole job,
+  // which satisfies the same requirement (it never crowds the directory) more simply.
+  const owner = readFileSync("src/components/app/InvitationsPanel.tsx", "utf8")
+    + readFileSync("src/app/owner/invitations/page.tsx", "utf8");
+  const overview = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  assert(!/role="dialog"/.test(overview) && overview.includes('"/owner/invitations"'),
+    "owner: inviting lives on its own page and the overview links to it");
+  assert(owner.includes("<form") && owner.includes('htmlFor="invite-email"'),
+    "owner: the invite form is labelled where it lives");
+  assert(owner.includes('href="/owner/members"') || owner.includes("Back to overview"),
+    "owner: the invite page offers a way back");
   // Nothing may be lost in the move: every delivery path still exists.
   for (const kept of ["createInvitation", "Copy invitation link", 'id="invite-phone"', "sms", "expires_days".slice(0, 8)]) {
     assert(owner.includes(kept), `owner: the invite dialog still provides ${kept}`);

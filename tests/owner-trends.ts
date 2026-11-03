@@ -45,7 +45,10 @@ export function runOwnerTrendTests(assert: (cond: boolean, msg: string) => void)
   assert(!/token|percent|%/i.test(code),
     "trends: no percentages or token claims, because neither is measured");
   const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  // 2026-11-03: the tiles are built from one table, so each trend is asserted as the note
+  // value bound to its own tile rather than as a JSX expression.
   for (const key of ["trends.members", "trends.active", "trends.invitations", "trends.requests"]) {
-    assert(dash.includes(`{${key}}`), `trends: the ${key.split(".")[1]} tile shows its line`);
+    assert(dash.includes(`note: ${key}`), `trends: the ${key.split(".")[1]} tile shows its line`);
   }
+  assert(dash.includes("{t.note}"), "trends: the tile renders the note it is given");
 }

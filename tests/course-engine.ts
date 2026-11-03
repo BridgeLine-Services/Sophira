@@ -524,9 +524,15 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(gateScript.includes("0001-0038"),
     "gate: migration range reflects the CURRENT chain end 0038 (tail-marker probe)");
 
+  // 2026-11-03: only the overview anchor survives on the dashboard; the other sections are
+  // real routes, so they need pages rather than anchors.
   const ownerDash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-  assert(ownerDash.includes('id="overview"') && ownerDash.includes('id="requests"') && ownerDash.includes('id="invite"') && ownerDash.includes('id="members"'),
-    "owner: dashboard sections have anchor targets for the owner navigation items");
+  assert(ownerDash.includes('id="overview"'),
+    "owner: the overview anchor target still exists for the dashboard nav item");
+  for (const route of ["members", "invitations", "requests", "activity", "status", "security", "ai-providers"]) {
+    assert(existsSync(`src/app/owner/${route}/page.tsx`),
+      `owner: /owner/${route} is a real page, not a missing anchor`);
+  }
 
   // Courses hierarchy: Science is a parent with Biology/Chemistry/Physics nested.
   const coursesPage = readFileSync("src/app/courses/page.tsx", "utf8");
@@ -833,9 +839,13 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       assert(owner.includes(`id="${frag}"`),
         "owner-nav: /owner#" + frag + " targets a real element on the owner page");
     }
-    for (const frag of ["members", "invite", "requests"]) {
-      assert(dash.includes(`id="${frag}"`),
-        "owner-nav: /owner#" + frag + " targets a real section of the member dashboard");
+    // These three are routes now, so the nav points at a page instead of a fragment. The
+    // integrity requirement is unchanged: a destination must actually exist.
+    for (const route of ["members", "invitations", "requests"]) {
+      assert(existsSync(`src/app/owner/${route}/page.tsx`),
+        "owner-nav: /owner/" + route + " resolves to a real page");
+      assert(!flat.includes(`href: "/owner#${route}"`),
+        "owner-nav: the old #" + route + " fragment link is gone");
     }
   }
 
@@ -979,14 +989,18 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "invitations: a pending unexpired invitation for the same address is REUSED — retries never duplicate rows or emails");
     assert(api.includes("email_status") && api.includes("email_note"),
       "invitations: the response carries the honest email status and a human note");
-    const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-    assert(dash.includes("result.emailNote") && dash.includes("inviteNote"),
+    const dash = readFileSync("src/components/app/InvitationsPanel.tsx", "utf8");
+    assert(dash.includes("result.emailNote") && dash.includes("deliveryMessage"),
       "invitations: the owner sees the actual email result next to the copy link");
     const mig = readFileSync("supabase/migrations/0036_invitation_email_status.sql", "utf8");
     assert(mig.includes("email_status") && mig.includes("add column if not exists"),
       "invitations: migration 0036 records delivery status non-destructively");
-    assert(dash.includes('fetch("/api/network/stats", { cache: "no-store" })') &&
-      dash.includes('fetch("/api/invitation-requests", { cache: "no-store" })'),
+    // 2026-11-03: the refreshing panels moved to their own pages; the no-store rule follows.
+    const panels = readFileSync("src/components/app/InvitationsPanel.tsx", "utf8")
+      + readFileSync("src/components/app/RequestsPanel.tsx", "utf8")
+      + readFileSync("src/components/app/MembersPanel.tsx", "utf8");
+    assert(panels.includes('fetch("/api/network/stats", { cache: "no-store" })') &&
+      panels.includes('fetch("/api/invitation-requests", { cache: "no-store" })'),
       "dashboard: refreshes bypass the browser cache — mutations reflect immediately, and a failed refresh is surfaced, not silent");
   }
 
@@ -1208,9 +1222,12 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     const api = readFileSync("src/app/api/notebooks/route.ts", "utf8");
     assert(api.includes('NextResponse.json({ notebooks: data ?? [] })'),
       "notebooks API: an empty list and a failed query are never conflated");
-    const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-    assert(dash.includes("Could not refresh the member list") && dash.includes('{ cache: "no-store" }'),
-      "owner dashboard: a failed refresh toasts honestly and keeps the current lists (verified, no change needed)");
+    const dash = readFileSync("src/components/app/MembersPanel.tsx", "utf8")
+      + readFileSync("src/components/app/InvitationsPanel.tsx", "utf8")
+      + readFileSync("src/components/app/RequestsPanel.tsx", "utf8")
+      + readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+    assert(dash.includes('{ cache: "no-store" }') && /could not|Could not/i.test(dash),
+      "owner: a failed refresh states it plainly and keeps the current lists (verified, no change needed)");
   }
 // ==== Release-hardening round (2026-10-14): the false-green migration gate ====
   section("live migration verification can never silently pass on the wrong probe");

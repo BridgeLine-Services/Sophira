@@ -3,7 +3,7 @@
  * IndexedDB out-of-line-key failure, and System Health honesty in the
  * deployed architecture.
  */
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 
 export function runProdFixTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
   section("production fixes (owner nav, offline keys, deployment honesty)");
@@ -11,9 +11,17 @@ export function runProdFixTests(assert: (c: boolean, n: string) => void, section
   const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
   assert(!shell.includes('href: "#'),
     "nav: no hash-only owner links remain (a hash-only href resolves against the CURRENT route, which is why they did nothing on /owner/health)");
-  for (const href of ["/owner#overview"]) {
-    assert(shell.includes(`{ href: "${href}",`),
-      `nav: ${href} navigates to the Owner Dashboard route FIRST, then applies the hash`);
+  // 2026-11-03 (phase 1): the owner sections became real routes, so no owner nav link may
+  // depend on a hash. A hash link only scrolls an existing anchor and silently does nothing
+  // when that anchor is gone, which is the defect this file was written for.
+  assert(!/\/owner#/.test(shell),
+    "nav: no owner nav link uses a hash any more - every destination is its own page");
+  for (const route of ["/owner", "/owner/health", "/owner/members", "/owner/invitations",
+    "/owner/requests", "/owner/activity", "/owner/status", "/owner/security",
+    "/owner/ai-providers", "/owner/integrations"]) {
+    assert(shell.includes(`{ href: "${route}",`), `nav: ${route} is a sidebar destination`);
+    const file = route === "/owner" ? "src/app/owner/page.tsx" : `src/app${route}/page.tsx`;
+    assert(existsSync(file), `nav: ${route} resolves to a real page module (${file})`);
   }
   assert(!shell.includes('label: "Online status"'),
     "nav: no redundant owner-nav Online entry remains (the sidebar connectivity indicator already links to /online; two entries to the same page was the reported defect)");
@@ -28,11 +36,13 @@ export function runProdFixTests(assert: (c: boolean, n: string) => void, section
   assert(/\.put\(value,\s*\w+\)/.test(backend),
     "offline: every kv write now supplies the record key explicitly, preserving all existing stored records (no schema reset, no data loss)");
 
+  // The overview keeps one anchor (its own tiles); the other sections are routes now, so a
+  // stale anchor cannot be relied on. The dashboard must not scroll-jack to fake them.
   const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-  assert(dash.includes("hashchange") && dash.includes("scrollIntoView"),
-    "nav: arriving at /owner#members (and refresh + back/forward) scrolls to the section instead of silently landing at the top");
-  for (const id of ['id="overview"', 'id="requests"', 'id="invite"', 'id="members"']) {
-    assert(dash.includes(id), `nav: the ${id} anchor target exists (a hash link without its anchor is a silent no-op)`);
+  assert(dash.includes('id="overview"'), "nav: the overview anchor still exists for the dashboard link");
+  for (const gone of ['id="requests"', 'id="invite"', 'id="members"']) {
+    assert(!dash.includes(gone),
+      `nav: ${gone} is no longer a dashboard anchor - that section is its own page`);
   }
 
   const route = readFileSync("src/app/api/owner/system-health/route.ts", "utf8");
