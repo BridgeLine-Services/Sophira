@@ -3,11 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { memberIdentity } from "@/lib/member-identity";
 import { MemberDirectory } from "@/components/app/MemberDirectory";
+import { buildActivity } from "@/lib/owner-activity";
 import { Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Label, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import {
   Copy, Mail, MailQuestion, ShieldOff, Trash2, UserPlus, Users, XCircle,
+  Activity,
 } from "lucide-react";
 
 /**
@@ -204,6 +206,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   const joinedFor = (email: string | null) =>
     members.find((m) => m.email && email && m.email.toLowerCase() === email.toLowerCase()) ?? null;
 
+  const activity = buildActivity({ members, invitations });
   const activeMembers = members.filter((m) => m.status === "active");
   const isExpired = (i: Invitation) =>
     i.status === "pending" && new Date(i.expires_at).getTime() <= Date.now();
@@ -512,6 +515,32 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
           You can see membership and aggregate activity, but never another member&apos;s private academic
           work — their courses, assignments, writing, and feedback stay visible only to them.
         </p>
+      </section>
+
+      {/* Recent activity - derived from stored timestamps only, never simulated. */}
+      <section id="activity" className="scroll-mt-4">
+        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
+          <Activity className="h-5 w-5 text-accent" /> Recent activity
+        </h2>
+        {activity.length === 0 ? (
+          <EmptyState icon={<Activity className="h-6 w-6" />} title="Nothing yet"
+            description="Invitations, new members, and access changes appear here as they happen." />
+        ) : (
+          <Card>
+            <CardContent className="divide-y divide-line p-0">
+              {activity.map((item) => (
+                <div key={item.id} className="flex items-start gap-3 p-4">
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-ink">{item.title}</p>
+                    <p className="mt-0.5 text-xs text-ink-soft">{item.detail}</p>
+                  </div>
+                  <span className="whitespace-nowrap text-xs text-ink-soft">{timeAgo(item.at)}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </section>
 
       <ConfirmDialog
