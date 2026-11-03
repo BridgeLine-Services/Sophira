@@ -197,6 +197,11 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
     setRemoveTarget(null);
   }
 
+  // After someone accepts, the invitation row must say WHO joined - the name they chose and
+  // the phone they gave - so the owner can identify a person before revoking anyone.
+  const joinedFor = (email: string | null) =>
+    members.find((m) => m.email && email && m.email.toLowerCase() === email.toLowerCase()) ?? null;
+
   const activeMembers = members.filter((m) => m.status === "active");
   const isExpired = (i: Invitation) =>
     i.status === "pending" && new Date(i.expires_at).getTime() <= Date.now();
@@ -427,6 +432,12 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                       {i.email}
                       <Badge>{isExpired(i) ? "expired" : i.status}</Badge>
                     </p>
+                    {joinedFor(i.email) ? (
+                      <p className="mt-0.5 text-xs text-ink">
+                        joined as <span className="font-medium">{memberIdentity(joinedFor(i.email)!).title}</span>
+                        {joinedFor(i.email)!.phone ? ' · ' + joinedFor(i.email)!.phone : ' · no phone yet'}
+                      </p>
+                    ) : null}
                     <p className="mt-0.5 text-xs text-ink-soft">
                       created {fmtDate(i.created_at)}
                       {i.accepted_at ? ` · accepted ${fmtDate(i.accepted_at)}` : ""}
@@ -492,7 +503,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                         </div>
                       </div>
                       <p className="mt-1 text-xs text-ink-soft">
-                        {m.email || "no email"} · access granted {fmtDate(m.created_at)}
+                        {m.phone ? m.phone : "no phone yet"} · access granted {fmtDate(m.created_at)}
                         {m.status === "revoked" && m.access_revoked_at
                           ? ` · access revoked ${fmtDate(m.access_revoked_at)}`
                           : ""}{" "}

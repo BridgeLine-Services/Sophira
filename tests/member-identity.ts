@@ -24,15 +24,36 @@ export function runMemberIdentityTests(assert: (cond: boolean, msg: string) => v
   assert(single.initials === "PR", "identity: a single-word name yields two initials");
   assert(single.subtitle === "No email on file", "identity: a missing email is stated, not left silent");
 
-  const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-  assert(!dash.includes("(no name)"), "dashboard: the (no name) placeholder no longer exists");
-  assert(dash.includes("memberIdentity"), "dashboard: rows use the tested identity helper");
-  assert(dash.includes("id.title") && dash.includes("id.subtitle"), "dashboard: name and email are both rendered per member");
-  assert(dash.includes("confirmRevokeId") && dash.includes("Confirm revoke"), "dashboard: revoking takes an explicit confirmation step");
-  assert(dash.includes('id="invite-phone"') && dash.includes("sms"), "dashboard: the SMS invite option is preserved, not removed");
-  assert(dash.includes("memberAction(m, \"restore\")"), "dashboard: reinstatement still calls the unchanged action handler");
+  const dashSrc = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  assert(!dashSrc.includes("(no name)"), "dashboard: the (no name) placeholder no longer exists");
+  assert(dashSrc.includes("memberIdentity"), "dashboard: rows use the tested identity helper");
+  assert(dashSrc.includes("id.title") && dashSrc.includes("id.subtitle"), "dashboard: name and email are both rendered per member");
+  assert(dashSrc.includes("confirmRevokeId") && dashSrc.includes("Confirm revoke"), "dashboard: revoking takes an explicit confirmation step");
+  assert(dashSrc.includes('id="invite-phone"') && dashSrc.includes("sms"), "dashboard: the SMS invite option is preserved, not removed");
+  assert(dashSrc.includes("memberAction(m, \"restore\")"), "dashboard: reinstatement still calls the unchanged action handler");
 
   const types = readFileSync("src/lib/types.ts", "utf8");
-  assert(!/interface NetworkMemberStats[\s\S]{0,400}phone:/.test(types),
-    "types: no phone field was invented for members (no such data is collected)");
+  assert(/interface NetworkMemberStats[\s\S]{0,400}phone\??: string \| null/.test(types),
+    "types: the member record carries a nullable phone, matching the 0043 column");
+
+  // ---- What the owner is told about a person they may need to remove ----------
+  assert(dashSrc.includes('joinedFor') && dashSrc.includes('joined as'),
+    'owner: an accepted invitation says who joined, not just the invited address');
+  assert(dashSrc.includes('no phone yet'),
+    'owner: a missing phone number is stated plainly so the owner knows who to ask');
+  assert(dashSrc.includes('m.phone'), 'owner: the member row shows the phone number when one exists');
+
+  const signup = readFileSync('src/app/signup/page.tsx', 'utf8');
+  assert(signup.includes('required') && signup.includes('Please enter the name'),
+    'signup: the chosen name is required, so the owner always has a name to identify');
+  assert(signup.includes('phone: phone.trim()'),
+    'signup: the optional phone number travels into the new profile');
+
+  const mig = readFileSync('supabase/migrations/0043_member_phone.sql', 'utf8');
+  assert(mig.includes('add column if not exists phone'),
+    '0043: the phone column is added additively');
+  assert(mig.includes('network_member_phones') && /owner only/i.test(mig),
+    '0043: phone numbers are readable only by the owner');
+  assert(mig.includes('on conflict (id) do nothing'),
+    '0043: the single-owner claim from 0025 is still present, not reverted');
 }

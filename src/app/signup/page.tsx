@@ -47,6 +47,11 @@ function SignUpForm() {
     // to the dashboard Site URL default (the local dev address). Same helper
     // as owner signup; an unsafe/unset address fails truthfully instead of
     // sending a dead link.
+    if (!fullName.trim()) {
+      setBusy(false);
+      setError("Please enter the name you would like your Sophira owner to see.");
+      return;
+    }
     const confirmUrl = authCallbackUrl("/dashboard", window.location.origin);
     if (!confirmUrl) {
       setBusy(false);
@@ -148,6 +153,8 @@ function SignUpForm() {
               <Label htmlFor="fullname">Your name</Label>
               <Input
                 id="fullname"
+                required
+                autoComplete="name"
                 className="mt-1.5"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
