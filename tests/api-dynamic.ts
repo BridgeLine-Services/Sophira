@@ -27,7 +27,9 @@ export function runApiDynamicTests(
       else if (entry.name === "route.ts") files.push(full);
     }
   };
-  walk("src/app/api");
+  // Walk all of src/app, not just /api: src/app/auth/callback/route.ts is a GET handler too,
+  // and it was outside the original scan until the inventory reported 85 routes against my 84.
+  walk("src/app");
 
   const offenders = files.filter((file) => {
     const src = readFileSync(file, "utf8");
