@@ -70,3 +70,38 @@ rollback are separate operations — see `docs/BACKUP_RECOVERY.md`.
 | Native build | `SOPHIRA_APP_URL` for a release APK |
 
 None of these are code problems. Each needs one credential or one device from you.
+
+## Live check, 2026-11-03 22:40 UTC
+
+Previously recorded here as **NOT TESTED** - "no build was deployed from this environment". The
+deployment is reachable without credentials, so the parts that can be checked without signing in
+were checked, from the machine that wrote this file. Probes and their results:
+
+| Probe | Result |
+|---|---|
+| `GET /` | 307 to `/login?next=%2F` - the signed-out gate works in production |
+| `GET /login` | 200, one `<h1>Sign in to Sophira`, carries `role="main"` |
+| `GET /signup` | 200 |
+| `GET /robots.txt` | 200, serves the advisory crawler policy |
+| `GET /api/owner/preservation` | 307 to `/login`, `cache-control: no-store, private` |
+| `GET /offline`, `/nope-404` | 307 to `/login` - unknown and child routes fall to the gate, not to a 500 |
+| Response headers on `/login` | `x-frame-options: DENY`, `x-content-type-options: nosniff`, `referrer-policy: strict-origin-when-cross-origin`, `permissions-policy` restricted, HSTS 1 year |
+
+What this establishes:
+
+- **Production auto-deploys from `master`.** The `/login` landmark was committed at `d3975f2` and is
+  already live, and `/api/owner/preservation` (committed at `c957961`) answers with the gate rather
+  than a 404, so the running build is at or after that commit.
+- **The cache policy holds where it matters.** Member and API routes answer `no-store, private` in
+  production. Public pages (`/login`) answer Vercel's `public, max-age=0, must-revalidate`, which is
+  Next's normal treatment of a prerendered public page - it is identical for every visitor and
+  revalidates on each request, so there is nothing user-specific to cache.
+
+What this does **not** establish, and is still **NOT TESTED**:
+
+- Anything behind the sign-in gate: the owner dashboard, the member directory, the census against
+  the real database, RLS enforcement with two live accounts.
+- Any third-party integration (Google, Microsoft, Resend, web search) - no credentials here.
+- PWA install and native builds - no devices here.
+
+Live deployment: reachable and current. Signed-in behaviour: still unverified.

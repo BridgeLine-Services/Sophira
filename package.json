@@ -35,7 +35,8 @@
     "preserve:members": "node scripts/member-preservation.mjs",
     "backup:plan": "node scripts/backup-sophira.mjs --plan",
     "backup:run": "node scripts/backup-sophira.mjs --run --out backups",
-    "backup:verify": "node scripts/backup-sophira.mjs --verify"
+    "backup:verify": "node scripts/backup-sophira.mjs --verify",
+    "smoke:prod": "node scripts/smoke-prod.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
