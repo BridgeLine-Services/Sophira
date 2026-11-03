@@ -19,7 +19,7 @@ export default function AccessDeniedPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center px-4 py-10 text-center">
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center px-4 py-10 text-center">
       <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
         <ShieldOff className="h-7 w-7" />
       </span>
@@ -35,6 +35,6 @@ export default function AccessDeniedPage() {
       <Button className="mt-6" onClick={signOut} disabled={busy}>
         {busy ? "Signing out…" : "Sign out"}
       </Button>
-    </div>
+    </main>
   );
 }
