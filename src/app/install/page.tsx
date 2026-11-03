@@ -162,7 +162,7 @@ export default function InstallPage() {
     <div className="mx-auto max-w-2xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-ink">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">S</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
           Sophira
         </Link>
         <Badge tone="accent">Private academic assistant</Badge>

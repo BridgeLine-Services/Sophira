@@ -8,7 +8,7 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-white">?</span>
+      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-on-accent">?</span>
       <h1 className="text-xl font-semibold text-ink">We couldn&apos;t find that page</h1>
       <p className="text-sm text-ink-soft">
         The link may be out of date, or the page may have moved. Nothing in your
@@ -17,7 +17,7 @@ export default function NotFound() {
       <div className="flex gap-2">
         <Link
           href="/dashboard"
-          className="rounded-button bg-accent px-4 py-2 text-sm font-medium text-white shadow-sm"
+          className="rounded-button bg-accent px-4 py-2 text-sm font-medium text-on-accent shadow-sm"
         >
           Go to dashboard
         </Link>

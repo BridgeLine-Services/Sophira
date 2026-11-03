@@ -40,7 +40,7 @@ export default function SetupRepair({ available, reason }: { available: boolean;
       <p className="mt-1 text-ink-soft">{reason}</p>
       {available && (
         <button type="button" onClick={repair} disabled={busy}
-          className="mt-3 rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-60">
+          className="mt-3 rounded-lg bg-accent px-4 py-2 font-medium text-on-accent disabled:opacity-60">
           {busy ? "Repairing..." : "Repair Setup"}
         </button>
       )}

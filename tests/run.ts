@@ -3219,12 +3219,28 @@ async function runThemeTokenTests(): Promise<void> {
     "theme: light status and secondary colours are unchanged");
 
   // DARK IS THE VIOLET DIRECTION, and the shipped CSS (not a constant) is measured.
-  assert(dark.paper === "#211735" && dark.card === "#382254" && dark.accent === "#7865ff",
+  assert(dark.paper === "#211735" && dark.card === "#382254",
     "theme: dark tokens implement the violet design direction");
+  // 2026-11-03: the dark accent and danger were lightened after the contrast audit measured
+  // them at 3.35:1 and 4.16:1 on card surfaces. The violet hue is unchanged; the lightness is.
+  assert(dark.accent === "#9684ff" && dark.danger === "#f87171",
+    "theme: dark accent and danger meet WCAG AA on card surfaces (measured, not eyeballed)");
   assert(Object.keys(light).length >= 14 && Object.keys(dark).length >= 14,
     "theme: both themes define the full token set");
   assert(Object.keys(light).sort().join() === Object.keys(dark).sort().join(),
     "theme: light and dark define exactly the same tokens (no theme-only colour)");
+  // Two dark palettes existed and drifted: the toggle wrote one, following the OS used the
+  // other, so a fix could reach only half the users. There is now exactly one.
+  assert((css.match(/--c-paper:/g) ?? []).length === 2,
+    "theme: exactly one dark palette exists (light + dark, no third copy to drift from)");
+  assert(!css.includes("prefers-color-scheme"),
+    "theme: first paint resolves the OS preference in the layout script, not in a second palette");
+
+  // The audit is executed, not trusted: a token change that hurts legibility fails the suite.
+  const { spawnSync: runNode } = await import("node:child_process");
+  const audit = runNode("node", ["scripts/contrast.mjs"], { encoding: "utf8" });
+  assert(audit.status === 0,
+    `theme: every text/surface pair in both themes passes WCAG AA (${(audit.stderr || audit.stdout || "").split("\n").find((l) => l.includes("below WCAG")) ?? "script failed"})`);
 
   const { contrastRatio } = await import("../src/lib/ui/contrast");
   const pairs: [string, string, string, number][] = [

@@ -153,7 +153,7 @@ function MathScanInner() {
       <div className="flex items-center gap-2 text-xs">
         {["Upload", "Review transcription", "Solve & verify"].map((lbl, i) => (
           <span key={lbl} className="flex items-center gap-2">
-            <span className={`flex h-6 w-6 items-center justify-center rounded-full ${i === 0 ? "bg-accent text-white" : "bg-accent-soft text-accent"}`}>{i + 1}</span>
+            <span className={`flex h-6 w-6 items-center justify-center rounded-full ${i === 0 ? "bg-accent text-on-accent" : "bg-accent-soft text-accent"}`}>{i + 1}</span>
             <span className={i === 0 ? "font-semibold text-ink" : "text-ink/50"}>{lbl}</span>
             {i < 2 && <span aria-hidden>→</span>}
           </span>
@@ -193,7 +193,7 @@ function MathScanInner() {
             <div className="rounded-lg border border-line bg-ink/[0.02] p-4">
               <p className="text-sm font-medium">Prefer to type?</p>
               <p className="text-xs text-ink/60">Enter a problem in the dedicated Type to Solve workspace.</p>
-              <a href="/math" className="mt-2 inline-block rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white">Open Type to Solve</a>
+              <a href="/math" className="mt-2 inline-block rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-on-accent">Open Type to Solve</a>
             </div>
           </CardContent>
         </Card>

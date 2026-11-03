@@ -164,7 +164,7 @@ function LoginForm() {
     return (
       <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-white">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-on-accent">
             <Sparkles className="h-6 w-6" />
           </span>
           <div>
@@ -177,7 +177,7 @@ function LoginForm() {
             Your private Sophira is almost ready. Sign-in opens automatically once setup is finished -
             there is nothing to sign in with yet.
           </p>
-          <a href="/setup" className="mt-4 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+          <a href="/setup" className="mt-4 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent">
             Continue Setup
           </a>
         </div>
@@ -187,7 +187,7 @@ function LoginForm() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
       <Link href="/install" className="mb-8 flex flex-col items-center gap-3 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-white">
+        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-on-accent">
           <Sparkles className="h-6 w-6" />
         </span>
         <div>
@@ -266,7 +266,7 @@ function LoginForm() {
                     type="button"
                     onClick={() => void retrySetup()}
                     disabled={retryBusy}
-                    className="w-full rounded-button bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-60"
+                    className="w-full rounded-button bg-accent px-3 py-2 text-sm font-medium text-on-accent shadow-sm disabled:opacity-60"
                   >
                     {retryBusy ? "Retrying setup…" : "Retry setup"}
                   </button>
@@ -293,7 +293,7 @@ function LoginForm() {
       {ownerCreationOpen && (
         <div className="mt-5 rounded-lg border border-success/30 bg-success/5 p-4 text-center">
           <p className="text-sm text-ink-soft">This Sophira has no owner yet.</p>
-          <Link href="/create-owner" className="mt-2 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+          <Link href="/create-owner" className="mt-2 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent">
             Create Owner Account
           </Link>
         </div>

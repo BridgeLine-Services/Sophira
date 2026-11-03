@@ -36,7 +36,7 @@ export function SignOutButton({ nav = false }: { nav?: boolean } = {}) {
       onClick={signOut}
       disabled={busy}
       className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition active:scale-[0.99] disabled:opacity-60 ${
-        nav ? "text-ink-soft hover:bg-ink/5 hover:text-ink" : "rounded-button bg-accent px-4 py-2 text-white shadow-sm"
+        nav ? "text-ink-soft hover:bg-ink/5 hover:text-ink" : "rounded-button bg-accent px-4 py-2 text-on-accent shadow-sm"
       }`}
     >
       {nav && <LogOut className="h-4 w-4" aria-hidden />}

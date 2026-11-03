@@ -44,7 +44,7 @@ export default function LocalTestPage() {
           </p>
         </CardContent>
       </Card>
-      <Link href="/offline" className="inline-block rounded-lg bg-accent px-6 py-3 font-medium text-white">
+      <Link href="/offline" className="inline-block rounded-lg bg-accent px-6 py-3 font-medium text-on-accent">
         Test Local AI
       </Link>
       <p className="flex items-center gap-2 text-xs text-ink-soft">

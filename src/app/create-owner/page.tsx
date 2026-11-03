@@ -244,7 +244,7 @@ export default function CreateOwnerPage() {
           <p className="mt-1 text-ink-soft">{status!.repair!.reason}</p>
           {status!.repair!.available ? (
             <button type="button" onClick={repair} disabled={repairing}
-              className="mt-3 rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-60">
+              className="mt-3 rounded-lg bg-accent px-4 py-2 font-medium text-on-accent disabled:opacity-60">
               {repairing ? "Repairing..." : "Repair Setup"}
             </button>
           ) : null}
@@ -287,7 +287,7 @@ export default function CreateOwnerPage() {
               className="mt-1 w-full rounded-lg border border-line px-3 py-2" autoComplete="new-password" />
           </label>
           {error && <p className="text-sm text-danger">{error}</p>}
-          <button type="submit" disabled={busy} className="w-full rounded-lg bg-accent px-4 py-2.5 font-medium text-white disabled:opacity-60">
+          <button type="submit" disabled={busy} className="w-full rounded-lg bg-accent px-4 py-2.5 font-medium text-on-accent disabled:opacity-60">
             {busy ? "Creating..." : "Create owner account"}
           </button>
         </form>

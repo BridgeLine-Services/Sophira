@@ -112,7 +112,7 @@ export default async function SetupPage() {
         )}
 
         {ownerReady ? (
-          <Link href="/login" className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+          <Link href="/login" className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent">
             Continue setup: sign in
           </Link>
         ) : (
@@ -120,7 +120,7 @@ export default async function SetupPage() {
             {/* 2026-10-28: the owner is never parked here. /create-owner runs
                 the repair itself, so this link is a real path even while the
                 database is still being confirmed. */}
-            <Link href="/create-owner" className="inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+            <Link href="/create-owner" className="inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent">
               Create owner account
             </Link>
             <Link href="/login" className="text-sm text-accent hover:underline">Sign in</Link>
@@ -166,7 +166,7 @@ export default async function SetupPage() {
               Your database is ready. Create your owner account - just your email and a password you choose.
               Owner creation then closes permanently, and new people join by invitation only.
             </p>
-            <Link href="/create-owner" className="mt-4 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+            <Link href="/create-owner" className="mt-4 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent">
               Create Owner Account
             </Link>
           </>

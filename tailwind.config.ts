@@ -31,6 +31,7 @@ const config: Config = {
         ink: { DEFAULT: token("ink"), soft: token("ink-soft") },
         // accent + status
         accent: { DEFAULT: token("accent"), soft: token("accent-soft"), deep: token("accent-deep") },
+        "on-accent": token("on-accent"),
         success: token("success"),
         warn: token("warn"),
         danger: token("danger"),

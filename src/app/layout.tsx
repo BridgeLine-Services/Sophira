@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           dangerouslySetInnerHTML={{
             __html:
-              'try{var t=localStorage.getItem("sophira-theme");if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t}}catch(e){}',
+              'try{var t=localStorage.getItem("sophira-theme");if(t!=="dark"&&t!=="light"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"}document.documentElement.dataset.theme=t}catch(e){}',
           }}
         />
         <ToastProvider>

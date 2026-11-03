@@ -141,7 +141,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <Link href="/proposals" className="block">
             <Card className="border-accent/40 bg-accent-soft/40 transition hover:border-accent">
               <CardContent className="flex items-center gap-3 p-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent">
                   <ClipboardCheck className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">

@@ -454,7 +454,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         aria-label="Primary"
       >
         <Link href={variant === "owner" ? "/owner" : isOwner ? "/owner" : "/dashboard"} className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">S</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
           Sophira
         </Link>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label={variant === "owner" ? "Owner sections" : "Sections"}>
@@ -523,7 +523,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             </Link>
           ) : (
             <Link href={variant === "owner" ? "/owner" : isOwner ? "/owner" : "/dashboard"} className="flex items-center gap-2 font-semibold text-ink lg:hidden">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">S</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
               <span className="hidden sm:inline">Sophira</span>
             </Link>
           )}
@@ -613,7 +613,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
           >
             <div className="flex items-center justify-between px-5 py-4">
               <span className="flex items-center gap-2 font-semibold text-ink">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">S</span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
                 Sophira
               </span>
               <button

@@ -133,7 +133,7 @@ export default function SetupWizard({
           type="button"
           onClick={run}
           disabled={busy}
-          className="mt-4 rounded-lg bg-accent px-5 py-2.5 font-medium text-white disabled:opacity-60"
+          className="mt-4 rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent disabled:opacity-60"
         >
           {busy ? "Working..." : "Set Up Sophira"}
         </button>
@@ -145,7 +145,7 @@ export default function SetupWizard({
               href={supabaseIntegrationsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-lg bg-accent px-5 py-2.5 font-medium text-white"
+              className="rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent"
             >
               Open your database dashboard
             </a>
@@ -180,7 +180,7 @@ export default function SetupWizard({
                 setCopied("failed");
               }
             }}
-            className="rounded-lg bg-accent px-5 py-2.5 font-medium text-white"
+            className="rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent"
           >
             Copy the setup text
           </button>
@@ -231,7 +231,7 @@ export default function SetupWizard({
             <button
               type="button"
               onClick={() => router.refresh()}
-              className="rounded-lg bg-accent px-5 py-2.5 font-medium text-white"
+              className="rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent"
             >
               Check again
             </button>

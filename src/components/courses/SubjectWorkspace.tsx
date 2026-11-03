@@ -58,7 +58,7 @@ export async function SubjectWorkspace({ slug }: { slug: string }) {
                   <p className="text-sm text-ink-soft">
                     Workspace, library, memory, and changes scoped to {child.label}.
                   </p>
-                  <Link href={`/courses/${child.slug}`} className="mt-3 inline-flex items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white">
+                  <Link href={`/courses/${child.slug}`} className="mt-3 inline-flex items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent">
                     Open {child.label}
                   </Link>
                 </CardContent>
@@ -95,7 +95,7 @@ export async function SubjectWorkspace({ slug }: { slug: string }) {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm text-ink-soft">{tool.description}</p>
-                  <Link href={subjectToolUrl(tool, node.slug)} className="inline-flex items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white">
+                  <Link href={subjectToolUrl(tool, node.slug)} className="inline-flex items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent">
                     {tool.label}
                   </Link>
                 </CardContent>
