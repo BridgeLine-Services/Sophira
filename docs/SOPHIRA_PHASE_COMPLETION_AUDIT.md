@@ -103,7 +103,7 @@ them from static analysis would be exactly the shortcut the directive forbids.
 - RLS and owner guards: `src/lib/supabase/guard.ts`, `src/middleware.ts`, and per-route owner
   checks (`src/lib/owner/page-context.ts`). Route-level guard ratchet exists and passes.
 - Member and record preservation: `scripts/member-preservation.mjs` (`npm run preserve:members`)
-  snapshots members and invitations **and now row counts for 48 user-data tables** (`447e091`).
+  snapshots members and invitations **and now row counts for 47 user-data tables** (`447e091`).
   Before that, a migration or restore that emptied assignments, notebooks or research still
   printed "Members and invitations preserved", so the most permanent data was the part nothing
   watched. Losing rows in any table, or a table vanishing entirely, now fails the comparison.

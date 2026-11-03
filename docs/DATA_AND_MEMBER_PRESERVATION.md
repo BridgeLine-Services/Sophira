@@ -136,3 +136,36 @@ decision rather than an accident. The script prints no email addresses or names.
 The four "not executed here" rows are the honest gap: they require owner-level access to the
 database and hosting account. Everything that can be proven from the repository is proven and
 pinned by tests (4,543 assertions).
+
+## 9. Checking data without a terminal
+
+Added 2026-11-03. The record census existed only as `npm run preserve:members`, which requires a
+terminal. The owner this application is written for does not use one, so the check that matters
+most was the least reachable: an owner could not ask "is my data still here" and get an answer.
+
+`GET /api/owner/preservation` is the reachable version. It runs the same count across the same 47
+tables and replies with one plain sentence:
+
+- complete: "All 47 areas of your records answered with a real count. Nothing is missing."
+- a table has vanished: "1 area is missing from the database entirely. This is real damage, not a
+  slow connection. Restore from a backup before adding anything new."
+- some tables could not be read: "N of 47 areas could not be counted just now, so this check is
+  incomplete. Nothing here proves data was lost - run it again."
+- nothing readable at all: HTTP 503 with "this check proves nothing", never an empty result.
+
+Three properties the endpoint must keep, each asserted in `tests/owner-preservation-census.ts`:
+
+1. It reports and never repairs. A check that writes cannot be trusted when data is already suspect.
+2. It distinguishes 0 rows from an absent table. PostgREST answers `404` for a dropped table and a
+   total of `*` when it never computed a count; counting either as 0 would report a destroyed
+   database as an empty one. Both are findings.
+3. It never returns the service key, and the success payload carries counts, not row contents.
+
+The counting is unit-tested through an injected fetch, so the dangerous parsing is exercised
+against fake PostgREST responses rather than assumed. A drift test compares this module's table list
+with the CLI script's, so a table added in one place cannot become a blind spot in the other.
+
+**Honest status:** the parsing, the guards and the 503 path are verified. A run against a real
+database is **NOT TESTED** - no Supabase credentials exist in this environment. There is also no
+button for this yet: the owner must open the endpoint's address. Wiring it into the owner dashboard
+needs a browser to verify, which this environment does not have.
