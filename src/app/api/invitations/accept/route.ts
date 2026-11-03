@@ -22,7 +22,18 @@ export const runtime = "nodejs";
  */
 export async function POST(request: NextRequest) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // The lazy client never throws at construction, so a deployment without Supabase configured
+  // fails HERE. Unguarded, that turned an anonymous POST into a 500 (found 2026-11-03); with this
+  // it is the honest 503 the other routes already give.
+  let user = null;
+  try {
+    ({ data: { user } } = await supabase.auth.getUser());
+  } catch {
+    return NextResponse.json(
+      { error: "Sophira is not connected to its database yet, so invitations cannot be checked. Nothing was lost - try again once setup is finished." },
+      { status: 503 },
+    );
+  }
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   let body: { token?: string };

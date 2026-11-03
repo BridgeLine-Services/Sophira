@@ -108,6 +108,40 @@ console.log(`\nruntime smoke test against ${BASE}\n`);
     perms.includes("camera=()") && perms.includes("microphone=()"), perms || "(missing)");
 }
 
+// No API route may crash on an anonymous request (2026-11-03). This probe found
+// /api/invitations/accept answering 500 to an empty signed-out POST - a crash where every other
+// route returned an honest 401 - and it is the kind of defect that only shows up when something
+// asks the question. Excluded: routes that could change state before rejecting the caller
+// (owner creation, setup repair, account deletion), since probing them means asking a live
+// deployment to do the thing we are testing it refuses.
+{
+  const SKIP = new Set(["/api/complete-owner", "/api/setup-repair", "/api/setup-sql", "/api/account/delete"]);
+  const manifest = JSON.parse(
+    readFileSync(new URL("../.next/server/app-paths-manifest.json", import.meta.url), "utf8"));
+  const apis = Object.keys(manifest)
+    .map((k) => k.replace(/\/route$/, ""))
+    .filter((r) => r.startsWith("/api") && !SKIP.has(r));
+  // 503 is NOT a failure here: an unconfigured deployment answers 503 by design (52 of these
+  // routes do in CI), which is the honest "not connected yet" response. What must never appear is
+  // a 500, or any 5xx that leaks a stack frame, module path or database DSN to an anonymous caller.
+  const LEAK = /at\s+[A-Za-z_$][\w$]*\s+\(|node_modules|PGRST|postgres:\/\/|eyJ[A-Za-z0-9_-]{10,}/;
+  const crashed = [];
+  let unavailable = 0;
+  for (const r of apis) {
+    const url = r.replace(/\[[^\]]+\]/g, "smoke-probe");
+    const res = await fetch(BASE + url, {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{}", redirect: "manual",
+    });
+    const body = await res.text();
+    if (res.status === 503) unavailable++;
+    if (res.status === 500 || LEAK.test(body)) {
+      crashed.push(`${r} -> ${res.status}${LEAK.test(body) ? " (leaks internals)" : ""}`);
+    }
+  }
+  record(`no API route crashes or leaks internals on an anonymous POST (${apis.length} probed, ${unavailable} answered 503 by design)`,
+    crashed.length === 0, crashed.join("; ") || "none");
+}
+
 // Nothing may be public by accident (2026-11-03). Every page route in the build is probed
 // signed-out; a 200 is only allowed for the routes listed here, each of which is public on
 // purpose. Adding a route that forgets its auth check now fails the suite instead of quietly
