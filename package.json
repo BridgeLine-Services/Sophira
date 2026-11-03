@@ -32,7 +32,10 @@
     "integrations:doctor": "node scripts/integrations-doctor.mjs",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
     "verify:production": "node scripts/production-verification.mjs",
-    "preserve:members": "node scripts/member-preservation.mjs"
+    "preserve:members": "node scripts/member-preservation.mjs",
+    "backup:plan": "node scripts/backup-sophira.mjs --plan",
+    "backup:run": "node scripts/backup-sophira.mjs --run --out backups",
+    "backup:verify": "node scripts/backup-sophira.mjs --verify"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
