@@ -72,6 +72,15 @@ Accessibility is now covered by three gates that run in the suite, each with its
 | `scripts/a11y-audit.mjs` | buttons with no accessible name, form controls with no label, dialogs without `aria-modal` and a name (TypeScript AST, self-tested against planted defects) | focus order, keyboard traps, ARIA misuse beyond these rules |
 | `scripts/smoke-runtime.mjs` | exactly one non-empty `h1` in the rendered HTML of each public page | authenticated pages, which need a signed-in session |
 
+Security headers (added 2026-11-03, asserted by the smoke suite): `X-Content-Type-Options`,
+`Referrer-Policy`, `X-Frame-Options: DENY`, `Permissions-Policy`, and `Strict-Transport-Security`
+in production builds. Before this the app sent **none** of them, which left `/create-owner`
+framable by a hostile page. **NOT shipped deliberately:** a Content-Security-Policy. Next injects
+inline hydration scripts and the app calls Supabase and provider APIs, so a wrong policy
+white-screens the app, and this environment has no browser to validate one against. Tracking it as
+pending rather than shipping it unverified is the honest option; `X-Frame-Options` already covers
+the clickjacking case.
+
 Genuinely **NOT TESTED**: keyboard traversal, focus visibility in the browser, screen-reader
 announcements, reduced-motion behaviour. These need a browser and assistive technology; claiming
 them from static analysis would be exactly the shortcut the directive forbids.

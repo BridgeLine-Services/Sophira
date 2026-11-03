@@ -57,6 +57,17 @@ function scanSource(f, src) {
 
       const spreadsProps = opening.attributes.properties.some((a) => ts.isJsxSpreadAttribute(a));
 
+      // Links carry the same requirement: an icon-only <Link> is an unnamed link in a screen
+      // reader's link list, which is worse than an unnamed button because the list is the
+      // primary way headings and links are navigated.
+      if (["Link", "a"].includes(tag) && ts.isJsxElement(node)) {
+        const named = [...ATTR_NAMES].some((n) => attr(opening, n));
+        const text = node.children.map((c) => c.getText(sf)).join(" ").toLowerCase();
+        if (!subtreeHasText(node) && !named && !text.includes("sr-only")) {
+          found.push({ f, line: line(node), rule: "link without accessible name" });
+        }
+      }
+
       if (tag === "button" && ts.isJsxElement(node)) {
         const named = [...ATTR_NAMES].some((n) => attr(opening, n));
         const text = node.children.map((c) => c.getText(sf)).join(" ").toLowerCase();
@@ -105,12 +116,13 @@ if (process.argv.includes("--self-test")) {
         <button onClick={g}><span><Icon /> Save</span></button>
         <label>Name <input value={n} /></label>
         <button onClick={h} aria-label="Close"><X /></button>
+        <Link href="/x"><Pencil /></Link>
       </div>
     );`;
   const got = scanSource("fixture.tsx", bad);
   const rules = got.map((g) => g.rule).sort();
   const want = ["<input> without label", "<select> without label", "button without accessible name",
-                "dialog missing aria-modal or name"];
+                "dialog missing aria-modal or name", "link without accessible name"];
   const ok = JSON.stringify(rules) === JSON.stringify(want.sort());
   console.log(ok
     ? `a11y self-test: PASS (${got.length} planted defects found, none invented)`

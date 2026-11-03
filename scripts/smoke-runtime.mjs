@@ -43,7 +43,7 @@ const record = (name, ok, detail) => {
 const get = async (path) => {
   const res = await fetch(BASE + path, { redirect: "manual" });
   const body = res.status === 200 ? await res.text() : "";
-  return { status: res.status, body, location: res.headers.get("location") || "" };
+  return { status: res.status, body, headers: res.headers, location: res.headers.get("location") || "" };
 };
 
 // Refuse to run against a server this script did not start. A leftover process on the port
@@ -88,6 +88,24 @@ if (!ready) {
 }
 
 console.log(`\nruntime smoke test against ${BASE}\n`);
+
+// Security headers (2026-11-03). The app previously sent none; a regression here is invisible
+// until it is exploited, so it is asserted on the same response the page checks use.
+{
+  const r = await get("/login");
+  const want = {
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "x-frame-options": "DENY",
+  };
+  for (const [name, value] of Object.entries(want)) {
+    const got = r.headers.get(name);
+    record(`header ${name}`, got === value, `${name}=${got ?? "(missing)"}`);
+  }
+  const perms = r.headers.get("permissions-policy") ?? "";
+  record("header permissions-policy disables camera and microphone",
+    perms.includes("camera=()") && perms.includes("microphone=()"), perms || "(missing)");
+}
 
 for (const page of PUBLIC_PAGES) {
   const r = await get(page.path);
