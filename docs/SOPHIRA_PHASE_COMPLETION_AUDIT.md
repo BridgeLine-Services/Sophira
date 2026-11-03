@@ -1,6 +1,6 @@
 # Sophira phase completion audit
 
-Audited branch: `master` @ `3f02c20` (baseline), plus the changes on this branch.
+Audited branch: `master` @ `3f02c20` (baseline), plus `327d691`, `447e091` and `caf476c`.
 Audit date: 2026-11-03.
 
 Statuses used, exactly as the directive defines them: **COMPLETE** (implemented and verified),
@@ -16,12 +16,12 @@ sandbox, the command is named. Where it could not happen, the row says so and sa
 
 | Command | Result |
 | --- | --- |
-| `npm test` | 4,823 passed, 0 failed |
+| `npm test` | 4,830 passed, 0 failed |
 | `npx tsc --noEmit` | clean |
 | `npm run build` | compiled successfully |
 | `npm run lint` | 0 errors, 104 warnings |
 | `npm run verify` | PASS |
-| `npm run smoke:runtime` | 73/73 against the built app (8 public routes, headers, page-route allowlist, anonymous-API probe) |
+| `npm run smoke:runtime` | 77/77 against the built app (8 public routes, security headers, page-route allowlist, anonymous-API probe, cache policy, crawler guidance) |
 | `npm run scan:secrets` | CLEAN |
 | `node scripts/contrast.mjs` | PASS, 32 pairs (16 per theme) |
 | `node scripts/design-drift.mjs` | 0 literal palette colours |
@@ -55,6 +55,15 @@ Completed and verified in this branch:
   were fixed by that pass (light-slate chips in `SyncStatus` and `SystemHealthPanel`, white text
   on the accent gradient in `dashboard/page.tsx`, and a rose destructive button with white text).
 - All 69 routes were inventoried, not redesigned: `docs/REDESIGN_INVENTORY.md`.
+- Crash safety (`327d691`): there was no `global-error.tsx`, and `error.tsx` does not catch a
+  failure thrown in the root layout itself, so a layout-level crash rendered a blank white page.
+  Added, with plain-language text and a plain link (a client-side `Link` could fail for the same
+  reason the boundary was reached). Its own crash path is **NOT TESTED**: inducing a real layout
+  failure needs a browser session.
+- Keyboard access (`327d691`): the audit found two dialogs dismissible only by mouse. One had a
+  backdrop safe to mark `aria-hidden`; in `notebooks/[id]` the handler sat on the element wrapping
+  the dialog, so it was split into a real backdrop plus `role="dialog" aria-modal="true"` rather
+  than silencing the rule. Screen-reader confirmation of either is **NOT TESTED** (no browser).
 
 Still open, per route, for the remaining 61: page-level redesign against the design system,
 then light/dark and mobile checks. `docs/redesign-status.json` records only what has passed,
@@ -93,8 +102,21 @@ them from static analysis would be exactly the shortcut the directive forbids.
 
 - RLS and owner guards: `src/lib/supabase/guard.ts`, `src/middleware.ts`, and per-route owner
   checks (`src/lib/owner/page-context.ts`). Route-level guard ratchet exists and passes.
-- Member preservation: `scripts/member-preservation.mjs` (`npm run preserve:members`) snapshots
-  and compares member records; covered by tests.
+- Member and record preservation: `scripts/member-preservation.mjs` (`npm run preserve:members`)
+  snapshots members and invitations **and now row counts for 48 user-data tables** (`447e091`).
+  Before that, a migration or restore that emptied assignments, notebooks or research still
+  printed "Members and invitations preserved", so the most permanent data was the part nothing
+  watched. Losing rows in any table, or a table vanishing entirely, now fails the comparison.
+  The comparison is self-tested offline against 4 planted losses and 4 legitimate changes that
+  must be ignored (growth, unchanged, new table, acknowledged deletion). A run against a real
+  database is **NOT TESTED** - no Supabase credentials exist here, so the counting itself is
+  unexercised.
+- Cache policy (`caf476c`): `/api/*` and member page groups now answer `no-store, private`.
+  Verified against the running built server, including the negative: with the rule removed and
+  the app rebuilt, `/api/notifications` returns no cache header and the suite reports 76/77.
+  Public pages keep their caching (`/terms` still `s-maxage=31536000`), so the rule is scoped.
+- `src/app/robots.ts` (`caf476c`) disallows member areas and the first-run setup page. It is
+  advisory only: those paths are already gated by the middleware, and the file says so.
 - Live cross-user testing against a separate Supabase project: **BLOCKED**. No test project
   credentials exist in this environment; the directive forbids using production.
 - Migrations `0042` (notifications) and `0043` (member phone): additive and reviewed, **not
