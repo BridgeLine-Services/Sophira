@@ -14,6 +14,7 @@
  * Usage: node scripts/smoke-runtime.mjs [port]
  */
 import { spawn } from "child_process";
+import { readFileSync } from "node:fs";
 import { setTimeout as sleep } from "timers/promises";
 
 const PORT = Number(process.argv[2] || process.env.SMOKE_PORT || 3311);
@@ -105,6 +106,33 @@ console.log(`\nruntime smoke test against ${BASE}\n`);
   const perms = r.headers.get("permissions-policy") ?? "";
   record("header permissions-policy disables camera and microphone",
     perms.includes("camera=()") && perms.includes("microphone=()"), perms || "(missing)");
+}
+
+// Nothing may be public by accident (2026-11-03). Every page route in the build is probed
+// signed-out; a 200 is only allowed for the routes listed here, each of which is public on
+// purpose. Adding a route that forgets its auth check now fails the suite instead of quietly
+// exposing a page. Dynamic segments are probed with a placeholder and only need to not be 200.
+const PUBLIC_ROUTES = new Set([
+  "/create-owner", // first-run owner claim; gated by its own logic, not by a session
+  "/downloads",    // release downloads; reads only the public GitHub API
+  "/install", "/license", "/login", "/privacy", "/reset-password", "/setup", "/signup", "/terms",
+]);
+{
+  const manifest = JSON.parse(
+    readFileSync(new URL("../.next/server/app-paths-manifest.json", import.meta.url), "utf8"));
+  const routes = Object.keys(manifest)
+    .map((k) => k.replace(/\/page$/, ""))
+    .filter((r) => !r.startsWith("/api"));
+  const offenders = [];
+  let probed = 0;
+  for (const r of routes) {
+    const url = (r === "/" ? "/" : r).replace(/\[[^\]]+\]/g, "smoke-probe");
+    const res = await fetch(BASE + url, { redirect: "manual" });
+    probed++;
+    if (res.status === 200 && !PUBLIC_ROUTES.has(r)) offenders.push(`${r} answered 200 signed-out`);
+  }
+  record(`no route outside the public allowlist answers 200 signed-out (${probed} probed)`,
+    offenders.length === 0, offenders.join("; ") || "none");
 }
 
 for (const page of PUBLIC_PAGES) {

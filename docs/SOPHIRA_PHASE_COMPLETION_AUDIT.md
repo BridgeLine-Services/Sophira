@@ -21,7 +21,7 @@ sandbox, the command is named. Where it could not happen, the row says so and sa
 | `npm run build` | compiled successfully |
 | `npm run lint` | 0 errors, 104 warnings |
 | `npm run verify` | PASS |
-| `npm run smoke:runtime` | 67/67 against the built app (8 public routes, incl. heading structure) |
+| `npm run smoke:runtime` | 72/72 against the built app (8 public routes, headers, route allowlist) |
 | `npm run scan:secrets` | CLEAN |
 | `node scripts/contrast.mjs` | PASS, 32 pairs (16 per theme) |
 | `node scripts/design-drift.mjs` | 0 literal palette colours |
@@ -70,7 +70,7 @@ Accessibility is now covered by three gates that run in the suite, each with its
 | --- | --- | --- |
 | `scripts/contrast.mjs` | WCAG AA ratio for every token pair, both themes | real rendered output, images, gradients |
 | `scripts/a11y-audit.mjs` | buttons with no accessible name, form controls with no label, dialogs without `aria-modal` and a name (TypeScript AST, self-tested against planted defects) | focus order, keyboard traps, ARIA misuse beyond these rules |
-| `scripts/smoke-runtime.mjs` | exactly one non-empty `h1` in the rendered HTML of each public page | authenticated pages, which need a signed-in session |
+| `scripts/smoke-runtime.mjs` | one non-empty `h1` per public page, security headers, and: no page route outside an explicit public allowlist answers 200 signed-out (71 routes probed) | authenticated pages' content, which needs a signed-in session |
 
 Security headers (added 2026-11-03, asserted by the smoke suite): `X-Content-Type-Options`,
 `Referrer-Policy`, `X-Frame-Options: DENY`, `Permissions-Policy`, and `Strict-Transport-Security`
