@@ -100,6 +100,7 @@ These are the systems this project must not break. File pointers are for the nex
 | `npm run build` | succeeds |
 | `npm run smoke:prod` (against production) | 27/27 |
 | `node scripts/inventory.mjs` | 69 pages, 44 shell, 85 routes |
+| `production-smoke.yml` dispatch | GitHub Actions run `41734777238`: completed, success |
 
 ## 6. What Phase 1 does not establish
 
