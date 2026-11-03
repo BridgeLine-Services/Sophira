@@ -5,6 +5,7 @@
  * members, invitations, permissions, or academic records. These tests pin the three
  * mechanisms that make that true, so a future change cannot undo them without failing CI.
  */
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { scanSql, scanMigrations } from "../src/lib/migrations/destructive-scan";
@@ -118,4 +119,32 @@ export function runDataPreservationTests(
   const revocation = walk("supabase/migrations").map((f) => readFileSync(f, "utf8")).join("\n");
   assert(/refresh_tokens/i.test(revocation),
     "members: revocation clears stored refresh tokens, so a revoked session cannot renew itself");
+
+  section("data preservation (the record census catches data loss, not just missing members)");
+  {
+    // The preservation script used to compare members and invitations only, so a migration or
+    // restore that emptied assignments, notebooks or research still reported "preserved".
+    // Its comparison is now exercised offline, against planted losses, so the day the logic
+    // breaks the suite says so instead of waiting for a real deployment to lose data.
+    const out = execFileSync("node", ["scripts/member-preservation.mjs", "--self-test"], {
+      encoding: "utf8",
+      cwd: process.cwd(),
+    });
+    assert(/self-test: PASS/.test(out), "preservation: the census comparison self-test passes offline");
+    assert(/[1-9]\d* planted losses detected/.test(out),
+      "preservation: the self-test detects planted losses (it is not a vacuous pass)");
+    assert(/legitimate changes correctly ignored/.test(out) && !/FAIL/.test(out),
+      "preservation: growth and unchanged counts are NOT reported as loss");
+
+    const source = readFileSync("scripts/member-preservation.mjs", "utf8");
+    assert(/member_notifications/.test(source) && /research_sources/.test(source) && /notebooks/.test(source),
+      "preservation: the census covers academic records and the notification tables, not only members");
+    // Inspect the LIST, not the file: the comment above the list names these tables in order to
+    // explain why they are excluded, and a test that greps the whole file cannot tell the
+    // difference between a mention and an entry.
+    const list = source.slice(source.indexOf("const CENSUS_TABLES = ["), source.indexOf("];", source.indexOf("const CENSUS_TABLES = [")));
+    assert(list.length > 100, "preservation: the census table list is found and non-trivial");
+    assert(!/owner_bootstrap|app_config|sophira_meta/.test(list),
+      "preservation: setup state (owner bootstrap, app config, schema meta) is excluded from the census on purpose");
+  }
 }

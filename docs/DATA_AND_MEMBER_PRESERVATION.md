@@ -93,8 +93,10 @@ provider is limited by Supabase's refresh-token model.
 1. Create a new Supabase project (or use the staging project). Do not restore over production.
 2. Restore the database dump, then the storage buckets.
 3. Point a staging deployment at the restored project.
-4. Run `node scripts/member-preservation.mjs --save after-restore.json` and compare member and
-   invitation counts with the pre-incident snapshot.
+4. Run `node scripts/member-preservation.mjs --save after-restore.json` and compare the snapshot
+   with the pre-incident one. Since 2026-11-03 this compares ROW COUNTS for every user-data table
+   (assignments, notebooks, research, feedback, notifications and the rest), not just members and
+   invitations, so a restore that lost academic work cannot pass as preserved.
 5. Sign in as a test member and confirm their own work is present; confirm a revoked member is
    still refused; confirm one member cannot read another's assignment.
 6. Only then consider promoting the restored project.
@@ -108,8 +110,10 @@ node scripts/member-preservation.mjs --save before.json
 node scripts/member-preservation.mjs --compare before.json
 ```
 
-The comparison fails if a member or an invitation disappeared, and reports duplicate
-identities. An intentional removal must be named with `--acknowledge-removed <id>` so it is a
+The comparison fails if a member or an invitation disappeared, if any data table lost rows, or if
+a table that existed before is gone entirely. It also reports duplicate identities. Tables that
+grew are listed but are not a failure, and an intentional deletion is named with
+`--acknowledge-removed-records <table>` so it is recorded rather than assumed. An intentional removal must be named with `--acknowledge-removed <id>` so it is a
 decision rather than an accident. The script prints no email addresses or names.
 
 ## 8. Acceptance tests from the requirement, and their honest status
@@ -119,6 +123,7 @@ decision rather than an accident. The script prints no email addresses or names.
 | Invite multiple members | Automated coverage exists for invitation creation/acceptance (mocked). Live: not run. |
 | Redeploy the whole application | Done repeatedly in this session; production reachable after each deploy. |
 | Members remain present | `member-preservation.mjs --compare` — ready; needs owner database access to run. |
+| Academic records remain present | same command: the record census compares row counts across 48 data tables. Comparison logic is self-tested offline (`--self-test`); an actual run against the live database is still outstanding. |
 | Outstanding invitations remain valid | Same check reports outstanding counts and lost invitations. |
 | Members can access their existing accounts | Auth path unchanged by deploys; verified structurally, not with a live member. |
 | No duplicate identities | Duplicate-email detection in the preservation check. |
