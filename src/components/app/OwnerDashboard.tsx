@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { memberIdentity } from "@/lib/member-identity";
 import { Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Label, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
@@ -22,6 +23,9 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   siteUrl: string;
 }) {
   const [members, setMembers] = useState(initialMembers);
+  // Revoking is reversible but disruptive (it signs the member out), so it takes two
+  // deliberate clicks. Real revocation logic is untouched.
+  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
   const [invitations, setInvitations] = useState(initialInvitations);
   const [requests, setRequests] = useState(initialRequests);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -467,16 +471,27 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
           <div className="space-y-2">
             {members.map((m) => {
               const isSelfOwner = m.role === "owner";
+              // Identity first: a row must always say WHO this is. Previously an empty
+              // display_name rendered a useless placeholder even though the email was known.
+              const id = memberIdentity(m);
               return (
                 <Card key={m.user_id}>
                   <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
                     <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
-                        {m.display_name || "(no name)"}
-                        <Badge>{m.role}</Badge>
-                        <Badge>{m.status}</Badge>
-                      </p>
-                      <p className="mt-0.5 text-xs text-ink-soft">
+                      <div className="flex items-start gap-3">
+                        <span aria-hidden="true" className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent">
+                          {id.initials}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
+                            <span className="truncate">{id.title}</span>
+                            <Badge>{m.role}</Badge>
+                            <Badge>{m.status}</Badge>
+                          </p>
+                          <p className="mt-0.5 break-words text-xs text-ink-soft">{id.subtitle}</p>
+                        </div>
+                      </div>
+                      <p className="mt-1 text-xs text-ink-soft">
                         {m.email || "no email"} · access granted {fmtDate(m.created_at)}
                         {m.status === "revoked" && m.access_revoked_at
                           ? ` · access revoked ${fmtDate(m.access_revoked_at)}`
@@ -501,9 +516,25 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
                     {!isSelfOwner && (
                       <div className="flex shrink-0 flex-wrap gap-2">
                         {m.status === "active" ? (
-                          <Button size="sm" variant="secondary" disabled={busyId === m.user_id} onClick={() => memberAction(m, "revoke")}>
-                            <ShieldOff className="h-4 w-4" /> Revoke access
-                          </Button>
+                          confirmRevokeId === m.user_id ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={busyId === m.user_id}
+                                onClick={() => { setConfirmRevokeId(null); memberAction(m, "revoke"); }}
+                              >
+                                <ShieldOff className="h-4 w-4" /> Confirm revoke
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setConfirmRevokeId(null)}>
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <Button size="sm" variant="secondary" disabled={busyId === m.user_id} onClick={() => setConfirmRevokeId(m.user_id)}>
+                              <ShieldOff className="h-4 w-4" /> Revoke access
+                            </Button>
+                          )
                         ) : (
                           <Button size="sm" disabled={busyId === m.user_id} onClick={() => memberAction(m, "restore")}>
                             <CheckCircle2 className="h-4 w-4" /> Restore
