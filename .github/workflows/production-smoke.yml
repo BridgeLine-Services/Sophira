@@ -1,0 +1,47 @@
+name: Production smoke
+
+# The deployed site, checked on a schedule (2026-11-03).
+#
+# ci.yml grades a build of master; this grades the address users actually reach. Those are
+# different things: a deployment can fail, lag behind master, or serve a page that errors while
+# every local check is green. Runs daily and on demand, needs no secrets (it only requests public
+# URLs), and prints exactly what it cannot check so a green run is never read as more than it is.
+
+on:
+  schedule:
+    # Daily 06:30 UTC - after the weekly gate on Mondays, before the school day.
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No npm install: the script uses only Node built-ins, so a broken dependency tree cannot
+      # make this report on the live site.
+      - name: Check the deployed site
+        env:
+          SMOKE_TARGET: ${{ vars.SOPHIRA_PRODUCTION_URL }}
+        run: |
+          TARGET="${SMOKE_TARGET:-https://sophira.vercel.app}"
+          echo "Checking $TARGET"
+          node scripts/smoke-prod.mjs "$TARGET"
+
+      - name: Note what this run did not cover
+        if: always()
+        run: |
+          echo "Not covered (needs sign-in or credentials): dashboard, member data, live census, integrations."
