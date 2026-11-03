@@ -2,11 +2,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { memberIdentity } from "@/lib/member-identity";
+import { MemberDirectory } from "@/components/app/MemberDirectory";
 import { Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Label, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import {
-  CheckCircle2, ClipboardList, Copy, Mail, MailQuestion, ShieldOff, Trash2, UserPlus, Users, XCircle,
+  Copy, Mail, MailQuestion, ShieldOff, Trash2, UserPlus, Users, XCircle,
 } from "lucide-react";
 
 /**
@@ -25,7 +26,6 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   const [members, setMembers] = useState(initialMembers);
   // Revoking is reversible but disruptive (it signs the member out), so it takes two
   // deliberate clicks. Real revocation logic is untouched.
-  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
   const [invitations, setInvitations] = useState(initialInvitations);
   const [requests, setRequests] = useState(initialRequests);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -477,102 +477,16 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
           out their active sessions.
         </p>
         {members.length === 0 ? (
-          <EmptyState icon={<Users className="h-6 w-6" />} title="No members yet" description="Invite people you trust — Sophira is a private network." />
+          <EmptyState icon={<Users className="h-6 w-6" />} title="No members yet" description="Invite people you trust - Sophira is a private network." />
         ) : (
-          <div className="space-y-2">
-            {members.map((m) => {
-              const isSelfOwner = m.role === "owner";
-              // Identity first: a row must always say WHO this is. Previously an empty
-              // display_name rendered a useless placeholder even though the email was known.
-              const id = memberIdentity(m);
-              return (
-                <Card key={m.user_id}>
-                  <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start gap-3">
-                        <span aria-hidden="true" className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent">
-                          {id.initials}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
-                            <span className="truncate">{id.title}</span>
-                            <Badge>{m.role}</Badge>
-                            <Badge>{m.status}</Badge>
-                          </p>
-                          <p className="mt-0.5 break-words text-xs text-ink-soft">{id.subtitle}</p>
-                        </div>
-                      </div>
-                      <p className="mt-1 text-xs text-ink-soft">
-                        {m.phone ? m.phone : "no phone yet"} · access granted {fmtDate(m.created_at)}
-                        {m.status === "revoked" && m.access_revoked_at
-                          ? ` · access revoked ${fmtDate(m.access_revoked_at)}`
-                          : ""}{" "}
-                        · last active {timeAgo(m.last_active_at)} ·{" "}
-                        {m.assignment_count} assignment{m.assignment_count === 1 ? "" : "s"} · {m.response_count} AI response{m.response_count === 1 ? "" : "s"}
-                      </p>
-                      {/* 2026-10-28: a member row with a NULL subject_usage
-                          (fresh owner / older network_stats) threw
-                          "Cannot read properties of null (reading 'length')"
-                          during render - the generic "Something went wrong"
-                          screen, and /dashboard redirects owners right back
-                          here. Guard the optional field instead of crashing. */}
-                      {(m.subject_usage?.length ?? 0) > 0 && (
-                        <p className="mt-1 flex flex-wrap gap-1">
-                          {(m.subject_usage ?? []).map((s) => (
-                            <Badge key={s.subject}>{s.subject} ×{s.count}</Badge>
-                          ))}
-                        </p>
-                      )}
-                    </div>
-                    {!isSelfOwner && (
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        {m.status === "active" ? (
-                          confirmRevokeId === m.user_id ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={busyId === m.user_id}
-                                onClick={() => { setConfirmRevokeId(null); memberAction(m, "revoke"); }}
-                              >
-                                <ShieldOff className="h-4 w-4" /> Confirm revoke
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setConfirmRevokeId(null)}>
-                                Cancel
-                              </Button>
-                            </>
-                          ) : (
-                            <Button size="sm" variant="secondary" disabled={busyId === m.user_id} onClick={() => setConfirmRevokeId(m.user_id)}>
-                              <ShieldOff className="h-4 w-4" /> Revoke access
-                            </Button>
-                          )
-                        ) : (
-                          <Button size="sm" disabled={busyId === m.user_id} onClick={() => memberAction(m, "restore")}>
-                            <CheckCircle2 className="h-4 w-4" /> Restore
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busyId === m.user_id}
-                          onClick={() => memberAction(m, "set_invite_permission", !m.can_request_invites)}
-                          title={m.can_request_invites
-                            ? "Revoke this member's right to request invitations"
-                            : "Allow this member to request invitations for others (you still approve each one)"}
-                        >
-                          <ClipboardList className="h-4 w-4" />
-                          <span className="hidden sm:inline">{m.can_request_invites ? "Can request invites" : "No invite requests"}</span>
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setRemoveTarget(m)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <MemberDirectory
+            members={members}
+            busyId={busyId}
+            fmtDate={fmtDate}
+            timeAgo={timeAgo}
+            onAction={memberAction}
+            onRemove={setRemoveTarget}
+          />
         )}
         <p className="mt-2 text-xs leading-relaxed text-ink-soft">
           You can see membership and aggregate activity, but never another member&apos;s private academic

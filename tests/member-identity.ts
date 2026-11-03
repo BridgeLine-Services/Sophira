@@ -24,13 +24,17 @@ export function runMemberIdentityTests(assert: (cond: boolean, msg: string) => v
   assert(single.initials === "PR", "identity: a single-word name yields two initials");
   assert(single.subtitle === "No email on file", "identity: a missing email is stated, not left silent");
 
-  const dashSrc = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  const dashSrc = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8")
+    + readFileSync("src/components/app/MemberDirectory.tsx", "utf8");
   assert(!dashSrc.includes("(no name)"), "dashboard: the (no name) placeholder no longer exists");
   assert(dashSrc.includes("memberIdentity"), "dashboard: rows use the tested identity helper");
   assert(dashSrc.includes("id.title") && dashSrc.includes("id.subtitle"), "dashboard: name and email are both rendered per member");
   assert(dashSrc.includes("confirmRevokeId") && dashSrc.includes("Confirm revoke"), "dashboard: revoking takes an explicit confirmation step");
   assert(dashSrc.includes('id="invite-phone"') && dashSrc.includes("sms"), "dashboard: the SMS invite option is preserved, not removed");
-  assert(dashSrc.includes("memberAction(m, \"restore\")"), "dashboard: reinstatement still calls the unchanged action handler");
+  // The table calls onAction; OwnerDashboard wires that prop to the same memberAction handler,
+  // so a restore still reaches the unchanged server route.
+  assert(dashSrc.includes('onAction(m, "restore")') && dashSrc.includes("onAction={memberAction}"),
+    "dashboard: reinstatement still reaches the unchanged action handler");
 
   const types = readFileSync("src/lib/types.ts", "utf8");
   assert(/interface NetworkMemberStats[\s\S]{0,400}phone\??: string \| null/.test(types),

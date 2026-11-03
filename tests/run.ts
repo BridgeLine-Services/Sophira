@@ -4081,11 +4081,14 @@ async function runAccessControlTests(): Promise<void> {
     // ---- the owner UI is a window, not the boundary -------------------------
     const ownerPage = fs.readFileSync(path.join(process.cwd(), "src", "app", "owner", "page.tsx"), "utf8");
     assert(ownerPage.includes('profile.role !== "owner"'), "access: /owner is owner-only, checked server-side");
-    const ui = fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "OwnerDashboard.tsx"), "utf8");
+    // 2026-11-03: the member list moved into MemberDirectory (a table), so these pins read
+    // both files. Behaviour is unchanged; only the presentation moved.
+    const ui = fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "OwnerDashboard.tsx"), "utf8")
+      + fs.readFileSync(path.join(process.cwd(), "src", "components", "app", "MemberDirectory.tsx"), "utf8");
     assert(ui.includes("Revoke access") && ui.includes("Restore"),
       "access: the Access Management area offers revoke/reinstate");
-    assert(ui.includes("m.email") && ui.includes("access granted") && ui.includes("access revoked"),
-      "access: member cards show name, email, dates granted/revoked");
+    assert(ui.includes("id.subtitle") && ui.includes("joined ") && ui.includes("revoked "),
+      "access: member rows show name, email, and the dates access was granted/revoked");
     assert(ui.includes("Only the owner can grant, revoke, or reinstate access"),
       "access: the UI states clearly that only the owner can manage access");
 
@@ -4677,7 +4680,8 @@ async function runDeliveryCapabilityTests(): Promise<void> {
     const manifest = readFileSync("src/config/env.manifest.json", "utf8");
     for (const n of ["SOPHIRA_INVITE_FROM_EMAIL","EMAIL_API_URL","EMAIL_API_KEY","EMAIL_FROM","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER"])
       assert(manifest.includes(`"name": "${n}"`), `delivery: ${n} is declared in the authoritative manifest`);
-    const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+    const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8")
+    + readFileSync("src/components/app/MemberDirectory.tsx", "utf8");
     // 2026-10-29 (owner request): choices are NO LONGER disabled. The owner may
     // always pick a channel; an unconfigured channel creates the invitation and
     // reveals the copy link, and the status line names what is missing.
@@ -4824,7 +4828,8 @@ async function runAutoSetupTests(): Promise<void> {
 
 async function runOwnerRenderSafetyTests(): Promise<void> {
   const { readFileSync } = await import("fs");
-  const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
+  const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8")
+    + readFileSync("src/components/app/MemberDirectory.tsx", "utf8");
   // 2026-10-28 regression: a null optional field must never throw during
   // render (the owner saw the generic error screen on /owner, and
   // /dashboard redirects owners straight back to /owner).
