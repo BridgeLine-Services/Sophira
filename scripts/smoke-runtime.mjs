@@ -25,6 +25,12 @@ const PUBLIC_PAGES = [
   { path: "/privacy", expect: "privacy", title: "Sophira" },
   // The owner's first screen. It must explain itself, not just render.
   { path: "/setup", expect: "what sophira checks", title: "Sophira" },
+  // Added 2026-11-03: these four also render without a session (probed against the built app),
+  // so they were simply untested. Each now gets the response, heading and content checks.
+  { path: "/terms", expect: "terms", title: "Sophira" },
+  { path: "/reset-password", expect: "password", title: "Sophira" },
+  { path: "/install", expect: "install", title: "Sophira" },
+  { path: "/create-owner", expect: "owner", title: "Sophira" },
 ];
 const PROTECTED = ["/dashboard", "/courses", "/settings", "/writing/review"];
 

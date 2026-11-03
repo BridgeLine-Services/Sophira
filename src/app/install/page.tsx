@@ -57,7 +57,9 @@ function InstallCard() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Download className="h-5 w-5 text-accent" />
-          <CardTitle>Install Sophira on this device</CardTitle>
+          {/* The page’s only title. CardTitle renders an h3, which left this page with no h1
+              at all (smoke check, 2026-11-03). */}
+          <h1 className="font-semibold text-ink text-[17px] leading-snug">Install Sophira on this device</h1>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
