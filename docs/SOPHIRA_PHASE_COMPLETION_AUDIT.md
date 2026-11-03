@@ -64,6 +64,18 @@ Not verified anywhere yet: layout at 360/390/430/768/1024/1440 px, focus order t
 owner tiles, dark-mode visual quality. These need a browser; none is available in this
 environment, so they are **NOT TESTED** rather than assumed.
 
+Accessibility is now covered by three gates that run in the suite, each with its own limits:
+
+| Gate | Covers | Does not cover |
+| --- | --- | --- |
+| `scripts/contrast.mjs` | WCAG AA ratio for every token pair, both themes | real rendered output, images, gradients |
+| `scripts/a11y-audit.mjs` | buttons with no accessible name, form controls with no label, dialogs without `aria-modal` and a name (TypeScript AST, self-tested against planted defects) | focus order, keyboard traps, ARIA misuse beyond these rules |
+| `scripts/smoke-runtime.mjs` | exactly one non-empty `h1` in the rendered HTML of each public page | authenticated pages, which need a signed-in session |
+
+Genuinely **NOT TESTED**: keyboard traversal, focus visibility in the browser, screen-reader
+announcements, reduced-motion behaviour. These need a browser and assistive technology; claiming
+them from static analysis would be exactly the shortcut the directive forbids.
+
 ## Phase 3 - Security and data preservation
 
 **Status: PARTIALLY COMPLETE.**

@@ -3004,6 +3004,18 @@ async function runRankingRegressionTests(): Promise<void> {
 }
 
 async function runIntegrationsDoctorTests(): Promise<void> {
+  // Accessibility, statically (directive 5.7 / 9.6). The self-test runs first: a scanner that
+  // reports nothing proves nothing unless it can still find a planted defect.
+  {
+    const { spawnSync } = await import("node:child_process");
+    const self = spawnSync("node", ["scripts/a11y-audit.mjs", "--self-test"], { encoding: "utf8" });
+    assert(self.status === 0 && /self-test: PASS/.test(self.stdout || ""),
+      `a11y: the audit detects planted defects (${(self.stdout || "").trim().split("\n")[0]})`);
+    const real = spawnSync("node", ["scripts/a11y-audit.mjs"], { encoding: "utf8" });
+    assert(real.status === 0 && /a11y: 0 findings/.test(real.stdout || ""),
+      `a11y: no control lacks an accessible name or label (${(real.stdout || "").split("\n")[0]})`);
+  }
+
   // Part 2 of the directive: a member must never be shown a raw database error or told to run
   // a migration. Those are owner concerns, and the message names internals they cannot act on.
   {
