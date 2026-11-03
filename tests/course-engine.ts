@@ -521,6 +521,19 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "scope: the active subject/course scope is visible next to the title in every engine page");
 
   const gateScript = readFileSync("scripts/release-gate.mjs", "utf8");
+  // 2026-11-03: the doc said "The 39 checks" while the gate registered 41, and the rows were
+  // out of order. The prose must match the registry, or a reader counts the wrong number.
+  {
+    const gateDoc = readFileSync("docs/RELEASE_GATE.md", "utf8");
+    const documented = Number((gateDoc.match(/## The (\d+) checks/) ?? [])[1]);
+    const declared = Number((gateScript.match(/ALL (\d+) checks PASS/) ?? [])[1]);
+    assert(documented === declared && documented === 41,
+      `gate: the document and the gate agree on the check count (doc ${documented}, gate ${declared})`);
+    const ids = (gateDoc.match(/^\| (\d+) \|/gm) ?? []).map((r) => Number(r.replace(/\D/g, "")));
+    assert(ids.length === declared && ids.every((n, i) => n === i + 1),
+      `gate: the documented checks are numbered in order with no gaps (${ids.length} rows)`);
+  }
+
   assert(gateScript.includes("0001-0038"),
     "gate: migration range reflects the CURRENT chain end 0038 (tail-marker probe)");
 

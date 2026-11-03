@@ -3237,6 +3237,15 @@ async function runThemeTokenTests(): Promise<void> {
     "theme: first paint resolves the OS preference in the layout script, not in a second palette");
 
   // The audit is executed, not trusted: a token change that hurts legibility fails the suite.
+  // Phase 2: pages must use the semantic tokens, not literal palette colours, or a theme change
+  // reaches only the screens someone remembered to update.
+  {
+    const { spawnSync: drift } = await import("node:child_process");
+    const r = drift("node", ["scripts/design-drift.mjs"], { encoding: "utf8" });
+    assert(r.status === 0 && /design-drift: 0 literal/.test(r.stdout || ""),
+      `theme: no page uses a literal palette colour instead of a token (${(r.stdout || "").split("\n")[0]})`);
+  }
+
   const { spawnSync: runNode } = await import("node:child_process");
   const audit = runNode("node", ["scripts/contrast.mjs"], { encoding: "utf8" });
   assert(audit.status === 0,

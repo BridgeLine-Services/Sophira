@@ -86,12 +86,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <Link
               href="/assignments/new"
-              className="group flex min-h-28 flex-col justify-center gap-1.5 rounded-card bg-gradient-to-br from-accent to-accent-deep p-5 text-white shadow-[0_12px_24px_rgba(81,69,232,0.18)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(81,69,232,0.24)] active:scale-[0.99]"
+              className="group flex min-h-28 flex-col justify-center gap-1.5 rounded-card bg-gradient-to-br from-accent to-accent-deep p-5 text-on-accent shadow-[0_12px_24px_rgba(81,69,232,0.18)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(81,69,232,0.24)] active:scale-[0.99]"
             >
               <span className="flex items-center gap-2 font-semibold">
                 <FileText className="h-5 w-5" /> Start an assignment
               </span>
-              <span className="text-sm text-white/85">Upload, paste, or photograph your instructions. Sophira will follow your teacher&apos;s rules.</span>
+              <span className="text-sm text-on-accent/85">Upload, paste, or photograph your instructions. Sophira will follow your teacher&apos;s rules.</span>
             </Link>
             <Link
               href="/assignments/new?mode=learn"

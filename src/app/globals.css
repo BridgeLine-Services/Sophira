@@ -17,8 +17,9 @@
   --c-accent: 81 69 232;
   --c-accent-soft: 240 238 255;
   --c-accent-deep: 63 53 201;
-  /* Text placed ON the accent colour. Light mode is white; dark mode needs the dark ink
-     because the dark accent is deliberately light enough to read as link text (AA 4.5:1). */
+  /* Text placed ON a filled emphasis surface (accent buttons, danger buttons). Light mode is
+     white; dark mode needs dark ink, because the dark accent and danger are deliberately light
+     enough to read as coloured text on a card (AA 4.5:1). */
   --c-on-accent: 255 255 255;
   --c-success: 15 118 110;
   --c-warn: 180 83 9;

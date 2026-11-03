@@ -46,7 +46,7 @@ const STATE_CLASS: Record<string, string> = {
   Ready: "bg-emerald-100 text-emerald-900",
   "Needs attention": "bg-amber-100 text-amber-900",
   Failed: "bg-red-100 text-red-900",
-  "Not verified": "bg-slate-200 text-slate-700",
+  "Not verified": "border border-line bg-card text-ink-soft",
 };
 
 export function SystemHealthPanel() {

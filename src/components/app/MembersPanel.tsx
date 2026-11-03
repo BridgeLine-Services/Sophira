@@ -71,7 +71,7 @@ export function MembersPanel({ initialMembers }: { initialMembers: NetworkMember
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded-full bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+              className="rounded-full bg-danger px-4 py-2 text-sm font-medium text-on-accent hover:bg-danger/90"
               disabled={busyId === removeTarget.user_id}
               onClick={async () => {
                 const target = removeTarget;
