@@ -170,6 +170,15 @@ export default async function OwnerPage() {
         initialInvitations={(invitations || []) as Invitation[]}
         initialRequests={(requests || []) as InvitationRequest[]}
         siteUrl={siteUrl}
+        status={{
+          // Every value below is a real configuration or request outcome: no estimate, and an
+          // unconfigured optional service is never reported as working.
+          aiReady: Boolean(pageDiag.activeProvider),
+          microsoft: setup.microsoft,
+          google: setup.google,
+          search: setup.search,
+          membersLoaded: !statsError,
+        }}
       />
       <section className="mt-8" aria-labelledby="owner-providers-h">
         <h2 id="owner-providers-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">AI Providers and Models</h2>

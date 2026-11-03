@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
 import { buildActivity } from "../src/lib/owner-activity";
+import { buildStatusRows, statusIsHealthy } from "../src/lib/owner-status";
 
 const member = (over: Partial<{ user_id: string; display_name: string; email: string | null; created_at: string; access_revoked_at: string | null }> = {}) => ({
   user_id: "u1", display_name: "Ada Lovelace", email: "ada@example.com",
@@ -55,4 +56,19 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
   const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
   assert(dash.includes('id="activity"') && dash.includes("buildActivity({ members, invitations })"),
     "activity: the owner dashboard renders the derived feed");
+
+  // ---- System status must never call an unconfigured service "working" ---------
+  const off = buildStatusRows({ aiReady: false, microsoft: false, google: false, search: false, membersLoaded: true });
+  assert(off.find((r) => r.key === "ai")?.state === "attention",
+    "status: a missing AI provider is flagged as needing attention, not hidden");
+  assert(off.filter((r) => r.state === "optional_off").length === 3,
+    "status: unconfigured optional connections are labelled not set up");
+  assert(!statusIsHealthy(off), "status: a missing AI provider makes the system not fully healthy");
+  const ok = buildStatusRows({ aiReady: true, microsoft: false, google: false, search: false, membersLoaded: true });
+  assert(statusIsHealthy(ok), "status: optional extras switched off never make the system unhealthy");
+  const dbDown = buildStatusRows({ aiReady: true, microsoft: true, google: true, search: true, membersLoaded: false });
+  assert(dbDown.find((r) => r.key === "members")?.state === "attention" && !statusIsHealthy(dbDown),
+    "status: a failed member load is reported as needing attention even when everything else is ready");
+  assert(dbDown.every((r) => r.detail.length > 20 && !/undefined|null/.test(r.detail)),
+    "status: every row explains itself in plain language");
 }

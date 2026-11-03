@@ -4,12 +4,14 @@ import Link from "next/link";
 import { memberIdentity } from "@/lib/member-identity";
 import { MemberDirectory } from "@/components/app/MemberDirectory";
 import { buildActivity } from "@/lib/owner-activity";
+import { buildStatusRows, statusIsHealthy, type StatusInput } from "@/lib/owner-status";
 import { Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Label, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import {
   Copy, Mail, MailQuestion, ShieldOff, Trash2, UserPlus, Users, XCircle,
   Activity,
+  ShieldCheck,
 } from "lucide-react";
 
 /**
@@ -19,11 +21,12 @@ import {
  * authorization server-side; the analytics show counts and timestamps —
  * never another member's academic content.
  */
-export function OwnerDashboard({ initialMembers, initialInvitations, initialRequests, siteUrl }: {
+export function OwnerDashboard({ initialMembers, initialInvitations, initialRequests, siteUrl, status }: {
   initialMembers: NetworkMemberStats[];
   initialInvitations: Invitation[];
   initialRequests: InvitationRequest[];
   siteUrl: string;
+  status: StatusInput;
 }) {
   const [members, setMembers] = useState(initialMembers);
   // Revoking is reversible but disruptive (it signs the member out), so it takes two
@@ -207,6 +210,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
     members.find((m) => m.email && email && m.email.toLowerCase() === email.toLowerCase()) ?? null;
 
   const activity = buildActivity({ members, invitations });
+  const statusRows = buildStatusRows(status);
   const activeMembers = members.filter((m) => m.status === "active");
   const isExpired = (i: Invitation) =>
     i.status === "pending" && new Date(i.expires_at).getTime() <= Date.now();
@@ -541,6 +545,38 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
             </CardContent>
           </Card>
         )}
+      </section>
+
+      {/* System status - each row reflects a real check, and says its state in words,
+          not by colour alone. */}
+      <section id="status" className="scroll-mt-4">
+        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
+          <ShieldCheck className="h-5 w-5 text-accent" /> System status
+        </h2>
+        <Card>
+          <CardContent className="divide-y divide-line p-0">
+            {statusRows.map((row) => (
+              <div key={row.key} className="flex items-start gap-3 p-4">
+                <span
+                  aria-hidden="true"
+                  className={"mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " + (row.state === "ready" ? "bg-emerald-500" : row.state === "attention" ? "bg-amber-400" : "bg-line")}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
+                    {row.label}
+                    <Badge>{row.state === "ready" ? "working" : row.state === "attention" ? "needs attention" : "not set up"}</Badge>
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-soft">{row.detail}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <p className="mt-2 text-xs text-ink-soft">
+          {statusIsHealthy(statusRows)
+            ? "Everything members need is working. Optional extras can be added any time."
+            : "The items marked “needs attention” affect members. The optional extras do not."}
+        </p>
       </section>
 
       <ConfirmDialog
