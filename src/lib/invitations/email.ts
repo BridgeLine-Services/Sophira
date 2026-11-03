@@ -55,6 +55,9 @@ export async function sendInvitationEmail(opts: {
       },
       body: JSON.stringify(body),
       cache: "no-store",
+      // 2026-11-03: without a bound, a stalled provider holds the owner's invite action open
+      // until the platform kills the function. The catch below already words a failure honestly.
+      signal: AbortSignal.timeout(15000),
     });
     const json = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
     if (res.ok && json.id) {

@@ -58,12 +58,12 @@ export async function GET() {
       const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
       const ghToken = process.env.GITHUB_HEALTH_TOKEN; // optional; reading a public repo needs no token
       if (ghToken) headers.Authorization = `Bearer ${ghToken}`;
-      const runsRes = await fetch(REPO_RUNS_URL, { headers, cache: "no-store" });
+      const runsRes = await fetch(REPO_RUNS_URL, { headers, cache: "no-store", signal: AbortSignal.timeout(8000) });
       if (!runsRes.ok) throw new Error(`runs ${runsRes.status}`);
       const runs = (await runsRes.json()) as { workflow_runs: WorkflowRunSummary[] };
       const run = runs.workflow_runs?.[0] ?? null;
       let gate_summary: string | null = null;
-      const issuesRes = await fetch(REPO_ISSUES_URL, { headers, cache: "no-store" });
+      const issuesRes = await fetch(REPO_ISSUES_URL, { headers, cache: "no-store", signal: AbortSignal.timeout(8000) });
       if (issuesRes.ok) {
         const issues = (await issuesRes.json()) as { title: string; body: string | null; number: number }[];
         const pinned = issues.find((i) => i.title === ISSUE_TITLE);
@@ -72,7 +72,7 @@ export async function GET() {
           if (!gate_summary) {
             const cRes = await fetch(
               `https://api.github.com/repos/BridgeLine-Services/Sophira/issues/${pinned.number}/comments?per_page=100`,
-              { headers, cache: "no-store" },
+              { headers, cache: "no-store", signal: AbortSignal.timeout(8000) },
             );
             if (cRes.ok) {
               const comments = (await cRes.json()) as { body: string }[];
@@ -167,6 +167,8 @@ export async function POST() {
         headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" },
         body: JSON.stringify({ ref: "master" }),
         cache: "no-store",
+        // A dispatch that never answers must fail out loud: the owner is waiting on this click.
+        signal: AbortSignal.timeout(10000),
       },
     );
     if (res.status !== 204) {
