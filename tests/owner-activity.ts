@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { buildActivity } from "../src/lib/owner-activity";
 import { buildStatusRows, statusIsHealthy } from "../src/lib/owner-status";
 
@@ -74,12 +74,14 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
 
   // ---- The owner sidebar must reach every section that now exists --------------
   const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
-  const dash2 = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-  for (const anchor of ["activity", "status"]) {
-    assert(shell.includes(`/owner#${anchor}`),
-      `nav: the owner sidebar links to the ${anchor} section`);
-    assert(dash2.includes(`id="${anchor}"`),
-      `nav: the ${anchor} section exists under the id the sidebar links to`);
+  for (const route of ["activity", "status", "security", "ai-providers"]) {
+    assert(shell.includes(`"/owner/${route}"`),
+      `nav: the owner sidebar links to the dedicated ${route} page`);
+    assert(existsSync(`src/app/owner/${route}/page.tsx`),
+      `nav: /owner/${route} exists, so the sidebar link cannot 404`);
+    const page = readFileSync(`src/app/owner/${route}/page.tsx`, "utf8");
+    assert(page.includes("requireOwnerPage"),
+      `nav: /owner/${route} authorises on the server, not by hiding a link`);
   }
   assert(shell.includes('heading: "Monitoring"'),
     "nav: the new sections sit in their own group rather than being appended anywhere");

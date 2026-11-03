@@ -54,15 +54,15 @@ const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; la
   {
     heading: "Monitoring",
     items: [
-      { href: "/owner#activity", label: "Recent activity", icon: Activity },
-      { href: "/owner#status", label: "System status", icon: ShieldCheck },
+      { href: "/owner/activity", label: "Recent activity", icon: Activity },
+      { href: "/owner/status", label: "System status", icon: ShieldCheck },
     ],
   },
   {
     heading: "Configuration",
     items: [
-      { href: "/owner#security", label: "Security and billing", icon: ShieldCheck },
-      { href: "/owner#owner-providers-h", label: "AI providers and models", icon: Gauge },
+      { href: "/owner/security", label: "Security and billing", icon: ShieldCheck },
+      { href: "/owner/ai-providers", label: "AI providers and models", icon: Gauge },
       { href: "/owner/integrations", label: "Integrations", icon: Settings },
     ],
   },
