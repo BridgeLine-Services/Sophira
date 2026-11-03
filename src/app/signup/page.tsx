@@ -210,7 +210,17 @@ function SignUpForm() {
 
 export default function SignUpPage() {
   return (
-    <Suspense>
+    // A fallback, not an empty Suspense: without it the server-rendered HTML contains no
+    // heading and no sign-up text at all, so a slow connection or a screen reader gets a blank
+    // page until the bundle hydrates.
+    <Suspense
+      fallback={
+        <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10 text-center">
+          <h1 className="text-xl font-semibold text-ink">Create your Sophira account</h1>
+          <p className="mt-2 text-sm text-ink-soft">Checking your invitation…</p>
+        </div>
+      }
+    >
       <SignUpForm />
     </Suspense>
   );

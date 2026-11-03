@@ -26,6 +26,10 @@ export function LegalDocPage({ doc }: { doc: LegalDocName }) {
     );
   }
 
+  // The document file starts with its own "# Title" heading. The page already renders that title
+  // as the h1, so rendering the body verbatim produced two page headings (smoke check, 2026-11-03).
+  const body = text.replace(/^\s*#\s+.*?(\r?\n|$)/, "").trimStart();
+
   const hasPlaceholders = legalPlaceholdersRemain(text);
 
   return (
@@ -46,7 +50,7 @@ export function LegalDocPage({ doc }: { doc: LegalDocName }) {
       )}
 
       <div className="result-body mt-6 text-ink">
-        <ResultBody content={text} />
+        <ResultBody content={body} />
       </div>
     </main>
   );

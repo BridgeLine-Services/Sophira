@@ -16,12 +16,12 @@ sandbox, the command is named. Where it could not happen, the row says so and sa
 
 | Command | Result |
 | --- | --- |
-| `npm test` | 4,820 passed, 0 failed |
+| `npm test` | 4,821 passed, 0 failed |
 | `npx tsc --noEmit` | clean |
 | `npm run build` | compiled successfully |
 | `npm run lint` | 0 errors, 104 warnings |
 | `npm run verify` | PASS |
-| `npm run smoke:runtime` | 31/31 against the built app |
+| `npm run smoke:runtime` | 39/39 against the built app (heading structure added) |
 | `npm run scan:secrets` | CLEAN |
 | `node scripts/contrast.mjs` | PASS, 32 pairs (16 per theme) |
 | `node scripts/design-drift.mjs` | 0 literal palette colours |

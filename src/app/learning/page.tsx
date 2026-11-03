@@ -188,7 +188,17 @@ export default async function LearningPage({
           each pattern&apos;s scope, confidence, and lifecycle under your control.
         </p>
         {patternsError ? (
-          <p className="text-sm text-ink-soft">Learning data is unavailable: {patternsError.message}. Run migration 0005 in Supabase.</p>
+          // The raw error is logged server-side, not shown: a student reading "run migration
+          // 0005 in Supabase" cannot act on it, and the database message may name internals.
+          <div className="rounded-card border border-line bg-card p-4" role="status">
+            <p className="text-sm font-medium text-ink">Your learning patterns couldn&apos;t be loaded</p>
+            <p className="mt-1 text-sm text-ink-soft">
+              This affects only this list. Your courses, notebooks and writing tools still work.
+            </p>
+            <a className="mt-2 inline-block text-sm font-medium text-accent underline" href="/learning">
+              Try again
+            </a>
+          </div>
         ) : (
           <CorrectionsPanel initialPatterns={(patterns || []) as LearningPattern[]} />
         )}

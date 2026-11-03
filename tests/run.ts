@@ -3004,6 +3004,29 @@ async function runRankingRegressionTests(): Promise<void> {
 }
 
 async function runIntegrationsDoctorTests(): Promise<void> {
+  // Part 2 of the directive: a member must never be shown a raw database error or told to run
+  // a migration. Those are owner concerns, and the message names internals they cannot act on.
+  {
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const walk = (d: string, out: string[] = []): string[] => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const f = `${d}/${e.name}`;
+        if (e.isDirectory()) walk(f, out);
+        else if (e.name.endsWith(".tsx")) out.push(f);
+      }
+      return out;
+    };
+    const memberFacing = walk("src/app").filter((f) => !f.includes("/owner/") && !f.includes("/setup/"));
+    const leaks: string[] = [];
+    for (const f of memberFacing) {
+      const src = readFileSync(f, "utf8");
+      // an error object interpolated directly into rendered text
+      if (/>\{[^}]*\b[A-Za-z]*[eE]rror\b[^}]*\.message\}/.test(src)) leaks.push(`${f}: renders a raw error message`);
+      if (/Run (the )?migration \d{4}/.test(src)) leaks.push(`${f}: tells the reader to run a migration`);
+    }
+    assert(leaks.length === 0, `copy: member pages explain problems in ordinary language (${leaks.join("; ")})`);
+  }
+
   const { execFileSync } = await import("node:child_process");
   const out = execFileSync("node", ["scripts/integrations-doctor.mjs", "--self-test"], { encoding: "utf8" });
   assert(/self-test: 8 passed, 0 failed/.test(out),

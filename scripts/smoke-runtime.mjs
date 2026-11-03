@@ -40,6 +40,18 @@ const get = async (path) => {
   return { status: res.status, body, location: res.headers.get("location") || "" };
 };
 
+// Refuse to run against a server this script did not start. A leftover process on the port
+// answers happily and the suite then grades an OLD build, which is a false PASS (it happened
+// on 2026-11-03: two fixed pages still showed the pre-fix HTML).
+try {
+  const probe = await fetch(BASE, { redirect: "manual" });
+  if (probe.status > 0) {
+    console.error(`SMOKE: something is already listening on ${BASE}.`);
+    console.error("Stop it or pass another port: SMOKE_PORT=3400 npm run smoke:runtime");
+    process.exit(1);
+  }
+} catch { /* nothing listening, which is what we want */ }
+
 const server = spawn("npx", ["next", "start", "-p", String(PORT)], {
   stdio: ["ignore", "pipe", "pipe"],
   detached: false,
@@ -78,6 +90,12 @@ for (const page of PUBLIC_PAGES) {
   record(`${page.path} has a title`, /<title>[^<]*Sophira/i.test(r.body), "title tag");
   record(`${page.path} did not hit the error boundary`, !r.body.includes("Something went wrong"), "");
   record(`${page.path} mentions its own subject`, r.body.toLowerCase().includes(page.expect), page.expect);
+  // Heading structure (directive 5.7): a rendered page needs exactly one h1, and it must say
+  // something. Checked on the real HTML because a page can delegate its title to a component,
+  // which a source grep cannot see - five pages looked headerless and were not.
+  const h1s = [...r.body.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1].replace(/<[^>]*>/g, "").trim());
+  record(`${page.path} has exactly one h1`, h1s.length === 1, `${h1s.length} found`);
+  record(`${page.path} h1 is not empty`, h1s.every((t) => t.length > 2), h1s[0]?.slice(0, 40) ?? "none");
 }
 
 for (const path of PROTECTED) {

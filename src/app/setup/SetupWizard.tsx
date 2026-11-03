@@ -218,7 +218,7 @@ export default function SetupWizard({
               , select all of it (Ctrl+A / Cmd+A), copy, and paste it into the SQL editor.
             </li>
             <li>
-              Press <strong>Run</strong> in Supabase. It finishes in a few seconds and never deletes anything.
+              Press <strong>Run</strong> on that page. It finishes in a few seconds and never deletes anything.
             </li>
             <li>
               Return here and press <strong>Check again</strong>.
