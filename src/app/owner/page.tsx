@@ -71,6 +71,17 @@ export default async function OwnerPage() {
     ? `Membership statistics could not be loaded (${(mErr?.message || "no data returned").replace(/[\n\r]/g, " ").slice(0, 160)}). The member list below may be incomplete — invitations and access management still work. Reload to retry.`
     : null;
 
+  // Owner-only phone directory (0043). A failure here must never hide the
+  // member list: phones are a convenience, membership is the record.
+  const { data: phones } = await supabase.rpc("network_member_phones");
+  const phoneById = new Map<string, string>(
+    ((phones ?? []) as Array<{ user_id: string; phone: string }>).map((r) => [r.user_id, r.phone])
+  );
+  const membersWithPhone: NetworkMemberStats[] = ((members ?? []) as NetworkMemberStats[]).map((m) => ({
+    ...m,
+    phone: phoneById.get(m.user_id) ?? m.phone ?? null,
+  }));
+
   const setup = providerSetupStatus();
   const pageDiag = providerDiagnostics(readAiEnv());
   const hdrs = await headers();
@@ -155,7 +166,7 @@ export default async function OwnerPage() {
         </div>
       )}
       <OwnerDashboard
-        initialMembers={(members || []) as NetworkMemberStats[]}
+        initialMembers={membersWithPhone}
         initialInvitations={(invitations || []) as Invitation[]}
         initialRequests={(requests || []) as InvitationRequest[]}
         siteUrl={siteUrl}

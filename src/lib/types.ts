@@ -50,6 +50,8 @@ export interface NetworkMemberStats {
   user_id: string;
   display_name: string;
   email: string | null;
+  /** Owner-visible only; null when the member has not shared one. */
+  phone?: string | null;
   role: "owner" | "user";
   status: "active" | "revoked";
   access_revoked_at: string | null;

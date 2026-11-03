@@ -16,6 +16,7 @@ function SignUpForm() {
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [checking, setChecking] = useState(true);
   const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +59,7 @@ function SignUpForm() {
       email: invitation.email,
       password,
       options: {
-        data: { display_name: fullName.trim() },
+        data: { display_name: fullName.trim(), phone: phone.trim() || undefined },
         emailRedirectTo: confirmUrl,
       },
     });
@@ -152,6 +153,24 @@ function SignUpForm() {
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="How should I greet you?"
               />
+            </div>
+            <div>
+              {/* Optional: the owner uses this to reach you about your account.
+                  It is never shared with other members. */}
+              <Label htmlFor="phone">Mobile number (optional)</Label>
+              <Input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                className="mt-1.5"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1 555 123 4567"
+                aria-describedby="phone-hint"
+              />
+              <p id="phone-hint" className="mt-1 text-xs text-ink-soft">
+                Only your Sophira owner can see this. You can remove it later.
+              </p>
             </div>
             <div>
               <Label htmlFor="password">Choose a password</Label>

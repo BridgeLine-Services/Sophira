@@ -42,4 +42,5 @@ export const MARKERS = {
   "0040_document_history.sql": "to_regclass('public.document_history') is not null",
   "0041_canvas_integration.sql": "to_regclass('public.canvas_assignments') is not null",
   "0042_member_notifications.sql": "to_regclass('public.member_notifications') is not null",
+  "0043_member_phone.sql": "exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'phone')",
 };
