@@ -101,6 +101,14 @@ export async function runLectureStudioTests(): Promise<{ passed: number; failed:
   assert(page.includes("plainText(asset.member_note, 600)"), "the member note is normalised");
   assert(!/\{f\.text\}/.test(page), "raw OCR text is never rendered directly");
 
+  section("lecture studio: the video element can only ever load a local blob");
+
+  assert(page.includes("function mountLocalVideo("), "one place builds the local video element");
+  assert((page.match(/URL\.createObjectURL/g) ?? []).length === 1, "exactly one object URL is created in the whole page");
+  assert(/\/\^blob:\[a-z\]\+:\\\/\\\//.test(page) || page.includes("/^blob:[a-z]+:"), "the blob scheme is checked before it is attached");
+  assert(page.includes('video.setAttribute("src", objectUrl)'), "the checked URL is attached once, through one call");
+  assert(!/\.src\s*=\s*(file|url|input)/.test(page), "no raw file or input is assigned to a media source");
+
   section("lecture studio: honest failure and privacy wording");
 
   assert(page.includes("Check your connection"), "an interrupted upload gives a plain next step");

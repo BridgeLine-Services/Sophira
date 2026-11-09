@@ -110,13 +110,29 @@ function sampleTimes(durationSec: number): number[] {
   return out;
 }
 
-/** Reads a frame out of a local video file without uploading it again. */
-async function grabFrame(file: File, atSec: number): Promise<Blob | null> {
-  const url = URL.createObjectURL(file);
+/**
+ * Builds the local preview element for a video the member picked.
+ *
+ * The only URL this ever loads is the opaque blob handle the browser itself
+ * issued for that File, and the scheme is checked before it is attached, so no
+ * part of the source can point the element anywhere else.
+ */
+function mountLocalVideo(file: File): { video: HTMLVideoElement; release: () => void } {
+  const objectUrl = URL.createObjectURL(file);
+  if (!/^blob:[a-z]+:\/\//i.test(objectUrl)) {
+    URL.revokeObjectURL(objectUrl);
+    throw new Error("unexpected local URL");
+  }
   const video = document.createElement("video");
-  video.src = url;
+  video.setAttribute("src", objectUrl);
   video.muted = true;
   video.preload = "auto";
+  return { video, release: () => URL.revokeObjectURL(objectUrl) };
+}
+
+/** Reads a frame out of a local video file without uploading it again. */
+async function grabFrame(file: File, atSec: number): Promise<Blob | null> {
+  const { video, release } = mountLocalVideo(file);
   try {
     await new Promise<void>((resolve, reject) => {
       video.onloadedmetadata = () => resolve();
@@ -135,7 +151,7 @@ async function grabFrame(file: File, atSec: number): Promise<Blob | null> {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.82));
   } finally {
-    URL.revokeObjectURL(url);
+    release();
   }
 }
 
@@ -293,14 +309,12 @@ export default function LecturesPage() {
         setBusyId("");
         return;
       }
-      const url = URL.createObjectURL(file);
+      const probe = mountLocalVideo(file);
       const duration = await new Promise<number>((resolve) => {
-        const v = document.createElement("video");
-        v.src = url;
-        v.onloadedmetadata = () => resolve(v.duration || 0);
-        v.onerror = () => resolve(0);
+        probe.video.onloadedmetadata = () => resolve(probe.video.duration || 0);
+        probe.video.onerror = () => resolve(0);
       });
-      URL.revokeObjectURL(url);
+      probe.release();
 
       const times = sampleTimes(duration || asset.duration_sec || 0);
       if (times.length === 0) {
