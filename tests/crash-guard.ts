@@ -43,7 +43,8 @@ export async function runCrashGuardTests(assert: Assert, section: Section): Prom
 
   // ---- 3. middleware: a SET-but-MALFORMED URL is degraded, not a crash ----
   {
-    const { middleware } = await import("../src/middleware");
+    const { proxy } = await import("../src/proxy");
+    const middleware = proxy; // Next 16: middleware -> proxy, same function.
     const { NextRequest } = await import("next/server");
     const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -71,7 +72,8 @@ export async function runCrashGuardTests(assert: Assert, section: Section): Prom
 
   // ---- 4. middleware: an UNREACHABLE (but valid) URL degrades too ----
   {
-    const { middleware } = await import("../src/middleware");
+    const { proxy } = await import("../src/proxy");
+    const middleware = proxy; // Next 16: middleware -> proxy, same function.
     const { NextRequest } = await import("next/server");
     const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

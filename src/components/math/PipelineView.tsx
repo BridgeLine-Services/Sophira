@@ -12,7 +12,11 @@ export interface PipelineResult {
   multipleChoice?: { inverted: boolean; established: boolean; base: string; choices: { label: string; text: string; verdict: "correct" | "incorrect" | "cannot_determine"; reason: string }[] };
 }
 
-declare global {
+// React 19 moved the JSX namespace off the global scope (it now lives on the
+// React module). Declaring it inside the module keeps the <math-field> custom
+// element typed on both React 18 and React 19, rather than breaking the math
+// editor the moment the runtime is upgraded.
+declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
       "math-field": Record<string, unknown>;

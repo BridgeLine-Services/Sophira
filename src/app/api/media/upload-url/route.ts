@@ -25,7 +25,7 @@ export const runtime = "nodejs";
  *  - the signed URL is the only thing the client receives; it expires.
  */
 export async function POST(request: Request) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const user = guard.data.user;

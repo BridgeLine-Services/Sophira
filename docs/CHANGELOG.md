@@ -1,3 +1,24 @@
+## 2026-11-09 — Phase 5a: Next.js 16.4 and React 19.3
+
+The framework upgrade proposed in pull request #16 could not be merged: its
+branch is 335 commits behind and would have reverted Phases 0 through 3g. The
+upgrade itself was therefore reapplied on top of current master.
+
+- **Next.js 16.4.6**, **React 19.3.1** (with matching `@types`), `lucide-react`
+  1.70.0 (first release supporting React 19).
+- `src/middleware.ts` → `src/proxy.ts` with the Next 16 `proxy` export. Every
+  rule is unchanged: public routes, revoked-member refusal, owner → `/owner`,
+  member → `/dashboard`, local-first development gating, and honest degradation
+  when Supabase is unconfigured. The old export name survives as an alias.
+- `math-field` JSX typing moved onto the React module, which React 19 requires;
+  the math editor keeps compiling and rendering.
+- **Defect fixed:** six API routes awaited the synchronous Supabase client,
+  which defeated the lazy crash guard and returned 500 instead of a friendly
+  503 when the database was unavailable (`/api/media/*`, `/api/owner/ai-*`).
+- **Defect fixed:** the runtime smoke test looked for the stylesheet at the
+  Next 15 path; Next 16 (Turbopack) emits it under `/_next/static/chunks/`.
+- Runtime smoke now passes 93/93; the suite is 5459 assertions.
+
 ### App-wide visual refresh: premium indigo palette via shared tokens (2026-10-15)
 
 One change, whole application: the shared Tailwind design tokens now carry the

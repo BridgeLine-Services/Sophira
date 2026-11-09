@@ -20,7 +20,7 @@ export function runResetPasswordTests(assert: (c: boolean, n: string) => void, s
   section("Reset-password flow (Supabase Auth — hardened, architecture unchanged)");
   const page = readFileSync("src/app/reset-password/page.tsx", "utf8");
   const login = readFileSync("src/app/login/page.tsx", "utf8");
-  const middleware = readFileSync("src/middleware.ts", "utf8");
+  const middleware = readFileSync("src/proxy.ts", "utf8");
 
   // 1. LOGIN UI
   assert(login.includes("Forgot your password?") && login.includes('href="/reset-password"'),

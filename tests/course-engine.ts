@@ -196,7 +196,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // ---- 10. Owner routes and authorization untouched ---------------------------
   const ownerPage = readFileSync("src/app/owner/page.tsx", "utf8");
   assert(ownerPage.length > 0, "owner: the Owner Dashboard route still exists");
-  assert(readFileSync("src/middleware.ts", "utf8").includes("/owner"),
+  assert(readFileSync("src/proxy.ts", "utf8").includes("/owner"),
     "owner: the middleware still guards the owner route");
 
   // ---- 11. Subject isolation: engines never rewrite learning scope ------------

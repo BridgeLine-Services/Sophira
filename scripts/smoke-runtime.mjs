@@ -231,7 +231,11 @@ record("unknown URL fails closed", [302, 303, 307, 404].includes(unknown.status)
 
 // A real stylesheet must be served, otherwise pages "work" but look broken.
 const login = await get("/login");
-const cssHref = (login.body.match(/href="(\/_next\/static\/css\/[^"]+)"/) || [])[1];
+// Next 16 builds with Turbopack and emits the stylesheet under
+// /_next/static/chunks/<hash>.css instead of /_next/static/css/. Accept both
+// layouts: the check is "a real stylesheet is linked and served", not "the
+// asset path is written the way Next 15 wrote it".
+const cssHref = (login.body.match(/href="(\/_next\/static\/(?:css|chunks)\/[^"]+\.css)"/) || [])[1];
 if (cssHref) {
   const css = await fetch(BASE + cssHref);
   const text = await css.text();

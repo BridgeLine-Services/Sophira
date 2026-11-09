@@ -25,7 +25,7 @@ export const runtime = "nodejs";
  *  - no key, URL credential or secret value is ever returned.
  */
 export async function GET() {
-  const supabase = await createClient();
+  const supabase = createClient();
   const user = await requireUser(supabase);
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 

@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from "fs";
 export function runLocalFirstTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
   section("Local-first testing mode: real local AI without Vercel/Supabase, production untouched");
 
-  const mw = readFileSync("src/middleware.ts", "utf8");
+  const mw = readFileSync("src/proxy.ts", "utf8");
 
   // The mode is explicit AND production-impossible
   assert(mw.includes('SOPHIRA_LOCAL_FIRST === "true"'), "local-first: requires the explicit SOPHIRA_LOCAL_FIRST=true env var");

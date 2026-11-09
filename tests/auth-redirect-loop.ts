@@ -21,7 +21,7 @@ import { readFileSync } from "fs";
 export function runAuthRedirectLoopTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
   section("Auth redirect loop, blank dashboard, reset-link origin (2026-10-08 fixes)");
   const requireUserSrc = readFileSync("src/lib/supabase/require-user.ts", "utf8");
-  const middleware = readFileSync("src/middleware.ts", "utf8");
+  const middleware = readFileSync("src/proxy.ts", "utf8");
   const login = readFileSync("src/app/login/page.tsx", "utf8");
   const dashboard = readFileSync("src/app/dashboard/page.tsx", "utf8");
   const owner = readFileSync("src/app/owner/page.tsx", "utf8");

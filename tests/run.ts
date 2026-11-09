@@ -117,6 +117,7 @@ import { runFrameOcrTests } from "./frame-ocr";
 import { runAiReliabilityTests } from "./ai-reliability";
 import { runAiReadinessTests } from "./ai-readiness";
 import { runEmailSourceTests } from "./email-source";
+import { runNext16MigrationTests } from "./next16-migration";
 import { runNotebookTests } from "./notebook";
 import { runAdversarialCitationTests } from "./adversarial-citations";
 import { runMathPipelineTests } from "./math-pipeline";
@@ -1402,7 +1403,7 @@ async function runLegalPageTests(): Promise<void> {
     }
 
     // public access + navigation
-    const mw = readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+    const mw = readFileSync(path.join(process.cwd(), "src", "proxy.ts"), "utf8");
     assert(mw.includes('"/terms"') && mw.includes('"/privacy"') && mw.includes('"/license"'), "legal pages: /terms /privacy /license are PUBLIC (viewable signed-out)");
     const loginSrc = readFileSync(path.join(process.cwd(), "src", "app", "login", "page.tsx"), "utf8");
     assert(loginSrc.includes('href="/terms"') && loginSrc.includes('href="/privacy"'), "legal pages: login page links Terms and Privacy");
@@ -1463,7 +1464,8 @@ function finish() {
 // homepage was a 500 for exactly this reason).
 // ---------------------------------------------------------------------------
 export async function run(): Promise<void> {
-  const { middleware, config } = await import("../src/middleware");
+  const { proxy, config } = await import("../src/proxy");
+  const middleware = proxy; // Next 16 renamed middleware -> proxy; same function.
   const { NextRequest } = await import("next/server");
   const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -2729,7 +2731,7 @@ async function runSecurityRegressionTests(): Promise<void> {
     const guard = fs.readFileSync(path.join(process.cwd(), "src", "lib", "supabase", "guard.ts"), "utf8");
     assert(/revoked/.test(guard),
       "security: the server guard refuses revoked users on protected routes");
-    const middleware = fs.readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+    const middleware = fs.readFileSync(path.join(process.cwd(), "src", "proxy.ts"), "utf8");
     assert(/revoked/.test(middleware) || /requireUser|requireOwner/.test(middleware),
       "security: middleware-side auth enforcement exists alongside RLS");
   }
@@ -2762,7 +2764,7 @@ async function runInvitationRegressionTests(): Promise<void> {
     const membersRoute = rd("src/app/api/network/members/route.ts");
     const signupPage = rd("src/app/signup/page.tsx");
     const guard = rd("src/lib/supabase/guard.ts");
-    const middleware = rd("src/middleware.ts");
+    const middleware = rd("src/proxy.ts");
     const fn0008 = migrations.slice(migrations.indexOf("SOPHIRA migration 0008"));
 
     // -- [1] New users cannot independently create authorized accounts ---
@@ -4034,7 +4036,7 @@ async function runPwaReadinessTests(): Promise<void> {
       "pwa: sw explicitly never caches HTML or API responses");
 
     // ---- middleware serves the shell without auth friction ----------------
-    const matcher = fs.readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+    const matcher = fs.readFileSync(path.join(process.cwd(), "src", "proxy.ts"), "utf8");
     assert(/manifest\.webmanifest/.test(matcher) && /sw\.js/.test(matcher) && /icons/.test(matcher),
       "pwa: middleware matcher lets the shell (manifest/sw/icons) load so the PWA can boot");
 
@@ -4161,7 +4163,7 @@ async function runAccessControlTests(): Promise<void> {
       "access: guard exposes no secrets to the client");
 
     // ---- middleware blocks revoked users on protected pages ----------------
-    const mw = fs.readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+    const mw = fs.readFileSync(path.join(process.cwd(), "src", "proxy.ts"), "utf8");
     assert(mw.includes('"revoked"') && mw.includes("/access-denied"),
       "access: middleware redirects revoked users away from protected pages");
 
@@ -5270,7 +5272,7 @@ async function runOwnerSetupTests(): Promise<void> {
   assert(pageSrc.startsWith("import") && !pageSrc.includes('"use client"'),
     "setup: /setup runs the database probe on the SERVER (secret env names never reach the client)");
 
-  const mwSrc = readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+  const mwSrc = readFileSync(path.join(process.cwd(), "src", "proxy.ts"), "utf8");
   assert(mwSrc.includes('"/setup"'), "setup: /setup is on the middleware PUBLIC list (operator must reach it pre-auth)");
 }
 
@@ -5306,6 +5308,10 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     failed += r.failed;
   }).then(async () => {
     const r = await runEmailSourceTests();
+    passed += r.passed;
+    failed += r.failed;
+  }).then(async () => {
+    const r = await runNext16MigrationTests();
     passed += r.passed;
     failed += r.failed;
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });

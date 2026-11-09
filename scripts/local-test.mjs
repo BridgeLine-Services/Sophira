@@ -18,7 +18,7 @@ for (const f of ["src/lib/offline/local-engine.ts", "src/lib/offline/model-manag
 const reg = readFileSync("src/lib/offline/model-registry.ts", "utf8");
 ok(reg.includes("smollm2-135m-instruct") && reg.includes("smollm2-360m-instruct"), "tiered model registry lists real local models");
 
-const mw = readFileSync("src/middleware.ts", "utf8");
+const mw = readFileSync("src/proxy.ts", "utf8");
 ok(mw.includes('SOPHIRA_LOCAL_FIRST === "true"') && mw.includes('NODE_ENV !== "production"'), "local-first mode is explicit AND production-impossible");
 ok(existsSync("docs/QUICK_START_LOCAL.md"), "QUICK_START_LOCAL.md exists");
 ok(readFileSync("docs/QUICK_START_LOCAL.md", "utf8").includes("SOPHIRA_LOCAL_FIRST=true"), "local-first activation is documented");
