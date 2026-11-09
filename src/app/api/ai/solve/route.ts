@@ -42,6 +42,15 @@ import {
 import type { Mode } from "@/lib/types";
 import { selectRelevantMemories, RETRIEVABLE_STATUSES, type StudentMemory } from "@/lib/memory/engine";
 import { recordMemoryEvidence } from "@/lib/memory/store";
+import { evaluateInformationRequest } from "@/lib/research/policy";
+
+/** Phase 2F (2026-11-09): wording-level boundary BEFORE any model call.
+ *  Prompt text is not enforcement - this runs in code on every request. */
+function screenRequest(text: string): { message: string; alternative?: string; code: string } | null {
+  const d = evaluateInformationRequest(text);
+  return d.blocked ? { message: d.message, alternative: d.alternative, code: d.code } : null;
+}
+
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -79,6 +88,8 @@ export async function POST(request: NextRequest) {
   }
 
   const question = (body.question || "").trim();
+  const screen = screenRequest(question);
+  if (screen) return NextResponse.json({ error: screen.message + (screen.alternative ? " " + screen.alternative : ""), blocked: true, code: screen.code }, { status: 422 });
   if (!question) {
     return NextResponse.json({ error: "Please describe what you need help with — your text was preserved, try sending again." }, { status: 400 });
   }
