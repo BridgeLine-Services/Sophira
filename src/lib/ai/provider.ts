@@ -527,22 +527,27 @@ export async function serverAiChat(
 ): Promise<{ text: string; provider: ProviderId; model: string }> {
   const plan = resolveProviders(env);
   const errors: string[] = [];
+  // Phase 1 reliability: a provider whose breaker is open is SKIPPED instead of
+  // being retried on every request. Config and cost policy are untouched - the
+  // candidate list still comes from resolveProviders().
+  const { aiBreakers, breakerKey, withBreaker } = await import("./reliability");
   for (const p of plan.candidates) {
+    const key = breakerKey(p, p === "selfhost" ? env.LOCAL_LLM_BASE_URL : null);
     try {
       if (p === "selfhost") {
-        const r = await selfhostChat(env, messages, opts, hooks.fetchFn);
+        const r = await withBreaker(aiBreakers, key, () => selfhostChat(env, messages, opts, hooks.fetchFn));
         if (!r.text) throw new Error("The local inference server returned an empty response.");
         hooks.onUse?.({ provider: "selfhost", model: env.LOCAL_LLM_MODEL, classification: "local", ok: true, tokensIn: r.tokensIn, tokensOut: r.tokensOut });
         return { text: r.text, provider: "selfhost", model: env.LOCAL_LLM_MODEL };
       }
       if (p === "gemini") {
-        const r = await geminiChat(env, messages, opts, hooks.fetchFn);
+        const r = await withBreaker(aiBreakers, key, () => geminiChat(env, messages, opts, hooks.fetchFn));
         if (!r.text) throw new Error("Gemini returned an empty response.");
         hooks.onUse?.({ provider: "gemini", model: env.GEMINI_MODEL, classification: "free-tier", ok: true, tokensIn: r.tokensIn, tokensOut: r.tokensOut });
         return { text: r.text, provider: "gemini", model: env.GEMINI_MODEL };
       }
       if (p === "openai") {
-        const text = await openaiChat(env, messages, opts, hooks.fetchFn);
+        const text = await withBreaker(aiBreakers, key, () => openaiChat(env, messages, opts, hooks.fetchFn));
         hooks.onUse?.({ provider: "openai", model: env.SOPHIRA_MODEL, classification: "paid", ok: true });
         return { text, provider: "openai", model: env.SOPHIRA_MODEL };
       }
