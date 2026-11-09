@@ -52,6 +52,32 @@ async function extractText(bytes: Buffer, mime: string, name: string): Promise<E
   }
 
   if (mime.startsWith("image/")) {
+    // Phase 3b: try the OWNER'S self-hosted Tesseract first — free, local, and
+    // no vendor. It only runs when SOPHIRA_OCR_URL is configured; otherwise
+    // this block is skipped entirely and behaviour is unchanged.
+    {
+      const { ocrImage } = await import("@/lib/extract/ocr");
+      const ocr = await ocrImage(bytes, mime);
+      if (ocr.ok) {
+        return {
+          text: ocr.text,
+          confidence: ocr.confidence,
+          notes: ocr.notes,
+          provenance: {
+            kind: "image",
+            engine: ocr.engine,
+            meanConfidence: ocr.meanConfidence,
+          },
+        };
+      }
+      // A configured service that returned nothing is a real signal (a scan of
+      // handwriting, a diagram): report it honestly instead of asking a cloud
+      // model to guess. An UNCONFIGURED service falls through to the existing
+      // AI-vision path below, exactly as before.
+      if (ocr.engine === "tesseract-selfhost") {
+        return { text: "", confidence: "failed", notes: ocr.notes };
+      }
+    }
     if (!aiConfigured()) {
       throw new Error("AI vision is not configured, so I can't read text from images yet. Please type or paste the question instead.");
     }
