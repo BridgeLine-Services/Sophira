@@ -24,7 +24,7 @@ export const maxDuration = 120;
  * uses at most 24 output tokens, and never returns a key or full endpoint URL.
  */
 async function guard() {
-  const supabase = await createClient();
+  const supabase = createClient();
   const user = await requireUser(supabase);
   if (!user) return { error: NextResponse.json({ error: "Not signed in." }, { status: 401 }) };
   const { profile } = await readProfileWithRepair(supabase, user.id);

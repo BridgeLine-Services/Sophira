@@ -27,7 +27,7 @@ export const maxDuration = 180;
  *    says so, it is not skipped or hidden.
  */
 async function guard() {
-  const supabase = await createClient();
+  const supabase = createClient();
   const user = await requireUser(supabase);
   if (!user) return { error: NextResponse.json({ error: "Not signed in." }, { status: 401 }) };
   const { profile } = await readProfileWithRepair(supabase, user.id);

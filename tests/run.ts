@@ -117,6 +117,7 @@ import { runFrameOcrTests } from "./frame-ocr";
 import { runAiReliabilityTests } from "./ai-reliability";
 import { runAiReadinessTests } from "./ai-readiness";
 import { runEmailSourceTests } from "./email-source";
+import { runNext16MigrationTests } from "./next16-migration";
 import { runNotebookTests } from "./notebook";
 import { runAdversarialCitationTests } from "./adversarial-citations";
 import { runMathPipelineTests } from "./math-pipeline";
@@ -5307,6 +5308,10 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     failed += r.failed;
   }).then(async () => {
     const r = await runEmailSourceTests();
+    passed += r.passed;
+    failed += r.failed;
+  }).then(async () => {
+    const r = await runNext16MigrationTests();
     passed += r.passed;
     failed += r.failed;
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });

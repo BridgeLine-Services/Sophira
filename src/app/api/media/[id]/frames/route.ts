@@ -33,7 +33,7 @@ export const maxDuration = 60;
  */
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const supabase = await createClient();
+  const supabase = createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 
@@ -51,7 +51,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
 
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const supabase = await createClient();
+  const supabase = createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const user = guard.data.user;
