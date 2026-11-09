@@ -108,6 +108,7 @@ import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "
 import { readFileSync } from "fs";
 import { runOfflineTests } from "./offline";
 import { runAutosaveTests } from "./autosave";
+import { runWritingProfileExpansionTests } from "./writing-profile-expansion";
 import { runNotebookTests } from "./notebook";
 import { runAdversarialCitationTests } from "./adversarial-citations";
 import { runMathPipelineTests } from "./math-pipeline";
@@ -1418,6 +1419,12 @@ function finish() {
   passed += sa.passed;
   {
     const r = runAutosaveTests();
+    passed += r.passed;
+    failed += r.failed;
+  }
+  // Phase 2B-2E: writing-profile learning expansion (2026-11-09).
+  {
+    const r = runWritingProfileExpansionTests();
     passed += r.passed;
     failed += r.failed;
   }
