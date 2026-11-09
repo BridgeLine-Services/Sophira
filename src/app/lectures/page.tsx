@@ -111,38 +111,33 @@ function sampleTimes(durationSec: number): number[] {
 }
 
 /**
- * Builds the local preview element for a video the member picked.
+ * Builds the player for a recording from the short-lived link the server issued.
  *
- * The only URL this ever loads is the opaque blob handle the browser itself
- * issued for that File, and the scheme is checked before it is attached, so no
- * part of the source can point the element anywhere else.
+ * Only an https link to the private bucket is accepted: the scheme is parsed
+ * rather than pattern-matched, so nothing from the response can point the
+ * element at a different kind of resource.
  */
-function mountLocalVideo(file: File): { video: HTMLVideoElement; release: () => void } {
-  const objectUrl = URL.createObjectURL(file);
-  if (!/^blob:[a-z]+:\/\//i.test(objectUrl)) {
-    URL.revokeObjectURL(objectUrl);
-    throw new Error("unexpected local URL");
+function mountRemoteVideo(signedUrl: string): HTMLVideoElement {
+  let parsed: URL;
+  try {
+    parsed = new URL(signedUrl);
+  } catch {
+    throw new Error("bad link");
+  }
+  if (parsed.protocol !== "https:" || !parsed.pathname.includes("/storage/")) {
+    throw new Error("unexpected link");
   }
   const video = document.createElement("video");
-  // This value is the browser's own opaque blob handle for a File the member
-  // picked: its scheme was checked immediately above, and it cannot resolve to
-  // markup or to a remote URL. Suppressed as a documented false positive; tests
-  // assert that exactly one object URL exists in this page and that no other
-  // string can reach a media source.
-  video.setAttribute("src", objectUrl); // codeql[js/xss-through-dom]
+  video.setAttribute("src", parsed.href);
   video.muted = true;
   video.preload = "auto";
-  return { video, release: () => URL.revokeObjectURL(objectUrl) };
+  video.crossOrigin = "anonymous";
+  return video;
 }
 
-/** Reads a frame out of a local video file without uploading it again. */
-async function grabFrame(file: File, atSec: number): Promise<Blob | null> {
-  const { video, release } = mountLocalVideo(file);
+/** Reads one still out of the recording at a given moment. */
+async function grabFrame(video: HTMLVideoElement, atSec: number): Promise<Blob | null> {
   try {
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error("unreadable"));
-    });
     video.currentTime = Math.min(atSec, Math.max(0, (video.duration || atSec) - 0.1));
     await new Promise<void>((resolve, reject) => {
       video.onseeked = () => resolve();
@@ -155,8 +150,8 @@ async function grabFrame(file: File, atSec: number): Promise<Blob | null> {
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.82));
-  } finally {
-    release();
+  } catch {
+    return null;
   }
 }
 
@@ -299,38 +294,34 @@ export default function LecturesPage() {
   }
 
   async function readSlides(asset: MediaAsset) {
-    if (!fileInput.current) return;
     setUploadError("");
     setBusyId(asset.id);
     try {
-      // The member re-picks the same file; it is read locally and never
-      // re-uploaded. Frames go up as small stills.
-      const file = await new Promise<File | null>((resolve) => {
-        const input = fileInput.current!;
-        input.onchange = () => resolve(input.files?.[0] ?? null);
-        input.click();
-      });
-      if (!file) {
-        setBusyId("");
+      const linkRes = await fetch(`/api/media/${asset.id}/stream`, { method: "GET" });
+      const link = await linkRes.json().catch(() => null);
+      if (!linkRes.ok || !link?.data?.url) {
+        setNotes((n) => ({
+          ...n,
+          [asset.id]: link?.error ?? "Sophira could not open that recording to read the slides.",
+        }));
         return;
       }
-      const probe = mountLocalVideo(file);
-      const duration = await new Promise<number>((resolve) => {
-        probe.video.onloadedmetadata = () => resolve(probe.video.duration || 0);
-        probe.video.onerror = () => resolve(0);
-      });
-      probe.release();
 
-      const times = sampleTimes(duration || asset.duration_sec || 0);
+      const video = mountRemoteVideo(String(link.data.url));
+      const duration = await new Promise<number>((resolve) => {
+        video.onloadedmetadata = () => resolve(video.duration || 0);
+        video.onerror = () => resolve(0);
+      });
+
+      const times = sampleTimes(duration || Number(asset.duration_sec) || 0);
       if (times.length === 0) {
-        setNotes((n) => ({ ...n, [asset.id]: "Sophira could not read the length of that video, so no slides were sampled." }));
-        setBusyId("");
+        setNotes((n) => ({ ...n, [asset.id]: "Sophira could not read the length of this recording, so no slides were sampled." }));
         return;
       }
 
       const collected: FrameResult[] = [];
       for (const at of times) {
-        const blob = await grabFrame(file, at);
+        const blob = await grabFrame(video, at);
         if (!blob) continue;
         const form = new FormData();
         form.set("frame", new File([blob], `frame-${Math.round(at)}.jpg`, { type: "image/jpeg" }));
@@ -354,9 +345,12 @@ export default function LecturesPage() {
           note: plainText(c.note, 300),
         })),
       }));
+      if (collected.length === 0) {
+        setNotes((n) => ({ ...n, [asset.id]: "Sophira could not read any frames from this recording. Nothing was stored." }));
+      }
       await load();
     } catch {
-      setUploadError("Sophira could not read slides from that video. Try the file again, or upload a shorter clip.");
+      setUploadError("Sophira could not read slides from that recording. Try again, or upload a shorter clip.");
     } finally {
       setBusyId("");
     }

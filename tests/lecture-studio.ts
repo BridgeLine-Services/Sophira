@@ -101,13 +101,24 @@ export async function runLectureStudioTests(): Promise<{ passed: number; failed:
   assert(page.includes("plainText(asset.member_note, 600)"), "the member note is normalised");
   assert(!/\{f\.text\}/.test(page), "raw OCR text is never rendered directly");
 
-  section("lecture studio: the video element can only ever load a local blob");
+  section("lecture studio: playback only ever loads a server-signed private link");
 
-  assert(page.includes("function mountLocalVideo("), "one place builds the local video element");
-  assert((page.match(/URL\.createObjectURL/g) ?? []).length === 1, "exactly one object URL is created in the whole page");
-  assert(/\/\^blob:\[a-z\]\+:\\\/\\\//.test(page) || page.includes("/^blob:[a-z]+:"), "the blob scheme is checked before it is attached");
-  assert(page.includes('video.setAttribute("src", objectUrl)'), "the checked URL is attached once, through one call");
-  assert(!/\.src\s*=\s*(file|url|input)/.test(page), "no raw file or input is assigned to a media source");
+  assert(page.includes("function mountRemoteVideo("), "one place builds the player");
+  assert((page.match(/createObjectURL/g) ?? []).length === 0, "no blob URL is created at all any more");
+  assert(page.includes('parsed.protocol !== "https:"'), "only an https link is accepted");
+  assert(page.includes('parsed.pathname.includes("/storage/")'), "the link must point inside storage, not anywhere else");
+  assert(page.includes("setAttribute(\"src\", parsed.href)"), "the parsed, checked link is attached once");
+  assert((page.match(/setAttribute\(/g) ?? []).length === 1, "there is exactly one attribute assignment in the whole page");
+  assert(!/\.src\s*=/.test(page), "no media element source is assigned directly");
+  assert(page.includes("/stream"), "the link comes from the member's own signed-link route");
+
+  const streamRoute = read("src/app/api/media/[id]/stream/route.ts");
+  assert(streamRoute.includes("requireUser"), "the link is only issued to a signed-in member");
+  assert(streamRoute.includes(".eq(\"id\", id)"), "the asset is read through the caller's own session (RLS scoped)");
+  assert(streamRoute.includes("createSignedUrl"), "the link is signed, not public");
+  assert(/createSignedUrl\([^)]*,\s*600\)/.test(streamRoute), "the link expires in ten minutes");
+  assert(streamRoute.includes("storage_path") && !streamRoute.includes("searchParams"), "the object path comes from the database, never from the request");
+  assert(streamRoute.includes("private-docs"), "it signs out of the private bucket only");
 
   section("lecture studio: honest failure and privacy wording");
 
