@@ -113,6 +113,7 @@ import { runExtractionProvenanceTests } from "./extraction-provenance";
 import { runSelfHostedMediaTests } from "./selfhost-media";
 import { runMediaPipelineTests } from "./media-pipeline";
 import { runLectureStudyTests } from "./lecture-study";
+import { runFrameOcrTests } from "./frame-ocr";
 import { runNotebookTests } from "./notebook";
 import { runAdversarialCitationTests } from "./adversarial-citations";
 import { runMathPipelineTests } from "./math-pipeline";
@@ -5286,6 +5287,10 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     failed += r.failed;
   }).then(async () => {
     const r = await runLectureStudyTests();
+    passed += r.passed;
+    failed += r.failed;
+  }).then(async () => {
+    const r = await runFrameOcrTests();
     passed += r.passed;
     failed += r.failed;
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
