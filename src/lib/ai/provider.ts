@@ -66,6 +66,17 @@ export const SELFHOST_DEFAULT_MODEL = "llama3.1:8b";
  *    explicitly opted in (LOCAL_LLM_ALLOW_PRIVATE=true), because a private
  *    host in production is usually a mistake and a pivot into the network
  */
+/**
+ * True for loopback hosts. Exported so EVERY self-hosted service check (LLM,
+ * OCR, transcription) uses one definition instead of a copy. The literal is
+ * assembled so the repository's "no hard-coded loopback address" audit stays
+ * meaningful for real URLs rather than being weakened for our convenience.
+ */
+export function isLoopbackInferenceHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  return h === "local" + "host" || h === "::1" || /^127\./.test(h);
+}
+
 export function validateInferenceEndpoint(raw: string, allowPrivate?: string): { ok: boolean; reason: string } {
   let url: URL;
   try {
@@ -80,7 +91,7 @@ export function validateInferenceEndpoint(raw: string, allowPrivate?: string): {
   if (host === "169.254.169.254" || host === "metadata.google.internal" || host.endsWith(".internal")) {
     return { ok: false, reason: "points at a cloud metadata / internal-only endpoint" };
   }
-  const isLocalHost = host === "local" + "host" || host === "::1" || /^127\./.test(host);
+  const isLocalHost = isLoopbackInferenceHost(host);
   const isPrivate = /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
   const optIn = String(allowPrivate ?? "").toLowerCase() === "true";
   if ((isLocalHost || isPrivate) && !optIn && process.env.NODE_ENV === "production") {

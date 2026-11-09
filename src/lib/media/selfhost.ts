@@ -25,7 +25,7 @@
  *  - Tokens never appear in messages, logs, or returned objects.
  *  - Every call is bounded by a timeout; no retry loops.
  */
-import { validateInferenceEndpoint } from "../ai/provider";
+import { isLoopbackInferenceHost, validateInferenceEndpoint } from "../ai/provider";
 
 export type SelfHostedKind = "ocr" | "asr";
 
@@ -64,8 +64,8 @@ export function readSelfHostedConfig(
     }
   })();
   const isLoopbackOrPrivate =
-    host === "::1" || /^127\./.test(host) || /^10\./.test(host) ||
-    /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === "localhost";
+    isLoopbackInferenceHost(host) || /^10\./.test(host) ||
+    /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
   if (raw.startsWith("http://") && !isLoopbackOrPrivate) {
     return { kind, configured: false, baseUrl: null, token, problem: "must use https for a public host (member media must not travel unencrypted)" };
   }
