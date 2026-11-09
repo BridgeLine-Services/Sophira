@@ -94,3 +94,33 @@ npm run lint      # correctness rules only, 0 errors
 npx tsc --noEmit
 npm run build
 ```
+
+## Phase 2B–2E expansion (2026-11-09)
+
+The deterministic analyser (`src/lib/ai/writing-profile-learning.ts`) now covers
+all seventeen dimensions named in the phase directive: sentence structure and
+length, paragraph organisation, vocabulary, word complexity, tone, formality,
+argument development, explanatory depth, transitions, openings, closings,
+citation habits, formatting, subject conventions, the member's own corrections,
+and preferred explanation style.
+
+Three rules are enforced in code, not in prompts:
+
+1. **Scope is earned.** One sample can only ever produce an *assignment*-scoped
+   observation; two to four samples can scope to a *course* (or *subject* when a
+   subject is supplied); five or more can propose a *general* preference. Every
+   observation carries its scope, scope key and the exact sample count behind it.
+2. **A correction never rewrites the profile.** `mayOverrideProfile()` rejects any
+   narrower-scoped observation replacing a broader one, and requires the full
+   sample threshold before a global claim can replace a course-level note.
+3. **Everything is approval-gated and reversible.** Accepted observations become
+   additive rows in `profile_update_proposals`; the profile itself is never
+   overwritten in place, and a member can inspect, correct or disable any learned
+   preference.
+
+Isolation: samples are read with the member's own request-scoped Supabase client,
+and `writing_samples` is RLS-protected on `user_id = auth.uid()`. One member's
+private samples can never train another member's profile.
+
+Honesty: no observation contains an authorship claim, a detector score, or a
+certainty percentage. Confidence reflects sample count and effect size only.
