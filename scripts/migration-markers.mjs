@@ -43,4 +43,8 @@ export const MARKERS = {
   "0041_canvas_integration.sql": "to_regclass('public.canvas_assignments') is not null",
   "0042_member_notifications.sql": "to_regclass('public.member_notifications') is not null",
   "0043_member_phone.sql": "exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'phone')",
+  // 0044 (media ingestion) had no marker, so the self-test refused the whole
+  // chain and the Migrations workflow failed on master. The probe checks the
+  // last table it creates, which only exists once the migration really ran.
+  "0044_media_ingestion.sql": "to_regclass('public.media_frames') is not null",
 };
