@@ -71,6 +71,11 @@ const USER_TABLES = [
   // Added with 0042: a member's own notices and notification choices are their data.
   "member_notifications",
   "notification_preferences",
+  // Added with 0044: lecture recordings and everything extracted from them.
+  "media_assets",
+  "media_transcripts",
+  "media_segments",
+  "media_frames",
 ] as const;
 
 const ROW_CAP = 10000;
