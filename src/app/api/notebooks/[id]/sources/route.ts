@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { fetchAndVerify } from "@/lib/research/verify";
 import { hashContent, ingestText, ingestPdf, ingestDocx, ingestImage, ingestWeb } from "@/lib/notebook/ingest";
+import { emailToSource, parseEmailSource, stripEmailThread } from "@/lib/extract/email";
 import type { IngestResult } from "@/lib/notebook/ingest";
 import type { NotebookSourceType } from "@/lib/notebook/types";
 
@@ -13,6 +14,8 @@ export const maxDuration = 120;
  * POST /api/notebooks/:id/sources — add a source.
  *   JSON  { source_type: 'teacher_instructions'|'assignment_instructions'|'user_notes'|'txt', title, text }
  *   JSON  { source_type: 'web_url', url }                     — fetched+verified for real
+ *   JSON  { source_type: 'email', eml }                       — an exported .eml message, or
+ *         { source_type: 'email', text, subject?, from?, date? } — pasted email text
  *   JSON  { source_type: 'image', title, ocr_text? }          — images need OCR upstream; stored honestly without it
  *   FORM  (multipart) file upload: PDF / DOCX / TXT
  * The API never stores a search snippet as source content; web sources come
@@ -44,6 +47,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   let ingest: IngestResult;
   let overrideHash = "";
 
+  // One storage path for every ingestion branch below, so a new source type can
+  // never bypass the RLS-scoped insert or the honest processing columns.
+  const storeIngest = async (result: IngestResult, hashOverride: string) => {
+    try {
+      const sourceId = await nextSourceId(supabase, id);
+      const row = {
+        notebook_id: id,
+        user_id: user.id,
+        source_id: sourceId,
+        title: result.title,
+        source_type: result.sourceType,
+        original_url: result.originalUrl,
+        canonical_url: result.canonicalUrl,
+        content_hash: hashOverride || result.contentHash,
+        retrieved_at: result.retrievedAt,
+        extracted_text: result.extractedText,
+        page_metadata: result.pageMetadata,
+        section_metadata: result.sectionMetadata,
+        processing_status: result.processingStatus,
+        verification_status: result.verificationStatus,
+        included: true,
+        pinned: false,
+        retrieval_notes: result.notes,
+      };
+      const { data, error } = await supabase.from("notebook_sources").insert(row).select().single();
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ source: data, notes: result.notes });
+    } catch (e) {
+      return NextResponse.json({ error: `Could not store the source: ${(e as Error).message}` }, { status: 500 });
+    }
+  };
+
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("multipart/form-data")) {
     const form = await request.formData();
@@ -51,6 +86,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!file) return NextResponse.json({ error: "No file provided." }, { status: 400 });
     const name = (form.get("title") as string | null) || file.name || "Untitled";
     const bytes = Buffer.from(await file.arrayBuffer());
+
+    // An exported email is a source in its own right: strip the thread and keep
+    // only what is new, rather than importing five copies of the same message.
+    if (/\.eml$/i.test(name) || file.type === "message/rfc822") {
+      const parsed = parseEmailSource(bytes.toString("utf8"));
+      const stripped = stripEmailThread(parsed.body);
+      const emailSource = emailToSource(parsed, stripped);
+      if (!emailSource.text.trim()) {
+        return NextResponse.json({ error: emailSource.note || "That email had no readable text." }, { status: 422 });
+      }
+      ingest = ingestText(emailSource.title, emailSource.text, "user_notes");
+      ingest.notes = [emailSource.note];
+      return storeIngest(ingest, "");
+    }
+
     if (/\.pdf$/i.test(name) || file.type === "application/pdf") {
       try {
         const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default as
@@ -78,13 +128,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     overrideHash = hashContent(bytes.toString("base64").slice(0, 0) + bytes.length + name); // binary identity marker
   } else {
-    let body: { source_type?: string; title?: string; text?: string; url?: string; ocr_text?: string | null };
+    let body: {
+      source_type?: string;
+      title?: string;
+      text?: string;
+      url?: string;
+      ocr_text?: string | null;
+      eml?: string;
+      subject?: string;
+      from?: string;
+      date?: string;
+    };
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
-    const type = (body.source_type || "") as NotebookSourceType;
+    // "email" is an ingestion path, not a stored source_type: it is stored as
+    // user_notes, the closest allowed type, with its provenance in the notes.
+    const type = (body.source_type || "") as NotebookSourceType | "email";
     const title = (body.title || "").trim();
     if (type === "web_url") {
       const url = (body.url || "").trim();
@@ -110,6 +172,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       } catch (e) {
         return NextResponse.json({ error: `Retrieval failed: ${(e as Error).message} — no source was stored.` }, { status: 422 });
       }
+    } else if (type === "email") {
+      const rawEmail = typeof body.eml === "string" && body.eml.trim()
+        ? body.eml
+        : [
+            body.subject ? `Subject: ${body.subject}` : "",
+            body.from ? `From: ${body.from}` : "",
+            body.date ? `Date: ${body.date}` : "",
+            "",
+            body.text ?? "",
+          ].filter(Boolean).join("\n");
+      if (!rawEmail.trim()) {
+        return NextResponse.json({ error: "Paste the email text or upload the .eml file." }, { status: 400 });
+      }
+      const parsed = parseEmailSource(rawEmail);
+      const stripped = stripEmailThread(parsed.body);
+      const emailSource = emailToSource(parsed, stripped);
+      if (!emailSource.text.trim()) {
+        return NextResponse.json({ error: emailSource.note || "That email had no readable text." }, { status: 422 });
+      }
+      ingest = ingestText(emailSource.title, emailSource.text, "user_notes");
+      ingest.notes = [emailSource.note];
     } else if (type === "image") {
       ingest = ingestImage(title || "Uploaded image", body.ocr_text ?? null);
     } else if (type === "teacher_instructions" || type === "assignment_instructions" || type === "user_notes" || type === "txt") {
@@ -120,33 +203,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
-  try {
-    const sourceId = await nextSourceId(supabase, id);
-    const row = {
-      notebook_id: id,
-      user_id: user.id,
-      source_id: sourceId,
-      title: ingest.title,
-      source_type: ingest.sourceType,
-      original_url: ingest.originalUrl,
-      canonical_url: ingest.canonicalUrl,
-      content_hash: overrideHash || ingest.contentHash,
-      retrieved_at: ingest.retrievedAt,
-      extracted_text: ingest.extractedText,
-      page_metadata: ingest.pageMetadata,
-      section_metadata: ingest.sectionMetadata,
-      processing_status: ingest.processingStatus,
-      verification_status: ingest.verificationStatus,
-      included: true,
-      pinned: false,
-      retrieval_notes: ingest.notes,
-    };
-    const { data, error } = await supabase.from("notebook_sources").insert(row).select().single();
-    if (error) throw new Error(error.message);
-    return NextResponse.json({ source: data, notes: ingest.notes });
-  } catch (e) {
-    return NextResponse.json({ error: `Could not store the source: ${(e as Error).message}` }, { status: 500 });
-  }
+  return storeIngest(ingest, overrideHash);
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
