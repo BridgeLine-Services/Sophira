@@ -65,6 +65,22 @@ const STATUS_TONE: Record<MediaAsset["status"], "neutral" | "success" | "warn" |
   failed: "danger",
 };
 
+/**
+ * Every string on this page came from somewhere outside: a transcript, a model,
+ * or text recognised in a picture of a slide. None of it is markup and none of it
+ * should ever become markup, so it is normalised to plain text before it reaches
+ * the DOM: control characters and angle brackets are removed and length is
+ * bounded. React escapes JSX text anyway; doing it here means the guarantee does
+ * not rest on a renderer detail.
+ */
+function plainText(value: unknown, max = 400): string {
+  return String(value ?? "")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
+    .replace(/[<>]/g, "")
+    .trim()
+    .slice(0, max);
+}
+
 function mb(bytes: number) {
   return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
 }
@@ -229,14 +245,14 @@ export default function LecturesPage() {
       const res = await fetch(`/api/media/${id}/study`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(ask ? { ask } : { task: "summary" }),
+        body: JSON.stringify(ask ? { ask: plainText(ask, 800) } : { task: "summary" }),
       });
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.data) {
         setAnswers((a) => ({
           ...a,
           [id]: {
-            answer: body?.error ?? "Sophira could not work on this lecture right now. Please try again.",
+            answer: plainText(body?.error ?? "Sophira could not work on this lecture right now. Please try again.", 2000),
             notice: "",
             transcriptConfidence: "",
             coverage: 0,
@@ -246,7 +262,16 @@ export default function LecturesPage() {
         }));
         return;
       }
-      setAnswers((a) => ({ ...a, [id]: body.data as StudyAnswer }));
+      const data = body.data as StudyAnswer;
+      setAnswers((a) => ({
+        ...a,
+        [id]: {
+          ...data,
+          answer: plainText(data.answer, 20000),
+          notice: plainText(data.notice, 600),
+          transcriptConfidence: plainText(data.transcriptConfidence, 40),
+        },
+      }));
     } finally {
       setBusyId("");
     }
@@ -302,7 +327,14 @@ export default function LecturesPage() {
           });
         }
       }
-      setFrames((f) => ({ ...f, [asset.id]: collected }));
+      setFrames((f) => ({
+        ...f,
+        [asset.id]: collected.map((c) => ({
+          ...c,
+          text: plainText(c.text, 300),
+          note: plainText(c.note, 300),
+        })),
+      }));
       await load();
     } catch {
       setUploadError("Sophira could not read slides from that video. Try the file again, or upload a shorter clip.");
@@ -394,8 +426,8 @@ export default function LecturesPage() {
                       {asset.frames_sampled > 0 ? ` · ${asset.frames_sampled} stills read` : ""}
                     </p>
 
-                    {asset.member_note ? <p className="text-sm text-muted">{asset.member_note}</p> : null}
-                    {notes[asset.id] ? <p className="text-sm text-muted">{notes[asset.id]}</p> : null}
+                    {asset.member_note ? <p className="text-sm text-muted">{plainText(asset.member_note, 600)}</p> : null}
+                    {notes[asset.id] ? <p className="text-sm text-muted">{plainText(notes[asset.id], 600)}</p> : null}
 
                     <div className="flex flex-wrap gap-2">
                       <Button variant="secondary" onClick={() => void transcribe(asset.id)} disabled={busy}>
@@ -419,7 +451,7 @@ export default function LecturesPage() {
 
                     {answer ? (
                       <div className="space-y-2 rounded-lg border border-line bg-surface-2 p-3">
-                        <p className="whitespace-pre-wrap text-sm text-ink">{answer.answer}</p>
+                        <p className="whitespace-pre-wrap text-sm text-ink">{plainText(answer.answer, 20000)}</p>
                         <p className="text-xs text-muted">
                           {answer.notice ? `${answer.notice} ` : ""}
                           {answer.transcriptConfidence ? `Transcript confidence: ${answer.transcriptConfidence}. ` : ""}
@@ -455,7 +487,7 @@ export default function LecturesPage() {
                         {frameSet.map((f, i) => (
                           <p key={`${asset.id}-${i}`} className="text-xs text-muted">
                             <span className="font-medium text-ink">{clock(f.atSec)}</span>
-                            {f.text ? `: ${f.text.slice(0, 180)}` : f.note ? `: ${f.note}` : ": nothing readable"}
+                            {f.text ? `: ${plainText(f.text, 180)}` : f.note ? `: ${plainText(f.note, 180)}` : ": nothing readable"}
                           </p>
                         ))}
                       </div>

@@ -54,7 +54,8 @@ export async function runLectureStudioTests(): Promise<{ passed: number; failed:
   assert(page.includes("/study`"), "study notes and questions are wired to the study endpoint");
   assert(page.includes("/frames`"), "slide reading is wired to the frames endpoint");
   assert(page.includes('task: "summary"'), "study notes request the summary task");
-  assert(/body:\s*JSON\.stringify\(ask \? \{ ask \}/.test(page), "a question is sent as the member's own words");
+  assert(/body:\s*JSON\.stringify\(ask \? \{ ask: plainText\(ask, 800\) \}/.test(page),
+    "a question is sent as the member's own words, normalised to plain text");
   assert(page.includes('method: "POST"'), "pipeline steps are POSTs");
 
   section("lecture studio: honest states, no invented results");
@@ -89,6 +90,16 @@ export async function runLectureStudioTests(): Promise<{ passed: number; failed:
   assert(page.includes('image/jpeg'), "frames are sent as JPEG stills, small enough to upload one by one");
   assert(page.includes('form.set("at_sec"'), "each frame carries its timestamp, which is what makes it citable");
   assert(!/canvas\.width\s*=\s*\d{4,}/.test(page), "no oversized canvas (resolution follows the video)");
+
+  section("lecture studio: outside text can never become markup");
+
+  assert(page.includes("function plainText("), "one normaliser is defined for all outside text");
+  assert(/replace\(\/\[<>\]\/g, ""\)/.test(page), "angle brackets are stripped from transcript, OCR and model text");
+  assert(page.includes("text: plainText(c.text, 300)"), "slide text is normalised before it is stored in state");
+  assert(page.includes("answer: plainText(data.answer, 20000)"), "a model answer is normalised before it is shown");
+  assert(page.includes("plainText(data.notice, 600)"), "the server's notice is normalised too");
+  assert(page.includes("plainText(asset.member_note, 600)"), "the member note is normalised");
+  assert(!/\{f\.text\}/.test(page), "raw OCR text is never rendered directly");
 
   section("lecture studio: honest failure and privacy wording");
 
