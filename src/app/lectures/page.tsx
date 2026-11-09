@@ -124,12 +124,12 @@ function mountLocalVideo(file: File): { video: HTMLVideoElement; release: () => 
     throw new Error("unexpected local URL");
   }
   const video = document.createElement("video");
-  // codeql[js/xss-through-dom] False positive, deliberately suppressed: this
-  // value is the browser's own opaque blob handle for a File the member picked,
-  // its scheme was checked immediately above, and it cannot resolve to markup or
-  // to a remote URL. Verified by test: exactly one object URL exists in this
-  // page and no other string can reach a media source.
-  video.setAttribute("src", objectUrl);
+  // This value is the browser's own opaque blob handle for a File the member
+  // picked: its scheme was checked immediately above, and it cannot resolve to
+  // markup or to a remote URL. Suppressed as a documented false positive; tests
+  // assert that exactly one object URL exists in this page and that no other
+  // string can reach a media source.
+  video.setAttribute("src", objectUrl); // codeql[js/xss-through-dom]
   video.muted = true;
   video.preload = "auto";
   return { video, release: () => URL.revokeObjectURL(objectUrl) };
