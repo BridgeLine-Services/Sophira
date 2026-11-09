@@ -163,6 +163,7 @@ import { runLocalFirstTests } from "./local-first";
 import { runReadinessCompletionTests } from "./readiness-completion";
 import { runProdEnvPolicyTests } from "./prod-env-policy";
 import { runProviderTests, runSecretScanTests } from "./providers";
+import { runSourceAccessTests } from "./source-access";
 
 let passed = 0;
 let failed = 0;
@@ -1410,7 +1411,10 @@ async function runLegalPageTests(): Promise<void> {
 
 function finish() {
   console.log(`\n${"=".repeat(50)}`);
-  console.log(`RESULTS: ${passed} passed, ${failed} failed, ${passed + failed} total`);
+  const sa = runSourceAccessTests();
+for (const f of sa.failures) { failures.push(f); }
+passed += sa.passed;
+console.log(`RESULTS: ${passed} passed, ${failed} failed, ${passed + failed} total`);
   // Offline-suite evidence file for the release gate's OFFLINE-ONLY AI path
   // (scripts/release-gate.mjs). The gate PASSes an offline-only designation
   // ONLY on this real evidence — never on assumption.

@@ -11,6 +11,7 @@
 //    list is fetched from Canvas with that student's token.
 
 import { createHash } from "crypto";
+import { isProhibitedHost } from "../research/policy";
 
 export const CANVAS_MAX_PAGES = 10;
 export const CANVAS_PAGE_SIZE = 100;
@@ -41,6 +42,11 @@ export function normalizeInstanceUrl(raw: string | null | undefined): string | n
   try {
     const u = new URL(raw.trim());
     if (u.protocol !== "https:") return null;
+    // Phase 2F (2026-11-09): the instance URL is MEMBER-SUPPLIED, so it is a
+    // retrieval pathway and gets the same SSRF gate as research sources.
+    // Without this, a member could point Sophira at loopback / RFC1918 /
+    // cloud-metadata addresses and make the server fetch them.
+    if (isProhibitedHost(u.hostname)) return null;
     // a Canvas instance can never be a loopback host: this REJECTS such input,
     // it is not a reachable address, so no request is ever made to it.
     if (/^(localhost|127\.|0\.0\.0\.0)/i.test(u.hostname)) return null;

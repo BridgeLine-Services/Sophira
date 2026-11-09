@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/supabase/guard";
 import { getSearchProvider, searchProviderConfigured, searchModeNotice, SearchNotConfiguredError } from "@/lib/research/provider";
 import { generateQueries } from "@/lib/research/research";
 import { executeResearchPass } from "@/lib/research/run";
+import { evaluateInformationRequest } from "@/lib/research/policy";
 
 export const runtime = "nodejs";
 export const maxDuration = 240;
@@ -53,6 +54,16 @@ export async function POST(request: NextRequest) {
   const topic = (body.topic || "").trim();
   if (topic.length < 3) {
     return NextResponse.json({ error: "Provide the research topic (what the essay needs sources for)." }, { status: 400 });
+  }
+  // Phase 2F (2026-11-09): the research topic/question is the member's own
+  // wording - screen it for restricted-material or access-bypass intent
+  // BEFORE any search provider or source fetch runs.
+  const screened = evaluateInformationRequest(`${topic}\n${body.question ?? ""}`);
+  if (screened.blocked) {
+    return NextResponse.json(
+      { error: screened.message + (screened.alternative ? " " + screened.alternative : ""), blocked: true, code: screened.code },
+      { status: 422 },
+    );
   }
 
   const spec = {

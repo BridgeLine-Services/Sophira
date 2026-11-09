@@ -3,6 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { AiNotConfiguredError, aiChat, aiConfigured } from "@/lib/ai/client";
 import { classifyEngine } from "@/lib/courses/engines";
+import { evaluateInformationRequest } from "@/lib/research/policy";
+
+/** Phase 2F (2026-11-09): wording-level boundary BEFORE any model call.
+ *  Prompt text is not enforcement - this runs in code on every request. */
+function screenRequest(text: string): { message: string; alternative?: string; code: string } | null {
+  const d = evaluateInformationRequest(text);
+  return d.blocked ? { message: d.message, alternative: d.alternative, code: d.code } : null;
+}
+
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -29,6 +38,8 @@ export async function POST(request: NextRequest) {
   try { body = await request.json(); } catch { /* empty */ }
   const question = (body.question ?? "").trim();
   if (!question) return NextResponse.json({ error: "Ask a question about this subject." }, { status: 400 });
+  const screen = screenRequest(question);
+  if (screen) return NextResponse.json({ error: screen.message + (screen.alternative ? " " + screen.alternative : ""), blocked: true, code: screen.code }, { status: 422 });
 
   const enginePrompts: Record<string, string> = {
     biology: "You are a biology tutor. Help with concepts, terminology, processes, experiments, and diagrams (describe them in text).",
