@@ -8,7 +8,7 @@ import { Bell, CloudOff, ScanLine } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { Activity, BookOpen, Brain, Briefcase, ChevronDown, GraduationCap, Home, Library, LogOut, MailQuestion, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, UserPlus, Users, Wifi, X } from "lucide-react";
+import { Activity, BookOpen, Brain, Briefcase, ChevronDown, GraduationCap, Home, Library, LogOut, MailQuestion, Menu, NotebookPen, PenLine, Settings, ClipboardCheck, ShieldCheck, Sigma, FileText, Mic, UserPlus, Users, Wifi, X } from "lucide-react";
 import { Gauge, Keyboard } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
@@ -21,6 +21,10 @@ const NAV = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/courses", label: "Courses", icon: BookOpen },
   { href: "/notebooks", label: "Notebooks", icon: NotebookPen },
+  // Lecture studio: the only screen that drives the media pipeline
+  // (upload -> transcribe -> study notes -> slides). It was headless until
+  // Phase 5, so it is reachable from the main workspace navigation.
+  { href: "/lectures", label: "Lectures", icon: Mic },
   { href: "/learning", label: "Learning / Memory", icon: Brain },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/offline", label: "Offline", icon: CloudOff },

@@ -34,7 +34,7 @@ const PUBLIC_PAGES = [
   { path: "/install", expect: "install", title: "Sophira" },
   { path: "/create-owner", expect: "owner", title: "Sophira" },
 ];
-const PROTECTED = ["/dashboard", "/courses", "/settings", "/writing/review"];
+const PROTECTED = ["/dashboard", "/courses", "/settings", "/writing/review", "/lectures"];
 
 const results = [];
 const record = (name, ok, detail) => {
