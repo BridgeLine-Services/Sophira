@@ -1,3 +1,23 @@
+## 2026-11-09 — Phase 5c: the lecture studio (/lectures)
+
+Every media capability shipped since Phase 3 was headless: upload, transcription,
+study notes, timestamped questions and slide reading all worked, but no screen
+used them. `/lectures` is that screen, reachable from the workspace navigation.
+
+- Choose a file, or record; the browser uploads it straight into the member's
+  own private folder with a short-lived signed link (never through the
+  application server, which cannot carry a two-hour recording).
+- Transcribe, then study notes, then a question about the lecture. Answers show
+  the transcript's confidence, any dropped quotes, whether the lecture was
+  shortened, and the coverage notice the server returned.
+- "Read the slides" samples frames from the video in the browser and sends each
+  still with its timestamp, so recognised text stays citable. The sampler obeys
+  the server's own limits (one frame per half minute, twelve at most).
+- Nothing is invented: unavailable steps say why, an unreadable frame says so,
+  and no progress percentage is shown for a step whose length is unknown.
+- `/lectures` fails closed when signed out (verified by the runtime smoke, now
+  95/95).
+
 ## 2026-11-09 — Phase 5a: Next.js 16.4 and React 19.3
 
 The framework upgrade proposed in pull request #16 could not be merged: its
