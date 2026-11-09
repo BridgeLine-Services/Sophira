@@ -155,3 +155,29 @@ request, so it is validated before any call:
 
 Development is unaffected: `http://127.0.0.1:11434/v1` works locally as before.
 Nothing about the URL is logged or returned in diagnostics.
+
+## Reliability (Phase 1a/1b)
+
+Three pieces keep a local-first engine from feeling broken when the local server is asleep.
+
+**Circuit breakers** (`src/lib/ai/reliability.ts`). Each provider@endpoint pair
+gets its own breaker. Three consecutive failures open it; an open breaker is
+skipped for 60 seconds, then exactly one trial request is allowed. A success
+closes it. Failures far apart in time are not treated as a pattern. The breaker
+never changes which providers are configured or allowed: `resolveProviders()`
+still decides the chain and the cost policy is untouched, so an open breaker can
+never promote a paid provider. State is in-process on purpose: a network fault is
+a per-process fact, and a restart should re-try everything.
+
+**Owner AI health** (`GET /api/owner/ai-health`). Reports which provider would
+answer right now, consecutive failures, retry countdown and last error code.
+It never calls a model, so opening the page costs nothing. An untried provider is
+reported as "ready, but nothing has been sent to it yet", never as healthy.
+
+**Readiness and evaluation** (`GET|POST /api/owner/ai-readiness`,
+`GET|POST /api/owner/ai-eval`). The readiness check times one 24-token generation
+and turns it into a verdict (ready / usable / too slow / cannot fit in memory /
+unknown) with plain-English advice and a model suggestion. The eval route runs a
+fixed four-case suite (grounded answer, refusal when the source cannot answer,
+JSON shape, citation) through the chain students are actually served by, scored
+mechanically at temperature 0, and reports each case's reason.
