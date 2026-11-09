@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/supabase/guard";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import { docxHtmlToStructuredText, parsePptx, parseSpreadsheet, parseCsv } from "@/lib/extract/documents";
+import { buildPdfProvenance } from "@/lib/extract/provenance";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,8 @@ const MAX_BYTES = 10 * 1024 * 1024;
 interface Extraction {
   text: string;
   confidence: "high" | "medium" | "low" | "failed";
+  /** Phase 3a: optional page-level provenance (PDF today; additive). */
+  provenance?: unknown;
   notes: string;
 }
 
@@ -24,7 +27,8 @@ async function extractText(bytes: Buffer, mime: string, name: string): Promise<E
 
   if (mime === "application/pdf" || lower.endsWith(".pdf")) {
     const { extractPdfText } = await import("@/lib/extract/pdf");
-    const { text, via } = await extractPdfText(bytes);
+    const pdf = await extractPdfText(bytes);
+    const { text, via } = pdf;
     const clean = (text || "").trim();
     if (via === "none") {
       return { text: "", confidence: "failed", notes: "This PDF could not be read (it may be corrupted or password-protected). Try a different export or paste the text." };
@@ -34,9 +38,17 @@ async function extractText(bytes: Buffer, mime: string, name: string): Promise<E
         text: clean,
         confidence: "low",
         notes: "This PDF contained very little readable text. It may be a scanned image (no embedded text). Try exporting it as a text-based PDF, take a clear photo of the page, or paste the text.",
+        provenance: buildPdfProvenance(pdf.pages ?? null),
       };
     }
-    return { text: clean, confidence: "high", notes: "Text extracted from PDF. Layout, tables, and math formatting may be imperfect - please review." };
+    return {
+      text: clean,
+      confidence: "high",
+      notes: "Text extracted from PDF. Layout, tables, and math formatting may be imperfect - please review.",
+      // Phase 3a: page-level provenance (page numbers, scanned pages).
+      // Purely additive - existing fields above are unchanged.
+      provenance: buildPdfProvenance(pdf.pages ?? null),
+    };
   }
 
   if (mime.startsWith("image/")) {
