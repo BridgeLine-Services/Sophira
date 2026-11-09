@@ -186,3 +186,30 @@ environment, so a scan's contents remain missing until the member uploads a
 text version or clearer images (the original file is always kept). Multi-column
 reading order and table reconstruction are unchanged from the previous
 baseline and remain limitations.
+
+## Email as a source (Phase 3)
+
+Teachers send the material that matters by email, so a message can be added to a
+notebook directly: upload the exported `.eml` file, or paste the email text.
+
+What is kept and what is not:
+
+- Headers are read from the message (sender, subject, sent date, message id) and
+  the subject becomes the source title. Pasted text with no headers is stored
+  without inventing a sender, and says so.
+- Quoted replies, the sender's signature and Outlook `From:/Sent:` blocks are
+  removed before storage, because a five-message thread would otherwise repeat
+  the same instructions and inflate every citation. What was trimmed is reported
+  in words (`retrieval_notes`), never silently.
+- An HTML-only message is converted to readable text and the note says the text
+  came from its HTML.
+- Attachments are listed by filename with a note that their contents are not in
+  the message. Nothing pretends to have read a file it has not seen.
+- A reply with nothing new is refused (`quoted-only`), an attachment-only message
+  is refused with the filename to add instead, and a two-word reply is stored but
+  flagged as too short to quote.
+
+Stored as `source_type = 'user_notes'` (the allowed type closest to a message)
+with the sender and date in the provenance note. Every ingestion path now shares
+one `storeIngest` step, so a new source type cannot bypass the RLS-scoped insert
+or the honest processing columns.
