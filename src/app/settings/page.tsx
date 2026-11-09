@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,8 @@ import {
 import { fmtDate } from "@/lib/format";
 import type { InvitationRequest, Profile } from "@/lib/types";
 import { ShieldCheck, Smartphone, Download } from "lucide-react";
+import { useAutosave } from "@/lib/save/useAutosave";
+import SaveStatus from "@/components/ui/SaveStatus";
 
 const LEVELS = ["Kindergarten/Elementary", "Middle school", "High school", "College/Undergraduate", "Graduate/Master's", "PhD", "Other"];
 const EXPLANATION = ["Simple", "Standard", "Advanced"];
@@ -24,6 +26,41 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [form, setForm] = useState({ display_name: "", academic_level: "", explanation_level: "", answer_style: "", formatting_pref: "", preferred_language: "" });
   const [saving, setSaving] = useState(false);
+  // Phase 4C: revision-aware autosave. profiles.updated_at is the version
+  // token (no new schema); the profile form autosaves as the member types.
+  const baseVersionRef = useRef<string | null>(null);
+  const autosave = useAutosave<{ display_name: string; academic_level: string | null; explanation_level: string | null; answer_style: string | null; formatting_pref: string | null; preferred_language: string | null }>({
+    save: async (payload, base) => {
+      if (!userId) throw Object.assign(new Error("not signed in"), { code: "network" });
+      // Read the current server version; a change since our base is a
+      // conflict we must NOT overwrite silently.
+      const { data: cur, error: readErr } = await supabase
+        .from("profiles")
+        .select("updated_at")
+        .eq("id", userId)
+        .single();
+      if (readErr) throw Object.assign(new Error(readErr.message), { code: "network" });
+      if (base && cur?.updated_at && cur.updated_at !== base) {
+        throw Object.assign(new Error("conflict"), { code: "conflict" });
+      }
+      // Version-guarded write: only succeed if the row still has the
+      // version we validated above (0 rows back = someone else wrote first).
+      const guardVersion = cur?.updated_at ?? base;
+      let query = supabase.from("profiles").update(payload).eq("id", userId);
+      if (guardVersion) query = query.eq("updated_at", guardVersion);
+      const { data: written, error } = await query.select("id");
+      if (error) throw Object.assign(new Error(error.message), { code: "network" });
+      if (!written || written.length === 0) {
+        throw Object.assign(new Error("conflict"), { code: "conflict" });
+      }
+      // Read the AUTHORITATIVE version back (a DB trigger may set it).
+      const { data: after } = await supabase.from("profiles").select("updated_at").eq("id", userId).single();
+      const version = after?.updated_at ?? new Date().toISOString();
+      baseVersionRef.current = version;
+      return { version };
+    },
+    debounceMs: 1200,
+  });
 
   // Invitation requests (non-owner members with permission)
   const [requests, setRequests] = useState<InvitationRequest[]>([]);
@@ -55,6 +92,7 @@ export default function SettingsPage() {
       setEmail(user.email ?? "");
       const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       if (p) {
+        baseVersionRef.current = (p as { updated_at?: string }).updated_at ?? null;
         setProfile(p as Profile);
         setForm({
           display_name: p.display_name || "",
@@ -75,7 +113,20 @@ export default function SettingsPage() {
   }, [supabase, router]);
 
   function set<K extends keyof typeof form>(key: K, value: string) {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+      // Autosave every edit (debounced inside the hook); the manual Save
+      // button below remains as an explicit "save now".
+      autosave.markEdited({
+        display_name: next.display_name.trim(),
+        academic_level: next.academic_level || null,
+        explanation_level: next.explanation_level || null,
+        answer_style: next.answer_style.trim() || null,
+        formatting_pref: next.formatting_pref.trim() || null,
+        preferred_language: next.preferred_language.trim() || null,
+      });
+      return next;
+    });
   }
 
   async function saveProfile(e: FormEvent) {
@@ -249,7 +300,18 @@ export default function SettingsPage() {
                 <Label htmlFor="pl">Preferred language</Label>
                 <Input id="pl" className="mt-1.5" value={form.preferred_language} onChange={(e) => set("preferred_language", e.target.value)} placeholder="Optional" />
               </div>
-              <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+                <SaveStatus
+                  snapshot={autosave.snapshot}
+                  onRetry={autosave.retry}
+                  onKeepMine={() => autosave.resolveConflict("mine")}
+                  onUseTheirs={() => {
+                    autosave.resolveConflict("theirs");
+                    router.refresh();
+                  }}
+                />
+              </div>
             </form>
           </CardContent>
         </Card>
