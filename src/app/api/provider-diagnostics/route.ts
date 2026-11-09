@@ -23,7 +23,7 @@ export async function GET() {
       { status: 503 },
     );
   }
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireOwner(supabase);
   if (!guard.ok) return guard.response;
   return NextResponse.json(startupDiagnostics(readAiEnv()));

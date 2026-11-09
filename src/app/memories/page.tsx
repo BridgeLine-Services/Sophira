@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * has no path to another member's memories — same as all academic data.
  */
 export default async function MemoriesPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

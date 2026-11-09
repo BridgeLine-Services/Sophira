@@ -63,7 +63,7 @@ const QUESTION_LIMIT = 30000;
 const PER_FILE_LIMIT = 12000;
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user, profile } = guard.data;

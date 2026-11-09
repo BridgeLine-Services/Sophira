@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * Teacher/Writing profile update waits here for the student's decision.
  */
 export default async function ProposalsPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 

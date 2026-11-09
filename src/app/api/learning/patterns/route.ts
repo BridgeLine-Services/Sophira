@@ -29,7 +29,7 @@ const ACTIONS: PatternAction[] = ["confirm", "mark_corrected", "reactivate", "ma
 const SET_INTENTIONAL = "set_intentional";
 
 export async function GET() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 
@@ -43,7 +43,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 
@@ -117,7 +117,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 

@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  *                    the learning system with evidence rows).
  */
 export async function GET(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 

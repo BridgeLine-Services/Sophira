@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { data, error } = await supabase
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user } = guard.data;

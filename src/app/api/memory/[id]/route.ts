@@ -21,7 +21,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { id } = await params;
@@ -41,7 +41,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { id } = await params;
@@ -97,7 +97,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { id } = await params;

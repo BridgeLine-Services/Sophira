@@ -20,7 +20,7 @@ export async function POST() {
       { status: 503 },
     );
   }
-  const supabase = createClient();
+  const supabase = await createClient();
   // Full authorization chain: authenticated -> ACTIVE access -> own resource.
   // A revoked user must not be able to call account deletion directly.
   const guard = await requireUser(supabase);

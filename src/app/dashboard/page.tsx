@@ -9,7 +9,7 @@ import { BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library,
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 

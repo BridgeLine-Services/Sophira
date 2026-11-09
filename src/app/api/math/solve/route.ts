@@ -48,7 +48,7 @@ async function visionOcr(dataUrl: string): Promise<{ text: string; confidence: n
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user } = guard.data;

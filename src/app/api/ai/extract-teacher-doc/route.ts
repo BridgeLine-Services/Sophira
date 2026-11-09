@@ -28,7 +28,7 @@ const FIELDS = [
  * Creates a PENDING proposal — nothing changes until the student approves it.
  */
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   // Full authorization chain: authenticated -> ACTIVE access -> own resource.
   // A revoked user must not be able to call account deletion directly.
   const guard = await requireUser(supabase);

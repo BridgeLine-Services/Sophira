@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * reliably; nothing here claims "$0".
  */
 export async function GET() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireOwner(supabase);
   if (!guard.ok) return guard.response;
 

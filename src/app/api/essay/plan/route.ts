@@ -38,7 +38,7 @@ interface PlanBody {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user, profile } = guard.data;
@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
 
 /** GET /api/essay/plan?session_id=… — restore a session (page reopen). */
 export async function GET(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user } = guard.data;

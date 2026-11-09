@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function ownerClient() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireOwner(supabase);
   if (!guard.ok) return { supabase: null, error: guard.response };
   return { supabase, error: null as null };

@@ -50,7 +50,7 @@ function toNotebookSource(row: Record<string, unknown>): NotebookSource {
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string; sourceId: string }> }) {
   const { id, sourceId } = await params;
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const row = await load(supabase, id, sourceId, guard.data.user.id);
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; sourceId: string }> }) {
   const { id, sourceId } = await params;
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const row = await load(supabase, id, sourceId, guard.data.user.id);
@@ -105,7 +105,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string; sourceId: string }> }) {
   const { id, sourceId } = await params;
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const row = await load(supabase, id, sourceId, guard.data.user.id);

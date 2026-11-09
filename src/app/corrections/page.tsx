@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * patterns here, same as everyone else.
  */
 export default async function CorrectionsPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

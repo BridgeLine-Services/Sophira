@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       { status: 503 },
     );
   }
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user } = guard.data;

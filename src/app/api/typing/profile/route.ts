@@ -21,7 +21,7 @@ export const runtime = "nodejs";
 const bad = (msg: string, status = 400) => NextResponse.json({ error: msg }, { status });
 
 export async function GET() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 
@@ -48,7 +48,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user } = guard.data;

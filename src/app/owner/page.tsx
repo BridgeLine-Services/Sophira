@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * back to the user dashboard — this is a redirect, not hidden UI.
  */
 export default async function OwnerPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

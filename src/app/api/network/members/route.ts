@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  * here; regular RLS keeps profiles strictly own-row for everyone else.
  */
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireOwner(supabase);
   if (!guard.ok) return guard.response;
   const ownerId = guard.data.user.id;

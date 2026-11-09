@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
  * negative evidence and a pattern can never outrank fresh instructions.
  */
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user } = guard.data;

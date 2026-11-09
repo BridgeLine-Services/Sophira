@@ -24,7 +24,7 @@ export const maxDuration = 300;
 interface SectionRow { id: string; draft: string | null; audits: { citation: string; rubric: string; style: string } | null }
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user } = guard.data;
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
 
 /** PATCH /api/essay/draft-section — approve or edit the outline (gate). */
 export async function PATCH(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
   const { user } = guard.data;
