@@ -126,6 +126,10 @@ sensitive and is never printed by any backup report.
 |---|---|---|---|
 | `member_notifications` | A member's own durable notices. | yes | yes |
 | `notification_preferences` | Which categories a member wants. Restoring these preserves the member's choices rather than resetting them to defaults. | yes | no |
+| `media_assets` | Uploaded lecture audio/video: the member's own file record (name, size, duration, processing state). | yes | yes |
+| `media_transcripts` | The transcript of one recording, including which engine produced it and how much of the audio it actually covers. | yes | yes |
+| `media_segments` | Timed speech segments (start/end, text, speaker when the engine reported one) that make a quotation citable. | yes | yes |
+| `media_frames` | Sampled frames and the text that was actually recognised in them. | yes | yes |
 
 ---
 
