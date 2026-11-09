@@ -162,3 +162,27 @@ a 3x3 table is flattened to a line of text with row adjacency intact, which is
 enough for search and citation but not for rebuilding a spreadsheet. Docling
 remains a candidate **only** if layout reconstruction is required - and that
 decision now has a measured baseline to compare against.
+
+## Phase 3a — page-level provenance (2026-11-09)
+
+What changed: `src/lib/extract/provenance.ts` (new, pure) plus additive fields
+on the existing PDF extractor and extract route. The existing response fields
+(`text`, `confidence`, `notes`), the primary parser, the modern fallback and
+every supported format are unchanged.
+
+What the member gets now:
+- **Page numbers that come from the file.** When the modern pdf.js path runs,
+  each page's text is kept separately and a quotation can be mapped back to its
+  page (`offsetToPage`). When only the primary parser runs, Sophira says page
+  numbers are not reliable instead of inventing them (`pageMapCertain: false`).
+- **Scanned pages are named, not silently dropped.** A page with no text layer
+  is listed in `scannedPages` with a plain-English note, the document is marked
+  `incomplete`, and the overall confidence becomes the WORST page.
+- **Honest summaries.** `describeProvenance` states pages read, pages missing,
+  and that reading a file correctly is not a claim that its contents are true.
+
+What is NOT claimed: OCR for scanned pages is not available in this
+environment, so a scan's contents remain missing until the member uploads a
+text version or clearer images (the original file is always kept). Multi-column
+reading order and table reconstruction are unchanged from the previous
+baseline and remain limitations.
