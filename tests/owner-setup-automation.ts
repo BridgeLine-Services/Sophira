@@ -28,7 +28,7 @@ function walkFiles(dir: string): string[] {
 export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): Promise<void> {
   section("Owner setup automation (deploy -> /create-owner -> done, no SQL editor)");
 
-  const mw = readFileSync("src/middleware.ts", "utf8");
+  const mw = readFileSync("src/proxy.ts", "utf8");
   const createOwner = readFileSync("src/app/create-owner/page.tsx", "utf8");
   const login = readFileSync("src/app/login/page.tsx", "utf8");
   const statusRoute = readFileSync("src/app/api/setup-status/route.ts", "utf8");

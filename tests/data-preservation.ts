@@ -113,7 +113,7 @@ export function runDataPreservationTests(
     "members: the member record is looked up by the permanent auth id, never by email");
 
   // Revocation must reach live sessions, not just hide navigation.
-  const middleware = readFileSync("src/middleware.ts", "utf8");
+  const middleware = readFileSync("src/proxy.ts", "utf8");
   assert(/revoked/.test(middleware) && /access-denied/.test(middleware),
     "members: a revoked member is turned away from protected pages on their next request");
   const revocation = walk("supabase/migrations").map((f) => readFileSync(f, "utf8")).join("\n");

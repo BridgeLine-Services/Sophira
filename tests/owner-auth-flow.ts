@@ -24,7 +24,7 @@ import { readFileSync } from "fs";
 export async function runOwnerAuthFlowTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): Promise<void> {
   section("First-owner authentication flow (login → create-owner → auth.users → handle_new_user → profiles → session → /owner)");
 
-  const mw = readFileSync("src/middleware.ts", "utf8");
+  const mw = readFileSync("src/proxy.ts", "utf8");
   const login = readFileSync("src/app/login/page.tsx", "utf8");
   const createOwner = readFileSync("src/app/create-owner/page.tsx", "utf8");
   const callback = readFileSync("src/app/auth/callback/route.ts", "utf8");

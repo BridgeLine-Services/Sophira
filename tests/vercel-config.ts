@@ -93,7 +93,7 @@ export function runVercelConfigTests(assert: (c: boolean, n: string) => void, se
   const allEnv = new Set<string>();
   const addEnv = (code: string): void => { for (const m of Array.from(code.matchAll(/process\.env\.([A-Z_0-9]+)/g))) allEnv.add(m[1]); };
   for (const [f, c] of allSrc) addEnv(c);
-  addEnv(readFileSync("src/middleware.ts", "utf8"));
+  addEnv(readFileSync("src/proxy.ts", "utf8"));
   const undocumented = Array.from(allEnv).filter((n) => n !== "NODE_ENV" && !envDoc.includes(n));
   assert(undocumented.length === 0, "audit: every environment variable the code reads is documented in docs/ENVIRONMENT_VARIABLES.md (missing: " + undocumented.join(", ") + ")");
   assert(envDoc.includes("NEXT_PUBLIC_") && envDoc.includes("SUPABASE_SERVICE_ROLE_KEY") && envDoc.includes("Server-only"),

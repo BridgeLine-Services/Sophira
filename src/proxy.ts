@@ -55,7 +55,14 @@ function hasSupabaseEnv() {
 const LOCAL_FIRST = process.env.SOPHIRA_LOCAL_FIRST === "true" && process.env.NODE_ENV !== "production";
 const LOCAL_TEST_PATHS = ["/local", "/offline"];
 
-export async function middleware(request: NextRequest) {
+// Next.js 16 renamed the "middleware" file convention to "proxy": the same
+// request-interception hook, loaded now as mod.proxy instead of
+// mod.middleware. The file moved to src/proxy.ts and the exported name
+// changed; every rule inside is unchanged, because this file is the ONLY
+// authentication barrier between a signed-out visitor and private academic
+// data. `middleware` stays exported as an alias so the existing tests (and
+// anything importing it by name) keep asserting on the real function.
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC.some((p) => path === p || path.startsWith(p + "/"));
@@ -191,3 +198,6 @@ export const config = {
       "/((?!_next/static|_next/image|api/|icons/|manifest.webmanifest|sw.js|robots.txt|favicon.ico|favicon.png|apple-touch-icon.png).*)",
     ],
 };
+
+/** Alias kept for existing callers that import the handler by its former name. */
+export const middleware = proxy;

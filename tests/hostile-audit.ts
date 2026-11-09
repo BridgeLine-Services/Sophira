@@ -33,7 +33,7 @@ export async function runHostileAuditTests(assert: Assert, section: Section): Pr
     assert(guard.includes("ACTIVE_STATUSES.has("), "audit: the active-access check is membership in the allow-list");
     assert(guard.includes("fail CLOSED") || guard.includes("fail closed") || guard.includes("fail CLOSED".toLowerCase() || ""), "audit: the fail-closed rule is documented at the check itself");
 
-    const mw = src("src/middleware.ts");
+    const mw = src("src/proxy.ts");
     assert(/profile\.status === "pending" \|\| profile\.status === "accepted" \|\| profile\.status === "active"/.test(mw), "audit: the middleware uses the same allow-list (a revoked or unknown status cannot pass the page gate)");
 
     // the restore action's 'active' status is legal at the DB
@@ -144,7 +144,7 @@ export async function runHostileAuditTests(assert: Assert, section: Section): Pr
       [/xoxb-[0-9A-Za-z\-]{10,}/, "Slack token"],
     ];
     const scanTargets = [
-      "src/middleware.ts", "public/sw.js", "public/manifest.webmanifest",
+      "src/proxy.ts", "public/sw.js", "public/manifest.webmanifest",
       "src/lib/supabase/server.ts", "src/lib/supabase/admin.ts", "src/lib/ai/client.ts",
     ];
     for (const t of scanTargets) {
