@@ -20,6 +20,45 @@ import { setTimeout as sleep } from "timers/promises";
 const PORT = Number(process.argv[2] || process.env.SMOKE_PORT || 3311);
 const BASE = `http://127.0.0.1:${PORT}`;
 
+/**
+ * Removes tags from HTML by scanning, not by regular expression (2026-11-09).
+ * A regex strip is a bypass class: `</script >`, `<img/src=x>` and unterminated tags
+ * all get through it. This checks the rendered output of OUR OWN pages, so the risk is
+ * low - but the scanner is three lines longer and cannot be fooled, so there is no
+ * reason to keep the weaker form (CodeQL #19/#18/#17).
+ */
+function stripTags(html) {
+  let out = "";
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf("<", i);
+    if (lt === -1) {
+      out += html.slice(i);
+      break;
+    }
+    out += html.slice(i, lt);
+    let quote = null;
+    let j = lt + 1;
+    let closed = false;
+    for (; j < html.length; j++) {
+      const ch = html[j];
+      if (quote) {
+        if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === ">") {
+        closed = true;
+        break;
+      }
+    }
+    // An unterminated tag is dropped rather than treated as text: either way it must
+    // never contribute "content" to a heading check.
+    i = closed ? j + 1 : html.length;
+  }
+  return out;
+}
+
 const PUBLIC_PAGES = [
   { path: "/login", expect: "sign", title: "Sophira" },
   { path: "/signup", expect: "account", title: "Sophira" },
@@ -206,7 +245,7 @@ for (const page of PUBLIC_PAGES) {
   // Heading structure (directive 5.7): a rendered page needs exactly one h1, and it must say
   // something. Checked on the real HTML because a page can delegate its title to a component,
   // which a source grep cannot see - five pages looked headerless and were not.
-  const h1s = [...r.body.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1].replace(/<[^>]*>/g, "").trim());
+  const h1s = [...r.body.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => stripTags(m[1]).trim());
   record(`${page.path} has exactly one h1`, h1s.length === 1, `${h1s.length} found`);
   record(`${page.path} h1 is not empty`, h1s.every((t) => t.length > 2), h1s[0]?.slice(0, 40) ?? "none");
   // A page needs one main landmark so a screen reader can jump past the chrome (2026-11-03).

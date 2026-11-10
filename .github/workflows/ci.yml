@@ -9,6 +9,12 @@ on:
 
 # npm registry flake protection. These apply to tarball/metadata fetches; the
 # onnxruntime binary download is handled by ONNXRUNTIME_NODE_INSTALL below.
+# Least privilege (CodeQL #1-#8): this workflow only builds and tests. It needs to
+# read the repository and nothing else - it must never be able to push, tag, or
+# create releases, even if a later step is compromised.
+permissions:
+  contents: read
+
 env:
   npm_config_fetch_retries: "5"
   npm_config_fetch_retry_maxtimeout: "120000"

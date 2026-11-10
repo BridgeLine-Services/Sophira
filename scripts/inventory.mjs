@@ -22,7 +22,9 @@ function walk(dir, out = []) {
 }
 
 const files = walk(ROOT);
-const route = (p) => "/" + dirname(p).slice(ROOT.length + 1).replace(/\/?\(.*?\)\/?/g, "").replace(/^$/, "");
+// `.replace(/^$/, "")` was a no-op (empty match replaced by empty string) and only
+// obscured what this does: strip route-group segments like "(marketing)" from a path.
+const route = (p) => "/" + dirname(p).slice(ROOT.length + 1).replace(/\/?\(.*?\)\/?/g, "");
 
 function signals(file) {
   const src = readFileSync(file, "utf8");

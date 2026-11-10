@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/supabase/guard";
 import { invitationEmailNote } from "@/lib/invitations/email";
+import { checkEmail, emailProblemMessage, EMAIL_MAX_INPUT } from "@/lib/validation/email";
 import { deliverInvitation, normalizePhone, type Channel } from "@/lib/invitations/delivery";
 
 export const runtime = "nodejs";
@@ -30,16 +31,30 @@ export async function POST(request: NextRequest) {
   const { supabase, error } = await ownerClient();
   if (error || !supabase) return error!;
 
+  // BODY LIMIT BEFORE VALIDATION (2026-11-09): an invitation body is tiny, so a
+  // multi-megabyte one is refused before it is parsed. This is what makes the email
+  // check below bounded no matter what arrives (CodeQL #11/#10).
+  const rawBody = await request.text();
+  if (rawBody.length > 8192) {
+    return NextResponse.json({ error: "That request was too large. Please try again." }, { status: 413 });
+  }
   let body: { email?: string; phone?: string; expires_days?: number; channel?: string };
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const email = (body.email || "").trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+  // Deterministic, linear-time validation. The old regex had nested quantifiers, so
+  // a long string with no "@" made the engine backtrack (CodeQL #11/#10).
+  const emailCheck = checkEmail(body.email);
+  if (!emailCheck.ok) {
+    const tooLong = body.email?.length && body.email.length > EMAIL_MAX_INPUT;
+    return NextResponse.json(
+      { error: emailProblemMessage(emailCheck.problem) },
+      { status: tooLong ? 413 : 400 }
+    );
   }
+  const email = emailCheck.email;
 
   // IDEMPOTENCY (2026-10-13): a pending, unexpired invitation for the same
   // address is REUSED, so retrying never creates duplicate rows or duplicate

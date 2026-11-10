@@ -27,6 +27,7 @@ import { explainSource } from "../src/lib/notebook/why-source";
 import { buildArtifact } from "../src/lib/notebook/artifacts";
 import { ingestText, ingestPdf, ingestDocx, ingestImage, ingestWeb, hashContent } from "../src/lib/notebook/ingest";
 import type { NotebookSource, ResearchCandidate } from "../src/lib/notebook/types";
+import { hasUrl } from "./helpers/url-check";
 
 type Assert = (condition: boolean, name: string) => void;
 type Section = (title: string) => void;
@@ -201,7 +202,7 @@ export async function runNotebookTests(assert: Assert, section: Section): Promis
   assert(withOptIn.groundedIn === "notebook sources + web research", "notebook ground: grounding mode reports web research honestly");
   const webCit = withOptIn.statements[0].citations[0];
   assert(webCit.locator.url === "https://w.example/a" && webCit.locator.retrievedAt === "2026-10-06T02:00:00Z", "notebook ground: web citation carries URL + retrieved timestamp");
-  assert(webCit.marker.includes("https://w.example/a") && webCit.marker.includes("retrieved"), "notebook ground: web citation marker shows URL and retrieval date");
+  assert(hasUrl(webCit.marker, "w.example", "/a") && webCit.marker.includes("retrieved"), "notebook ground: web citation marker shows URL and retrieval date");
 
   // deterministic no-model fallback still quotes verbatim
   const fallback = buildGroundedAnswer({ question: "Marshall Plan aid dollars provided?", sources: [s1] });

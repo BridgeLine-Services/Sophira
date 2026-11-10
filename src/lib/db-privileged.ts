@@ -367,7 +367,21 @@ export async function ensureAuthRedirectConfig(): Promise<"applied" | "already-c
     if (!res.ok) return "unavailable";
     const config = (await res.json()) as { site_url?: string; redirect_urls?: string[] };
     const urls = config.redirect_urls ?? [];
-    const needsFix = config.site_url !== site || !urls.some((u) => u.startsWith(site));
+    // Compare ORIGINS, not string prefixes (CodeQL #43): "https://sophira.app.evil.example"
+    // startsWith "https://sophira.app" but is a different site. A redirect entry is
+    // correct when its origin matches and its path stays under the site's path.
+    const siteUrl = (() => { try { return new URL(site); } catch { return null; } })();
+    const coversSite = (candidate: string): boolean => {
+      if (!siteUrl) return false;
+      let parsed: URL;
+      try { parsed = new URL(candidate); } catch { return false; }
+      if (parsed.origin !== siteUrl.origin) return false;
+      const base = siteUrl.pathname.replace(/\/$/, "");
+      const path = parsed.pathname.replace(/\/$/, "");
+      if (!base) return true;
+      return path === base || path.startsWith(`${base}/`) || path === `${base}/**`;
+    };
+    const needsFix = config.site_url !== site || !urls.some(coversSite);
     if (!needsFix) return "already-correct";
     const merged = Array.from(new Set([site, `${site}/auth/callback`, `${site}/**`, ...urls])).slice(0, 100);
     const patch = await fetch(`https://api.supabase.com/v1/projects/${ref}/config/auth`, {

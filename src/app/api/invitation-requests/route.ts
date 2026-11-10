@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner, requireUser } from "@/lib/supabase/guard";
+import { checkEmail, emailProblemMessage, EMAIL_MAX_INPUT } from "@/lib/validation/email";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Invitation-request flow (workflow §5).
@@ -62,16 +61,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Bounded before parsing, then validated by a linear-time scanner: the reject
+  // regex that used to live here backtracked on long input (CodeQL #11/#10).
+  const rawBody = await request.text();
+  if (rawBody.length > 8192) {
+    return NextResponse.json({ error: "That request was too large. Please try again." }, { status: 413 });
+  }
   let body: { email?: string; reason?: string };
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const email = (body.email || "").trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+  const emailCheck = checkEmail(body.email);
+  if (!emailCheck.ok) {
+    const tooLong = body.email?.length && body.email.length > EMAIL_MAX_INPUT;
+    return NextResponse.json(
+      { error: emailProblemMessage(emailCheck.problem) },
+      { status: tooLong ? 413 : 400 }
+    );
   }
+  const email = emailCheck.email;
   const reason = (body.reason || "").trim().slice(0, 500);
 
   // Refuse duplicate pending requests for the same email.

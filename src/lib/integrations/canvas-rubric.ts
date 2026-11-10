@@ -15,6 +15,7 @@
  *    rather than 0 (which would look like a real zero-point criterion).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { decodeHtmlEntities, stripTags } from "../text/entities";
 
 export interface RubricRating {
   description: string;
@@ -35,15 +36,10 @@ export const RUBRIC_LIMITS = { criteria: 40, ratings: 10, textChars: 600 } as co
 /** Reduce third-party HTML-ish text to a single plain-text line. */
 export function plainText(value: unknown): string {
   if (typeof value !== "string") return "";
-  const withoutTags = value.replace(/<[^>]*>/g, " ");
-  const decoded = withoutTags
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#0?39;/gi, "'")
-    .replace(/&apos;/gi, "'");
+  // Tags are removed by the scanner in src/lib/text/entities.ts, then entities are
+  // decoded ONCE. A describe-then-decode chain decoded its own output, so a
+  // teacher-authored `&amp;lt;b&amp;gt;` became a live-looking tag (CodeQL #15/#14).
+  const decoded = decodeHtmlEntities(stripTags(value)).replace(/&nbsp;/gi, " ");
   return decoded.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
