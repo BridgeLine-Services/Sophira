@@ -8,6 +8,7 @@
  * fetch implementation (no network).
  */
 
+import { mentionsHost } from "./helpers/url";
 import { verifyCitation, checkUrlSyntax, refetchSource, summarizeCitations, researchCompletionLine, type CitationEvidence } from "../src/lib/research/citation-invariant";
 import type { CitationGateSummary } from "../src/lib/research/citation-invariant";
 
@@ -97,7 +98,7 @@ export async function runAdversarialCitationTests(assert: Assert, section: Secti
   assert(base.status === "VERIFIED", "adversarial: a fully-passing record is VERIFIED");
   assert(base.steps.length === 12, "adversarial: all 12 steps are evaluated");
   assert(base.steps.every((s) => s.ok), "adversarial: baseline passes every step");
-  assert(base.citation !== null && base.citation.includes("history.example.org"), "adversarial: VERIFIED citation is formatted from stored metadata");
+  assert(base.citation !== null && mentionsHost(base.citation, "history.example.org"), "adversarial: VERIFIED citation is formatted from stored metadata");
 
   // every single step, failed in isolation, must produce UNVERIFIED
   const mutations: [string, Partial<CitationEvidence>][] = [

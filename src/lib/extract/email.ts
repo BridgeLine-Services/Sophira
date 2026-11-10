@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from "../text/entities";
+
 /**
  * Email-as-source extraction (Phase 3, pure - no network, no mailbox provider).
  *
@@ -44,17 +46,13 @@ export interface EmailThreadStripResult {
 
 const MAX_BODY_CHARS = 120_000;
 
+/**
+ * Entity decoding now lives in src/lib/text/entities.ts as a SINGLE-PASS
+ * decoder. The old chain of .replace() calls decoded its own output, so
+ * "&amp;lt;script&amp;gt;" became live-looking markup (CodeQL #48).
+ */
 function decodeEntitiesBasic(input: string): string {
-  return input
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&mdash;/gi, "-")
-    .replace(/&ndash;/gi, "-")
-    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)));
+  return decodeHtmlEntities(input);
 }
 
 /** Minimal HTML to text, enough for an email body. */

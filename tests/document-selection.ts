@@ -92,7 +92,6 @@ export async function runDocumentSelectionTests(assert: (cond: boolean, label: s
     "honesty: a discovered file is only ever 'listed' — discovery is never reported as write access or synchronization");
 
   // ---- Google consent honesty ----
-  const oauthState = readFileSync("src/lib/integrations/oauth-state.ts", "utf8");
   const { googleAuthorizeUrl } = await import("../src/lib/integrations/oauth-state");
   const defaultUrl = googleAuthorizeUrl("cid", "https://app.example/cb", "st");
   assert(!defaultUrl.includes("drive.readonly"),

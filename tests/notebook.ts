@@ -17,6 +17,7 @@
  *  - artifacts: deterministic, provenance retained, empty-notebook honesty
  */
 
+import { hostIs } from "./helpers/url";
 import { readFileSync } from "fs";
 import { join } from "path";
 import type { SearchHit } from "../src/lib/research/provider";
@@ -294,7 +295,7 @@ export async function runNotebookTests(assert: Assert, section: Section): Promis
   }
   const bib = buildArtifact({ type: "bibliography", topic: "t", sources: artSources, evidence: [], citationStyle: "MLA" });
   assert(bib.sections[0].items.some((i) => i.includes("x.example/p")), "notebook artifact: bibliography formats real stored URLs");
-  assert(!bib.sections[0].items.some((i) => i.includes("example.com")), "notebook artifact: bibliography never invents entries");
+  assert(!bib.sections[0].items.some((i) => hostIs(i, "example.com")), "notebook artifact: bibliography never invents entries");
   const emptyArt = buildArtifact({ type: "study_guide", topic: "t", sources: [], evidence: [] });
   assert(emptyArt.provenance.length === 0 && emptyArt.honestNote.includes("unsourced"), "notebook artifact: empty notebook is stated honestly, not fabricated");
 
