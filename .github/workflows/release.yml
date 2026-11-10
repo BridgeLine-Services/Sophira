@@ -22,6 +22,14 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Least privilege (CodeQL #1-#8). Every job here builds artifacts and uploads them
+# with the Actions artifact API, which needs `actions: read`. Only the final
+# `release` job may write repository contents, and it says so itself; nothing else
+# in this pipeline can create or modify a release, tag, or commit.
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -312,6 +320,11 @@ jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    # The ONLY job in this repository allowed to write contents: it creates the
+    # GitHub Release and attaches artifacts to it.
+    permissions:
+      contents: write
+      actions: read
     needs: [android, ios, desktop]
     steps:
       - uses: actions/download-artifact@v4

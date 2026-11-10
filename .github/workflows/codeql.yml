@@ -19,6 +19,11 @@ on:
   schedule:
     - cron: '15 11 * * 1'
 
+# Least privilege (CodeQL #1-#8): read-only at the workflow level. The analysis job
+# raises only what it needs for itself (security-events: write to upload results).
+permissions:
+  contents: read
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})

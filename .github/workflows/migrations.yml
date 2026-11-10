@@ -27,6 +27,11 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# Least privilege: the job reads the repository and talks to Supabase with its own
+# token. It never writes to GitHub, so the GITHUB_TOKEN stays read-only.
+permissions:
+  contents: read
+
 jobs:
   migrate:
     runs-on: ubuntu-latest

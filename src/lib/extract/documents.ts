@@ -11,6 +11,9 @@
  * All functions are pure (Buffer in → { text, notes } out) and unit-testable.
  */
 
+import { decodeHtmlEntities } from "../text/entities";
+import { htmlInlineText, htmlToStructuredText } from "../text/html-blocks";
+
 export interface ParsedDocument {
   text: string;
   notes: string;
@@ -20,67 +23,29 @@ export interface ParsedDocument {
 /* DOCX                                                                */
 /* ------------------------------------------------------------------ */
 
-function inlineText(h: string): string {
-  return h
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|h1|h2|h3|h4|h5|h6|li|tr)>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-/** Converts mammoth's HTML output to structured plain text. */
+/**
+ * DOCX HTML -> structured text.
+ *
+ * 2026-11-09: the previous implementation was a chain of regex replacements, which
+ * both let crafted tags through (CodeQL #19/#18/#17) and decoded entities twice
+ * (#15/#14). It now goes through the tree parser in src/lib/text/html-blocks.ts:
+ * headings, ordered and unordered lists, tables and paragraphs survive, and every
+ * character of content arrives as text, never as markup.
+ */
 export function docxHtmlToStructuredText(html: string): string {
-  let out = "";
-  out = html.replace(/<h1[^>]*>(.*?)<\/h1>/gis, (_m: string, t: string) => `# ${inlineText(t)}\n`);
-  out = out.replace(/<h2[^>]*>(.*?)<\/h2>/gis, (_m: string, t: string) => `## ${inlineText(t)}\n`);
-  out = out.replace(/<h3[^>]*>(.*?)<\/h3>/gis, (_m: string, t: string) => `### ${inlineText(t)}\n`);
-  out = out.replace(/<h[456][^>]*>(.*?)<\/h[456]>/gis, (_m: string, t: string) => `#### ${inlineText(t)}\n`);
-
-  let ol = 1;
-  out = out.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gis, (_m: string, body: string) => {
-    ol = 1;
-    return body.replace(/<li[^>]*>([\s\S]*?)<\/li>/gis, (_l: string, li: string) => `${ol++}. ${inlineText(li).trim()}\n`);
-  });
-  out = out.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gis, (_m: string, body: string) =>
-    body.replace(/<li[^>]*>([\s\S]*?)<\/li>/gis, (_l: string, li: string) => `- ${inlineText(li).trim()}\n`)
-  );
-
-  out = out.replace(/<table[^>]*>([\s\S]*?)<\/table>/gis, (_m: string, body: string) => {
-    const rows: string[] = [];
-    const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gis;
-    let m: RegExpExecArray | null;
-    while ((m = rowRe.exec(body)) !== null) {
-      const cellRe = /<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gis;
-      const cells: string[] = [];
-      let c: RegExpExecArray | null;
-      while ((c = cellRe.exec(m[1])) !== null) cells.push(inlineText(c[1]).trim());
-      rows.push(`| ${cells.join(" | ")} |`);
-    }
-    return rows.join("\n") + "\n";
-  });
-
-  out = out.replace(/<p[^>]*>([\s\S]*?)<\/p>/gis, (_m: string, t: string) => `${inlineText(t).trim()}\n`);
-  out = inlineText(out);
-  return out.replace(/\n{3,}/g, "\n\n").trim();
+  return htmlToStructuredText(html);
 }
 
 /* ------------------------------------------------------------------ */
 /* PPTX                                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Slide XML entities, decoded exactly once by the shared decoder so a nested
+ * reference (`&amp;lt;`) stays literal instead of becoming a tag character.
+ */
 function decodeXmlEntities(s: string): string {
-  return s
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
-    .replace(/&amp;/g, "&");
+  return decodeHtmlEntities(s);
 }
 
 /** Extracts <a:t> runs from a slide/notes XML string, grouped by paragraph. */

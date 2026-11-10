@@ -114,6 +114,11 @@ import { runSpreadsheetFormulaTests } from "./spreadsheet-formulas";
 import { runSsrfTests } from "./ssrf";
 import { runEntityDecodingTests } from "./entity-decoding";
 import { runDocCountTests } from "./doc-counts";
+import { runDbConnectionIdentityTests } from "./db-connection-identity";
+import { runEmailValidationTests } from "./email-validation";
+import { runDocumentHtmlTests } from "./document-html";
+import { runWorkflowPermissionTests } from "./workflow-permissions";
+import { runDependencyVersionTests } from "./dependency-versions";
 import { runWritingProfileExpansionTests } from "./writing-profile-expansion";
 import { runExtractionProvenanceTests } from "./extraction-provenance";
 import { runSelfHostedMediaTests } from "./selfhost-media";
@@ -5324,6 +5329,21 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
   }).then(async () => {
     // Phase 4 (audit): the documented counts match the repository.
     runDocCountTests(assert, section);
+  }).then(async () => {
+    // Phase 0 security remediation (2026-11-09): CodeQL #43/#33/#26/#24/#21/#20.
+    runDbConnectionIdentityTests(assert, section);
+  }).then(async () => {
+    // Phase 0 security remediation: CodeQL #11/#10 (invitation email validation).
+    runEmailValidationTests(assert, section);
+  }).then(async () => {
+    // Phase 0 security remediation: CodeQL #19/#18/#17 and #15/#14 (document HTML).
+    runDocumentHtmlTests(assert, section);
+  }).then(async () => {
+    // Phase 0 security remediation: CodeQL #1-#8 (workflow permissions).
+    runWorkflowPermissionTests(assert, section);
+  }).then(async () => {
+    // Phase 0 security remediation: Dependabot (minimatch, glob) + glib record.
+    runDependencyVersionTests(assert, section);
   }).then(async () => {
     const r = await runAiReliabilityTests();
     passed += r.passed;

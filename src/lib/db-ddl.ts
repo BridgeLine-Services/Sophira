@@ -30,6 +30,7 @@ import { Client } from "pg";
 import { MIGRATIONS } from "./db-migrations.generated";
 import { present } from "./env";
 import { publicSupabaseUrl, CONNECTION_ENV_NAMES, connectionEnvNames } from "./supabase-config";
+import { analyzeConnection, isSameProjectConnection } from "./db/connection-identity";
 
 export { connectionEnvNames };
 
@@ -53,12 +54,11 @@ export function directPostgresConfigured(): boolean {
 export function sameProjectUrl(url: string): boolean {
   const ref = supabaseProjectRef();
   if (!ref) return false;
-  try {
-    const parsed = new URL(url);
-    return parsed.host.includes(ref) || decodeURIComponent(parsed.username).includes(ref);
-  } catch {
-    return false;
-  }
+  // Structural identity (2026-11-09): the host and username must MATCH the exact
+  // Supabase shapes, never merely contain the project ref. See
+  // src/lib/db/connection-identity.ts for the accepted forms and the reasons a
+  // host that embeds the ref is still refused.
+  return isSameProjectConnection(url, ref);
 }
 
 export function connectionTarget(): "same-project" | "foreign" | "none" {
@@ -66,19 +66,12 @@ export function connectionTarget(): "same-project" | "foreign" | "none" {
   if (!url) return "none";
   const ref = supabaseProjectRef();
   if (!ref) return "foreign";
-  try {
-    const parsed = new URL(url);
-    // Supabase direct hosts embed the ref (db.<ref>.supabase.co); the
-    // supavisor POOLED connections carry it in the username instead
-    // (postgres.<ref>:...@aws-....pooler.supabase.com) - both are this
-    // project; anything else is a different database and is refused.
-    const same =
-      parsed.host.includes(ref) ||
-      decodeURIComponent(parsed.username).includes(ref);
-    return same ? "same-project" : "foreign";
-  } catch {
-    return "foreign";
-  }
+  // Supabase direct hosts are exactly db.<ref>.supabase.co; supavisor POOLED
+  // connections name the project in the role (postgres.<ref>@aws-....pooler).
+  // Both are this project; everything else - including a host that merely
+  // embeds the ref, a foreign project's ref, an unexpected port or protocol -
+  // is a different database and is refused.
+  return analyzeConnection(url, ref).allowed ? "same-project" : "foreign";
 }
 
 function supabaseProjectRef(): string | null {
@@ -168,12 +161,11 @@ export function connectionCandidates(): string[] {
     seen.add(u);
     return sameProjectUrl(u);
   });
-  const pooled = ok.filter((u) => u.includes(".pooler.supabase.com"));
-  const direct = ok.filter((u) => {
-    if (u.includes(".pooler.supabase.com")) return false;
-    try { return new URL(u).host.startsWith("db."); } catch { return false; }
-  });
-  const middle = ok.filter((u) => !pooled.includes(u) && !direct.includes(u));
+  const ref = supabaseProjectRef() ?? "";
+  const kindOf = (u: string) => analyzeConnection(u, ref).kind;
+  const pooled = ok.filter((u) => kindOf(u) === "pooled");
+  const direct = ok.filter((u) => kindOf(u) === "direct");
+  const middle = ok.filter((u) => kindOf(u) !== "pooled" && kindOf(u) !== "direct");
   return [...pooled, ...middle, ...direct];
 }
 
