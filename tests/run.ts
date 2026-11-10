@@ -115,6 +115,7 @@ import { runSsrfTests } from "./ssrf";
 import { runEntityDecodingTests } from "./entity-decoding";
 import { runDocCountTests } from "./doc-counts";
 import { runDbConnectionIdentityTests } from "./db-connection-identity";
+import { hasUrlWithHost, hostOf } from "./helpers/url-check";
 import { runEmailValidationTests } from "./email-validation";
 import { runDocumentHtmlTests } from "./document-html";
 import { runWorkflowPermissionTests } from "./workflow-permissions";
@@ -1641,7 +1642,7 @@ const __researchTests = (async () => {
       { title: "gov data", url: "https://www.noaa.gov/data", snippet: "s" },
     ]);
     assert(hostIs(ranked[0].url, "noaa.gov") || hostIs(ranked[0].url, "harvard.edu"), "research: official/academic domains rank first (objective quality)");
-    assert(!ranked.some((h) => h.url.startsWith("http://blog.example.net")), "research: plain-http low-value hit filtered");
+    assert(!ranked.some((h) => hostOf(h.url) === "blog.example.net"), "research: plain-http low-value hit filtered");
   }
 
   section("16b. Claim evidence traceability: CLAIM → SOURCE → PASSAGE → URL → STATUS (research-integrity round)");

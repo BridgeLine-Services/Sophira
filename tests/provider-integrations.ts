@@ -6,6 +6,7 @@
  * BLOCKED until the owner registers the OAuth apps (see the setup guide).
  */
 import { readFileSync } from "fs";
+import { hasUrl } from "./helpers/url-check";
 
 export function runProviderIntegrationTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
   section("provider integrations (Microsoft Word + Google Docs)");
@@ -118,7 +119,7 @@ export function runProviderIntegrationTests(assert: (c: boolean, n: string) => v
 
   const docsGg = readFileSync("src/app/api/integrations/google/documents/route.ts", "utf8");
   const googleLib = readFileSync("src/lib/integrations/google.ts", "utf8");
-  assert(docsGg.includes("createDocFromArtifact") && googleLib.includes("https://docs.google.com/document/d/"),
+  assert(docsGg.includes("createDocFromArtifact") && hasUrl(googleLib, "docs.google.com", "/document/d/"),
     "google: documents are created through the real Docs API and the response carries the document's real URL");
 
   // ---- account export: credentials NEVER leave the server ----

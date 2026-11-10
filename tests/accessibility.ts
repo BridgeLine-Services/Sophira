@@ -8,6 +8,7 @@
  */
 import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join } from "path";
+import { stripTags } from "../src/lib/text/entities";
 
 const walk = (dir: string, out: string[] = []): string[] => {
   if (!existsSync(dir)) return out;
@@ -55,7 +56,7 @@ export function runAccessibilityTests(assert: (c: boolean, n: string) => void, s
     for (const b of flat.match(/<button\b[^>]*>([\s\S]{0,80}?)<\/button>/g) || []) {
       const inner = (b.match(/>([\s\S]*?)<\/button>/) || [])[1] || "";
       if (/aria-label=/.test(b)) continue;
-      if (/[A-Za-z]{2,}/.test(inner.replace(/<[^>]*>/g, ""))) continue;
+      if (/[A-Za-z]{2,}/.test(stripTags(inner))) continue;
       iconOnly.push(file);
     }
   }
