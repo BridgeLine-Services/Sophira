@@ -5,7 +5,8 @@ the one that **cannot** be fixed yet. It is kept honest by `tests/dependency-ver
 if a vulnerable range returns to `package-lock.json`, or if this document loses the glib
 record, the test suite fails.
 
-Last reviewed: **2026-11-09** at `master` `1813a01` (npm tree: 455 packages, 0 audit findings).
+Last reviewed: **2026-11-09** at `master` `770755b` (npm tree: 456 packages after `npm ci`, 0 audit findings).
+Upstream Rust status re-verified: **2026-11-09**.
 
 ---
 
@@ -62,54 +63,128 @@ members. It was fixed anyway because a clean audit is a signal that stops people
 
 ---
 
-## 3. glib (Rust, `src-tauri/Cargo.lock`) — **NOT FIXED. Blocked upstream. This is documented, not resolved.**
+## 3. glib (Rust, `src-tauri/Cargo.lock`) - **UNRESOLVED / BLOCKED UPSTREAM**
 
-**Advisory:** RUSTSEC-2024-0429 / GHSA-wrw7-89jp-8q8g — *unsoundness* in
-`glib::VariantStrIter`'s `Iterator`/`DoubleEndedIterator` implementations (a `*mut` out-argument
-passed as `&`), which newer rustc optimizations ignore, leading to undefined behaviour and
-`NULL`-dereference crashes. Affected **>=0.15.0 <0.20.0**; patched **0.20.0**.
-RustSec classifies it `informational = "unsound"`, not a remote code execution issue.
+Status: **not fixed, not claimed fixed, not dismissed, not suppressed.** This section is the record
+of why, and of exactly what would have to change before it can be fixed.
 
-**Current pin:** `glib 0.18.5`.
+### The advisory
 
-**Dependency chain (read from `src-tauri/Cargo.lock`):**
+| | |
+|---|---|
+| Identifier | **RUSTSEC-2024-0429** / **GHSA-wrw7-89jp-8q8g** ("Unsoundness in `Iterator` and `DoubleEndedIterator` implementations for `glib::VariantStrIter`") |
+| Affected versions | **`>=0.15.0, <0.20.0`** |
+| Patched version | **`0.20.0`** |
+| RustSec class | `informational = "unsound"` (undefined behaviour; the demonstrated failure is a `NULL`-dereference crash) |
+| Nature of the defect | `VariantStrIter::impl_get` passed a `*mut` out-argument as `&`; newer rustc optimisations disregard the write, so the C string pointer stays `NULL` |
+
+### The exact version pinned today
+
+`src-tauri/Cargo.lock` at `master 770755b` pins **`glib 0.18.5`**, with **`glib-sys 0.18.1`** and
+**`glib-macros 0.18.5`**.
+
+### The exact dependency chain that brings it into the Linux desktop build
+
+Read directly from `src-tauri/Cargo.lock` (not inferred):
 
 ```
 tauri 2.12.0
-├── gtk 0.18.2        → glib 0.18.5
-│   └── gdk 0.18.2    → glib
-└── webkit2gtk 2.0.2  → glib 0.18.5 (also glib-sys, gobject-sys, soup3, javascriptcore-rs)
-    via wry → tauri-runtime-wry 2.12.0
+├── gtk 0.18.2 ──────────────► glib 0.18.5  (also glib-sys)
+│   ├── gdk 0.18.2 ──────────► gio 0.18.4, pango 0.18.3, glib 0.18.5
+│   ├── gio 0.18.4 ──────────► glib 0.18.5
+│   ├── pango 0.18.3 ────────► glib 0.18.5
+│   ├── atk 0.18.2 ──────────► glib 0.18.5
+│   └── gtk-sys 0.18.2 ──────► glib-sys 0.18.1
+├── webkit2gtk 2.0.2 ────────► glib 0.18.5, glib-sys, gtk 0.18.2, gdk 0.18.2, gio 0.18.4
+└── tauri-runtime-wry 2.12.0
+    └── wry 0.57.0 ──────────► gtk 0.18.2, webkit2gtk 2.0.2
 ```
 
-**Why it cannot be upgraded in this repository.** glib 0.20.0 exists only in gtk-rs **0.20**.
-Getting there means `gtk 0.20` + `gdk 0.20` + a `webkit2gtk` release built on gtk-rs 0.20, and
-Tauri 2.x pins gtk-rs **0.18** across `tauri`, `wry` and `tauri-runtime-wry`. There is no
-combination of currently released versions that resolves to glib 0.20.0. Forcing
-`glib = "0.20"` into the lockfile would produce two incompatible gtk-rs generations in one
-binary: it does not compile, and the brief explicitly forbids forcing an incompatible version.
+Every path into glib goes through the gtk-rs **0.18** generation, which the whole Tauri 2.x line
+pins. There is no second, independent path.
 
-**Exposure.** glib is the Linux GTK layer of the desktop shell. It is not used on Windows
-(WebView2) or macOS (WKWebView), so Windows and macOS builds are unaffected. On Linux the
-affected APIs are `VariantStrIter` iterator methods; the failure mode is undefined behaviour or
-a crash inside GVariant string iteration, not remote code execution or data disclosure.
+### Upstream status (verified 2026-11-09, not assumed)
 
-**Mitigation in place.** No Sophira code calls `VariantStrIter`. The desktop shell renders the
-hosted app, and untrusted content (documents, email, web pages) is processed server-side, never
-by the native shell. The desktop artifact remains unsigned-optional and is not the primary
-delivery path (the web app is).
+| Question | Answer |
+|---|---|
+| Is there a published glib 0.18.6 with the fix? | **No.** `https://crates.io/api/v1/crates/glib/0.18.6` returns **404**. |
+| What did the 0.18 backport do? | gtk-rs PR **#1991** ("glib: fix UB in `VariantStrIter::impl_get`") — **closed 2026-06-24, not merged**. |
+| And the release request? | gtk-rs issue **#2010** ("Release glib 0.18.6 with the `VariantStrIter` soundness fix") — **closed 2026-07-31** with no 0.18.6 release. |
+| Does the fix exist at all? | Yes, only in the **0.20+** line. Current published glib is **0.22.10** (2026-09-19). The 0.18 line stops at 0.18.5. |
+| Tauri's position | tauri issue **#12564** ("Reach Out to `gtk-rs` for Potential `glib` Upgrade") — **closed 2026-07-03**. |
+| Does current stable Tauri avoid it? | **No.** `tauri 2.12.5` (latest stable) still depends on `gtk ^0.18` and `webkit2gtk ^2`; `wry 0.57.2` requires `gtk ^0.18` and `webkit2gtk =2.0.2`; the newest `webkit2gtk` crate is **2.0.2** (2025-12-16). |
+| Would the Tauri 3 preview help? | **Not yet.** `tauri 3.0.0-alpha.6` (2026-11-06) **still requires `gtk ^0.18`**. |
 
-**Upgrade path.** When Tauri ships a release on gtk-rs 0.20 (tracked upstream in
-`tauri`/`wry`), run `cargo update -p glib` in `src-tauri` and confirm `cargo tree -i glib`
-resolves to >=0.20.0. Until then this stays an accepted, documented risk.
+**Conclusion:** no compatible, published dependency combination resolves glib to `>=0.20.0`. Forcing
+it would place gtk-rs 0.18 and 0.20 in the same binary, which does not compile. Per the remediation
+brief, no lockfile edit, `[patch.crates-io]`, direct glib dependency, vendored fork, Tauri major
+upgrade, desktop-feature removal, audit ignore rule or alert dismissal was performed.
 
-**What was NOT run here, and why.** `cargo` is not installed in this environment, so
-`cargo tree -i glib`, `cargo audit`, and any native Linux/Windows/macOS build could **not** be
-run. The chain above was read directly from `Cargo.lock`. The release workflow
-(`.github/workflows/release.yml`) is what builds the native artifacts, and it has not been
-executed for this change.
+### Does Sophira call the affected API?
 
----
+Search across the repository (`VariantStrIter`, `array_iter_str`):
+
+- **`VariantStrIter` — no matches.**
+- **`array_iter_str` — no matches.**
+
+The desktop shell contains three Rust files (`src-tauri/build.rs`, `src-tauri/src/lib.rs`,
+`src-tauri/src/main.rs`); it opens the hosted Sophira site and does not read GVariant string
+iterators. Untrusted member content (documents, mail, web pages, media) is processed in the web
+application, never in the native shell.
+
+**This lowers exposure. It does not remove the vulnerable package and it does not close the
+alert.** Dependabot will keep reporting it until the dependency graph actually resolves `>=0.20.0`.
+
+### Exposure, and who is affected
+
+Linux desktop builds only (GTK/GLib). Windows (WebView2) and macOS (WKWebView) do not use glib, so
+those artifacts are unaffected. The demonstrated failure mode is a crash through undefined
+behaviour inside GVariant string iteration, not remote code execution and not data disclosure.
+The web application, which is the primary delivery path, is entirely unaffected.
+
+### Conditions that must be met before this can be upgraded
+
+Either of:
+
+1. **gtk-rs publishes `glib 0.18.6`** containing the RUSTSEC-2024-0429 backport (currently refused:
+   PR #1991 closed, issue #2010 closed), **or**
+2. **A Tauri release resolves glib `>=0.20.0`** — that means Tauri (2.x patch/minor, or 3.x once it
+   is stable) moving to gtk-rs 0.20+, which also requires a `webkit2gtk` release built on it
+   (latest is 2.0.2 on gtk 0.18).
+
+Then, in one reviewed change:
+
+1. `cd src-tauri && cargo update -p glib` (let Cargo regenerate `Cargo.lock`; never hand-edit it);
+2. `cargo tree -i glib` shows **`>=0.20.0`**;
+3. `cargo tree -d` shows a **single** gtk-rs generation (no gtk 0.18 and 0.20 side by side);
+4. `cargo check --locked` passes;
+5. `cargo audit` reports **no** RUSTSEC-2024-0429;
+6. Linux desktop build passes, and Windows/macOS builds pass because shared Tauri dependencies
+   changed;
+7. the built desktop application launches and loads the configured Sophira URL;
+8. only then is Dependabot #4 dismissed, with the build evidence attached.
+
+### What has NOT been verified here, and why
+
+`cargo` and `rustc` are **not installed** in this environment, so the following were **not run**
+and are **not claimed**:
+
+- `cargo tree -i glib`, `cargo tree -d`, `cargo metadata --locked`
+- `cargo check --locked`, `cargo audit`
+- any native Linux, Windows or macOS desktop build (those are built by
+  `.github/workflows/release.yml`, which runs only on `v*` tags and was not triggered)
+
+The chain and version numbers above were read directly from `src-tauri/Cargo.lock`, and the
+upstream facts from crates.io and the GitHub API on 2026-11-09.
+
+### Upstream references for the next maintenance pass
+
+- `https://rustsec.org/advisories/RUSTSEC-2024-0429.html`
+- `https://github.com/advisories/GHSA-wrw7-89jp-8q8g`
+- `https://github.com/gtk-rs/gtk-rs-core/pull/1991` (closed, unmerged)
+- `https://github.com/gtk-rs/gtk-rs-core/issues/2010` (closed, no 0.18.6)
+- `https://github.com/tauri-apps/tauri/issues/12564` (closed)
+- `https://crates.io/crates/glib/versions` (0.20+ line only)
 
 ## Verification actually performed (2026-11-09, on `master` after the merge)
 
@@ -121,7 +196,7 @@ executed for this change.
 | `npm ls glob` | `glob@14.0.4` via `rimraf@6.1.4` |
 | `npx tsc --noEmit` | clean |
 | `npm run lint` | 0 errors, 104 warnings (ceiling 107) |
-| `npm test` (offline suite) | **5978 / 5978** |
+| `npm test` (offline suite) | **5978 / 5978** at `770755b`; **6012 / 6012** with the CodeQL #43 fix applied |
 | `npm run build` | production build succeeded |
 | `npm run smoke:runtime` (live server, production build) | **SMOKE PASS 95/95**, including fail-closed redirects for every signed-out route |
 | CodeQL on the merge PR (`Analyze (javascript-typescript)`, `Analyze (actions)`) | both **success**; **no annotations** - no new alerts in the changed files |
