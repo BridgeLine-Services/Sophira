@@ -108,6 +108,7 @@ import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "
 import { readFileSync } from "fs";
 import { runOfflineTests } from "./offline";
 import { runAutosaveRegistryTests, runAutosaveTests } from "./autosave";
+import { runEmailAttachmentTests } from "./email-attachments";
 import { runWritingProfileExpansionTests } from "./writing-profile-expansion";
 import { runExtractionProvenanceTests } from "./extraction-provenance";
 import { runSelfHostedMediaTests } from "./selfhost-media";
@@ -5303,6 +5304,9 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
   }).then(async () => {
     // Phase 4C extension: the honest coverage registry and the proven saver.
     await runAutosaveRegistryTests(assert, section);
+  }).then(async () => {
+    // Phase 3: attachments inside an email are read as real sources.
+    await runEmailAttachmentTests(assert, section);
   }).then(async () => {
     const r = await runAiReliabilityTests();
     passed += r.passed;
