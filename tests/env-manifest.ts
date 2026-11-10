@@ -120,6 +120,19 @@ export function runEnvManifestTests(assert: (c: boolean, n: string) => void, sec
   const plainHttp = checkEnv({ NEXT_PUBLIC_SITE_URL: "http://app.example.com" }, {}) as R;
   assert(errs(plainHttp).some((e) => e.message.includes("https")),
     "env: non-https app URLs are rejected");
+  // The development exemption for the loopback http default must be a HOST check,
+  // not a text prefix (2026-11-09): "http://localhost.attacker.example" starts with
+  // the old pattern but is a real, non-local host.
+  const lookalikeLocalhost = checkEnv({ NEXT_PUBLIC_SITE_URL: "http://localhost.attacker.example" }, { production: false }) as R;
+  assert(errs(lookalikeLocalhost).some((e) => e.var === "NEXT_PUBLIC_SITE_URL" && e.message.includes("https")),
+    "env: a localhost LOOKALIKE host is not exempt from https");
+  const realLocalhost = checkEnv({ NEXT_PUBLIC_SITE_URL: "http://localhost:3000" }, { production: false }) as R;
+  assert(!errs(realLocalhost).some((e) => e.var === "NEXT_PUBLIC_SITE_URL"),
+    "env: the real loopback development default is still allowed outside production");
+  const localhostInProd = checkEnv({ NEXT_PUBLIC_SITE_URL: "http://localhost:3000" }, { production: true }) as R;
+  assert(errs(localhostInProd).some((e) => e.var === "NEXT_PUBLIC_SITE_URL"),
+    "env: the loopback development default is still refused in production");
+
   const badEnum = checkEnv({ AI_PROVIDER: "grok" }, {}) as R;
   assert(errs(badEnum).some((e) => e.var === "AI_PROVIDER"),
     "env: invalid enum values are rejected");

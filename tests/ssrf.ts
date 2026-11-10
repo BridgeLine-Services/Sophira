@@ -188,7 +188,11 @@ export async function runSsrfTests(
   };
   const upgraded = await safeFetch("http://plain.example.com/", { deps: upgrade });
   assert(upgraded.ok === true && upgraded.redirectCount === 1, "an http → https redirect is followed after its own validation");
-  assert(upgraded.finalUrl.startsWith("https://plain.example.com/secure"), "the final URL is recorded as the secured one");
+  // Parsed comparison (CodeQL #43 family): the recorded URL must be https on the
+  // expected host and under /secure, rather than merely starting with that text.
+  const upgradedUrl = (() => { try { return new URL(upgraded.finalUrl); } catch { return null; } })();
+  assert(upgradedUrl !== null && upgradedUrl.protocol === "https:" && upgradedUrl.hostname === "plain.example.com"
+    && upgradedUrl.pathname.startsWith("/secure"), "the final URL is recorded as the secured one");
 
   // ---- public sources must keep working --------------------------------
   const publicDeps: SafeFetchDeps = {
