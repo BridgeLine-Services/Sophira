@@ -115,7 +115,7 @@ import { runSsrfTests } from "./ssrf";
 import { runEntityDecodingTests } from "./entity-decoding";
 import { runDocCountTests } from "./doc-counts";
 import { runDbConnectionIdentityTests } from "./db-connection-identity";
-import { hasUrlWithHost, hostOf } from "./helpers/url-check";
+import { hostOf } from "./helpers/url-check";
 import { runEmailValidationTests } from "./email-validation";
 import { runDocumentHtmlTests } from "./document-html";
 import { runWorkflowPermissionTests } from "./workflow-permissions";
