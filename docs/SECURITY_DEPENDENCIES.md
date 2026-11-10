@@ -111,18 +111,29 @@ executed for this change.
 
 ---
 
-## Verification actually performed (2026-11-09)
+## Verification actually performed (2026-11-09, on `master` after the merge)
 
 | Check | Result |
 |---|---|
-| `npm ci` (clean install from lockfile) | 455 packages, completed |
+| `npm ci` (clean install from the lockfile) | 456 packages, completed |
 | `npm audit --audit-level=low` | **0 vulnerabilities** |
-| `npm ls minimatch` | `11.0.1 overridden`; eslint keeps `3.1.5` |
+| `npm ls minimatch` | `11.0.1 overridden` (typescript-estree), `11.0.5` (glob path); eslint keeps its own `3.1.5` |
 | `npm ls glob` | `glob@14.0.4` via `rimraf@6.1.4` |
 | `npx tsc --noEmit` | clean |
-| `npm run lint` | 0 errors |
-| `npm test` | see PR (full offline suite) |
+| `npm run lint` | 0 errors, 104 warnings (ceiling 107) |
+| `npm test` (offline suite) | **5978 / 5978** |
 | `npm run build` | production build succeeded |
-| `cargo tree -i glib` | **not run** (cargo absent) |
+| `npm run smoke:runtime` (live server, production build) | **SMOKE PASS 95/95**, including fail-closed redirects for every signed-out route |
+| CodeQL on the merge PR (`Analyze (javascript-typescript)`, `Analyze (actions)`) | both **success**; **no annotations** - no new alerts in the changed files |
+| CodeQL overall check | `neutral`, only because two stale `java-kotlin` / `rust` analysis configurations registered on `master` by older workflow versions are reported missing; those languages are not in `codeql.yml` |
+| `cargo tree -i glib` | **not run** (cargo absent from this environment) |
 | `cargo audit` | **not run** (cargo absent) |
-| Linux/Windows/macOS native builds | **not run** here; built by the release workflow on `v*` tags |
+| Linux / Windows / macOS native builds | **not run** here; built by `.github/workflows/release.yml` on `v*` tags |
+| Reading alert states from the API | **blocked**: `/code-scanning/alerts` and `/dependabot/alerts` return 403 for a token without `security_events`. Closure of individual alert numbers therefore has to be read on the repository's Security tab. |
+
+### Why the individual alert numbers are not marked closed here
+
+Dismissing an alert without evidence is exactly what this phase was told not to do, so the
+alerts were left alone. The evidence that they are resolved is the scan itself: the files the
+alerts pointed at were all changed, and CodeQL reports **no findings** in them. The Security tab
+is the authoritative list.
