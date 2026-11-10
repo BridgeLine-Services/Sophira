@@ -4,6 +4,10 @@ import { requireUser } from "@/lib/supabase/guard";
 import { fetchAndVerify } from "@/lib/research/verify";
 import { hashContent, ingestText, ingestPdf, ingestDocx, ingestImage, ingestWeb } from "@/lib/notebook/ingest";
 import { emailToSource, parseEmailSource, stripEmailThread } from "@/lib/extract/email";
+import { extractEmailAttachments, renderAttachments } from "@/lib/extract/email-attachments";
+import { extractPdfText } from "@/lib/extract/pdf";
+import { parseCsv, parsePptx, parseSpreadsheet } from "@/lib/extract/documents";
+import { ocrImage } from "@/lib/extract/ocr";
 import type { IngestResult } from "@/lib/notebook/ingest";
 import type { NotebookSourceType } from "@/lib/notebook/types";
 
@@ -188,11 +192,49 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const parsed = parseEmailSource(rawEmail);
       const stripped = stripEmailThread(parsed.body);
       const emailSource = emailToSource(parsed, stripped);
-      if (!emailSource.text.trim()) {
-        return NextResponse.json({ error: emailSource.note || "That email had no readable text." }, { status: 422 });
+
+      // Attachments are read through the same extractors as uploads. A mail
+      // whose body is empty but which carries a readable PDF is still a source.
+      const attachmentWork = await extractEmailAttachments(rawEmail, {
+        pdf: async (bytes) => {
+          const out = await extractPdfText(bytes);
+          return { text: out.text, note: out.via === "none" ? "No PDF parser could read this file." : undefined };
+        },
+        pptx: async (bytes) => {
+          const out = await parsePptx(bytes);
+          return { text: out.text, note: out.notes || undefined };
+        },
+        spreadsheet: async (bytes) => {
+          const out = await parseSpreadsheet(bytes);
+          return { text: out.text, note: out.notes || undefined };
+        },
+        csv: (text) => {
+          const out = parseCsv(text);
+          return { text: out.text, note: out.notes || undefined };
+        },
+        image: async (bytes, mime) => {
+          const out = await ocrImage(bytes, mime);
+          return { ok: out.ok, text: out.text, notes: out.notes };
+        },
+      });
+
+      const attachmentText = renderAttachments(attachmentWork.attachments);
+      const combined = [emailSource.text.trim(), attachmentText].filter(Boolean).join("\n\n");
+
+      if (!combined.trim()) {
+        return NextResponse.json(
+          {
+            error:
+              emailSource.note ||
+              attachmentWork.notes[0] ||
+              "That email had no readable text.",
+          },
+          { status: 422 },
+        );
       }
-      ingest = ingestText(emailSource.title, emailSource.text, "user_notes");
-      ingest.notes = [emailSource.note];
+
+      ingest = ingestText(emailSource.title, combined, "user_notes");
+      ingest.notes = [emailSource.note, ...attachmentWork.notes].filter(Boolean);
     } else if (type === "image") {
       ingest = ingestImage(title || "Uploaded image", body.ocr_text ?? null);
     } else if (type === "teacher_instructions" || type === "assignment_instructions" || type === "user_notes" || type === "txt") {
