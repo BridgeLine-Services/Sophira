@@ -58,19 +58,22 @@ export function schemeIs(url: string | null | undefined, scheme: string): boolea
  * True when a piece of TEXT (for example a ranked citation like
  * "Nature paper (https://www.nature.com/articles/1)") mentions the host.
  *
- * Used where the value under test is formatted output, not a bare URL. The host
- * is matched on dot boundaries, so "nature.com" does not match
- * "evil-nature.com" or "nature.com.attacker.example".
+ * Used where the value under test is formatted output, not a bare URL. Hosts are
+ * matched as whole dot-separated segments, so "nature.com" does not match
+ * "evil-nature.com" or "nature.com.attacker.example". No regular expression is
+ * built from the hostname (CodeQL #25-#47): the text is split into tokens and the
+ * segments are compared as strings.
  */
 export function mentionsHost(text: string | null | undefined, expected: string): boolean {
-  const value = text ?? "";
-  const target = expected.toLowerCase().replace(/^\./, "");
+  const value = (text ?? "").toLowerCase();
+  const target = expected.toLowerCase().replace(/^\./, "").replace(/\.$/, "");
   if (!value || !target) return false;
 
-  // Prefer a real URL inside the text.
-  const embedded = value.match(/https?:\/\/[^\s)"'<>]+/i);
-  if (embedded && hostIs(embedded[0], target)) return true;
+  // Any real URL in the text is parsed, which is the strongest check available.
+  const urls = value.match(/https?:\/\/[^\s)"'<>,;]+/g) ?? [];
+  if (urls.some((u) => hostIs(u, target))) return true;
 
-  const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:^|[^a-z0-9.-])(?:[a-z0-9-]+\\.)*${escaped}(?![a-z0-9-])`, "i").test(value);
+  // Otherwise compare dot-separated segments of each word-like token.
+  const tokens = value.split(/[^a-z0-9.-]+/).filter(Boolean);
+  return tokens.some((token) => token === target || token.endsWith(`.${target}`));
 }

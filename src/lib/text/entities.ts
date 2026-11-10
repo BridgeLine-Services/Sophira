@@ -197,9 +197,11 @@ export function decodeHtmlEntities(input: string): string {
 export function htmlToPlainText(html: string): string {
   if (!html) return "";
   const withoutDangerousBlocks = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, " ")
+    .replace(/<script\b[^>]*>[\s\S]*$/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*$/gi, " ")
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript\s*>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ");
   const withBreaks = withoutDangerousBlocks.replace(
     /<\/(?:p|div|li|h[1-6]|tr|section|article|blockquote|pre)>|<br\s*\/?>/gi,

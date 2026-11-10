@@ -111,9 +111,11 @@ function extractCanonical(html: string, finalUrl: string): string {
 function extractText(html: string): string {
   return decodeEntities(
     html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, " ")
+      .replace(/<script\b[^>]*>[\s\S]*$/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*$/gi, " ")
+      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript\s*>/gi, " ")
       .replace(/<!--[\s\S]*?-->/g, " ")
       .replace(/<(?:nav|header|footer|form|aside)[^>]*>[\s\S]{0,8000}?<\/(?:nav|header|footer|form|aside)>/gi, " ")
       .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article|br)>/gi, "\n")
@@ -143,7 +145,11 @@ import { evaluateSourceRequest } from "./policy";
 import { safeFetch } from "../net/safe-fetch";
 
 export async function fetchAndVerify(url: string, opts: VerifyOptions = {}): Promise<VerifiedPage> {
-  const doFetch = opts.fetchImpl ?? fetch;
+  // Production has exactly ONE network path: safeFetch below, which pins the
+  // validated address. An injected fetchImpl exists only so tests can supply
+  // bytes; it is never the global fetch, so nothing here can reach the network
+  // with a URL that was not pinned (CodeQL #12).
+  const doFetch = opts.fetchImpl;
   const maxRedirects = opts.maxRedirects ?? 6;
   const timeoutMs = opts.timeoutMs ?? 15_000;
   const maxBytes = opts.maxBytes ?? 250_000;
@@ -205,7 +211,7 @@ export async function fetchAndVerify(url: string, opts: VerifyOptions = {}): Pro
       headers: { "content-type": retrieved.headers.get("content-type") ?? "" },
     });
     current = retrieved.finalUrl || current;
-  } else {
+  } else if (doFetch) {
     // Injected-test path: the caller supplies the bytes, so this loop only
     // models transports. Production never reaches it.
     for (let i = 0; i <= maxRedirects; i++) {
