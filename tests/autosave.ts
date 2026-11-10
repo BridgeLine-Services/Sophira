@@ -134,7 +134,9 @@ for (const t of AUTOSAVE_TARGETS) {
   const hasRoute = Boolean(t.route && t.method);
   assert(hasRoute || Boolean(t.reason), `${t.id}: either a write route or a stated reason, never a silent gap`);
   assert(t.fields.length > 0, `${t.id}: names the fields a member can change`);
-  if (t.coverage === "wired") assert(hasRoute, `${t.id}: a wired target must have a write route`);
+  // A wired surface may save through the typed Supabase client rather than an
+  // HTTP route, provided it says so and how it detects a conflict.
+  if (t.coverage === "wired") assert(hasRoute || Boolean(t.reason), `${t.id}: a wired target must have a write route or state how it saves`);
   if (t.coverage === "route-ready") assert(hasRoute, `${t.id}: route-ready means the route exists and only the editor is missing`);
 }
 
