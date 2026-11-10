@@ -169,15 +169,54 @@ export async function PATCH(request: NextRequest) {
   }
   delete update.plan;
 
-  const { data, error } = await supabase
+  // Revision-aware write: the member's editor sends the version it started
+  // from. If the row has moved on since, this write is refused instead of
+  // quietly overwriting someone's newer accepted changes.
+  const baseVersion = request.headers.get("x-sophira-base-version");
+
+  let write = supabase
     .from("essay_sessions")
     .update(update)
     .eq("id", body.session_id)
-    .eq("user_id", user.id)
-    .select("id, outline, outline_approved")
-    .single();
-  if (error) return NextResponse.json({ error: "Could not update the outline." }, { status: 500 });
-  return NextResponse.json({ data });
+    .eq("user_id", user.id);
+  if (baseVersion) write = write.eq("updated_date", baseVersion);
+
+  const { data, error } = await write
+    .select("id, outline, outline_approved, updated_date")
+    .maybeSingle();
+  if (error) {
+    return NextResponse.json({ error: "Could not update the outline." }, { status: 500 });
+  }
+  if (!data) {
+    // Either the session is not this member's, or its version moved on. Only
+    // the second case is a conflict, and it carries the version to compare.
+    const { data: current } = await supabase
+      .from("essay_sessions")
+      .select("id, updated_date")
+      .eq("id", body.session_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (current) {
+      return NextResponse.json(
+        {
+          error: "This outline changed somewhere else after you started editing.",
+          data: { version: current.updated_date, conflict: true },
+        },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: "Essay session not found." }, { status: 404 });
+  }
+  // The new version travels back so the editor knows what it is now saving on
+  // top of; without it the member would keep seeing "not saved".
+  return NextResponse.json({
+    data: {
+      id: data.id,
+      outline: data.outline,
+      outline_approved: data.outline_approved,
+      version: data.updated_date,
+    },
+  });
 }
 
 interface EvidenceRow { label: string; sourceTitle: string; passage: string }

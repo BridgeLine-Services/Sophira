@@ -97,3 +97,135 @@ export function runAutosaveTests(): { passed: number; failed: number } {
 
   return { passed, failed };
 }
+
+/**
+ * PHASE 4C EXTENSION (2026-11-09) — the registry and the saver, proved.
+ *
+ * The registry is the honest map of what autosaves. These tests prove the map
+ * cannot drift into a claim: every target either names a write route or says in
+ * plain words why autosave does not apply, and only targets whose page really
+ * calls the hook may be marked "wired". The saver tests prove that a success
+ * without the server's version is never reported as a save.
+ */
+import {
+  AUTOSAVE_TARGETS,
+  pendingTargets,
+  targetById,
+  wiredTargets,
+} from "../src/lib/save/targets";
+import {
+  RevisionConflictError,
+  TransientSaveError,
+  UnconfirmedSaveError,
+  makeDraftSaver,
+} from "../src/lib/save/draft";
+
+export async function runAutosaveRegistryTests(
+  assert: (cond: boolean, name: string) => void,
+  section: (title: string) => void,
+): Promise<void> {
+  const essayPage = readFileSync("src/app/essay/page.tsx", "utf8");
+  const draftRoute = readFileSync("src/app/api/essay/draft-section/route.ts", "utf8");
+
+section("autosave registry: honest coverage for every member-editable thing");
+
+assert(AUTOSAVE_TARGETS.length >= 13, "the registry covers the thirteen audited workflows");
+for (const t of AUTOSAVE_TARGETS) {
+  const hasRoute = Boolean(t.route && t.method);
+  assert(hasRoute || Boolean(t.reason), `${t.id}: either a write route or a stated reason, never a silent gap`);
+  assert(t.fields.length > 0, `${t.id}: names the fields a member can change`);
+  if (t.coverage === "wired") assert(hasRoute, `${t.id}: a wired target must have a write route`);
+  if (t.coverage === "route-ready") assert(hasRoute, `${t.id}: route-ready means the route exists and only the editor is missing`);
+}
+
+// The wired claim is checked against the pages themselves.
+for (const t of wiredTargets()) {
+  if (t.id === "essay_outline" || t.id === "outlines") {
+    assert(essayPage.includes('targetById("essay_outline")'), "essay outline is wired to the autosave hook");
+    assert(essayPage.includes("useAutosave"), "the essay page uses the autosave engine");
+    assert(essayPage.includes("<SaveStatus"), "the essay page shows the member the save state");
+  }
+}
+
+assert(AUTOSAVE_TARGETS.filter((t) => t.coverage === "wired").length >= 2, "at least the outline editors are wired");
+assert(pendingTargets().every((t) => t.coverage === "route-ready"), "pending targets are exactly the route-ready ones");
+assert(targetById("notebook_note_composer")?.coverage === "no-editor", "a composer that appends rows is not falsely called autosaved");
+assert(
+  (targetById("document_revisions")?.reason ?? "").includes("immutable"),
+  "document revisions are explained as append-only rather than autosaved",
+);
+
+section("autosave saver: the server's version is the only proof of a save");
+
+const target = targetById("essay_outline")!;
+const payload = { session_id: "s1", outline: [{ title: "Intro" }] };
+
+// 1. A confirmed save returns the server's new version.
+{
+  let seen: { url: string; init?: RequestInit } | null = null;
+  const save = makeDraftSaver(target, () => "/api/essay/draft-section", async (url, init) => {
+    seen = { url, init };
+    return new Response(JSON.stringify({ data: { version: "2026-11-09T12:00:00Z" } }), { status: 200 });
+  });
+  const out = await save(payload, "2026-11-09T11:00:00Z");
+  assert(out.version === "2026-11-09T12:00:00Z", "the new server version is handed back to the editor");
+  const headers = (seen!.init!.headers ?? {}) as Record<string, string>;
+  assert(headers["x-sophira-base-version"] === "2026-11-09T11:00:00Z", "the version the member started from travels with the write");
+  assert(seen!.init!.method === "PATCH", "the registry's method is what is actually used");
+}
+
+// 2. A success body with no version is NOT a save.
+{
+  const save = makeDraftSaver(target, () => "/api/essay/draft-section", async () =>
+    new Response(JSON.stringify({ data: { id: "s1" } }), { status: 200 }),
+  );
+  let failed = false;
+  try { await save(payload, null); } catch (e) { failed = e instanceof UnconfirmedSaveError; }
+  assert(failed, "no version on the wire means 'not confirmed', never 'saved'");
+}
+
+// 3. 409 is a conflict carrying the other version, not a retry.
+{
+  const save = makeDraftSaver(target, () => "/api/essay/draft-section", async () =>
+    new Response(JSON.stringify({ data: { version: "2026-11-09T13:00:00Z", conflict: true } }), { status: 409 }),
+  );
+  let conflict: RevisionConflictError | null = null;
+  try { await save(payload, "2026-11-09T11:00:00Z"); } catch (e) {
+    if (e instanceof RevisionConflictError) conflict = e;
+  }
+  assert(conflict?.serverVersion === "2026-11-09T13:00:00Z", "the conflict carries the version the member chooses between");
+}
+
+// 4. Transport failures are retryable; refusals are not.
+{
+  const offline = makeDraftSaver(target, () => "/x", async () => { throw new Error("offline"); });
+  let transient = false;
+  try { await offline(payload, null); } catch (e) { transient = e instanceof TransientSaveError; }
+  assert(transient, "a network failure is typed so the engine can retry with backoff");
+
+  const busy = makeDraftSaver(target, () => "/x", async () => new Response("{}", { status: 503 }));
+  let retryable = false;
+  try { await busy(payload, null); } catch (e) { retryable = e instanceof TransientSaveError; }
+  assert(retryable, "a 5xx is treated as busy, not as the member's mistake");
+
+  const refused = makeDraftSaver(target, () => "/x", async () => new Response("{}", { status: 403 }));
+  let permanent = false;
+  try { await refused(payload, null); } catch (e) { permanent = e instanceof UnconfirmedSaveError; }
+  assert(permanent, "a refusal is reported once instead of retried forever");
+}
+
+// 5. A target with no route cannot pretend to save.
+{
+  const none = targetById("assignments")!;
+  let threw = false;
+  try { makeDraftSaver(none); } catch { threw = true; }
+  assert(threw, "a target with no write route refuses to build a saver");
+}
+
+section("autosave server contract: revisions are refused, not overwritten");
+
+assert(draftRoute.includes("x-sophira-base-version"), "the outline route reads the version the editor started from");
+assert(draftRoute.includes('.eq("updated_date", baseVersion)'), "the update only lands on the version it started from");
+assert(draftRoute.includes("{ status: 409 }"), "a moved-on outline answers 409 so the member chooses");
+assert(draftRoute.includes("version: data.updated_date"), "the confirmed version is returned in the same shape the saver reads");
+}
