@@ -109,6 +109,7 @@ import { readFileSync } from "fs";
 import { runOfflineTests } from "./offline";
 import { runAutosaveRegistryTests, runAutosaveTests } from "./autosave";
 import { runEmailAttachmentTests } from "./email-attachments";
+import { runSpreadsheetFormulaTests } from "./spreadsheet-formulas";
 import { runWritingProfileExpansionTests } from "./writing-profile-expansion";
 import { runExtractionProvenanceTests } from "./extraction-provenance";
 import { runSelfHostedMediaTests } from "./selfhost-media";
@@ -5307,6 +5308,9 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
   }).then(async () => {
     // Phase 3: attachments inside an email are read as real sources.
     await runEmailAttachmentTests(assert, section);
+  }).then(async () => {
+    // Phase 3 / Task 4: spreadsheet formulas are preserved.
+    await runSpreadsheetFormulaTests(assert, section);
   }).then(async () => {
     const r = await runAiReliabilityTests();
     passed += r.passed;
