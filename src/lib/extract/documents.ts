@@ -164,27 +164,48 @@ export async function parseSpreadsheet(bytes: Buffer): Promise<ParsedDocument> {
       continue;
     }
 
-    // Detect formulas for the honest note.
+    // Formulas are kept, not discarded: a formula IS the student's method in a
+    // finance or physics sheet, and showing only the computed cell would hide
+    // the very reasoning they are asked to quote.
     const range = XLSX.utils.decode_range(sheet["!ref"] || "A1");
+    const formulaAt = new Map<string, { f: string; v: unknown }>();
     for (let r = range.s.r; r <= Math.min(range.e.r, 200); r++) {
       for (let c = range.s.c; c <= range.e.c; c++) {
-        const cell = sheet[XLSX.utils.encode_cell({ r, c })];
-        if (cell && typeof cell === "object" && "f" in cell && (cell as { f?: string }).f) {
+        const cell = sheet[XLSX.utils.encode_cell({ r, c })] as
+          | { f?: string; v?: unknown; w?: string }
+          | undefined;
+        if (cell && typeof cell === "object" && cell.f) {
           formulas++;
+          formulaAt.set(`${r}:${c}`, { f: cell.f, v: cell.w ?? cell.v ?? "" });
         }
       }
     }
 
     const maxRows = Math.min(rows.length, 100);
     for (let i = 0; i < maxRows; i++) {
-      const cells = (rows[i] || []).map((v) => String(v ?? "").replace(/\|/g, "/"));
+      // sheet_to_json indexes from the used range, so absolute cell addresses
+      // need the range's origin added back before looking a formula up.
+      const cells = (rows[i] || []).map((v, colIndex) => {
+        const formula = formulaAt.get(`${range.s.r + i}:${range.s.c + colIndex}`);
+        const rendered = String(v ?? "").replace(/\|/g, "/");
+        if (!formula) return rendered;
+        // "=B2*C2 → 120": the formula first, the computed value after it.
+        const value = String(formula.v ?? "").replace(/\|/g, "/");
+        return value ? `=${formula.f} → ${value}` : `=${formula.f}`;
+      });
       parts.push(`| ${cells.join(" | ")} |`);
     }
     if (rows.length > maxRows) parts.push(`(${rows.length - maxRows} more rows truncated — import the full file if you need them)`);
   }
 
   const notes = ["Extracted spreadsheet with sheet names and headers preserved; cells rendered as a table."];
-  if (formulas) notes.push(`${formulas} formula cell(s) were read as their computed values — formulas themselves are not shown.`);
+  if (formulas) {
+    notes.push(
+      `${formulas} formula cell(s) are shown as "=formula → computed value", so both the method and the result are preserved.`,
+    );
+  } else {
+    notes.push("No formulas were found in the workbook, so cells are shown as their computed values.");
+  }
   notes.push("Charts embedded in the workbook could not be read; the underlying data is included instead.");
 
   return { text: parts.join("\n"), notes: notes.join(" ") };
