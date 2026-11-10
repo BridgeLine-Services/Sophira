@@ -61,8 +61,8 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
     id: "essay_sections",
     label: "Essay sections (drafted text)",
     table: "essay_sections",
-    route: "/api/essay/draft-section",
-    method: "POST",
+    route: null,
+    method: null,
     fields: ["draft"],
     versionFrom: "data.version",
     coverage: "no-editor",
@@ -110,7 +110,8 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
     fields: ["response"],
     versionFrom: null,
     coverage: "no-editor",
-    reason: "No response editor exists yet; essays are the current submission path.",
+    reason:
+      "Sections are written by the drafting pipeline, not by a member editor: no page lets a member type a section, and no API route writes this table. The declared route was removed after the audit because /api/essay/draft-section persists essay_sessions, not essay_sections.",
   },
   {
     id: "notebook_notes",
@@ -174,6 +175,21 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
     fields: ["blocks"],
     versionFrom: "data.updated_at",
     coverage: "route-ready",
+  },
+  {
+    id: "profile_settings",
+    label: "Settings: profile and study preferences",
+    table: "profiles",
+    // Saved with the Supabase client from src/app/settings/page.tsx, not through a
+    // route: the page reads data.updated_at first and sends it as the base
+    // version, so a concurrent change is a conflict rather than an overwrite.
+    route: null,
+    method: null,
+    fields: ["display_name", "academic_level", "explanation_level", "answer_style", "formatting_pref", "preferred_language"],
+    versionFrom: "data.updated_at",
+    coverage: "wired",
+    reason:
+      "Client-side revision-checked save on the Settings page (no HTTP route). Added during the 2026-11-09 audit: the Settings profile autosave existed in code but was missing from this registry.",
   },
   {
     id: "integration_settings",
