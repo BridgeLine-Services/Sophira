@@ -94,7 +94,21 @@ export function checkEnv(
       if (def.type === "https-url" && !value.toLowerCase().startsWith("https://")) {
         // The loopback http default is intended for DEVELOPMENT; only
         // production deployments must use https (auth redirects, invites).
-        const localhostDev = value.toLowerCase().startsWith("http://localhost") && !opts.production;
+        //
+        // 2026-11-09: this exemption used to be a TEXT PREFIX check,
+        // startsWith("http://localhost"), which also accepts
+        // http://localhost.attacker.example — a real host that is not localhost.
+        // The URL is parsed and the HOSTNAME compared exactly instead. Only the
+        // narrow development case is still exempt; every other non-https value is
+        // an error in production, exactly as before.
+        let localhostHost = "";
+        try {
+          const parsed = new URL(value);
+          if (parsed.protocol === "http:") localhostHost = parsed.hostname.toLowerCase();
+        } catch {
+          localhostHost = "";
+        }
+        const localhostDev = localhostHost === "localhost" && !opts.production;
         if (!localhostDev) {
           err(def.name, `${def.name} must be an https:// URL in production (a plain or non-local URL would break auth redirects / native release builds).`);
         }

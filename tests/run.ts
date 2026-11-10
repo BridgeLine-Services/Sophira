@@ -7,7 +7,7 @@
  * subject routing, and independent math verification.
  */
 
-import { hostIs, mentionsHost } from "./helpers/url";
+import { hostIs, mentionsHost, schemeIs } from "./helpers/url";
 import {
   composeAcademicContext,
   findSourceConflicts,
@@ -120,6 +120,7 @@ import { runEmailValidationTests } from "./email-validation";
 import { runDocumentHtmlTests } from "./document-html";
 import { runWorkflowPermissionTests } from "./workflow-permissions";
 import { runDependencyVersionTests } from "./dependency-versions";
+import { runUrlHostHelperTests } from "./url-host-helpers";
 import { runWritingProfileExpansionTests } from "./writing-profile-expansion";
 import { runExtractionProvenanceTests } from "./extraction-provenance";
 import { runSelfHostedMediaTests } from "./selfhost-media";
@@ -2621,9 +2622,35 @@ async function runNativeUrlTests(): Promise<void> {
     const capCfg = fs.readFileSync("capacitor.config.ts", "utf8");
     assert(!capCfg.includes('|| "https://sophira.example.com"'),
       "url: capacitor.config.ts contains NO silent placeholder fallback anymore");
-    const tauriCfg = fs.readFileSync("src-tauri/tauri.conf.json", "utf8");
-    assert(!tauriCfg.includes("sophira.example.com"),
+    // CodeQL #43 (2026-11-09): this used to search the raw JSON TEXT for the
+    // placeholder hostname. A substring search on configuration source proves very
+    // little - it would pass for a lookalike host, and it cannot tell a commented-out
+    // value from the value the app actually uses. The config is now parsed, the
+    // window URL is read, and the HOSTNAME is compared with hostIs(). A missing
+    // window or a malformed URL now FAILS instead of quietly passing, which is the
+    // property the original assertion was reaching for.
+    let tauriCfg: { app?: { windows?: Array<{ url?: unknown }> } };
+    try {
+      tauriCfg = JSON.parse(fs.readFileSync("src-tauri/tauri.conf.json", "utf8"));
+    } catch {
+      assert(false, "url: tauri.conf.json parses as JSON");
+      tauriCfg = {};
+    }
+    const nativeWindowUrl = tauriCfg.app?.windows?.[0]?.url;
+    assert(typeof nativeWindowUrl === "string" && nativeWindowUrl.trim().length > 0,
+      "url: tauri.conf.json configures app.windows[0].url as a non-empty string");
+    let nativeUrl: URL | null = null;
+    try {
+      nativeUrl = new URL(String(nativeWindowUrl));
+    } catch {
+      nativeUrl = null;
+    }
+    assert(nativeUrl !== null,
+      "url: the tauri.conf.json window URL is a valid absolute URL (a malformed value must fail here)");
+    assert(nativeUrl !== null && !hostIs(nativeUrl.href, "sophira.example.com"),
       "url: tauri.conf.json no longer hardcodes the fake production URL (dev default; release patches it via scripts/native-url.mjs)");
+    assert(nativeUrl !== null && schemeIs(nativeUrl.href, "http") && hostIs(nativeUrl.href, "localhost"),
+      "url: the checked-in tauri.conf.json stays the local development default");
     const urlValid = validateNativeAppUrl("https://sophira.app", "release");
     assert(urlValid.ok === true && urlValid.url === "https://sophira.app",
       "url: the pure validator accepts a clean https URL");
@@ -5345,6 +5372,9 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
   }).then(async () => {
     // Phase 0 security remediation: Dependabot (minimatch, glob) + glib record.
     runDependencyVersionTests(assert, section);
+  }).then(async () => {
+    // CodeQL #43: the hostname helper behind the native-URL assertions.
+    runUrlHostHelperTests(assert, section);
   }).then(async () => {
     const r = await runAiReliabilityTests();
     passed += r.passed;
