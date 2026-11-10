@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { decodeHtmlEntities, stripTags } from "../text/entities";
 
 /**
  * URL/source verification (spec §9): every source Sophira intends to cite
@@ -67,14 +68,9 @@ function domainOf(url: string): string {
 }
 
 function decodeEntities(s: string): string {
-  return s
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)));
+  // Single-pass, non-recursive decoding (CodeQL #48): the old chain decoded its
+  // own output, so "&amp;lt;" became "<" instead of the text "&lt;".
+  return decodeHtmlEntities(s);
 }
 
 function extractTitle(html: string): string {
@@ -113,18 +109,17 @@ function extractCanonical(html: string, finalUrl: string): string {
 }
 
 function extractText(html: string): string {
-  return decodeEntities(
-    html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<(?:nav|header|footer|form|aside)[^>]*>[\s\S]{0,8000}?<\/(?:nav|header|footer|form|aside)>/gi, " ")
-      .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article|br)>/gi, "\n")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\n\s*\n+/g, "\n")
-  ).trim();
+  // Tag stripping is a scanner, not a regex (CodeQL js/bad-tag-filter): script,
+  // style, noscript, template and comments are skipped by name, and every other
+  // tag is dropped. Decoding happens once, after stripping, so an escaped tag in
+  // the source can never become live markup.
+  const withoutChrome = stripTags(
+    html.replace(/<(?:nav|header|footer|form|aside)[^>]*>[\s\S]{0,8000}?<\/(?:nav|header|footer|form|aside)>/gi, " "),
+  );
+  return decodeEntities(withoutChrome)
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n")
+    .trim();
 }
 
 /** Loose title correspondence check between the search listing and the page. */
@@ -144,9 +139,14 @@ export function titlesCorrespond(listed: string, actual: string): boolean {
  * pages, and login/paywall walls are detected and reported, never hidden.
  */
 import { evaluateSourceRequest } from "./policy";
+import { safeFetch } from "../net/safe-fetch";
 
 export async function fetchAndVerify(url: string, opts: VerifyOptions = {}): Promise<VerifiedPage> {
-  const doFetch = opts.fetchImpl ?? fetch;
+  // Production has exactly ONE network path: safeFetch below, which pins the
+  // validated address. An injected fetchImpl exists only so tests can supply
+  // bytes; it is never the global fetch, so nothing here can reach the network
+  // with a URL that was not pinned (CodeQL #12).
+  const doFetch = opts.fetchImpl;
   const maxRedirects = opts.maxRedirects ?? 6;
   const timeoutMs = opts.timeoutMs ?? 15_000;
   const maxBytes = opts.maxBytes ?? 250_000;
@@ -175,48 +175,82 @@ export async function fetchAndVerify(url: string, opts: VerifyOptions = {}): Pro
   }
 
 
+  // Retrieval path.
+  //
+  // Production uses safeFetch: it validates AND pins the destination address,
+  // so the socket can only reach the address that was checked, on every hop.
+  // A test may still inject fetchImpl to simulate a page deterministically; that
+  // path keeps the old string-level gate so the injected bytes are never trusted
+  // as a security decision.
   let current = url;
   let redirectCount = 0;
   let response: Response | null = null;
-  for (let i = 0; i <= maxRedirects; i++) {
-    let res: Response;
-    try {
-      res = await doFetch(current, {
-        redirect: "manual",
-        signal: AbortSignal.timeout(timeoutMs),
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; SophiraResearch/1.0; +https://sophira.app)",
-          Accept: "text/html,application/xhtml+xml,application/pdf;q=0.5,*/*;q=0.1",
-        },
-      });
-    } catch (e) {
-      const reason = e instanceof Error && e.name === "TimeoutError" ? "timed out" : e instanceof Error ? e.message : "network error";
-      notes.push(`Fetch failed: ${reason}.`);
+
+  if (!opts.fetchImpl) {
+    const retrieved = await safeFetch(url, { timeoutMs, maxBytes, maxRedirects });
+    notes.push(...retrieved.notes);
+    redirectCount = retrieved.redirectCount;
+    current = retrieved.finalUrl || url;
+    if (retrieved.refusal) {
+      const earlyStatus: VerificationStatus =
+        retrieved.refusal.code === "network" || retrieved.refusal.code === "timeout"
+          ? "inaccessible"
+          : "failed";
       return {
         originalUrl: url, finalUrl: current, redirectCount, httpStatus: 0, ok: false, contentType: "",
         domain: domainOf(current), title: "", author: null, publicationDate: null, canonicalUrl: "",
-        text: "", textChars: 0, hash: "", status: "inaccessible", notes,
+        text: "", textChars: 0, hash: "", status: earlyStatus, notes,
       };
     }
-    const status = res.status;
-    if ([301, 302, 303, 307, 308].includes(status)) {
-      const loc = res.headers.get("location");
-      if (!loc) { response = res; break; }
-      let next: string;
-      try { next = new URL(loc, current).toString(); } catch { notes.push("Invalid redirect target."); response = res; break; }
-      if (!/^https?:\/\//i.test(next)) { notes.push("Redirect left http(s) — refused."); response = res; break; }
-      const hopGate = evaluateSourceRequest(next);
-      if (!hopGate.allowed) {
-        notes.push(`Redirect target refused (${hopGate.code}): ${hopGate.reason}`);
-        response = res;
-        break;
+    const body = await retrieved.text();
+    response = new Response(body, {
+      status: retrieved.status,
+      headers: { "content-type": retrieved.headers.get("content-type") ?? "" },
+    });
+    current = retrieved.finalUrl || current;
+  } else if (doFetch) {
+    // Injected-test path: the caller supplies the bytes, so this loop only
+    // models transports. Production never reaches it.
+    for (let i = 0; i <= maxRedirects; i++) {
+      let res: Response;
+      try {
+        res = await doFetch(current, {
+          redirect: "manual",
+          signal: AbortSignal.timeout(timeoutMs),
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; SophiraResearch/1.0; +https://sophira.app)",
+            Accept: "text/html,application/xhtml+xml,application/pdf;q=0.5,*/*;q=0.1",
+          },
+        });
+      } catch (e) {
+        const reason = e instanceof Error && e.name === "TimeoutError" ? "timed out" : e instanceof Error ? e.message : "network error";
+        notes.push(`Fetch failed: ${reason}.`);
+        return {
+          originalUrl: url, finalUrl: current, redirectCount, httpStatus: 0, ok: false, contentType: "",
+          domain: domainOf(current), title: "", author: null, publicationDate: null, canonicalUrl: "",
+          text: "", textChars: 0, hash: "", status: "inaccessible", notes,
+        };
       }
-      redirectCount++;
-      current = next;
-      continue;
+      const status = res.status;
+      if ([301, 302, 303, 307, 308].includes(status)) {
+        const loc = res.headers.get("location");
+        if (!loc) { response = res; break; }
+        let next: string;
+        try { next = new URL(loc, current).toString(); } catch { notes.push("Invalid redirect target."); response = res; break; }
+        if (!/^https?:\/\//i.test(next)) { notes.push("Redirect left http(s) — refused."); response = res; break; }
+        const hopGate = evaluateSourceRequest(next);
+        if (!hopGate.allowed) {
+          notes.push(`Redirect target refused (${hopGate.code}): ${hopGate.reason}`);
+          response = res;
+          break;
+        }
+        redirectCount++;
+        current = next;
+        continue;
+      }
+      response = res;
+      break;
     }
-    response = res;
-    break;
   }
 
   if (!response) {

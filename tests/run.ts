@@ -7,6 +7,7 @@
  * subject routing, and independent math verification.
  */
 
+import { hostIs, mentionsHost } from "./helpers/url";
 import {
   composeAcademicContext,
   findSourceConflicts,
@@ -110,6 +111,8 @@ import { runOfflineTests } from "./offline";
 import { runAutosaveRegistryTests, runAutosaveTests } from "./autosave";
 import { runEmailAttachmentTests } from "./email-attachments";
 import { runSpreadsheetFormulaTests } from "./spreadsheet-formulas";
+import { runSsrfTests } from "./ssrf";
+import { runEntityDecodingTests } from "./entity-decoding";
 import { runWritingProfileExpansionTests } from "./writing-profile-expansion";
 import { runExtractionProvenanceTests } from "./extraction-provenance";
 import { runSelfHostedMediaTests } from "./selfhost-media";
@@ -1531,7 +1534,7 @@ const __researchTests = (async () => {
     // redirect followed manually, final URL recorded
     const redirecting = await fetchAndVerify("https://short.example.com/a", {
       fetchImpl: (async (url: string) =>
-        String(url).includes("short.example.com")
+        hostIs(String(url), "short.example.com")
           ? new Response("", { status: 301, headers: { location: "https://real.example.com/paper" } })
           : html("The Paper", "<p>".concat("Substantial text. ".repeat(80), "</p>")) ) as unknown as typeof fetch,
     });
@@ -1541,7 +1544,7 @@ const __researchTests = (async () => {
     // unrelated-domain redirect is flagged
     const crossDomain = await fetchAndVerify("https://old.example.com/a", {
       fetchImpl: (async (url: string) =>
-        String(url).includes("old.example.com")
+        hostIs(String(url), "old.example.com")
           ? new Response("", { status: 302, headers: { location: "https://totally-other.example.org/b" } })
           : html("Unrelated", "<p>".concat("Content here. ".repeat(90), "</p>")) ) as unknown as typeof fetch,
     });
@@ -1592,12 +1595,12 @@ const __researchTests = (async () => {
     const mla = formatCitation(src, "MLA");
     assert(mla.startsWith("Chen, Maria.") && mla.includes('"Coral bleaching frequency in tropical reefs."'), "citation: MLA author-last, quoted title");
     const apa = formatCitation(src, "APA");
-    assert(apa.includes("(2023).") && apa.includes("marine.example.org"), "citation: APA year + source");
+    assert(apa.includes("(2023).") && mentionsHost(apa, "marine.example.org"), "citation: APA year + source");
     const chicago = formatCitation(src, "CHICAGO");
     assert(chicago.includes("Accessed"), "citation: Chicago includes access date");
     assert(formatCitation(src, "unknown-style").includes("Retrieved"), "citation: unknown styles fall back to generic honestly");
     const noMeta = formatCitation({ title: "Untitled page", author: null, publisher: null, publicationDate: null, url: "https://x.example.org/p", accessedISO: "2026-09-27T00:00:00.000Z", doi: null }, "MLA");
-    assert(noMeta.includes("n.d.") && noMeta.includes("x.example.org"), "citation: missing dates/authors render honestly, never invented");
+    assert(noMeta.includes("n.d.") && mentionsHost(noMeta, "x.example.org"), "citation: missing dates/authors render honestly, never invented");
     const bib = buildBibliography([src, { ...src, author: "Aaron Diaz", title: "Second source" }], "APA");
     assert(bib.split("\n\n").length === 2 && bib.includes("Diaz"), "citation: bibliography built from source records, alphabetized");
     const markers = extractCitationMarkers("Claim one [1]. Claim two (Smith 2020). Claim three (Jones et al., 2021).");
@@ -1631,7 +1634,7 @@ const __researchTests = (async () => {
       { title: "random blog", url: "http://blog.example.net/post", snippet: "s" },
       { title: "gov data", url: "https://www.noaa.gov/data", snippet: "s" },
     ]);
-    assert(ranked[0].url.includes("noaa.gov") || ranked[0].url.includes("harvard.edu"), "research: official/academic domains rank first (objective quality)");
+    assert(hostIs(ranked[0].url, "noaa.gov") || hostIs(ranked[0].url, "harvard.edu"), "research: official/academic domains rank first (objective quality)");
     assert(!ranked.some((h) => h.url.startsWith("http://blog.example.net")), "research: plain-http low-value hit filtered");
   }
 
@@ -1858,10 +1861,10 @@ const __researchTests = (async () => {
 
     // --- Ranking follows the HISTORY hierarchy: primary sources first ---
     const histRanked = rankCandidatesForAssignment([blogHist, jstorHist, museumHist, eduHist, locArchive], histSpec);
-    assert(histRanked[0].hit.url.includes("loc.gov"), "authority: history — primary sources rank first");
-    assert(histRanked.findIndex((r) => r.hit.url.includes("jstor")) < histRanked.findIndex((r) => r.hit.url.includes("metmuseum")),
+    assert(hostIs(histRanked[0].hit.url, "loc.gov"), "authority: history — primary sources rank first");
+    assert(histRanked.findIndex((r) => hostIs(r.hit.url, "jstor.org")) < histRanked.findIndex((r) => hostIs(r.hit.url, "metmuseum.org")),
       "authority: history — scholarly articles (tier 2) above museums (tier 4)");
-    assert(histRanked.findIndex((r) => r.hit.url.includes("columbia")) < histRanked.findIndex((r) => r.hit.url.includes("metmuseum")),
+    assert(histRanked.findIndex((r) => hostIs(r.hit.url, "columbia.edu")) < histRanked.findIndex((r) => hostIs(r.hit.url, "metmuseum.org")),
       "authority: history — university archives (tier 3) rank above museums (tier 4), exactly as the hierarchy specifies");
     assert(histRanked[histRanked.length - 1].hit.url.includes("historyblog"),
       "authority: history — a personal blog ranks last under the history profile");
@@ -1875,33 +1878,33 @@ const __researchTests = (async () => {
     const asHistory = rankCandidatesForAssignment(shared, histSpec);
     const asScience = rankCandidatesForAssignment(shared, bioSpec);
     const asLiterature = rankCandidatesForAssignment(shared, litSpec);
-    assert(asHistory[0].hit.url.includes("loc.gov") && asScience[0].hit.url.includes("nature.com") && asLiterature[0].hit.url.includes("gutenberg"),
+    assert(hostIs(asHistory[0].hit.url, "loc.gov") && hostIs(asScience[0].hit.url, "nature.com") && hostIs(asLiterature[0].hit.url, "gutenberg.org"),
       "authority: THE SAME sources rank differently — archive first for history, journal for science, primary text for literature");
     assert(asScience[0].decision.category === "science" && asHistory[0].decision.category === "history",
       "authority: the stored decision carries the assignment's classification");
 
     // --- Science hierarchy: journals > NIH/PubMed > university > textbooks ---
     const sciRanked = rankCandidatesForAssignment([eduBio, pubmedBio, natureBio], bioSpec);
-    assert(sciRanked[0].hit.url.includes("nature.com"), "authority: science — peer-reviewed journal first");
-    assert(sciRanked.findIndex((r) => r.hit.url.includes("pubmed")) < sciRanked.findIndex((r) => r.hit.url.includes("brown.edu")),
+    assert(hostIs(sciRanked[0].hit.url, "nature.com"), "authority: science — peer-reviewed journal first");
+    assert(sciRanked.findIndex((r) => hostIs(r.hit.url, "pubmed")) < sciRanked.findIndex((r) => hostIs(r.hit.url, "brown.edu")),
       "authority: science — NIH/PubMed (tier 2) above university sources (tier 3)");
     assert(sciRanked[0].decision.peer_reviewed === true, "authority: peer-review status recorded in the decision");
 
     // --- Teacher requirements OVERRIDE generic ranking preferences ---
     const litGovSpec = { ...litSpec, sourceType: "government documents" };
     const govRanked = rankCandidatesForAssignment([jstorLit, govLit], litGovSpec);
-    assert(govRanked[0].hit.url.includes("congress.gov"),
+    assert(hostIs(govRanked[0].hit.url, "congress.gov"),
       "authority: teacher requires government sources → a .gov report OUTRANKS scholarly criticism despite the literature profile");
     assert(govRanked[0].decision.teacher_required === true, "authority: teacher-required flag stored on the decision");
     assert(govRanked[1].decision.reasons.some((r) => r.includes("teacher's required source type")),
       "authority: non-satisfying sources get the honest downrank reason");
     const noReqRanked = rankCandidatesForAssignment([jstorLit, govLit], litSpec);
-    assert(noReqRanked[0].hit.url.includes("jstor"),
+    assert(hostIs(noReqRanked[0].hit.url, "jstor.org"),
       "authority: without the teacher requirement the literature profile ranks scholarly criticism first again");
 
     // --- .gov/.edu are NEVER blindly prioritized ---
     const litRanked = rankCandidatesForAssignment([govLit, gutenbergLit, jstorLit], litSpec);
-    assert(litRanked[0].hit.url.includes("gutenberg") && litRanked[1].hit.url.includes("jstor") && litRanked[2].hit.url.includes("congress.gov"),
+    assert(hostIs(litRanked[0].hit.url, "gutenberg.org") && hostIs(litRanked[1].hit.url, "jstor.org") && hostIs(litRanked[2].hit.url, "congress.gov"),
       "authority: a random .gov page is LAST for literature — institutional domains only count where the profile values them");
     assert(litRanked[2].decision.institutional === true && (litRanked[2].decision.tier === null),
       "authority: institutional flag is recorded for explanation but gives no blind score boost");
@@ -1912,7 +1915,7 @@ const __researchTests = (async () => {
     const news2001 = mkHit("https://www.economist.com/election-finance-archive", "Election campaign finance reports and analysis",
       "Election campaign finance reports and analysis from the newsroom, archive coverage.", "2001-05-05");
     const newsRanked = rankCandidatesForAssignment([news2001, news2026], newsSpec);
-    assert(newsRanked[0].hit.url.includes("bbc.com"),
+    assert(hostIs(newsRanked[0].hit.url, "bbc.com"),
       "authority: same-tier current-events sources — the fresh one ranks first under a recency requirement");
     assert(newsRanked[0].decision.date_fit > 0 && newsRanked[1].decision.date_fit < 0,
       "authority: date fit recorded honestly per source");
@@ -1923,7 +1926,7 @@ const __researchTests = (async () => {
     const statsBland = mkHit("https://www.bls.gov/tables", "Table downloads",
       "Downloadable statistical tables.", "2024-01-01");
     const socRanked = rankCandidatesForAssignment([statsBland, censusTopical], socSpec);
-    assert(socRanked[0].hit.url.includes("census.gov"),
+    assert(hostIs(socRanked[0].hit.url, "census.gov"),
       "authority: same tier — the source actually ABOUT the topic outranks the off-topic one");
     assert(socRanked[1].decision.evidence_quality === 0 && socRanked[1].decision.reasons.some((r) => r.includes("Thin snippet")),
       "authority: thin evidence quality recorded honestly");
@@ -1931,7 +1934,7 @@ const __researchTests = (async () => {
     // --- General: teacher/rubric requirements determine the hierarchy ---
     const genReq = { topic: "How to structure a persuasive essay", sourceType: "peer-reviewed journals" };
     const genRanked = rankCandidatesForAssignment([blogHist, govLit, jstorLit], genReq);
-    assert(genRanked[0].hit.url.includes("jstor"),
+    assert(hostIs(genRanked[0].hit.url, "jstor.org"),
       "authority: general assignment with a teacher requirement — satisfying sources rank first");
     assert(genRanked.every((r) => r.decision.category === "general"), "authority: general classification stored on every decision");
 
@@ -2978,7 +2981,7 @@ async function runResearchBenchPinTests(): Promise<void> {
   assert(bench.includes("rankCandidatesForAssignment"),
     "research-bench measures the shipped ranking function, not a copy");
   const doc = fs.readFileSync("docs/RESEARCH_RETRIEVAL_BASELINE.md", "utf8");
-  assert(doc.includes("DEFECT") && doc.includes("fdrlibrary.org"),
+  assert(doc.includes("DEFECT") && mentionsHost(doc, "fdrlibrary.org"),
     "research baseline records the measured authority inversion");
   assert(doc.includes("NOT adopted") && doc.includes("pgvector") && doc.includes("Haystack"),
     "research baseline records the explicit non-adoption decisions");
@@ -3031,14 +3034,14 @@ async function runRankingRegressionTests(): Promise<void> {
     `ranking: an institutional archive outranks an opinion blog (got ${anyRanking.join(" > ")})`);
   // Host-based only: a blog that merely mentions archives gains nothing.
   const faux = rank([hit("My archive blog", "https://medium.com/p/2", LONG), hit("Library archive", "https://www.loc.gov/item/1", LONG)], "any");
-  assert(faux[0].includes("loc.gov"), "ranking: the archive signal is host-based, not title-based");
+  assert(mentionsHost(faux[0], "loc.gov"), "ranking: the archive signal is host-based, not title-based");
   // Teacher authority is untouched.
   const teacher = rank([hit("Textbook", "https://openstax.org/b", LONG), hit("Truman memo", "https://www.trumanlibrary.gov/m", LONG)], "primary sources");
   assert(teacher[0].includes("trumanlibrary"), "ranking: teacher-required source types still rank first");
   assert(teacher.length === 2, "ranking: non-satisfying sources are DEMOTED, not removed");
   // A peer-reviewed journal still beats an archive of the same topic.
   const journal = rank([hit("Archive", "https://www.fdrlibrary.org/x", LONG), hit("Nature paper", "https://www.nature.com/articles/1", LONG)], "peer-reviewed");
-  assert(journal[0].includes("nature.com"), "ranking: a satisfied teacher requirement still outranks the archive signal");
+  assert(mentionsHost(journal[0], "nature.com"), "ranking: a satisfied teacher requirement still outranks the archive signal");
 }
 
 async function runIntegrationsDoctorTests(): Promise<void> {
@@ -4557,7 +4560,7 @@ async function runConnectionCandidateTests(): Promise<void> {
     delete process.env.SUPABASE_DB_PASSWORD;
     delete process.env.DATABASE_URL;
     const cands = connectionCandidates();
-    assert(cands.length > 0 && cands[0].includes(".pooler.supabase.com"),
+    assert(cands.length > 0 && hostIs(cands[0], "pooler.supabase.com"),
       "db: the IPv4-reachable pooler URL is tried FIRST when both forms are configured");
     assert(cands[cands.length - 1].includes(`db.${ref}.supabase.co`),
       "db: the IPv6-only direct host is tried LAST, never first");
@@ -5311,6 +5314,12 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
   }).then(async () => {
     // Phase 3 / Task 4: spreadsheet formulas are preserved.
     await runSpreadsheetFormulaTests(assert, section);
+  }).then(async () => {
+    // Phase 1 (security): SSRF is closed by pinning the validated address.
+    await runSsrfTests(assert, section);
+  }).then(async () => {
+    // Phase 2 (security): entity decoding is single-pass (CodeQL #48).
+    await runEntityDecodingTests(assert, section);
   }).then(async () => {
     const r = await runAiReliabilityTests();
     passed += r.passed;
