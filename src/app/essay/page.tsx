@@ -1,6 +1,10 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import SaveStatus from "@/components/ui/SaveStatus";
+import { useAutosave } from "@/lib/save/useAutosave";
+import { makeDraftSaver } from "@/lib/save/draft";
+import { targetById } from "@/lib/save/targets";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
@@ -47,6 +51,15 @@ function EssayPageInner() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [form, setForm] = useState({ title: "", question: "", genre: "Essay", deadline: "", breakSeconds: "600", outputMode: "calibrated" as OutputMode, customWpm: "40" });
   const [outlineDraft, setOutlineDraft] = useState<OutlineSection[]>([]);
+
+  /**
+   * The outline is the one part of the essay workflow the member edits by hand,
+   * so it autosaves: debounced, revision-aware, and never reported as saved
+   * until the server sends back the version it now holds.
+   */
+  const outlineAutosave = useAutosave<{ session_id: string; outline: OutlineSection[] }>({
+    save: makeDraftSaver<{ session_id: string; outline: OutlineSection[] }>(targetById("essay_outline")!),
+  });
   const [profile, setProfile] = useState<CalibratedProfile | null>(null);
 
   const loadProfile = useCallback(async () => {
@@ -209,10 +222,20 @@ function EssayPageInner() {
               <Card>
                 <CardHeader><CardTitle>Outline — approve or edit before drafting</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
+                  <SaveStatus
+                    snapshot={outlineAutosave.snapshot}
+                    onRetry={outlineAutosave.retry}
+                    onKeepMine={() => outlineAutosave.resolveConflict("mine")}
+                    onUseTheirs={() => outlineAutosave.resolveConflict("theirs")}
+                  />
                   {outlineDraft.map((s, i) => (
                     <div key={s.id} className="rounded-lg border border-line p-3">
                       <div className="flex items-center gap-2">
-                        <Input value={s.title} onChange={(e) => setOutlineDraft(outlineDraft.map((o, j) => j === i ? { ...o, title: e.target.value } : o))} className="flex-1" />
+                        <Input value={s.title} onChange={(e) => {
+                          const next = outlineDraft.map((o, j) => (j === i ? { ...o, title: e.target.value } : o));
+                          setOutlineDraft(next);
+                          if (session) outlineAutosave.markEdited({ session_id: session.id, outline: next });
+                        }} className="flex-1" />
                         <Button size="sm" variant="secondary" onClick={() => setOutlineDraft(outlineDraft.filter((_, j) => j !== i))}>Remove</Button>
                       </div>
                       <Input className="mt-2" value={s.points.join("; ")} onChange={(e) => setOutlineDraft(outlineDraft.map((o, j) => j === i ? { ...o, points: e.target.value.split(";").map((p) => p.trim()).filter(Boolean) } : o))} placeholder="points, separated by ;" />

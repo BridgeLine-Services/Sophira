@@ -107,7 +107,7 @@ import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
 import { readFileSync } from "fs";
 import { runOfflineTests } from "./offline";
-import { runAutosaveTests } from "./autosave";
+import { runAutosaveRegistryTests, runAutosaveTests } from "./autosave";
 import { runWritingProfileExpansionTests } from "./writing-profile-expansion";
 import { runExtractionProvenanceTests } from "./extraction-provenance";
 import { runSelfHostedMediaTests } from "./selfhost-media";
@@ -1432,6 +1432,7 @@ function finish() {
     passed += r.passed;
     failed += r.failed;
   }
+
   // Phase 2B-2E: writing-profile learning expansion (2026-11-09).
   {
     const r = runWritingProfileExpansionTests();
@@ -5299,6 +5300,9 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     const r = await runFrameOcrTests();
     passed += r.passed;
     failed += r.failed;
+  }).then(async () => {
+    // Phase 4C extension: the honest coverage registry and the proven saver.
+    await runAutosaveRegistryTests(assert, section);
   }).then(async () => {
     const r = await runAiReliabilityTests();
     passed += r.passed;
