@@ -45,7 +45,7 @@ provider-diagnostics, provider-status, readiness (+ final), research (+ audit, v
 resume), rubric-audit, schedule (+ executions), setup-repair, setup-sql, setup-status, tutor,
 typing (+ profile), writing (grammar, plan, review).
 
-**Data model (43 migrations, 43 tables + auth):** academic_sources, app_config, canvas_*
+**Data model at Phase 0 (43 migrations, 43 tables + auth — snapshot; current figures are in [BACKUP_INVENTORY.md](BACKUP_INVENTORY.md)):** academic_sources, app_config, canvas_*
 (3), document_history, essay_sessions, invitation_requests, learning_patterns,
 member_notifications, notebook_* (7), notification_preferences, owner_bootstrap,
 profile_versions, profiles, provider_connections, provider_usage, research_* (7),

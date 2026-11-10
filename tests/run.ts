@@ -113,6 +113,7 @@ import { runEmailAttachmentTests } from "./email-attachments";
 import { runSpreadsheetFormulaTests } from "./spreadsheet-formulas";
 import { runSsrfTests } from "./ssrf";
 import { runEntityDecodingTests } from "./entity-decoding";
+import { runDocCountTests } from "./doc-counts";
 import { runWritingProfileExpansionTests } from "./writing-profile-expansion";
 import { runExtractionProvenanceTests } from "./extraction-provenance";
 import { runSelfHostedMediaTests } from "./selfhost-media";
@@ -5320,6 +5321,9 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
   }).then(async () => {
     // Phase 2 (security): entity decoding is single-pass (CodeQL #48).
     await runEntityDecodingTests(assert, section);
+  }).then(async () => {
+    // Phase 4 (audit): the documented counts match the repository.
+    runDocCountTests(assert, section);
   }).then(async () => {
     const r = await runAiReliabilityTests();
     passed += r.passed;

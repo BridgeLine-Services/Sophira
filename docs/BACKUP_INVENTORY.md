@@ -4,7 +4,12 @@
 `tests/backup-integrity.ts`: every table below is derived from `supabase/migrations/*.sql`,
 and the test fails if a table exists in the schema but is missing from this inventory.
 
-**Scope at time of writing:** 42 migrations, 50 application tables, 1 private storage bucket.
+**How these numbers are kept true:** `tests/doc-counts.ts` reads this line, counts the
+migrations, the tables they create (minus any dropped later) and the storage buckets,
+and fails the suite when they disagree. A migration added without updating this line
+is a test failure, not a stale document.
+
+**Scope at time of writing:** 44 migrations, 55 application tables, 1 private storage bucket (`private-docs`).
 
 ---
 
