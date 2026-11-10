@@ -187,26 +187,119 @@ export function decodeHtmlEntities(input: string): string {
 }
 
 /**
+ * Removes element blocks that can never be useful text, plus all remaining tags.
+ *
+ * WHY A SCANNER AND NOT REGULAR EXPRESSIONS
+ * -----------------------------------------
+ * Tag-stripping regexes are a known bypass class: `</script >`, `</script foo>`,
+ * `<script
+src=x>` and unterminated blocks all slip past a pattern that looks
+ * right (CodeQL js/bad-tag-filter). Rather than chase every variant, this reads
+ * the string left to right:
+ *
+ *   - `<script`, `<style`, `<noscript` open a block that is skipped up to its own
+ *     closing tag (any spacing, any attributes), or to the end if never closed;
+ *   - `<!--` opens a comment that is skipped to `-->` (or to the end);
+ *   - any other `<` that reaches a `>` is a tag and is dropped;
+ *   - everything else is copied through as text.
+ *
+ * Content inside script/style is therefore never seen, and no crafted tag can
+ * survive as markup because nothing is emitted as markup at all.
+ */
+const SKIPPED_BLOCKS = ["script", "style", "noscript", "template"] as const;
+
+function isNameChar(ch: string): boolean {
+  return /[a-z0-9:_-]/i.test(ch);
+}
+
+/** Index just past `<tag ...>` starting at `lt`, or -1 when there is no `>`. */
+function endOfTag(html: string, lt: number): number {
+  const gt = html.indexOf(">", lt + 1);
+  return gt === -1 ? -1 : gt + 1;
+}
+
+/** Index just past the block opened at `lt`, following any closing spelling. */
+function endOfBlock(html: string, lt: number, name: string): number {
+  const openEnd = endOfTag(html, lt);
+  if (openEnd === -1) return html.length;
+
+  let cursor = openEnd;
+  while (cursor < html.length) {
+    const nextOpen = html.indexOf("</", cursor);
+    if (nextOpen === -1) return html.length;
+    let i = nextOpen + 2;
+    // tolerate whitespace after "</" and match the tag name case-insensitively
+    while (i < html.length && /\s/.test(html[i])) i++;
+    const candidate = html.slice(i, i + name.length).toLowerCase();
+    if (candidate === name) {
+      const closeEnd = endOfTag(html, nextOpen);
+      return closeEnd === -1 ? html.length : closeEnd;
+    }
+    cursor = nextOpen + 2;
+  }
+  return html.length;
+}
+
+export function stripTags(html: string): string {
+  let out = "";
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf("<", i);
+    if (lt === -1) {
+      out += html.slice(i);
+      break;
+    }
+    out += html.slice(i, lt);
+
+    // HTML comment
+    if (html.startsWith("<!--", lt)) {
+      const close = html.indexOf("-->", lt + 4);
+      i = close === -1 ? html.length : close + 3;
+      out += " ";
+      continue;
+    }
+
+    // Skip whole element blocks whose content is not text.
+    let name = "";
+    for (const candidate of SKIPPED_BLOCKS) {
+      const slice = html.slice(lt + 1, lt + 1 + candidate.length).toLowerCase();
+      const after = html[lt + 1 + candidate.length] ?? ">";
+      if (slice === candidate && !isNameChar(after)) {
+        name = candidate;
+        break;
+      }
+    }
+    if (name) {
+      i = endOfBlock(html, lt, name);
+      out += " ";
+      continue;
+    }
+
+    // Any other tag: drop it, keep a newline for block-level boundaries.
+    const tagEnd = endOfTag(html, lt);
+    if (tagEnd === -1) {
+      // A stray "<" with no closing ">" is text, not a tag.
+      out += html.slice(lt);
+      break;
+    }
+    const raw = html.slice(lt, tagEnd).toLowerCase();
+    const isBreak = /^<\/(?:p|div|li|h[1-6]|tr|section|article|blockquote|pre)\b/.test(raw)
+      || /^<br\b/.test(raw)
+      || /^<\/?p\b/.test(raw);
+    out += isBreak ? "\n" : " ";
+    i = tagEnd;
+  }
+  return out;
+}
+
+/**
  * Strips HTML tags from markup, then decodes entities once.
  *
  * Order matters and is deliberate: tags are removed from the ORIGINAL markup, so
  * text that was escaped by the sender (`&lt;script&gt;`) is not turned into a tag
- * after decoding, and script/style CONTENT is dropped before anything is decoded.
- * The result is plain text, never markup.
+ * after decoding. The result is plain text, never markup.
  */
 export function htmlToPlainText(html: string): string {
   if (!html) return "";
-  const withoutDangerousBlocks = html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, " ")
-    .replace(/<script\b[^>]*>[\s\S]*$/gi, " ")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, " ")
-    .replace(/<style\b[^>]*>[\s\S]*$/gi, " ")
-    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript\s*>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ");
-  const withBreaks = withoutDangerousBlocks.replace(
-    /<\/(?:p|div|li|h[1-6]|tr|section|article|blockquote|pre)>|<br\s*\/?>/gi,
-    "\n",
-  );
-  const stripped = withBreaks.replace(/<[^>]*>/g, " ");
-  return decodeHtmlEntities(stripped);
+  return decodeHtmlEntities(stripTags(html));
 }

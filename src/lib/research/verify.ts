@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { decodeHtmlEntities } from "../text/entities";
+import { decodeHtmlEntities, stripTags } from "../text/entities";
 
 /**
  * URL/source verification (spec §9): every source Sophira intends to cite
@@ -109,20 +109,17 @@ function extractCanonical(html: string, finalUrl: string): string {
 }
 
 function extractText(html: string): string {
-  return decodeEntities(
-    html
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, " ")
-      .replace(/<script\b[^>]*>[\s\S]*$/gi, " ")
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, " ")
-      .replace(/<style\b[^>]*>[\s\S]*$/gi, " ")
-      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript\s*>/gi, " ")
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<(?:nav|header|footer|form|aside)[^>]*>[\s\S]{0,8000}?<\/(?:nav|header|footer|form|aside)>/gi, " ")
-      .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article|br)>/gi, "\n")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\n\s*\n+/g, "\n")
-  ).trim();
+  // Tag stripping is a scanner, not a regex (CodeQL js/bad-tag-filter): script,
+  // style, noscript, template and comments are skipped by name, and every other
+  // tag is dropped. Decoding happens once, after stripping, so an escaped tag in
+  // the source can never become live markup.
+  const withoutChrome = stripTags(
+    html.replace(/<(?:nav|header|footer|form|aside)[^>]*>[\s\S]{0,8000}?<\/(?:nav|header|footer|form|aside)>/gi, " "),
+  );
+  return decodeEntities(withoutChrome)
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n")
+    .trim();
 }
 
 /** Loose title correspondence check between the search listing and the page. */
