@@ -57,6 +57,9 @@ if (ping.status !== 0) {
 
 const DB = process.env.SOPHIRA_VERIFY_DB || "sophira_verify";
 const M45 = readdirSync("supabase/migrations").find((f) => f.startsWith("0045_"));
+// The NEWEST migration by filename, whatever its number: adding a migration must
+// not slip past this check by being newer than a hardcoded name (2026-11-11).
+const NEWEST = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort().pop();
 
 function freshDatabase() {
   spawnSync("dropdb", ["--if-exists", DB], { env });
@@ -114,10 +117,63 @@ try {
       const applied = psql(DB, ["-f", `supabase/migrations/${M45}`]);
       check(applied.status === 0, `${M45} applies over existing data`, (applied.stderr || "").slice(0, 200));
 
+  // 2. Migrations that must survive EXISTING rows, which is the only way to catch a
+  //    NOT NULL column or a backfill that would break a live deployment.
+  //
+  //    Each scenario inserts its fixture BEFORE the migration it tests. The generic
+  //    scenario used to insert after 0045 had already applied, so its own fixture
+  //    arrived with today's timestamp and the 0045 assertion failed - the fixture was
+  //    wrong, not the migration (found 2026-11-11).
+  const migrations = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
+  const seedRow = () => {
+    psql(DB, ["-c", "insert into auth.users (id) values ('11111111-1111-1111-1111-111111111111')"]);
+    const seeded = psql(DB, ["-c",
+      "insert into public.responses (user_id, content, created_at) values ('11111111-1111-1111-1111-111111111111','legacy answer','2026-10-01T10:00:00Z')"]);
+    check(seeded.status === 0, "a pre-existing row can be written before the migration");
+  };
+  const applyUpTo = (exclusive) => {
+    for (const f of migrations.filter((f) => f < exclusive)) {
+      const r = psql(DB, ["-f", `supabase/migrations/${f}`]);
+      if (r.status !== 0) {
+        check(false, `migrations before ${exclusive} apply`, `${f}: ${(r.stderr || "").slice(0, 160)}`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 2a. The 0045 guarantee: an answer written before versioning existed gets a
+  //     version equal to its creation time, and keeps its text.
+  const M45 = migrations.find((f) => f.startsWith("0045_"));
+  if (M45) {
+    freshDatabase();
+    if (applyUpTo(M45)) {
+      seedRow();
+      const applied = psql(DB, ["-f", `supabase/migrations/${M45}`]);
+      check(applied.status === 0, `${M45} applies over existing data`, (applied.stderr || "").slice(0, 200));
       const backfill = psql(DB, ["-tAc", "select (updated_at = created_at) from public.responses limit 1"]);
       check((backfill.stdout || "").trim() === "t", "existing rows inherit created_at as their version");
       const kept = psql(DB, ["-tAc", "select content from public.responses limit 1"]);
       check((kept.stdout || "").trim() === "legacy answer", "the migration loses no existing text");
+    }
+  }
+
+  // 2b. The NEWEST migration, whatever it is, against a row that predates it.
+  if (!NEWEST) {
+    check(false, "the newest migration is present");
+  } else if (NEWEST !== M45) {
+    freshDatabase();
+    if (applyUpTo(NEWEST)) {
+      seedRow();
+      const applied = psql(DB, ["-f", `supabase/migrations/${NEWEST}`]);
+      check(applied.status === 0, `${NEWEST} applies over existing data`, (applied.stderr || "").slice(0, 200));
+      const kept = psql(DB, ["-tAc", "select content from public.responses limit 1"]);
+      check((kept.stdout || "").trim() === "legacy answer", "the newest migration loses no existing text");
+      if (NEWEST.startsWith("0046_")) {
+        const prov = psql(DB, ["-tAc", "select coalesce(provider_used,'NULL') from public.responses limit 1"]);
+        check((prov.stdout || "").trim() === "NULL",
+          "a row written before provenance was recorded stays unrecorded, never guessed as cloud");
+      }
     }
   }
 } catch (e) {

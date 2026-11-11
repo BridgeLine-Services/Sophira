@@ -1,4 +1,5 @@
 import { academicLevelBit } from "./academic-levels";
+import type { ProviderId } from "./provider";
 import type { Mode } from "../types";
 import type { Course, Profile, TeacherProfile, WritingProfile } from "../types";
 import { composeAcademicContext, conflictNotices, type ContextConflict } from "./context";
@@ -40,6 +41,15 @@ export async function aiChat(
   messages: ChatMessage[],
   opts: { temperature?: number; maxTokens?: number; jsonMode?: boolean; images?: string[] } = {}
 ): Promise<string> {
+  return (await aiChatMeta(messages, opts)).text;
+}
+
+/** Same call, but says WHO answered. The answer record used to guess a cloud
+ *  model name, so a locally-answered response could be filed as a cloud one. */
+export async function aiChatMeta(
+  messages: ChatMessage[],
+  opts: { temperature?: number; maxTokens?: number; jsonMode?: boolean; images?: string[] } = {}
+): Promise<{ text: string; provider: ProviderId; model: string }> {
   const { serverAiChat, readAiEnv, AiProviderUnavailableError } = await import("./provider");
   let record: ((r: UseRecord) => void) | undefined;
   try {
@@ -63,8 +73,7 @@ export async function aiChat(
     /* usage logging is optional — never block AI */
   }
   try {
-    const r = await serverAiChat(messages, opts, readAiEnv(), { onUse: record });
-    return r.text;
+    return await serverAiChat(messages, opts, readAiEnv(), { onUse: record });
   } catch (e) {
     if (e instanceof AiProviderUnavailableError) {
       throw new AiNotConfiguredError(e.message);

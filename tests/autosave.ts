@@ -244,6 +244,50 @@ section("autosave registry: shipped protection is not relabeled as missing (2026
     "academic memories name the fields the route accepts");
 }
 
+section("migrations: every file is accounted for, and the owner has a button (2026-11-11)");
+
+{
+  // The Migrations workflow failed AFTER merge at #289 because 0045 had no probe and
+  // the old self-test only looked at the newest file. These pins make the same gap
+  // fail in `npm test`, i.e. before a pull request can merge.
+  const markersSrc = readFileSync("scripts/migration-markers.mjs", "utf8");
+  const migrationFiles = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
+  const marked = new Set([...markersSrc.matchAll(/"(\d{4}_[a-z0-9_]+\.sql)":/g)].map((m) => m[1]));
+  const unaccounted = migrationFiles.filter((f) => !marked.has(f));
+  assert(unaccounted.length === 0, `every migration has a probe the database can answer (${unaccounted.join(", ") || "none missing"})`);
+  assert(marked.has(migrationFiles[migrationFiles.length - 1]), "the newest migration has a probe");
+  assert(marked.has("0045_response_edits.sql"), "0045 has the probe the failing workflow asked for");
+
+  const selfTest = readFileSync("scripts/apply-migrations.mjs", "utf8");
+  assert(selfTest.includes("unaccounted"),
+    "the CI pipeline refuses an unmarked migration instead of skipping it");
+  assert(!markersSrc.includes("LEGACY_UNMARKED"),
+    "there is no allowlist to hide an unmarked migration behind");
+
+  // The owner-facing path: a real page, a real owner-only route, and no request body
+  // it could be tricked into executing.
+  const route = readFileSync("src/app/api/owner/migrations/route.ts", "utf8");
+  assert(route.includes('profile.role !== "owner"') && route.includes("403"),
+    "the update endpoint is owner-only, checked on the server");
+  assert(route.includes("applyMigrationChainForOwner"), "it applies the repository's own chain, not anything from the request");
+  assert(!/request\.json|req\.json/.test(route), "the endpoint reads no request body, so nothing can be injected into the SQL");
+  assert(route.includes("unverifiable") && route.includes("409"),
+    "it refuses rather than guessing when a migration has no probe");
+
+  const page = readFileSync("src/app/owner/database/page.tsx", "utf8");
+  assert(page.includes("requireOwnerPage"), "the database page is owner-only too");
+  assert(page.includes("<DatabaseUpdates"), "the page renders the update control");
+  const control = readFileSync("src/app/owner/database/DatabaseUpdates.tsx", "utf8");
+  assert(control.includes("Update database") && control.includes("/api/owner/migrations"),
+    "the control is labelled in plain words and calls the owner endpoint");
+  assert(/Updates only add what is missing/.test(control),
+    "the page states that nothing is replaced or removed");
+
+  const nav = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  assert(nav.includes('href: "/owner/database"') && nav.includes("Database updates"),
+    "the owner navigation offers Database updates by name");
+}
+
 section("runtime smoke: the editor writes are probed, not just the pages (2026-11-10)");
 
 {
@@ -474,6 +518,35 @@ assert(
   (targetById("document_revisions")?.reason ?? "").includes("immutable"),
   "document revisions are explained as append-only rather than autosaved",
 );
+
+section("provenance: an answer records the engine that actually replied (2026-11-11)");
+
+{
+  const solve = readFileSync("src/app/api/ai/solve/route.ts", "utf8");
+  assert(!/model_used:\s*process\.env\.SOPHIRA_MODEL/.test(solve),
+    "the answer row no longer files every answer under one hardcoded cloud model name");
+  assert(solve.includes("provider_used: answeredBy?.provider ?? null"),
+    "the engine that replied is recorded, and NULL when nothing was measured");
+  assert(solve.includes("aiChatMeta"), "the record comes from the call that made the answer");
+
+  const client = readFileSync("src/lib/ai/client.ts", "utf8");
+  assert(client.includes("export async function aiChatMeta") && /return await serverAiChat/.test(client),
+    "aiChatMeta returns who answered instead of discarding it");
+
+  const view = readFileSync("src/components/app/AnswerProvenance.tsx", "utf8");
+  assert(view.includes("Nothing in this answer was sent to a cloud service"),
+    "a locally-written answer says so plainly");
+  assert(view.includes("came from a cloud service") && view.includes("were sent to it"),
+    "an answer written elsewhere says so, and says the work left the machine");
+  assert(view.includes("predates the record") && view.includes("will not claim either way"),
+    "an old answer with no record claims neither");
+
+  const mig = readFileSync("supabase/migrations/0046_response_provenance.sql", "utf8");
+  assert(/add column if not exists provider_used text/.test(mig),
+    "provenance is nullable so old rows are never back-filled with a guess");
+  assert(mig.includes("responses_provider_used_check"),
+    "only a real engine can be recorded");
+}
 
 section("autosave saver: the server's version is the only proof of a save");
 

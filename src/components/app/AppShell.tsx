@@ -4,7 +4,7 @@ import { SignOutButton } from "./SignOutButton";
 import { usePathname, useRouter } from "next/navigation";
 import { SyncStatus } from "@/components/app/SyncStatus";
 import { purgeOfflineOnLogout } from "@/lib/offline/client";
-import { Bell, CloudOff, ScanLine } from "lucide-react";
+import { Bell, CloudOff, ScanLine, Database } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -45,6 +45,9 @@ const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; la
     items: [
       { href: "/owner", label: "Dashboard overview", icon: Gauge },
       { href: "/owner/health", label: "System Health", icon: Gauge },
+      // 2026-11-11: production drifted nine tables behind with no way to update it
+      // from the app. This is that way, labelled in the owner's own words.
+      { href: "/owner/database", label: "Database updates", icon: Database },
     ],
   },
   {

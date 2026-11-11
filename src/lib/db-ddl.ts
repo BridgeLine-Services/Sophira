@@ -383,6 +383,102 @@ export async function probeSchemaStateDirect(): Promise<DirectSchemaProbe> {
   return out;
 }
 
+/**
+ * READ-ONLY migration scan (2026-11-11). Answers "which of the repository's
+ * migrations does this database already have?" without changing anything, so
+ * the Owner Dashboard can SHOW the gap before anyone presses a button.
+ *
+ * Uses the same probes as the chain applier (scripts/migration-markers.mjs,
+ * embedded per entry) so the two can never disagree about what is missing.
+ *
+ * An entry with no probe is reported as unverifiable rather than assumed
+ * applied: "we cannot tell" is a different fact from "it is done".
+ */
+export interface MigrationScan {
+  reachable: boolean;
+  channel: "direct-postgres" | "management-api" | "none";
+  applied: number;
+  pending: { name: string; label: string }[];
+  unverifiable: string[];
+}
+
+const migrationLabel = (name: string): string => {
+  const base = name.replace(/^\d+_/, "").replace(/\.sql$/, "").replace(/_/g, " ");
+  return base.charAt(0).toUpperCase() + base.slice(1);
+};
+
+export async function scanMigrations(): Promise<MigrationScan> {
+  const channel: MigrationScan["channel"] = directPostgresConfigured()
+    ? "direct-postgres"
+    : managementConfigured()
+      ? "management-api"
+      : "none";
+  const pending: { name: string; label: string }[] = [];
+  const unverifiable: string[] = [];
+  let applied = 0;
+
+  const note = (name: string, present: boolean) => {
+    if (present) applied += 1;
+    else pending.push({ name, label: migrationLabel(name) });
+  };
+
+  if (channel === "none") {
+    for (const e of MIGRATIONS) {
+      if (e.marker) pending.push({ name: e.name, label: migrationLabel(e.name) });
+      else unverifiable.push(e.name);
+    }
+    return { reachable: false, channel, applied: 0, pending, unverifiable };
+  }
+
+  if (channel === "direct-postgres") {
+    const connected = await connectFirstWorking();
+    if (!connected) {
+      for (const e of MIGRATIONS) {
+        if (e.marker) pending.push({ name: e.name, label: migrationLabel(e.name) });
+        else unverifiable.push(e.name);
+      }
+      return { reachable: false, channel, applied: 0, pending, unverifiable };
+    }
+    try {
+      for (const e of MIGRATIONS) {
+        if (!e.marker) { unverifiable.push(e.name); continue; }
+        let present = false;
+        try {
+          const r = await connected.client.query(`select (${e.marker}) as present;`);
+          present = r.rows[0]?.present === true;
+        } catch {
+          // A marker that throws means "not present" on an empty database.
+          present = false;
+        }
+        note(e.name, present);
+      }
+    } finally {
+      try { await connected.client.end(); } catch { /* already closed */ }
+    }
+    return { reachable: true, channel, applied, pending, unverifiable };
+  }
+
+  // Management API: same probes, one round trip each, read-only query endpoint.
+  const ref = process.env.SUPABASE_PROJECT_REF;
+  const token = process.env.SUPABASE_ACCESS_TOKEN;
+  try {
+    for (const e of MIGRATIONS) {
+      if (!e.marker) { unverifiable.push(e.name); continue; }
+      const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query: `select (${e.marker}) as present;` }),
+      });
+      if (!res.ok) return { reachable: false, channel, applied: 0, pending, unverifiable };
+      const rows = (await res.json()) as Array<{ present?: boolean }>;
+      note(e.name, Array.isArray(rows) && rows[0]?.present === true);
+    }
+    return { reachable: true, channel, applied, pending, unverifiable };
+  } catch {
+    return { reachable: false, channel, applied: 0, pending, unverifiable };
+  }
+}
+
 export async function applyMigrationChainDirect(): Promise<{
   ok: boolean;
   applied: number;

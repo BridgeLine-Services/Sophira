@@ -14,7 +14,7 @@ import {
   explainPatternDecisions,
   recordPatternEvidence,
 } from "@/lib/learning/evidence";
-import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
+import { AiNotConfiguredError, aiChat, aiChatMeta, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import {
   buildClassificationPrompt,
   buildSystemPrompt,
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
   // student's entire memory history.
   const { data: memoryRows } = await supabase
     .from("student_memories")
-    .select("id, user_id, category, statement, details, subject, subject_tags, confidence, status, improvement_trend, origin, source, first_observed, last_observed, last_used_at, created_at, updated_at")
+    .select("id, user_id, category, statement, details, subject, subject_tags, confidence, status, improvement_trend, origin, source, first_observed, last_observed, last_used_at, created_at, updated_at, course_id, teacher_id, assignment_id")
     .eq("user_id", user.id)
     .in("status", ["active", "monitoring", "improving"]);
   const memories = (memoryRows || []) as StudentMemory[];
@@ -208,6 +208,11 @@ export async function POST(request: NextRequest) {
     task_type: patternContext.task_type ?? null,
     mode,
     courseId: (body as { course_id?: string | null }).course_id ?? null,
+    // Scopes 4 and 5 (2026-11-11): a memory tied to this teacher or this
+    // assignment outranks the wider scopes, and one tied to a DIFFERENT teacher
+    // or assignment is not retrieved at all.
+    teacherId: (body as { teacher_id?: string | null }).teacher_id ?? null,
+    assignmentId: (body as { assignment_id?: string | null }).assignment_id ?? null,
   });
   // Genuinely used memories: record usage (drives recency ranking).
   if (memorySelection.decisions.length > 0) {
@@ -372,6 +377,9 @@ export async function POST(request: NextRequest) {
   }
 
   let content = "";
+  // Which engine answered. Known only after the call; "" until then, and the
+  // insert records NULL rather than guessing (2026-11-11).
+  let answeredBy: { provider: string; model: string } | null = null;
   let observedMistakesRaw: unknown = null;
   let observedPatternConflictsRaw: unknown = null;
   let verification: {
@@ -390,7 +398,7 @@ export async function POST(request: NextRequest) {
     kinds: string[];
   } = { results: [], allPassed: false, kinds: [] };
   try {
-    const raw = await aiChat(
+    const answered = await aiChatMeta(
       [
         { role: "system", content: systemPrompt },
         ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -398,6 +406,8 @@ export async function POST(request: NextRequest) {
       ],
       { temperature: 0.4, maxTokens: 4096, jsonMode: true, images }
     );
+    const raw = answered.text;
+    answeredBy = { provider: answered.provider, model: answered.model };
     const parsed = parseJsonLoose<{
       answer?: string;
       machine_checks?: unknown;
@@ -742,7 +752,10 @@ export async function POST(request: NextRequest) {
     mode,
     verification,
     context_applied: contextApplied,
-    model_used: process.env.SOPHIRA_MODEL || "gpt-4o-mini",
+    // Provenance is RECORDED, not guessed: aiChatMeta reports the engine that
+    // actually answered (2026-11-11).
+    model_used: answeredBy?.model ?? null,
+    provider_used: answeredBy?.provider ?? null,
   }).select("id").single();
 
   if (researchSources.length > 0 && !rErr && resp?.id) {
@@ -815,7 +828,9 @@ export async function POST(request: NextRequest) {
       classification,
       context_applied: contextApplied,
       research_integrity: integrityReport,
-      model_used: process.env.SOPHIRA_MODEL || "gpt-4o-mini",
+      // The engine that actually replied (2026-11-11). Never a guessed name.
+      model_used: answeredBy?.model ?? null,
+      provider_used: answeredBy?.provider ?? null,
     },
   });
 }

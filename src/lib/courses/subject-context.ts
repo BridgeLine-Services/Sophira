@@ -75,7 +75,15 @@ export async function sharedMemoryContext(
     .eq("user_id", userId)
     .in("status", RETRIEVABLE_STATUSES);
   const memories = (data ?? []) as StudentMemory[];
-  const selection = selectRelevantMemories(memories, { subject, courseId: courseId ?? null });
+  const selection = selectRelevantMemories(memories, {
+    subject,
+    courseId: courseId ?? null,
+    // Subject-level context has no teacher or assignment of its own, so both stay
+    // null: memories scoped to a specific teacher/assignment are correctly absent
+    // here rather than leaking into a general subject request (2026-11-11).
+    teacherId: null,
+    assignmentId: null,
+  });
   if (selection.decisions.length === 0) return "";
   const nowISO = new Date().toISOString();
   await supabase

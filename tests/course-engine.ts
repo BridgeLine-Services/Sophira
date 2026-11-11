@@ -437,7 +437,10 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const memEngine = readFileSync("src/lib/memory/engine.ts", "utf8");
   assert(memEngine.includes("course_id?: string | null;") && memEngine.includes("courseId?: string | null;"),
     "memory: engine types carry the course scope end to end");
-  assert(memEngine.includes("ctx.courseId && m.course_id === ctx.courseId) score += 0.6"),
+  // The literal 0.6 moved into the named SCOPE_BONUS table on 2026-11-11, so this
+  // pins the ORDER (which is the claim) instead of a magic number.
+  assert(memEngine.includes("m.course_id === ctx.courseId) score += SCOPE_BONUS.course") &&
+    /course: 0\.8/.test(memEngine) && /subjectTag: 0\.5/.test(memEngine),
     "memory: an exact-course match outranks a subject-tag match in relevance");
   assert(memEngine.includes("!(m.course_id && m.course_id !== ctx.courseId)"),
     "memory: a memory scoped to a DIFFERENT course never leaks into another course's or a course-less subject prompt");
