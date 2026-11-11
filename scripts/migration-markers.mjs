@@ -47,4 +47,66 @@ export const MARKERS = {
   // chain and the Migrations workflow failed on master. The probe checks the
   // last table it creates, which only exists once the migration really ran.
   "0044_media_ingestion.sql": "to_regclass('public.media_frames') is not null",
+  // 0045 (response edits) had no marker, so the Migrations workflow failed again at
+  // #289 exactly like 0044 did. The probe asks for the column that migration adds,
+  // so it is false before the migration and true only once it really ran.
+  "0045_response_edits.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'responses' and column_name = 'updated_at')",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0003_profile_versions_and_context.sql":
+    "to_regclass('public.profile_versions') is not null",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0004_sources_and_audit.sql":
+    "to_regclass('public.academic_sources') is not null",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0005_owner_membership_and_learning.sql":
+    "to_regclass('public.invitation_requests') is not null",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0009_typing_calibration.sql":
+    "to_regclass('public.typing_attempts') is not null",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0010_deadline_scheduling.sql":
+    "to_regclass('public.work_schedules') is not null",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0011_rubric_audits.sql":
+    "to_regclass('public.rubric_audits') is not null",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0012_research_tables.sql":
+    "to_regclass('public.research_projects') is not null",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0017_schedule_executions.sql":
+    "to_regclass('public.schedule_executions') is not null",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0018_adaptive_typing_profile.sql":
+    "to_regclass('public.typing_profiles') is not null",
+  // backfilled 2026-11-11 so a skip of this migration is detectable
+  "0030_subject_preferences.sql":
+    "to_regclass('public.subject_preferences') is not null",
+  // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
+  "0002_owner_only_invitations.sql":
+    "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_insert_own')",
+  // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
+  "0006_invitation_expiry.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'invitations' and column_name = 'expires_at')",
+  // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
+  "0007_intentional_habits.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'learning_patterns' and column_name = 'intentional')",
+  // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
+  "0013_claim_evidence.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'research_claims' and column_name = 'claim_id')",
+  // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
+  "0014_source_authority.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'research_sources' and column_name = 'authority_category')",
+  // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
+  "0015_submission_gate.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'responses' and column_name = 'submission_gate')",
+  // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
+  "0016_pattern_evidence.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'learning_patterns' and column_name = 'confirmation_count')",
+  // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
+  "0029_study_materials_course.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'study_materials' and column_name = 'course_id')",
+  // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
+  "0031_student_memory_course_scope.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'student_memories' and column_name = 'course_id')",
 };

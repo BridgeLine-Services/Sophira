@@ -395,6 +395,18 @@ async function applyMigrationChain(): Promise<SetupRepairResult> {
   }
 }
 
+/**
+ * Apply the ENTIRE migration chain, whatever is missing (2026-11-11).
+ *
+ * Exported for the Owner Dashboard's "Update database" button. The applier is
+ * the same one first launch uses, so the button and the wizard cannot drift
+ * apart. Unlike repairOwnerBootstrap this does NOT refuse an existing owner:
+ * keeping a live database current is the whole point.
+ */
+export async function applyMigrationChainForOwner(): Promise<SetupRepairResult> {
+  return await runChainAutomation();
+}
+
 /** The repair action from /setup and /create-owner: apply the missing
  *  first-owner bootstrap (0025) + recovery (0026) migrations. */
 export async function repairOwnerBootstrap(): Promise<SetupRepairResult> {
