@@ -183,14 +183,34 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
   },
   {
     id: "teacher_preferences",
-    label: "Teacher preferences",
+    label: "What a teacher requires",
+    // The entry named a `teacher_preferences` table with a `preferences` column.
+    // No such table exists: the requirements live on `teacher_profiles` as thirteen
+    // text columns (required_methods, show_work_rules, ...). Before 2026-11-10 the
+    // teacher page wrote them straight from the browser on a manual click with no
+    // version check. They now autosave through PUT /api/teachers/[id]/profile.
     table: "teacher_profiles",
-    route: null,
-    method: null,
-    fields: ["preferences"],
-    versionFrom: null,
-    coverage: "no-editor",
-    reason: "Teacher preferences are recorded from corrections, not typed into an editor.",
+    route: "/api/teachers/[id]/profile",
+    method: "PUT",
+    fields: [
+      "required_methods",
+      "required_steps",
+      "preferred_notation",
+      "units_sig_figs",
+      "formatting_requirements",
+      "citation_requirements",
+      "essay_structure",
+      "lab_report_requirements",
+      "preferred_terminology",
+      "show_work_rules",
+      "calculator_rules",
+      "allowed_tools",
+      "prohibited_tools",
+    ],
+    versionFrom: "data.updated_at",
+    coverage: "wired",
+    reason:
+      "Typing a teacher requirement saves through the revision-aware route; a stale tab is refused instead of overwriting newer requirements, and an archived teacher is not editable at all.",
   },
   {
     id: "scheduling",
