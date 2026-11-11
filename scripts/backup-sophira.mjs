@@ -95,6 +95,7 @@ const LABELS = {
   storage: "Uploaded files",
   storage_checksums: "File integrity",
   schema_state: "Database structure",
+  restore_drill: "Member sign-in after a restore",
   configuration: "Settings",
 };
 
@@ -112,6 +113,10 @@ function summarize(manifest) {
     lines.push(`- ${LABELS[c.key] ?? c.key}: ${PLAIN[c.status] ?? c.status}`);
   }
   lines.push(`- Files protected: ${manifest.objects_count}`);
+  const drill = (manifest.components ?? []).find((c) => c.key === "restore_drill");
+  if (drill && drill.status !== "pass") {
+    lines.push(`- ${LABELS.restore_drill}: ${drill.detail ?? "not checked yet"}`);
+  }
   if (!manifest.ok) {
     const broken = manifest.components.filter((c) => REQUIRED.includes(c.key) && c.status !== "pass");
     lines.push("");
@@ -149,6 +154,46 @@ function verifyManifest(raw) {
 }
 
 // ---- live backup ---------------------------------------------------------
+/**
+ * Reads one value from the live database. Used as EVIDENCE: a count of member
+ * accounts inside the export, and the tables that actually exist. When psql is
+ * missing or the database refuses, the caller must report "blocked", never "pass".
+ */
+function queryValue(dbUrl, sql) {
+  if (!has("psql")) return { ok: false, reason: "psql is not installed, so the live database could not be read" };
+  const r = spawnSync("psql", ["--no-psqlrc", "-t", "-A", "-q", "-v", "ON_ERROR_STOP=1", "--dbname", dbUrl, "-c", sql], { encoding: "utf8" });
+  if (r.status !== 0) return { ok: false, reason: "the database did not answer the check" };
+  return { ok: true, value: (r.stdout ?? "").trim() };
+}
+
+/**
+ * A practice restore is the only proof that members can sign in again. The record
+ * is a file the restore drill writes; without it the component stays "not_run".
+ */
+function readRestoreDrill() {
+  const file = process.env.SOPHIRA_RESTORE_DRILL;
+  if (!file) return { status: "not_run", detail: "a practice restore has not been run, so member sign-in after a restore is not proven yet" };
+  let record;
+  try {
+    record = JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return { status: "blocked", detail: "the practice-restore record could not be read, so sign-in is still unproven" };
+  }
+  const when = new Date(String(record?.verified_at ?? ""));
+  if (Number.isNaN(when.getTime())) {
+    return { status: "blocked", detail: "the practice-restore record has no usable date, so sign-in is still unproven" };
+  }
+  const days = Math.floor((Date.now() - when.getTime()) / 86_400_000);
+  const stamp = when.toISOString().slice(0, 10);
+  if (record?.signin_verified !== true) {
+    return { status: "fail", detail: `the practice restore on ${stamp} did not confirm that members could sign in` };
+  }
+  if (days > 180) {
+    return { status: "blocked", detail: `the last confirmed practice restore was ${stamp} (${days} days ago); run a new one` };
+  }
+  return { status: "pass", detail: `members signed in after a practice restore on ${stamp}` };
+}
+
 function has(command) {
   return spawnSync(command, ["--version"], { stdio: "ignore" }).status === 0;
 }
@@ -195,6 +240,7 @@ async function runBackup(outDir) {
 
   if (!base || !key || !dbUrl) {
     for (const k of REQUIRED) components.push({ key: k, status: "blocked", detail: "Sophira was not given access to its own storage" });
+    components.push({ key: "restore_drill", ...readRestoreDrill() });
     const blockedManifest = buildManifest({
       id: `blocked-${Date.now()}`, components, objects: [], commit: null,
       schemaVersion: scope.migrations.length, warnings: ["access was not available, so nothing was backed up"],
@@ -218,14 +264,27 @@ async function runBackup(outDir) {
   }
   components.push({ key: "database", status: dbStatus, detail: dbDetail });
 
-  // Member logins live in the same database, but only a restore proves they work.
-  components.push({
-    key: "identities",
-    status: dbStatus === "pass" ? "pass" : "blocked",
-    detail: dbStatus === "pass"
-      ? "included in the database export; sign-in is only proven by a practice restore"
-      : "not exported, so member sign-in cannot be preserved yet",
-  });
+  // Member accounts live in the same database. A dump proves a FILE was written; it
+  // does NOT prove the account rows are inside it, and it never proves sign-in. The
+  // component is only "pass" when the account rows were actually counted, and the
+  // separate restore_drill component carries the sign-in proof (2026-11-10).
+  if (dbStatus !== "pass") {
+    components.push({ key: "identities", status: "blocked", detail: "not exported, so member accounts cannot be preserved yet" });
+  } else {
+    const accounts = queryValue(dbUrl, "select count(*) from auth.users");
+    if (!accounts.ok) {
+      components.push({ key: "identities", status: "blocked", detail: accounts.reason });
+    } else {
+      const n = Number(accounts.value);
+      components.push({
+        key: "identities",
+        status: Number.isFinite(n) && n > 0 ? "pass" : "fail",
+        detail: Number.isFinite(n) && n > 0
+          ? `${n} member account(s) are inside the export; signing in is proven only by a practice restore`
+          : "the database reported no member accounts, so there is nothing to restore",
+      });
+    }
+  }
 
   let objects = [];
   let storageStatus = "pass", checksumStatus = "pass", storageDetail = "every file was copied";
@@ -241,7 +300,24 @@ async function runBackup(outDir) {
   }
   components.push({ key: "storage", status: storageStatus, detail: storageDetail });
   components.push({ key: "storage_checksums", status: checksumStatus, detail: objects.length ? `${objects.length} file(s) fingerprinted` : "no files to fingerprint" });
-  components.push({ key: "schema_state", status: "pass", detail: `${scope.migrations.length} updates recorded` });
+  // The number of migration FILES says what should exist; it says nothing about what
+  // the live database actually has. Compare the two, and stay "blocked" when the live
+  // schema cannot be read (2026-11-10).
+  const liveTables = queryValue(dbUrl, "select table_name from information_schema.tables where table_schema = 'public'");
+  if (!liveTables.ok) {
+    components.push({ key: "schema_state", status: "blocked", detail: liveTables.reason });
+  } else {
+    const present = new Set(liveTables.value.split("\n").map((t) => t.trim().toLowerCase()).filter(Boolean));
+    const missing = scope.tables.filter((t) => !present.has(t));
+    components.push({
+      key: "schema_state",
+      status: missing.length === 0 ? "pass" : "fail",
+      detail: missing.length === 0
+        ? `${scope.tables.length} of ${scope.tables.length} expected tables are present in the live database`
+        : `${missing.length} expected table(s) are missing from the live database`,
+    });
+  }
+  components.push({ key: "restore_drill", ...readRestoreDrill() });
   components.push({ key: "configuration", status: "pass", detail: "no passwords or keys are stored in the backup record" });
 
   const commit = spawnSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).stdout?.trim() || null;

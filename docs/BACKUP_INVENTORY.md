@@ -186,3 +186,34 @@ The bucket must never be made public to simplify a test or a restore.
 
 The last three rows are the reason Stage 1 is not marked complete. The rules are proven; the
 live run is blocked on access this environment does not have.
+
+## What each line means (2026-11-10)
+
+A backup line is only marked **protected** when there is evidence behind it.
+
+| Line | Marked protected only when |
+|---|---|
+| Your database | the export file was actually written |
+| Member accounts | the account rows were counted inside the database being exported |
+| Uploaded files | every listed file was copied |
+| File integrity | every copied file has a checksum |
+| Database structure | the tables the migrations expect were found in the **live** database |
+| Member sign-in after a restore | a practice restore ran, members signed in, and the record is under 180 days old |
+
+The last line is deliberately separate from "Member accounts". Having the account rows in a
+database file is not the same as proving somebody can sign in again, and a file count is not a
+backup. Until a practice restore has been recorded, Sophira reports the backup as needing
+attention instead of calling it complete.
+
+To record a practice restore, write a small file and point Sophira at it:
+
+```json
+{ "verified_at": "2026-11-08T15:00:00.000Z", "signin_verified": true }
+```
+
+```
+SOPHIRA_RESTORE_DRILL=/path/to/restore-drill.json node scripts/backup-sophira.mjs --run
+```
+
+A record that says sign-in was not confirmed, or one older than 180 days, never reports as
+protected.
