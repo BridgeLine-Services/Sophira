@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { publicSupabaseUrl, serviceRoleKey } from "../../../lib/supabase-config";
 import { createClient } from "../../../lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { callDbFunction, privilegedChannelConfigured, privilegedChannelReachable, provisionSignedInUser, ensureAuthRedirectConfig } from "../../../lib/db-privileged";
+import { privilegedChannelReachable, provisionSignedInUser, ensureAuthRedirectConfig } from "../../../lib/db-privileged";
 
 export const dynamic = "force-dynamic";
 

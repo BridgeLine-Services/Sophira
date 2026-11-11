@@ -22,7 +22,7 @@
  * Pure functions only — offline-testable with an injected clock (spec §34).
  */
 
-import { clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS, type SchedulePlan, type Urgency } from "./scheduler";
+import { clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "./scheduler";
 
 export type ExecutionState =
   | "WORKING"

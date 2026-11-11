@@ -4,10 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/app/AppShell";
-import {
-  Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, Input, Label,
-  Select, Spinner, useToast,
-} from "@/components/ui";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Spinner, useToast } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { InvitationRequest, Profile } from "@/lib/types";
 import { ShieldCheck, Smartphone, Download } from "lucide-react";
@@ -176,7 +173,6 @@ export default function SettingsPage() {
       setReqBusy(false);
     }
   }
-
 
   async function changePassword(e: FormEvent) {
     e.preventDefault();

@@ -8,72 +8,23 @@
  */
 
 import { hostIs, mentionsHost, schemeIs } from "./helpers/url";
-import {
-  composeAcademicContext,
-  findSourceConflicts,
-  activeDocs,
-  wrapUntrusted,
-  detectInjectionAttempt,
-} from "../src/lib/ai/context";
+import { composeAcademicContext, findSourceConflicts, activeDocs, wrapUntrusted, detectInjectionAttempt } from "../src/lib/ai/context";
 import { routeSubject, routeMathTopic } from "../src/lib/ai/subjects";
-import {
-  runWritingReview, applyAcceptedChanges, citationFindings, reviewSummary,
-} from "../src/lib/writing/review";
-import {
-  runOriginalityReview, findExactOverlaps, findCloseParaphrases, findUnattributedQuotations,
-  findMissingCitations, originalityScopeNote, type OriginalitySource,
-} from "../src/lib/writing/originality";
-import {
-  checkUnsupportedClaims, checkFormatting, checkBibliography, checkRubric,
-} from "../src/lib/writing/quality-checks";
-import {
-  normalizeInstanceUrl, canvasAuthorizeUrl, canvasConfigured, CANVAS_SCOPES,
-  CANVAS_MAX_DESCRIPTION_CHARS, CANVAS_MAX_ATTACHMENT_BYTES,
-  normalizeDueAt, clampText, normalizeAssignment, assignmentFingerprint,
-  planAssignmentSync, attachmentAllowed, describeSyncCounts,
-  type NormalizedAssignment,
-} from "../src/lib/integrations/canvas";
+import { runWritingReview, applyAcceptedChanges, citationFindings, reviewSummary } from "../src/lib/writing/review";
+import { runOriginalityReview, findExactOverlaps, findCloseParaphrases, findUnattributedQuotations, findMissingCitations, originalityScopeNote, type OriginalitySource } from "../src/lib/writing/originality";
+import { checkUnsupportedClaims, checkFormatting, checkBibliography, checkRubric } from "../src/lib/writing/quality-checks";
+import { normalizeInstanceUrl, canvasAuthorizeUrl, canvasConfigured, CANVAS_SCOPES, CANVAS_MAX_DESCRIPTION_CHARS, CANVAS_MAX_ATTACHMENT_BYTES, normalizeDueAt, clampText, normalizeAssignment, assignmentFingerprint, planAssignmentSync, attachmentAllowed, describeSyncCounts, type NormalizedAssignment } from "../src/lib/integrations/canvas";
 import { runMachineChecks } from "../src/lib/ai/mathverify";
 import { normalizeMethodCompliance } from "../src/lib/ai/compliance";
 import { docxHtmlToStructuredText, parsePptx, parseSpreadsheet, parseCsv } from "../src/lib/extract/documents";
-import {
-  scopeMatches, selectApplicablePatterns, bumpedConfidence, normalizeObservedMistakes,
-  matchesExistingPattern, transitionPattern, patternsForPrompt, describePatternStatus,
-  intentionalWritingHabits, isPatternStale, describeStaleness, STALE_AFTER_DAYS,
-  type LearningPattern,
-} from "../src/lib/learning/patterns";
+import { scopeMatches, selectApplicablePatterns, bumpedConfidence, normalizeObservedMistakes, matchesExistingPattern, transitionPattern, patternsForPrompt, describePatternStatus, intentionalWritingHabits, isPatternStale, describeStaleness, STALE_AFTER_DAYS, type LearningPattern } from "../src/lib/learning/patterns";
 import { buildReadiness, type ReadinessInput } from "../src/lib/readiness";
-import {
-  evaluateFinalGate, formatFinalGate, findUnresolvedPlaceholders,
-  type FinalGateInput, type FinalGateResearch,
-} from "../src/lib/readiness/finalGate";
-import {
-  recordPatternEvidence, applyTimeDecay, applyContradictionDecay,
-  explainPatternDecisions, selectApplicablePatternsAdaptive,
-  EVIDENCE_TYPES, CONFIDENCE_FLOOR, CONFIDENCE_CAP,
-  LOWER_CONFIDENCE_BELOW, TIME_DECAY_GRACE_DAYS,
-  type EvidenceType, type PatternEvidence,
-} from "../src/lib/learning/evidence";
-import {
-  createExecutionRow, reconcileExecution, applyExecutionAction,
-  replanExecution, executionView, planSessionsOf, totalWorkSeconds,
-  breakWindowFor,
-  type ExecutionRow, type ExecutionAction,
-} from "../src/lib/schedule-execution";
-import {
-  recomputeTypingProfile, effectiveTypingPace, trustworthyObservations,
-  RECENT_WINDOW, PLAUSIBLE_MAX_WPM, type ObservedTypingAttempt,
-} from "../src/lib/typing-profile";
-import {
-  clampConfidence, recencyWeight, recomputeConfidence, confidenceAfterEvidence,
-  computeTrend, statusAfterRecompute, studentTransition, selectRelevantMemories, SCOPE_BONUS,
-  MEMORY_CATEGORIES, MAX_PROMPT_MEMORIES, RETRIEVABLE_STATUSES, MONITORING_BELOW,
-  type StudentMemory, type MemoryEvidenceRow,
-} from "../src/lib/memory/engine";
-import {
-  validateNativeAppUrl, resolveNativeServerUrl, isReleaseBuild,
-  REMOVED_FALLBACK_URL, DEV_DEFAULT_URL,
-} from "../src/lib/native-url";
+import { evaluateFinalGate, formatFinalGate, findUnresolvedPlaceholders, type FinalGateInput, type FinalGateResearch } from "../src/lib/readiness/finalGate";
+import { recordPatternEvidence, applyTimeDecay, applyContradictionDecay, explainPatternDecisions, selectApplicablePatternsAdaptive, EVIDENCE_TYPES, CONFIDENCE_FLOOR, CONFIDENCE_CAP, TIME_DECAY_GRACE_DAYS } from "../src/lib/learning/evidence";
+import { createExecutionRow, reconcileExecution, applyExecutionAction, replanExecution, executionView, planSessionsOf, totalWorkSeconds, breakWindowFor, type ExecutionRow } from "../src/lib/schedule-execution";
+import { recomputeTypingProfile, effectiveTypingPace, trustworthyObservations, RECENT_WINDOW, type ObservedTypingAttempt } from "../src/lib/typing-profile";
+import { clampConfidence, recencyWeight, recomputeConfidence, confidenceAfterEvidence, computeTrend, statusAfterRecompute, studentTransition, selectRelevantMemories, SCOPE_BONUS, MEMORY_CATEGORIES, MAX_PROMPT_MEMORIES, RETRIEVABLE_STATUSES, MONITORING_BELOW, type StudentMemory, type MemoryEvidenceRow } from "../src/lib/memory/engine";
+import { validateNativeAppUrl, resolveNativeServerUrl, isReleaseBuild, REMOVED_FALLBACK_URL, DEV_DEFAULT_URL } from "../src/lib/native-url";
 import * as fs from "fs";
 import * as path from "path";
 import type { Profile, Course, TeacherProfile, WritingProfile } from "../src/lib/types";
@@ -92,17 +43,8 @@ import LicensePage from "../src/app/license/page";
 import { loadLegalDoc, legalPlaceholdersRemain } from "../src/lib/legal";
 import { formatCitation, buildBibliography, extractCitationMarkers, quoteInContent, claimSupportsDeterministic, parseISODateLoose } from "../src/lib/research/citation";
 import { generateQueries, normalizeUrl, dedupeSources, rankCandidates } from "../src/lib/research/research";
-import {
-  normalizeClaimCandidates, extractFactualSentences, locatePassage, claimNumbersSupported,
-  verifyClaimAgainstSource, verifyClaims, claimLevelStatus, buildIntegrityReport, formatIntegrityReport,
-  authorityScore, authorityVerdict,
-  type SourceForClaims, type ClaimEvidenceRecord, type IntegrityReportInput,
-} from "../src/lib/research/claims";
-import {
-  classifyAssignment, parseTeacherSourceType, rankCandidatesForAssignment,
-  registerAuthorityProfile, AUTHORITY_PROFILES,
-  type AuthorityDecision,
-} from "../src/lib/research/authority";
+import { normalizeClaimCandidates, extractFactualSentences, locatePassage, claimNumbersSupported, verifyClaimAgainstSource, verifyClaims, claimLevelStatus, buildIntegrityReport, formatIntegrityReport, authorityScore, authorityVerdict, type SourceForClaims, type ClaimEvidenceRecord, type IntegrityReportInput } from "../src/lib/research/claims";
+import { classifyAssignment, parseTeacherSourceType, rankCandidatesForAssignment, registerAuthorityProfile, AUTHORITY_PROFILES, type AuthorityDecision } from "../src/lib/research/authority";
 import type { SearchHit } from "../src/lib/research/provider";
 import { planReveal, visibleAt, pacingComplete } from "../src/lib/pacing";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
@@ -953,7 +895,6 @@ section("11. Composer applies learning honestly — what was applied comes from 
   assert(composed.applied.learning.patterns_considered === 4, "patterns considered counts ALL patterns, applied lists only relevant ones");
 }
 
-
 section("12a. Order of authority is declared up front (hierarchy)");
 {
   const course: Course = {
@@ -1036,7 +977,6 @@ section("12. Intentionally preserved habits — explicit opt-in, writing only (w
   assert(mj.includes("KNOWN RECURRING MISTAKES"), "in math the pattern remains an honest watch-for mistake");
   assert((mathTask.applied.learning.writing_habits_applied?.length ?? 0) === 0, "applied metadata reports zero habits for non-writing tasks");
 }
-
 
 /* ---------------------------------------------------------------- */
 
@@ -1285,7 +1225,6 @@ section("16. Proprietary license and legal documents (spec §11–§14)");
     "legal: review notice points to the configuration file of owner-supplied values");
 }
 
-
 // ---------------------------------------------------------------------------
 // LIVE Gemini verification (LIVE_GEMINI=1 + GEMINI_API_KEY in the server
 // environment): exercises the REAL serverAiChat / geminiChat code path
@@ -1376,7 +1315,6 @@ export async function runResearchLiveTests(): Promise<void> {
   console.log("  LIVE research verification complete: 4 real sources fetched, 1 dead link detected, " +
     "1 redirect followed, 1 refused page honestly categorized, claims + citation checked against genuinely retrieved content.");
 }
-
 
 // ---------------------------------------------------------------------------
 // In-app legal pages (legal-infrastructure round): the app renders the REAL
@@ -2075,7 +2013,6 @@ const __researchTests = (async () => {
   }
 })();
 
-
 // ---------------------------------------------------------------------------
 // /api/health deployment-configuration readiness (implementation-audit round
 // 2026-10-05, critical blocker CB3): the endpoint must report WHICH
@@ -2131,8 +2068,6 @@ async function runHealthTests(): Promise<void> {
     }
   }
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Deployment readiness + legal-placeholder status (2026-10-05, closing the
@@ -2194,7 +2129,6 @@ async function runDeploymentTests(): Promise<void> {
     assert(self.status === 0 && self.stdout.includes("7 live + 10 env rules"), "deployment: the release-workflow verifier script's self-test passes (7 live rules + 10 offline env rules)");
   }
 }
-
 
 // ---------------------------------------------------------------------------
 // PATTERN EVIDENCE & CONFIDENCE DECAY (2026-10-05): upgrades the existing
@@ -2390,7 +2324,6 @@ async function runPatternEvidenceTests(): Promise<void> {
   }
 }
 
-
 // ---------------------------------------------------------------------------
 // PERSISTENT SCHEDULE EXECUTION STATE MACHINE (2026-10-05): a server-side
 // persisted execution state on top of the UNCHANGED scheduler
@@ -2542,7 +2475,6 @@ async function runExecutionTests(): Promise<void> {
   }
 }
 
-
 // ---------------------------------------------------------------------------
 // OPTIONAL ADAPTIVE TYPING PROFILE (2026-10-05): built on top of the
 // UNCHANGED typing test (computeTypingResult/adoptBaseline/canonical
@@ -2642,7 +2574,6 @@ async function runTypingProfileTests(): Promise<void> {
   }
 }
 
-
 // ---------------------------------------------------------------------------
 // NATIVE APP URL — no silent production fallback (2026-10-05). Release
 // builds REQUIRE a defined, valid, non-placeholder https SOPHIRA_APP_URL;
@@ -2735,7 +2666,6 @@ async function runNativeUrlTests(): Promise<void> {
       "url: the pure validator accepts a clean https URL");
   }
 }
-
 
 // ---------------------------------------------------------------------------
 // SECURITY REGRESSION (2026-10-05) — permanent privacy gate, part of the
@@ -2856,7 +2786,6 @@ async function runSecurityRegressionTests(): Promise<void> {
       "security: middleware-side auth enforcement exists alongside RLS");
   }
 }
-
 
 // ---------------------------------------------------------------------------
 // INVITATION-ONLY ACCESS VERIFICATION (2026-10-05) — §23.
@@ -3211,13 +3140,13 @@ async function runIntegrationsDoctorTests(): Promise<void> {
 async function runLintGateTests(): Promise<void> {
   const { execFileSync } = await import("node:child_process");
   const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-  assert(/eslint .*--max-warnings=107/.test(pkg.scripts.lint || ""),
-    "lint: the warning ratchet is pinned at today's 107, so no new debt can land");
+  assert(/eslint .*--max-warnings=33/.test(pkg.scripts.lint || ""),
+    "lint: the warning ratchet is pinned at today's 33, so no new debt can land");
   let errors = -1;
   try {
     // Direct binary (no npx banner on stdout). Exit 0 == zero errors AND warnings
     // within the pinned ratchet, so the command itself is the contract.
-    execFileSync("node_modules/.bin/eslint", ["src", "scripts", "tests", "--max-warnings=107"], {
+    execFileSync("node_modules/.bin/eslint", ["src", "scripts", "tests", "--max-warnings=33"], {
       encoding: "utf8", stdio: "pipe",
     });
     errors = 0;
@@ -4361,7 +4290,6 @@ async function runAccessControlTests(): Promise<void> {
   }
 }
 
-
 /* ------------------------------------------------------------------ */
 /* 28. LONG-TERM STUDENT MEMORY (workflow §28) — structured academic   */
 /*     memory layer: evidence-backed hypotheses, recency-weighted     */
@@ -5478,5 +5406,4 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     passed += r.passed;
     failed += r.failed;
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
-
 

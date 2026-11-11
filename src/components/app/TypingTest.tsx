@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createTypingTracker, rawTypingAccuracy, correctionRate } from "@/lib/typing";
+import { createTypingTracker } from "@/lib/typing";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, Spinner, useToast } from "@/components/ui";
 import { Gauge, RefreshCw, Target } from "lucide-react";
 

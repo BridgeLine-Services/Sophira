@@ -11,15 +11,8 @@
  * time-wasting, impossible deadlines told immediately and never faked).
  */
 
-import {
-  ESSAY_STAGES, stageIndex, nextStage, formatAssignmentPlan,
-  newEssaySession, canDraft, nextSectionToDraft, allSectionsDrafted, assembledEssay,
-  type OutlineSection,
-} from "../src/lib/essay/pipeline";
-import {
-  OUTPUT_MODE_LABELS, effectiveRevealWpm, selectedWpm, serializeReveal, restoreReveal, revealStorageKey,
-  SLOW_FACTOR, MIN_REVEAL_WPM, type CalibratedProfile, type OutputMode,
-} from "../src/lib/essay/pacing";
+import { ESSAY_STAGES, stageIndex, nextStage, formatAssignmentPlan, newEssaySession, canDraft, nextSectionToDraft, allSectionsDrafted, assembledEssay, type OutlineSection } from "../src/lib/essay/pipeline";
+import { OUTPUT_MODE_LABELS, effectiveRevealWpm, selectedWpm, serializeReveal, restoreReveal, revealStorageKey, SLOW_FACTOR, MIN_REVEAL_WPM, type CalibratedProfile } from "../src/lib/essay/pacing";
 import { planEssaySchedule } from "../src/lib/essay/schedule";
 import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "../src/lib/scheduler";
 import { PacingController } from "../src/lib/pacing-controller";

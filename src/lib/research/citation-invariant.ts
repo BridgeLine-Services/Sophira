@@ -18,7 +18,6 @@
  * authority.ts, verify.ts — all preserved) rather than replacing it.
  */
 
-import { locatePassage } from "./claims";
 import { formatCitation, type CitationSource } from "./citation";
 
 /* ------------------------------------------------------------------ */

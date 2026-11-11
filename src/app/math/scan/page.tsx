@@ -1,14 +1,14 @@
 "use client";
 
 import { Suspense, useRef, useState } from "react";
-import Link from "next/link";
+
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Input, Label, Spinner, useToast } from "@/components/ui";
-import { preprocessForOcr, detectExpression, toGrayscale, type GrayImage } from "@/lib/math/image";
+import { Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Label, Spinner, useToast } from "@/components/ui";
+import { preprocessForOcr, detectExpression, toGrayscale } from "@/lib/math/image";
 import { PipelineView } from "@/components/math/PipelineView";
-import { TypesetMath } from "@/components/math/TypesetMath";
-import { AlertTriangle, Camera, CheckCheck, ScanLine, ShieldCheck } from "lucide-react";
+
+import { Camera, ScanLine } from "lucide-react";
 
 /**
  * Scan Problem (2026-10-06): image-to-solution pipeline.

@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Label, Spinner, useToast } from "@/components/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, Spinner, useToast } from "@/components/ui";
 import { MathKeyboard } from "@/components/math/MathKeyboard";
 import { PipelineView, type PipelineResult } from "@/components/math/PipelineView";
-import { Delete, Lightbulb, Sparkles } from "lucide-react";
+import { Lightbulb, Sparkles } from "lucide-react";
 
 /**
  * TYPE TO SOLVE (workflow-separation round, 2026-10-14): this page is the
@@ -17,7 +17,6 @@ import { Delete, Lightbulb, Sparkles } from "lucide-react";
  * expression string is the single source of truth; switching modes or
  * opening the keyboard NEVER clears it.
  */
-
 
 function MathTypePageInner() {
   const router = useRouter();

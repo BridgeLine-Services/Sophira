@@ -59,7 +59,10 @@ export default function CreateOwnerPage() {
       setAutoRepairTried(true);
       void repair();
     }
-  }, [status, autoRepairTried]);
+    // `repair` is a plain function declared below, so its identity changes every
+    // render. It is listed for correctness; the autoRepairTried guard above is what
+    // keeps this a single automatic attempt.
+  }, [status, autoRepairTried, repair]);
 
 
 

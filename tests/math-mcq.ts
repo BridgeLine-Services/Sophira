@@ -2,7 +2,7 @@
  * MCQ + editor + typeset regression (2026-10-14). Run via the project's
  * tsx runner. Real mathematical assertions only - no string smoke tests.
  */
-import { analyzeMultipleChoice, detectChoices } from "../src/lib/math/mcq";
+import { analyzeMultipleChoice } from "../src/lib/math/mcq";
 import { latexToCanonical } from "../src/lib/math/latex";
 
 let n = 0;

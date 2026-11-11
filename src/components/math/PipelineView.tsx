@@ -1,5 +1,5 @@
 "use client";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Spinner } from "@/components/ui";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from "@/components/ui";
 
 export interface PipelineResult {
   status: "OK" | "NEEDS CONFIRMATION" | "NEEDS REVIEW";

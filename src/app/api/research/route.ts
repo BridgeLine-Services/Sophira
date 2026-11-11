@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
-import { getSearchProvider, searchProviderConfigured, searchModeNotice, SearchNotConfiguredError } from "@/lib/research/provider";
+import { searchProviderConfigured, searchModeNotice } from "@/lib/research/provider";
 import { generateQueries } from "@/lib/research/research";
 import { executeResearchPass } from "@/lib/research/run";
 import { evaluateInformationRequest } from "@/lib/research/policy";

@@ -12,7 +12,7 @@
  */
 
 import { decodeHtmlEntities } from "../text/entities";
-import { htmlInlineText, htmlToStructuredText } from "../text/html-blocks";
+import { htmlToStructuredText } from "../text/html-blocks";
 
 export interface ParsedDocument {
   text: string;

@@ -44,6 +44,14 @@ export interface SourceDecision {
 }
 
 const RESTRICTED_HOST_SUFFIXES = [".mil"];
+// Access-controlled login surfaces (2026-11-11): an SSO/SAML endpoint is a gate,
+// never a source. The Phase 2G matrix asserts https://sso.agency.gov/saml is
+// refused, and the policy previously allowed it - the wording promised Sophira
+// never works around a login, but nothing in the classifier recognised a login.
+// Deliberately narrow: a bare "sso" SUBSTRING would also match innocent names
+// (e.g. /blossom.pdf), so hosts are matched by prefix and endpoints by path.
+const RESTRICTED_HOST_PREFIXES = ["sso.", "login.", "adfs.", "idp.", "auth."];
+const RESTRICTED_PATH_MARKERS = ["/saml", "/sso/", "/adfs/", "/oauth2/authorize", "/openid-connect/"];
 const RESTRICTED_MARKERS = [
   "classified",
   "restricted",
@@ -98,7 +106,10 @@ export function isProhibitedHost(hostname: string): boolean {
 function hasRestrictedSignal(url: URL): boolean {
   const host = url.hostname.toLowerCase();
   if (RESTRICTED_HOST_SUFFIXES.some((s) => host.endsWith(s))) return true;
-  const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
+  if (RESTRICTED_HOST_PREFIXES.some((p) => host.startsWith(p))) return true;
+  const path = url.pathname.toLowerCase();
+  if (RESTRICTED_PATH_MARKERS.some((p) => path.includes(p))) return true;
+  const haystack = `${host}${path}${url.search}`.toLowerCase();
   return RESTRICTED_MARKERS.some((m) => haystack.includes(m));
 }
 

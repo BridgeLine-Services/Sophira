@@ -53,7 +53,6 @@ const SERVICE_MESSAGE =
 export function classifyAuthError(err: AuthErrorInput): ClassifiedAuthError {
   const code = (err.code ?? "").toLowerCase();
   const message = (err.message ?? "").toLowerCase();
-  const combined = `${code} ${message}`;
 
   // 1. Email not confirmed — actionable guidance, never a fake credential error.
   if (

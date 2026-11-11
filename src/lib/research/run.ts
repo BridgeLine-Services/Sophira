@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSearchProvider } from "./provider";
 import { fetchAndVerify, titlesCorrespond } from "./verify";
-import { dedupeSources, rankCandidates } from "./research";
+import { dedupeSources } from "./research";
 import { rankCandidatesForAssignment } from "./authority";
 import { parseISODateLoose } from "./citation";
 
