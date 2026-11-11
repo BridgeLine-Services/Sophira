@@ -244,6 +244,43 @@ section("autosave registry: shipped protection is not relabeled as missing (2026
     "academic memories name the fields the route accepts");
 }
 
+section("assignment editor: the member's own brief is editable and saved (2026-11-10)");
+
+{
+  const route = readFileSync("src/app/api/assignments/[id]/route.ts", "utf8");
+  assert(route.includes("export async function PATCH"), "the assignment route accepts a revision-aware update");
+  assert(route.includes('x-sophira-base-version') && route.includes("409"),
+    "a concurrent change is refused with 409 instead of overwriting newer work");
+  assert(route.includes('eq("user_id", user.id)'),
+    "the write is scoped to the signed-in member in the query as well as in RLS");
+  assert(route.includes("instructions_text"),
+    "the brief is saved into the real column, not the imaginary `instructions`");
+  assert(!/patch\.due_date|due_date:/.test(route),
+    "the route never writes a due date the assignments table does not have");
+
+  const editor = readFileSync("src/components/app/AssignmentDetailsEditor.tsx", "utf8");
+  assert(editor.includes("useAutosave") && editor.includes("<SaveStatus"),
+    "the editor uses the autosave engine and shows the member its state");
+  assert(editor.includes("initialVersion: initial.updated_at"),
+    "the editor loads with the version it rendered, so a stale tab cannot silently win");
+  assert(editor.includes("resolveConflict(\"mine\")") && editor.includes("resolveConflict(\"theirs\")"),
+    "a conflict is the member's choice, both ways");
+  assert(editor.includes("useComposerDraft") && editor.includes('draftKey(["assignment-details"'),
+    "a pasted brief survives a closed tab in the encrypted device draft");
+  assert(/setBrief\(\(cur\) => \(cur\.trim\(\) \? cur : kept\.text/.test(editor),
+    "a restored draft fills only an empty brief");
+
+  const workspace = readFileSync("src/app/assignments/[id]/Workspace.tsx", "utf8");
+  assert(workspace.includes("<AssignmentDetailsEditor"),
+    "the assignment page really renders the editor");
+
+  const entry = targetById("assignments")!;
+  assert(entry.coverage === "wired" && entry.route === "/api/assignments/[id]",
+    "the registry points at the editor that now exists");
+  assert(JSON.stringify(entry.fields) === JSON.stringify(["title", "instructions_text"]),
+    "the registry names the two fields the route accepts");
+}
+
 section("autosave registry: every entry matches the route it describes (2026-11-10)");
 
 {
@@ -378,7 +415,7 @@ const payload = { session_id: "s1", outline: [{ title: "Intro" }] };
 
 // 5. A target with no route cannot pretend to save.
 {
-  const none = targetById("assignments")!;
+  const none = AUTOSAVE_TARGETS.find((t) => !t.route)!;
   let threw = false;
   try { makeDraftSaver(none); } catch { threw = true; }
   assert(threw, "a target with no write route refuses to build a saver");
