@@ -13,6 +13,7 @@ import { PacingController } from "@/lib/pacing-controller";
 import { formatAssignmentPlan, type AssignmentPlan, type OutlineSection } from "@/lib/essay/pipeline";
 import { OUTPUT_MODE_LABELS, effectiveRevealWpm, restoreReveal, serializeReveal, revealStorageKey, type CalibratedProfile, type OutputMode, type SectionRevealState } from "@/lib/essay/pacing";
 import { CalendarClock, FileText, Pause, Play, Timer } from "lucide-react";
+import EssaySectionEditor from "@/components/app/EssaySectionEditor";
 
 /**
  * Essay workspace (2026-10-06 hardening): the staged pipeline is VISIBLE —
@@ -21,13 +22,18 @@ import { CalendarClock, FileText, Pause, Play, Timer } from "lucide-react";
  * presentation (local timer, pause/resume, restore on reopen).
  */
 
-interface SectionRow { id: string; draft: string | null; audits: { citation: string; rubric: string; style: string } | null }
+interface SectionRow {
+  id: string; draft: string | null;
+  audits: { citation: string; rubric: string; style: string } | null;
+  edited_at?: string | null;
+}
 interface SessionData {
   id: string; title: string; question: string; status: string; stage: string;
   plan: AssignmentPlan; outline: OutlineSection[]; outline_approved: boolean;
   sections: SectionRow[]; final_verification: { status: string; note: string } | null;
   output_mode: OutputMode; custom_wpm: number | null; deadline: string | null;
   break_preference_seconds: number | null; schedule_verdict: string | null;
+  updated_date?: string | null;
 }
 
 const TICK_MS = 250;
@@ -77,6 +83,14 @@ function EssayPageInner() {
         });
       } else setProfile(null);
     } catch { setProfile(null); }
+  }, []);
+
+  // Refresh the session after a section edit WITHOUT resetting the outline draft:
+  // an unsaved outline edit must not be thrown away because a section saved.
+  const refreshSession = useCallback(async (id: string) => {
+    const res = await fetch(`/api/essay/plan?session_id=${id}`, { cache: "no-store" });
+    const json = await res.json();
+    if (res.ok && json.data) setSession(json.data as SessionData);
   }, []);
 
   const restoreSession = useCallback(async (id: string) => {
@@ -268,7 +282,7 @@ function EssayPageInner() {
                   </Button>
                   {session.sections.filter((s) => s.draft).map((s) => {
                     const meta = session.outline.find((o) => o.id === s.id);
-                    return <PacedSection key={s.id} sessionId={session.id} sectionId={s.id} title={meta?.title ?? s.id} draft={s.draft!} audits={s.audits} mode={session.output_mode} customWpm={session.custom_wpm} profile={profile} />;
+                    return <PacedSection key={s.id} onSectionSaved={() => void refreshSession(session.id)} sessionId={session.id} sessionUpdatedDate={session.updated_date ?? null} sectionId={s.id} title={meta?.title ?? s.id} draft={s.draft!} audits={s.audits} editedAt={s.edited_at ?? null} mode={session.output_mode} customWpm={session.custom_wpm} profile={profile} />;
                   })}
                   {session.final_verification && (
                     <div className="rounded-lg border border-line p-3 text-sm">
@@ -294,8 +308,9 @@ function EssayPageInner() {
 function evidenceSuffix(labels: string[]) { return labels.length ? ` · evidence: ${labels.join(", ")}` : ""; }
 
 /** One section, revealed progressively at the selected WPM with pause/resume + restore. */
-function PacedSection({ sessionId, sectionId, title, draft, audits, mode, customWpm, profile }: {
-  sessionId: string; sectionId: string; title: string; draft: string;
+function PacedSection({ sessionId, sessionUpdatedDate, sectionId, title, draft, audits, editedAt, mode, customWpm, profile, onSectionSaved }: {
+  sessionId: string; sessionUpdatedDate: string | null; onSectionSaved: () => void;
+  sectionId: string; title: string; draft: string; editedAt: string | null;
   audits: { citation: string; rubric: string; style: string } | null;
   mode: OutputMode; customWpm: number | null; profile: CalibratedProfile | null;
 }) {
@@ -373,6 +388,14 @@ function PacedSection({ sessionId, sectionId, title, draft, audits, mode, custom
       <div className="mt-1 h-1.5 rounded bg-ink/10">
         <div className="h-1.5 rounded bg-accent transition-all" style={{ width: `${draft.length ? (visible.length / draft.length) * 100 : 0}%` }} />
       </div>
+      <EssaySectionEditor
+        sessionId={sessionId}
+        sectionId={sectionId}
+        draft={draft}
+        updatedDate={sessionUpdatedDate}
+        editedAt={editedAt}
+        onSaved={onSectionSaved}
+      />
       {audits && (
         <details className="mt-2 text-xs text-ink/60">
           <summary className="cursor-pointer">Section audits (citation · rubric · style)</summary>
