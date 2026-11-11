@@ -9,7 +9,7 @@ migrations, the tables they create (minus any dropped later) and the storage buc
 and fails the suite when they disagree. A migration added without updating this line
 is a test failure, not a stale document.
 
-**Scope at time of writing:** 45 migrations, 55 application tables, 1 private storage bucket (`private-docs`).
+**Scope at time of writing:** 46 migrations, 55 application tables, 1 private storage bucket (`private-docs`).
 
 ---
 

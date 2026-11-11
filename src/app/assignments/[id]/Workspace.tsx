@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from "react";
 import AssignmentDetailsEditor from "@/components/app/AssignmentDetailsEditor";
 import ResponseEditor from "@/components/app/ResponseEditor";
+import AnswerProvenance from "@/components/app/AnswerProvenance";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -535,6 +536,7 @@ export function Workspace({
         <Card>
           <CardContent className="p-5">
             <PacedOutput key={latestResponse.id} text={latestResponse.content} responseId={latestResponse.id} />
+            <AnswerProvenance provider={latestResponse.provider_used ?? null} model={latestResponse.model_used} />
             <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
               <Button variant="secondary" size="sm" onClick={copyResult}>
                 <Copy className="h-4 w-4" /> Copy

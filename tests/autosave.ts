@@ -519,6 +519,35 @@ assert(
   "document revisions are explained as append-only rather than autosaved",
 );
 
+section("provenance: an answer records the engine that actually replied (2026-11-11)");
+
+{
+  const solve = readFileSync("src/app/api/ai/solve/route.ts", "utf8");
+  assert(!/model_used:\s*process\.env\.SOPHIRA_MODEL/.test(solve),
+    "the answer row no longer files every answer under one hardcoded cloud model name");
+  assert(solve.includes("provider_used: answeredBy?.provider ?? null"),
+    "the engine that replied is recorded, and NULL when nothing was measured");
+  assert(solve.includes("aiChatMeta"), "the record comes from the call that made the answer");
+
+  const client = readFileSync("src/lib/ai/client.ts", "utf8");
+  assert(client.includes("export async function aiChatMeta") && /return await serverAiChat/.test(client),
+    "aiChatMeta returns who answered instead of discarding it");
+
+  const view = readFileSync("src/components/app/AnswerProvenance.tsx", "utf8");
+  assert(view.includes("Nothing in this answer was sent to a cloud service"),
+    "a locally-written answer says so plainly");
+  assert(view.includes("came from a cloud service") && view.includes("were sent to it"),
+    "an answer written elsewhere says so, and says the work left the machine");
+  assert(view.includes("predates the record") && view.includes("will not claim either way"),
+    "an old answer with no record claims neither");
+
+  const mig = readFileSync("supabase/migrations/0046_response_provenance.sql", "utf8");
+  assert(/add column if not exists provider_used text/.test(mig),
+    "provenance is nullable so old rows are never back-filled with a guess");
+  assert(mig.includes("responses_provider_used_check"),
+    "only a real engine can be recorded");
+}
+
 section("autosave saver: the server's version is the only proof of a save");
 
 const target = targetById("essay_outline")!;

@@ -50,6 +50,8 @@ export const MARKERS = {
   // 0045 (response edits) had no marker, so the Migrations workflow failed again at
   // #289 exactly like 0044 did. The probe asks for the column that migration adds,
   // so it is false before the migration and true only once it really ran.
+  "0046_response_provenance.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'responses' and column_name = 'provider_used')",
   "0045_response_edits.sql":
     "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'responses' and column_name = 'updated_at')",
   // backfilled 2026-11-11 so a skip of this migration is detectable
