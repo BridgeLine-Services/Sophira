@@ -56,6 +56,7 @@ if (ping.status !== 0) {
 }
 
 const DB = process.env.SOPHIRA_VERIFY_DB || "sophira_verify";
+const M45 = readdirSync("supabase/migrations").find((f) => f.startsWith("0045_"));
 // The NEWEST migration by filename, whatever its number: adding a migration must
 // not slip past this check by being newer than a hardcoded name (2026-11-11).
 const NEWEST = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort().pop();
@@ -93,6 +94,28 @@ try {
     "select count(*) from pg_tables t where t.schemaname='public' and not t.rowsecurity"]);
   check(Number((rlsOff.stdout || "0").trim()) === 0, "every public table has row level security on",
     `${(rlsOff.stdout || "").trim()} without RLS`);
+
+  // 2. The newest migration against EXISTING rows, which is the only way to catch a
+  //    NOT NULL column that would break a live deployment.
+  if (!M45) {
+    check(false, "migration 0045 is present");
+  } else {
+    freshDatabase();
+    const migrations = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
+    const before = migrations.filter((f) => f < M45);
+    let partial = true;
+    for (const f of before) {
+      const r = psql(DB, ["-f", `supabase/migrations/${f}`]);
+      if (r.status !== 0) { partial = false; check(false, `migrations before ${M45} apply`, f); break; }
+    }
+    if (partial) {
+      psql(DB, ["-c", "insert into auth.users (id) values ('11111111-1111-1111-1111-111111111111')"]);
+      const seeded = psql(DB, ["-c",
+        "insert into public.responses (user_id, content, created_at) values ('11111111-1111-1111-1111-111111111111','legacy answer','2026-10-01T10:00:00Z')"]);
+      check(seeded.status === 0, "a pre-existing row can be written before the migration");
+
+      const applied = psql(DB, ["-f", `supabase/migrations/${M45}`]);
+      check(applied.status === 0, `${M45} applies over existing data`, (applied.stderr || "").slice(0, 200));
 
   // 2. Migrations that must survive EXISTING rows, which is the only way to catch a
   //    NOT NULL column or a backfill that would break a live deployment.
