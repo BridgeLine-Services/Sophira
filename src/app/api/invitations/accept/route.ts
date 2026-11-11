@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { selectRow, acceptInvitationAtomic, privilegedChannelConfigured, privilegedChannelReachable } from "@/lib/db-privileged";
+import { selectRow, acceptInvitationAtomic, privilegedChannelReachable } from "@/lib/db-privileged";
 
 export const runtime = "nodejs";
 

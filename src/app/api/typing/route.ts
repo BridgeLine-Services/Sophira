@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { computeTypingResult, validateEventSummary, rawTypingAccuracy } from "@/lib/typing";
-import { recomputeTypingProfile, trustworthyObservations, type ObservedTypingAttempt } from "@/lib/typing-profile";
+import { recomputeTypingProfile, type ObservedTypingAttempt } from "@/lib/typing-profile";
 import { passageById, pickPassage } from "@/lib/typing-passage";
 
 export const runtime = "nodejs";
@@ -25,7 +25,6 @@ export const runtime = "nodejs";
 const MAX_TYPED_LENGTH = 4000;
 const MIN_DURATION_MS = 500;
 const MAX_DURATION_MS = 15 * 60 * 1000;
-
 
 /** Recompute + persist the adaptive profile from the user's own attempts. */
 async function syncTypingProfile(

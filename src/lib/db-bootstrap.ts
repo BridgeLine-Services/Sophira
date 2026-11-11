@@ -26,8 +26,8 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { listProfileIds } from "./db-privileged";
 import { publicSupabaseUrl, serviceRoleKey } from "./supabase-config";
-import { present } from "./env";
-import { probeOwnerSetup, type OwnerSetupProbe, evaluateOwnerSetup } from "./owner-setup";
+
+import { probeOwnerSetup, type OwnerSetupProbe } from "./owner-setup";
 import { MIGRATIONS } from "./db-migrations.generated";
 import { directPostgresConfigured, managementConfigured, applyMigrationChainDirect } from "./db-ddl";
 
@@ -419,7 +419,6 @@ export async function repairOwnerBootstrap(): Promise<SetupRepairResult> {
     };
   }
   const probe = await probeOwnerSetup();
-  const status = evaluateOwnerSetup(probe);
   // Never touch a database that already has an owner, and never claim a
   // repair when everything is already present.
   if (probe.ownerAccount === "active" || probe.ownerAccount === "revoked") {

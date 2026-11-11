@@ -328,7 +328,9 @@ export async function geminiChat(
       }
     );
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
+      // Drain the error body so the connection is released, then discard it:
+      // it could reflect request data, so it is never echoed.
+      await res.text().catch(() => "");
       if (res.status === 429) {
         throw new Error("Gemini free-tier quota was exceeded (rate limited).");
       }

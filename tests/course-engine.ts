@@ -6,9 +6,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import {
-  classifyEngine, ENGINES, ENGINE_TOOLS, subjectTools, toolUrl, subjectToolUrl, COURSE_GROUPS, SUBJECT_TREE,
-} from "../src/lib/courses/engines";
+import { classifyEngine, ENGINES, ENGINE_TOOLS, subjectTools, toolUrl, subjectToolUrl, COURSE_GROUPS } from "../src/lib/courses/engines";
 
 export function runCourseEngineTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
   section("Course engine: subjects, workspaces, relocation, consolidation");
@@ -667,7 +665,6 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(typePage2.includes("your expression is preserved") || typePage2.includes("your expression is still preserved") || typePage2.includes("your expression is kept"),
     "math UI: failed solves keep the student's expression (honest error handling)");
 
-
   // ==== Subject propagation audit (2026-10-12): the three missing routes ====
   section("subject propagation audit (scoped routes, param preservation)");
   {
@@ -699,7 +696,6 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "ai: an invalid subject slug resolves to null — never treated as a real subject");
   }
 
-
   // ==== Section 6 belt-and-suspenders: course-independent lifecycle ====
   section("course-independent lifecycle (save, list, reopen, resume)");
   {
@@ -720,9 +716,6 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(sc.includes("opts: { courseId?: string | null } = {}"),
       "ai: courseId is OPTIONAL in the subject context builder — subject-aware help works with no course at all");
   }
-
-
-
 
   // ==== Academic-level adaptation: one shared behavioral config (2026-10-12) ====
   section("academic-level adaptation (preschool -> doctoral, shared across engines)");
@@ -766,7 +759,6 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       "levels: no duplicated per-subject academic-level registry exists beside the shared module");
   }
 
-
   // ==== UI/UX correction round: responsive shell + contained tables (2026-10-12) ====
   section("responsive shell and owner table containment");
   {
@@ -790,7 +782,6 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(dash.includes("xl:grid-cols-2") && dash.includes("sm:grid-cols-2 xl:grid-cols-1"),
       "workspace: dashboard content grids reflow responsively (two-column course/teacher overview on wide desktops) and stack naturally on smaller screens");
   }
-
 
   // ==== Owner dashboard: overview-first restructure (2026-10-12) ====
   section("owner dashboard overview and section order");
@@ -816,7 +807,6 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(owner.includes("Registered capability is not the same as") && owner.includes("active, verified connection"),
       "owner: the registry section distinguishes registered capability from verified connection");
   }
-
 
   // ==== Owner nav: grouped into functional areas (2026-10-12) ====
   section("owner nav grouping and anchor integrity");
@@ -864,7 +854,6 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
         "owner-nav: the old #" + route + " fragment link is gone");
     }
   }
-
 
   // ==== Academic-level evaluation fixtures (2026-10-12) ====
   section("academic-level evaluation fixtures (per-engine, per-level)");

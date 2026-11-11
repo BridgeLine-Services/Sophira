@@ -6,10 +6,7 @@ import AnswerProvenance from "@/components/app/AnswerProvenance";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import {
-  Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, Input, Label,
-  Select, Spinner, Textarea, useToast,
-} from "@/components/ui";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select, Spinner, Textarea, useToast } from "@/components/ui";
 import { ResultBody } from "@/components/app/ResultBody";
 import { PacedOutput } from "@/components/app/PacedOutput";
 import { SchedulePanel } from "@/components/app/SchedulePanel";

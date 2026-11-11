@@ -1,8 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Spinner, useToast } from "@/components/ui";
-import {
-  Search, ExternalLink, CheckCircle2, XCircle, ShieldAlert, BookOpenCheck, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { Search, ExternalLink, CheckCircle2, XCircle, ShieldAlert, BookOpenCheck, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 
 interface SourceRow {
   id: string;

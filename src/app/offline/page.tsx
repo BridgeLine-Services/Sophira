@@ -15,7 +15,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, Label, Spinner, Textarea, useToast } from "@/components/ui";
 import { SyncStatus } from "@/components/app/SyncStatus";
 import { ProvenanceBadge } from "@/components/app/ProvenanceBadge";
-import { offlineStack, purgeOfflineOnLogout } from "@/lib/offline/client";
+import { offlineStack } from "@/lib/offline/client";
 import { LOCAL_MODELS, findModel } from "@/lib/offline/model-registry";
 import { detectDeviceCapabilities } from "@/lib/offline/device-capabilities";
 import { setOfflineModeChoice, getOfflineModeChoice } from "@/lib/ai/offline-guard";

@@ -17,7 +17,7 @@
  *   - nothing here is ever imported by client code.
  */
 
-import { directPostgresConfigured, connectionString, connectFirstWorking } from "./db-ddl";
+import { directPostgresConfigured, connectFirstWorking } from "./db-ddl";
 import { publicSupabaseUrl } from "./supabase-config";
 
 const DB_FUNCTIONS = new Set(["revoke_all_sessions"] as const);
@@ -27,7 +27,6 @@ const TABLE_COLUMNS = {
 } as const;
 const PROFILE_COLUMNS = new Set(["status", "access_revoked_at", "can_request_invites"] as const);
 
-type AllowedDbFunction = (typeof DB_FUNCTIONS extends Set<infer T> ? T : never);
 type AllowedTable = keyof typeof TABLE_COLUMNS;
 
 function requireAllowed<T extends string>(kind: string, value: string, allowed: Set<T>): asserts value is T {
@@ -152,7 +151,6 @@ export async function privilegedChannelReachable(): Promise<boolean> {
 export function authAdminEndpoint(): string | null {
   return publicSupabaseUrl();
 }
-
 
 /**
  * THE GRANTS CONTRACT (migration 0027, pinned byte-identical to the

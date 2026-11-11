@@ -3,9 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useComposerDraft } from "@/lib/save/useComposerDraft";
 import { browserDraftStorage } from "@/lib/save/composer-draft-browser";
 import { draftKey } from "@/lib/save/composer-draft";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Spinner, useToast } from "@/components/ui";
+import { Badge, Button, Input, Label, Select, Spinner, useToast } from "@/components/ui";
 import { CalendarClock, Pause, Play, SkipForward, CheckCircle2, AlertTriangle, Coffee, Clock4 } from "lucide-react";
-import { executionView, type ExecutionRow, type ExecutionView } from "@/lib/schedule-execution";
+import { type ExecutionRow, type ExecutionView } from "@/lib/schedule-execution";
 
 export interface SchedulePlanShape {
   feasible?: boolean;

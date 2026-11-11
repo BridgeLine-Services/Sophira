@@ -2,24 +2,10 @@ import { isAcademicContent } from "@/lib/learning/academic-gate";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
-import {
-  selectApplicablePatterns,
-  normalizeObservedMistakes,
-  matchesExistingPattern,
-  bumpedConfidence,
-  type LearningPattern,
-} from "@/lib/learning/patterns";
-import {
-  selectApplicablePatternsAdaptive,
-  explainPatternDecisions,
-  recordPatternEvidence,
-} from "@/lib/learning/evidence";
+import { normalizeObservedMistakes, matchesExistingPattern, bumpedConfidence, type LearningPattern } from "@/lib/learning/patterns";
+import { selectApplicablePatternsAdaptive, explainPatternDecisions, recordPatternEvidence } from "@/lib/learning/evidence";
 import { AiNotConfiguredError, aiChat, aiChatMeta, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
-import {
-  buildClassificationPrompt,
-  buildSystemPrompt,
-  type TaskClassification,
-} from "@/lib/ai/client";
+import { buildClassificationPrompt, buildSystemPrompt, type TaskClassification } from "@/lib/ai/client";
 import { composeAcademicContext, wrapUntrusted, detectInjectionAttempt } from "@/lib/ai/context";
 import { routeSubject, routeMathTopic } from "@/lib/ai/subjects";
 import { subjectBySlug } from "@/lib/courses/engines";
@@ -28,17 +14,7 @@ import { runMachineChecks } from "@/lib/ai/mathverify";
 import { MODE_MAP } from "@/lib/modes";
 import { formatCitation } from "@/lib/research/citation";
 import { titlesCorrespond } from "@/lib/research/verify";
-import {
-  normalizeClaimCandidates,
-  extractFactualSentences,
-  verifyClaims,
-  buildIntegrityReport,
-  formatIntegrityReport,
-  authorityVerdict,
-  type ClaimCandidate,
-  type ClaimEvidenceRecord,
-  type IntegrityReport,
-} from "@/lib/research/claims";
+import { normalizeClaimCandidates, extractFactualSentences, verifyClaims, buildIntegrityReport, formatIntegrityReport, authorityVerdict, type ClaimCandidate, type ClaimEvidenceRecord, type IntegrityReport } from "@/lib/research/claims";
 import type { Mode } from "@/lib/types";
 import { selectRelevantMemories, RETRIEVABLE_STATUSES, type StudentMemory } from "@/lib/memory/engine";
 import { recordMemoryEvidence } from "@/lib/memory/store";
@@ -50,7 +26,6 @@ function screenRequest(text: string): { message: string; alternative?: string; c
   const d = evaluateInformationRequest(text);
   return d.blocked ? { message: d.message, alternative: d.alternative, code: d.code } : null;
 }
-
 
 export const runtime = "nodejs";
 export const maxDuration = 300;

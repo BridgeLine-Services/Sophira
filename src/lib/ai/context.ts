@@ -17,7 +17,7 @@
  */
 
 import { academicLevelBit } from "./academic-levels";
-import type { Course, Mode, Profile, TeacherProfile, WritingProfile } from "../types";
+import type { Course, Mode, Profile, WritingProfile } from "../types";
 import type { LearningPattern } from "../learning/patterns";
 import { patternsForPrompt, selectApplicablePatterns, intentionalWritingHabits } from "../learning/patterns";
 

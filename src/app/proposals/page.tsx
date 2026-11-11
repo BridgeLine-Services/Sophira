@@ -3,8 +3,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app/AppShell";
 import { ProposalsPanel } from "@/components/app/ProposalsPanel";
-import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState } from "@/components/ui";
-import { ClipboardCheck } from "lucide-react";
+import { Badge, Card, CardContent } from "@/components/ui";
+
 import { fmtDate } from "@/lib/format";
 import { subjectBySlug, classifyEngine } from "@/lib/courses/engines";
 

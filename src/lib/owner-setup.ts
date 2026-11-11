@@ -7,7 +7,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { present } from "./env";
 import { setupChannel, connectionTarget, directPostgresConfigured, probeSchemaStateDirect } from "./db-ddl";
-import { publicSupabaseUrl, publicAnonKey, serviceRoleKey, connectionEnvNames, supabaseConfigStatus } from "./supabase-config";
+import { publicSupabaseUrl, publicAnonKey, serviceRoleKey, connectionEnvNames } from "./supabase-config";
 
 /**
  * Owner setup / status diagnostic (operator round 2026-10-06).

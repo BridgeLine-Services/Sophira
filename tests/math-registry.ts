@@ -4,7 +4,7 @@
  * - orchestrator classification with independently verified expectations
  * - coverage snapshot honesty (counts match the registry exactly)
  */
-import { MATHEMATICS_REGISTRY, flattenRegistry, findField } from "../src/lib/math/registry";
+import { flattenRegistry } from "../src/lib/math/registry";
 import { classifyMathProblem, coverageSnapshot } from "../src/lib/math/orchestrator";
 
 export function runMathRegistryTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
