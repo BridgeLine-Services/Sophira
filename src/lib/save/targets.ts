@@ -133,7 +133,7 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
     versionFrom: null,
     coverage: "no-editor",
     reason:
-      "A note is appended as a new row when the member presses Save, so there is no stored draft to confirm; autosaving keystrokes would create a row per pause. Preserved instead as a local draft in the composer.",
+      "A note is appended as a new row when the member presses Save, so there is no stored draft row to confirm; autosaving keystrokes would create a row per pause. Since 2026-11-10 the composer keeps a durable ENCRYPTED device draft (src/lib/save/composer-draft.ts via the offline store): it restores only into empty fields and is cleared once the note is saved, so a closed tab no longer loses pasted text.",
   },
   {
     id: "research_notes",
