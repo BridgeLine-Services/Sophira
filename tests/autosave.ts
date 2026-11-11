@@ -244,6 +244,22 @@ section("autosave registry: shipped protection is not relabeled as missing (2026
     "academic memories name the fields the route accepts");
 }
 
+section("runtime smoke: the editor writes are probed, not just the pages (2026-11-10)");
+
+{
+  const smoke = readFileSync("scripts/smoke-runtime.mjs", "utf8");
+  assert(smoke.includes('"/api/essay/sections"') && smoke.includes('"/api/responses/00000000-0000-0000-0000-000000000000"'),
+    "the smoke suite sends real signed-out writes to the editor routes added this phase");
+  assert(smoke.includes("refuses a signed-out request"), "each route must refuse a signed-out request");
+  assert(/const REFUSED = new Set\(\[302, 303, 307, 401, 403, 404, 503\]\)/.test(smoke),
+    "the refusal set covers middleware redirects, guard denials and the fail-closed 503");
+  assert(smoke.includes("database unreachable, fail closed"),
+    "a 503 is reported as the guard's degraded state, not as a crash");
+
+  const deps = readFileSync("docs/SECURITY_DEPENDENCIES.md", "utf8");
+  assert(deps.includes("SMOKE PASS 100/100"), "the recorded smoke result matches the suite that actually runs");
+}
+
 section("essay sections: a drafted section is the member's to rewrite (2026-11-10)");
 
 {

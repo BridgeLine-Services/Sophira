@@ -278,6 +278,43 @@ for (const path of PROTECTED) {
   record(`${path} redirects to a sign-in route`, /login|local/.test(r.location), r.location || "no location");
 }
 
+// SIGNED-OUT WRITES (2026-11-10). The editor routes added this session are the only
+// way member text reaches these tables, so a signed-out visitor trying to write is a
+// real attack path, not a formality. Each must refuse, and must refuse WITHOUT
+// touching the row: a redirect to sign-in, a 401/403, or a 404 for a row that is not
+// the caller's - never a 2xx and never a 5xx (which would mean the guard ran after
+// the write).
+const send = async (path, method, body) => {
+  const res = await fetch(BASE + path, {
+    method,
+    redirect: "manual",
+    headers: body == null ? {} : { "Content-Type": "application/json" },
+    ...(body == null ? {} : { body: JSON.stringify(body) }),
+  });
+  return { status: res.status, location: res.headers.get("location") || "" };
+};
+const WRITE_ROUTES = [
+  ["PATCH", "/api/essay/sections", { session_id: "00000000-0000-0000-0000-000000000000", section_id: "s1", draft: "x" }],
+  ["PUT", "/api/teachers/00000000-0000-0000-0000-000000000000/profile", { requirements: { required_methods: "x" } }],
+  ["PATCH", "/api/responses/00000000-0000-0000-0000-000000000000", { content: "x" }],
+  ["PATCH", "/api/assignments/00000000-0000-0000-0000-000000000000", { title: "x" }],
+  ["GET", "/api/essay/plan?session_id=00000000-0000-0000-0000-000000000000", null],
+];
+// Refusal, honestly defined for THIS environment. The smoke server runs without
+// Supabase credentials, so a guarded route that reaches the guard answers 503 by
+// design ("cannot reach its database", fail closed - src/lib/supabase/guard.ts).
+// A signed-in-less production request would get 401/403, or a redirect from
+// middleware. All of those are refusals; a 2xx means the write was allowed and a
+// 500 means the handler broke before the guard could answer. One check per route,
+// naming the status actually seen, so a change from 503 to 200 or 500 fails loudly.
+const REFUSED = new Set([302, 303, 307, 401, 403, 404, 503]);
+for (const [method, path, body] of WRITE_ROUTES) {
+  const r = await send(path, method, body);
+  record(`${method} ${path} refuses a signed-out request`,
+    REFUSED.has(r.status),
+    r.status === 503 ? "status 503 (guard: database unreachable, fail closed)" : `status ${r.status}`);
+}
+
 // An unknown URL must never render an authenticated shell to a signed-out visitor.
 const unknown = await get("/this-page-does-not-exist-9f3a");
 record("unknown URL fails closed", [302, 303, 307, 404].includes(unknown.status), `status ${unknown.status}`);
