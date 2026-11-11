@@ -1,5 +1,6 @@
 "use client";
 import { useState, type FormEvent } from "react";
+import AssignmentDetailsEditor from "@/components/app/AssignmentDetailsEditor";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -278,6 +279,17 @@ export function Workspace({
               <Pencil className="h-4 w-4" />
             </Button>
           )}
+        </div>
+        <div className="mt-3">
+          <AssignmentDetailsEditor
+            initial={{
+              id: assignment.id,
+              title: assignment.title,
+              instructions_text: assignment.instructions_text ?? null,
+              updated_at: assignment.updated_at ?? null,
+            }}
+            onSaved={(details) => setTitle(details.title)}
+          />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge tone="accent">{MODE_MAP[assignment.mode]?.label ?? assignment.mode}</Badge>

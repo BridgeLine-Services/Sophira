@@ -94,14 +94,19 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
   {
     id: "assignments",
     label: "Assignment details",
+    // The earlier entry named a `due_date` field: assignments has no such column
+    // (the study schedule owns due dates) and the brief is `instructions_text`,
+    // not `instructions`. Since 2026-11-10 the assignment page edits both the
+    // title and the brief through PATCH /api/assignments/[id], revision-checked,
+    // with "Saved" only after the server confirms.
     table: "assignments",
-    route: null,
-    method: null,
-    fields: ["title", "due_date", "instructions"],
-    versionFrom: null,
-    coverage: "no-editor",
+    route: "/api/assignments/[id]",
+    method: "PATCH",
+    fields: ["title", "instructions_text"],
+    versionFrom: "data.updated_at",
+    coverage: "wired",
     reason:
-      "Assignments arrive from the schedule and the course pages; there is no member-facing assignment editor to autosave yet.",
+      "Typing in the assignment details editor saves through the revision-aware route; a concurrent change is a visible choice and a closed tab leaves an encrypted device draft.",
   },
   {
     id: "assignment_responses",
