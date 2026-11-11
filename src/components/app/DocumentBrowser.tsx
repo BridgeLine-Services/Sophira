@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useComposerDraft } from "@/lib/save/useComposerDraft";
+import { browserDraftStorage } from "@/lib/save/composer-draft-browser";
+import { draftKey } from "@/lib/save/composer-draft";
 import { GradualInsertPanel } from "./GradualInsertPanel";
 import { describeHistoryEvent, describeProvenance, type HistoryEventType, type HistoryActor, type HistoryProvenance, type HistoryOutcome } from "@/lib/integrations/history-labels";
 
@@ -27,6 +30,22 @@ export default function DocumentBrowser() {
   const [busy, setBusy] = useState(false);
   const [chosen, setChosen] = useState<DiscoveredDoc | null>(null);
   const [scope, setScope] = useState("");
+  // The scope statement is the honest description of what Sophira may help with.
+  // It is typed once; keeping it on the device means a closed or refreshed page
+  // does not make the member retype it, and nothing is saved until they confirm.
+  const scopeDraft = useComposerDraft({
+    storage: browserDraftStorage,
+    key: chosen ? draftKey(["doc-scope", provider, chosen.id]) : null,
+  });
+  const { restore: restoreScope, keep: keepScope, clear: clearScope, message: scopeMessage } = scopeDraft;
+  useEffect(() => {
+    if (!chosen) return;
+    void (async () => {
+      const kept = await restoreScope();
+      // Only fills an empty box, so a scope the member already started wins.
+      if (kept?.text) setScope((v) => v || kept.text!);
+    })();
+  }, [chosen, restoreScope]);
   const [selections, setSelections] = useState<Selection[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [historyFor, setHistoryFor] = useState<Selection | null>(null);
@@ -86,11 +105,15 @@ export default function DocumentBrowser() {
         }),
       });
       const json = (await res.json()) as { ok: boolean; error?: string };
-      if (json.ok) { setMessage(`Selected "${chosen.title}". Sophira will assist only with the scope you stated.`); setChosen(null); setScope(""); await loadSelections(); }
+      if (json.ok) {
+        await clearScope();
+        setMessage(`Selected "${chosen.title}". Sophira will assist only with the scope you stated.`);
+        setChosen(null); setScope(""); await loadSelections();
+      }
       else setMessage(json.error ?? "The selection could not be saved.");
     } catch { setMessage("The selection could not be saved."); }
     finally { setBusy(false); }
-  }, [chosen, provider, scope, loadSelections]);
+  }, [chosen, provider, scope, loadSelections, clearScope]);
 
   const removeSelection = useCallback(async (id: string) => {
     await fetch(`/api/integrations/selections/${id}`, { method: "DELETE" });
@@ -217,7 +240,8 @@ export default function DocumentBrowser() {
         <div className="mt-3 rounded-md border p-3">
           <p className="text-sm font-medium">{chosen.title}</p>
           <p className="mt-1 text-xs text-muted-foreground">State the workload scope — e.g. &quot;Section A: introduction (first 3 paragraphs)&quot; or &quot;questions 4-6 only&quot;.</p>
-          <textarea aria-label="State the scope of your assigned workload" className="mt-2 w-full rounded-md border p-2 text-sm" rows={2} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="Your assigned section, questions, or deliverables" />
+          <textarea aria-label="State the scope of your assigned workload" className="mt-2 w-full rounded-md border p-2 text-sm" rows={2} value={scope} onChange={(e) => { setScope(e.target.value); keepScope({ text: e.target.value }); }} placeholder="Your assigned section, questions, or deliverables" />
+          {scopeMessage ? <p role="status" className="mt-1 text-xs text-ink/60">{scopeMessage}</p> : null}
           <div className="mt-2 flex gap-2">
             <button type="button" className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50" disabled={busy} onClick={() => void confirmSelection()}>Confirm scope</button>
             <button type="button" className="rounded-md border px-3 py-1.5 text-sm" onClick={() => { setChosen(null); setScope(""); }}>Cancel</button>
