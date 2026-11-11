@@ -217,3 +217,17 @@ SOPHIRA_RESTORE_DRILL=/path/to/restore-drill.json node scripts/backup-sophira.mj
 
 A record that says sign-in was not confirmed, or one older than 180 days, never reports as
 protected.
+
+## Verifying the migrations without a real database (2026-11-11)
+
+`npm run db:verify:local` applies the entire chain to a throwaway PostgreSQL and then checks the
+newest migration against rows that already exist, which is the only way to catch a `not null` column
+that would break a live deployment. It needs nothing from Supabase: `supabase/local-stub.sql`
+recreates the parts Supabase provides (the `auth` schema, the three roles, the `storage` helpers).
+
+- Exit 0: the chain applied and the checks passed.
+- Exit 1: something failed. Do not apply this to the real database.
+- Exit 3: SKIPPED, because no `psql` or no server. Nothing was measured.
+
+On 2026-11-11 it reported 45 migrations, 55 public tables, 74 RLS policies, zero tables without RLS,
+and `0045` backfilling `updated_at = created_at` with the text intact.
