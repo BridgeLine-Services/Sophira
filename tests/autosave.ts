@@ -244,6 +244,41 @@ section("autosave registry: shipped protection is not relabeled as missing (2026
     "academic memories name the fields the route accepts");
 }
 
+section("essay sections: a drafted section is the member's to rewrite (2026-11-10)");
+
+{
+  const route = readFileSync("src/app/api/essay/sections/route.ts", "utf8");
+  assert(route.includes("export async function PATCH"), "a drafted section can be edited through a route");
+  assert(route.includes('x-sophira-base-version') && route.includes("updated_date"),
+    "the section write is revision-aware on the session row");
+  assert(route.includes('eq("user_id", user.id)'), "the write is scoped to the member in the query as well as RLS");
+  assert(route.includes("audits_of_drafted_version") && route.includes("audits: null"),
+    "the audits that ran on the drafted text are kept with that version, not shown over new words");
+  assert(route.includes('status: "NEEDS REVIEW"'),
+    "an edited essay goes back to NEEDS REVIEW instead of keeping a stale verdict");
+  assert(/current\.draft === text/.test(route),
+    "saving unchanged text is a no-op, so it cannot clear audits nobody touched");
+  assert(route.includes("has not been drafted yet"),
+    "an undrafted slot is refused rather than filled with member text");
+
+  const page = readFileSync("src/app/essay/page.tsx", "utf8");
+  assert(page.includes("<EssaySectionEditor"), "the essay page renders the section editor");
+  assert(page.includes("refreshSession") && page.includes("setSession(json.data as SessionData)"),
+    "a saved section refreshes the session without discarding an unsaved outline edit");
+
+  const editor = readFileSync("src/components/app/EssaySectionEditor.tsx", "utf8");
+  assert(editor.includes("useAutosave") && editor.includes("<SaveStatus"),
+    "the editor saves through the engine and shows its state");
+  assert(editor.includes('draftKey(["essay-section"') && editor.includes("useComposerDraft"),
+    "a half-rewritten paragraph survives a closed tab");
+  assert(/audits were run on the drafted text/.test(editor),
+    "the member is told plainly why the essay needs another check");
+
+  const entry = targetById("essay_sections")!;
+  assert(entry.coverage === "wired" && entry.table === "essay_sessions" && entry.route === "/api/essay/sections",
+    "the registry names the real storage instead of a table that does not exist");
+}
+
 section("teacher requirements: the text that shapes answers saves as you type (2026-11-10)");
 
 {

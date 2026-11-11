@@ -59,15 +59,19 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
   },
   {
     id: "essay_sections",
-    label: "Essay sections (drafted text)",
-    table: "essay_sections",
-    route: null,
-    method: null,
-    fields: ["draft"],
-    versionFrom: "data.version",
-    coverage: "no-editor",
+    label: "A drafted essay section",
+    // The entry named an `essay_sections` table with a `draft` column. No such table
+    // exists: sections are rows inside `essay_sessions.sections` (jsonb). Until
+    // 2026-11-10 that text was read-only once drafted. It now edits in place
+    // through PATCH /api/essay/sections.
+    table: "essay_sessions",
+    route: "/api/essay/sections",
+    method: "PATCH",
+    fields: ["sections"],
+    versionFrom: "data.updated_date",
+    coverage: "wired",
     reason:
-      "Sections are written by the drafting workflow from the approved outline, not typed by the member; an edit-and-save editor for section text does not exist yet.",
+      "Editing a drafted section saves through the revision-aware route; the audits that ran on the drafted text are moved to audits_of_drafted_version and the essay goes back to NEEDS REVIEW, because none of them saw the member's words.",
   },
   {
     id: "outlines",
