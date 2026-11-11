@@ -18,7 +18,11 @@ import { readFileSync } from "node:fs";
 import { setTimeout as sleep } from "timers/promises";
 
 const PORT = Number(process.argv[2] || process.env.SMOKE_PORT || 3311);
-const BASE = `http://127.0.0.1:${PORT}`;
+// The server tells us the port it actually bound (Next prefers an inherited PORT
+// over -p). BASE follows the CHILD's own "Local:" line, so the suite can never
+// grade a different process that happens to answer on the requested port.
+let BASE = `http://127.0.0.1:${PORT}`;
+const ACTUAL_PORT = /Local:\s+http:\/\/localhost:(\d+)/;
 
 /**
  * Removes tags from HTML by scanning, not by regular expression (2026-11-09).
@@ -113,8 +117,18 @@ const shutdown = () => {
 };
 
 let ready = false;
+let announced = false;
 for (let i = 0; i < 60 && !ready; i++) {
   await sleep(500);
+  const bound = ACTUAL_PORT.exec(log);
+  if (bound && !announced) {
+    const port = Number(bound[1]);
+    if (port !== PORT) {
+      console.log(`SMOKE: the server bound port ${port} instead of ${PORT} (an inherited PORT wins over -p); following it.`);
+      BASE = `http://127.0.0.1:${port}`;
+    }
+    announced = true;
+  }
   try {
     const res = await fetch(BASE + "/login", { redirect: "manual" });
     ready = res.status > 0;

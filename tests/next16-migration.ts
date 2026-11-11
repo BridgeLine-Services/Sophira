@@ -123,6 +123,10 @@ export async function runNext16MigrationTests(): Promise<{ passed: number; faile
   assert(smoke.includes("theme tokens"), "the smoke still verifies the design tokens actually arrive");
   assert(smoke.includes("/create-owner"), "the smoke still proves the first-owner page is reachable signed out");
   assert(smoke.includes("fails closed"), "the smoke still proves protected pages fail closed");
+  // 2026-11-10: the suite stalled whenever the child bound a different port (an
+  // inherited PORT wins over -p), so it now follows the port the server announces.
+  assert(smoke.includes("ACTUAL_PORT") && smoke.includes("BASE = `http://127.0.0.1:${port}`"),
+    "the smoke follows the port the server actually announced instead of waiting on the one it asked for");
 
   section("next 16: nothing was solved by weakening a check");
 
