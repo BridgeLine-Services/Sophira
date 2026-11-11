@@ -96,7 +96,7 @@ These are the systems this project must not break. File pointers are for the nex
 |---|---|
 | `npm test` | 4,858 passed, 0 failed |
 | `npx tsc --noEmit` | clean |
-| `npm run lint` | 0 errors, 104 warnings |
+| `npm run lint` | 0 errors, 104 warnings | *(2026-11-11: superseded — current is 0 errors / 33 warnings, ceiling 33; see docs/SECURITY_DEPENDENCIES.md.)*
 | `npm run build` | succeeds |
 | `npm run smoke:prod` (against production) | 27/27 |
 | `node scripts/inventory.mjs` | 69 pages, 44 shell, 85 routes |

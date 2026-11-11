@@ -19,7 +19,7 @@ sandbox, the command is named. Where it could not happen, the row says so and sa
 | `npm test` | 4,830 passed, 0 failed |
 | `npx tsc --noEmit` | clean |
 | `npm run build` | compiled successfully |
-| `npm run lint` | 0 errors, 104 warnings |
+| `npm run lint` | 0 errors, 104 warnings | *(2026-11-11: superseded — current is 0 errors / 33 warnings, ceiling 33; see docs/SECURITY_DEPENDENCIES.md.)*
 | `npm run verify` | PASS |
 | `npm run smoke:runtime` | 77/77 against the built app (8 public routes, security headers, page-route allowlist, anonymous-API probe, cache policy, crawler guidance) |
 | `npm run scan:secrets` | CLEAN |

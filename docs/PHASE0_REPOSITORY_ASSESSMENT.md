@@ -18,7 +18,7 @@ Where something could not be measured, it says so.
 | Secret scan | `npm run scan:secrets` | CLEAN (2 client artifact dirs, 4 secret names) |
 | Release gate self-test | `node scripts/release-gate.mjs --self-test` | PASS (41 checks registered) |
 | Deployment verify | `npm run verify` | PASS (warnings only for optional capabilities) |
-| Lint | `npm run lint` | **0 errors, 104 warnings** (eslint IS installed now; the older audit's "lint unavailable" limitation no longer applies) |
+| Lint | `npm run lint` | **0 errors, 104 warnings** (eslint IS installed now; the older audit's "lint unavailable" limitation no longer applies) | *(2026-11-11: superseded — current is 0 errors / 33 warnings, ceiling 33; see docs/SECURITY_DEPENDENCIES.md.)*
 
 Not run (and not claimed): any live database/RLS matrix (needs the project's credentials),
 any live model-quality benchmark (no inference endpoint reachable from this sandbox),

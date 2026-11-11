@@ -195,11 +195,11 @@ upstream facts from crates.io and the GitHub API on 2026-11-09.
 | `npm ls minimatch` | `11.0.1 overridden` (typescript-estree), `11.0.5` (glob path); eslint keeps its own `3.1.5` |
 | `npm ls glob` | `glob@14.0.4` via `rimraf@6.1.4` |
 | `npx tsc --noEmit` | clean |
-| `npm run lint` | 0 errors, 104 warnings (ceiling 107) |
+| `npm run lint` | 0 errors, 33 warnings (ceiling 33, tightened 2026-11-11) |
 | `npm test` (offline suite) | **5978 / 5978** at `770755b`; **6012 / 6012** with the CodeQL #43 fix applied |
 | `npm run build` | production build succeeded |
 | `npm run smoke:runtime` (live server, production build) | **SMOKE PASS 100/100**, including fail-closed redirects for every signed-out page and a refusal for every editor write route |
-| CodeQL on the merge PR (`Analyze (javascript-typescript)`, `Analyze (actions)`) | both **success**; **no annotations** - no new alerts in the changed files |
+| CodeQL on the merge PR (`Analyze (javascript-typescript)`, `Analyze (actions)`, `Analyze (java-kotlin)`, `Analyze (rust)`) | all four **success** (2026-11-11); **no annotations** - no new alerts in the changed files |
 | CodeQL overall check | `neutral`, only because two stale `java-kotlin` / `rust` analysis configurations registered on `master` by older workflow versions are reported missing; those languages are not in `codeql.yml` |
 | `cargo tree -i glib` | **not run** (cargo absent from this environment) |
 | `cargo audit` | **not run** (cargo absent) |
@@ -212,3 +212,18 @@ Dismissing an alert without evidence is exactly what this phase was told not to 
 alerts were left alone. The evidence that they are resolved is the scan itself: the files the
 alerts pointed at were all changed, and CodeQL reports **no findings** in them. The Security tab
 is the authoritative list.
+
+## CodeQL language coverage (2026-11-11)
+
+The analysis matrix previously listed only `javascript-typescript` and `actions`, while the
+repository still ships its native shells. Both are now scanned, each with `build-mode: none`
+(no Android SDK, no Gradle, no Tauri build required):
+
+| Language | Source | Why |
+| --- | --- | --- |
+| `java-kotlin` | `android/app/src/**` (3 files) | Capacitor `MainActivity` plus the instrumentation and unit tests |
+| `rust` | `src-tauri/src/{main,lib}.rs`, `src-tauri/build.rs` | the Tauri desktop shell and its build script |
+
+Known gap: `ios/App/App/AppDelegate.swift` is still not analysed. CodeQL Swift requires a
+macOS runner, which this repository does not use; adding one is a separate, deliberate change
+rather than a silent omission.
