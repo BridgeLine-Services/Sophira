@@ -61,8 +61,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (typeof body.title === "string" && body.title.trim().length >= 2) patch.title = body.title.trim();
   if (typeof body.description === "string") patch.description = body.description.trim();
   patch.updated_at = new Date().toISOString();
-  const { data, error } = await supabase.from("notebooks").update(patch).eq("id", id).eq("user_id", user.id).select().single();
+  // Revision-aware write (Phase 6, 2026-11-10): the editor sends the version it
+  // started from. If the notebook has moved on since - another tab or another
+  // device - this write is refused instead of quietly overwriting newer work.
+  // A client that sends no version behaves exactly as before.
+  const baseVersion = request.headers.get("x-sophira-base-version");
+  let write = supabase.from("notebooks").update(patch).eq("id", id).eq("user_id", user.id);
+  if (baseVersion) write = write.eq("updated_at", baseVersion);
+  const { data, error } = await write.select().maybeSingle();
   if (error) return NextResponse.json({ error: "Could not update the notebook." }, { status: 500 });
+  if (!data) {
+    return NextResponse.json({
+      error: "Another version of this notebook was saved somewhere else. Your text is still here - choose which version to keep.",
+      conflict: true,
+    }, { status: 409 });
+  }
   return NextResponse.json({ notebook: data });
 }
 

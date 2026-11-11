@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useComposerDraft } from "@/lib/save/useComposerDraft";
+import { useAutosave } from "@/lib/save/useAutosave";
+import { RevisionConflictError } from "@/lib/save/draft";
+import SaveStatus from "@/components/ui/SaveStatus";
 import { browserDraftStorage } from "@/lib/save/composer-draft-browser";
 import { draftKey } from "@/lib/save/composer-draft";
 import { useParams, useRouter } from "next/navigation";
@@ -73,7 +76,7 @@ export default function NotebookWorkspace() {
   const { toast } = useToast();
   const say = (text: string) => toast("info", text);
   const [tab, setTab] = useState<Tab>("sources");
-  const [notebook, setNotebook] = useState<{ title: string; description: string } | null>(null);
+  const [notebook, setNotebook] = useState<{ title: string; description: string; updated_at?: string } | null>(null);
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
@@ -98,6 +101,42 @@ export default function NotebookWorkspace() {
   // The source composer keeps a durable draft on this device (Phase 6): closing
   // the tab no longer loses pasted text, and nothing is written to the database
   // until the member presses "Add source".
+  // Notebook name and description (Phase 6, 2026-11-10). The registry listed this
+  // as "route-ready" - the route existed and no editor used it. Typing now saves
+  // through the same revision-aware path as the essay editors, and "Saved" only
+  // appears after the server confirms it.
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
+  const meta = useAutosave<{ title: string; description: string }>({
+    save: async (payload, baseVersion) => {
+      const res = await fetch(`/api/notebooks/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(baseVersion ? { "x-sophira-base-version": baseVersion } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409) throw new RevisionConflictError(data?.notebook?.updated_at ?? null);
+      if (!res.ok) throw new Error(data?.error ?? "Could not save the notebook details.");
+      return { version: data?.notebook?.updated_at ?? null };
+    },
+  });
+  // Stable callback from the hook, so the load effect can depend on it safely.
+  const { adoptVersion: adoptMetaVersion } = meta;
+  const metaLoadedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!notebook || !id) return;
+    // Only adopt the server's copy once per notebook, so a re-fetch never
+    // overwrites what the member is typing.
+    if (metaLoadedRef.current === id) return;
+    metaLoadedRef.current = id;
+    setMetaTitle(notebook.title ?? "");
+    setMetaDescription(notebook.description ?? "");
+    adoptMetaVersion(notebook.updated_at ?? null);
+  }, [notebook, id, adoptMetaVersion]);
+
   const composer = useComposerDraft({
     storage: browserDraftStorage,
     key: id ? draftKey(["notebook-source", id]) : null,
@@ -348,6 +387,43 @@ export default function NotebookWorkspace() {
       </>
     }>
       <div className="mx-auto max-w-5xl space-y-4">
+        <Card>
+          <CardContent className="space-y-3 pt-4">
+            <div>
+              <Label htmlFor="notebook-name">Notebook name</Label>
+              <Input
+                id="notebook-name"
+                value={metaTitle}
+                onChange={(e) => {
+                  setMetaTitle(e.target.value);
+                  meta.markEdited({ title: e.target.value, description: metaDescription });
+                }}
+                onBlur={() => meta.flush()}
+                placeholder="Name this notebook"
+              />
+            </div>
+            <div>
+              <Label htmlFor="notebook-description">What this notebook is for</Label>
+              <Textarea
+                id="notebook-description"
+                rows={2}
+                value={metaDescription}
+                onChange={(e) => {
+                  setMetaDescription(e.target.value);
+                  meta.markEdited({ title: metaTitle, description: e.target.value });
+                }}
+                onBlur={() => meta.flush()}
+                placeholder="Optional - a line about what you are working on"
+              />
+            </div>
+            <SaveStatus
+              snapshot={meta.snapshot}
+              onRetry={meta.retry}
+              onKeepMine={() => meta.resolveConflict("mine")}
+              onUseTheirs={() => meta.resolveConflict("theirs")}
+            />
+          </CardContent>
+        </Card>
         <div className="flex flex-wrap gap-1">
           {TABS.map((t) => (
             <button
