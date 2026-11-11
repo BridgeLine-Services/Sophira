@@ -1451,6 +1451,26 @@ function finish() {
   // Phase 2: the local model benchmark must be trustworthy in both directions
   // (2026-11-11). Runs the real script against a stub server: an honest model scores
   // 4/4, a bluffing one scores 0/4, and neither is ever graded against a cloud call.
+  // MIGRATIONS ARE VERIFIED BY EXECUTION (2026-11-11). npm test can only read the
+  // SQL; scripts/verify-migrations-local.mjs applies the whole chain to a throwaway
+  // PostgreSQL and checks the newest migration against existing rows. This pins the
+  // facts that make that script trustworthy and keeps its honest SKIP path.
+  section("MIGRATIONS — the chain is executed locally, and a skip never reads as a pass");
+  {
+    const verify = readFileSync("scripts/verify-migrations-local.mjs", "utf8");
+    assert(verify.includes("supabase/bootstrap-all.sql"), "the verifier applies the real chain, not a copy");
+    assert(verify.includes("exit(3)") && /SKIPPED: (psql|no PostgreSQL)/.test(verify),
+      "with no PostgreSQL it SKIPS with exit 3 instead of claiming a pass");
+    assert(verify.includes("legend") === false && verify.includes("MIGRATIONS VERIFIED"),
+      "a pass is stated only after the checks ran");
+    const stub = readFileSync("supabase/local-stub.sql", "utf8");
+    for (const piece of ["create schema if not exists auth", "create role anon", "storage.foldername", "raw_user_meta_data"]) {
+      assert(stub.includes(piece), `the local stub supplies what Supabase provides (${piece})`);
+    }
+    const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+    assert(typeof pkg.scripts["db:verify:local"] === "string", "db:verify:local runs the verifier");
+  }
+
   section("LOCAL MODEL BENCHMARK (Phase 2) — the harness judges a model honestly, not generously");
   {
     const r = runLocalModelBenchmarkTests();

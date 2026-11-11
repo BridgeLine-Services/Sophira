@@ -277,7 +277,18 @@ export async function runOwnerSetupAutomationTests(assert: (c: boolean, n: strin
     "ddl: .env.example is regenerated from the manifest and stays in sync");
   // ---- N. the exact runtime channel: what makes automation available ----
   const ddl = require("../src/lib/db-ddl");
-  const ENV_KEYS = ["POSTGRES_URL_NON_POOLING", "POSTGRES_URL", "POSTGRES_POOLER_URL_NON_POOLING", "POSTGRES_POOLER_URL", "SUPABASE_DB_PASSWORD", "SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "NEXT_PUBLIC_SUPABASE_URL"];
+  // Ambient credentials must not leak into these fixtures (2026-11-11). The sandbox
+  // now carries real SUPABASE_URL / SUPABASE_ANON_KEY values, and publicSupabaseUrl()
+  // prefers SUPABASE_URL over NEXT_PUBLIC_SUPABASE_URL, so a fixture that set only the
+  // NEXT_PUBLIC_* pair silently described the WRONG project and four checks failed.
+  // Every name the configuration reads is cleared and restored here.
+  const ENV_KEYS = [
+    "POSTGRES_URL_NON_POOLING", "POSTGRES_URL", "POSTGRES_POOLER_URL_NON_POOLING", "POSTGRES_POOLER_URL",
+    "SUPABASE_DB_PASSWORD", "SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY", "SUPABASE_DB_URL", "DATABASE_URL",
+  ];
   const savedEnv: Record<string, string | undefined> = {};
   for (const k of ENV_KEYS) { savedEnv[k] = process.env[k]; delete process.env[k]; }
   try {
