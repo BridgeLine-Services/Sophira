@@ -127,25 +127,36 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
   },
   {
     id: "notebook_note_composer",
-    label: "Notebook note being written",
+    label: "Notebook note being written (device draft; row appended on Save)",
     table: "notebook_notes",
     route: "/api/notebooks/[id]/notes",
     method: "POST",
     fields: ["content"],
     versionFrom: null,
+    // Deliberately NOT "wired": wired means the autosave engine has a server-confirmed
+    // row to report on, and this composer appends a new row only on Save. It is not
+    // left unprotected either — the durable device draft below covers a closed tab,
+    // so "no-editor" here means "no server-confirmed autosave", nothing more.
     coverage: "no-editor",
     reason:
-      "A note is appended as a new row when the member presses Save, so there is no stored draft row to confirm; autosaving keystrokes would create a row per pause. Since 2026-11-10 the composer keeps a durable ENCRYPTED device draft (src/lib/save/composer-draft.ts via the offline store): it restores only into empty fields and is cleared once the note is saved, so a closed tab no longer loses pasted text.",
+      "A note is appended as a new row on Save, so autosaving keystrokes would create a row per pause. Instead the composer keeps a durable ENCRYPTED device draft (src/app/notebooks/[id]/page.tsx via src/lib/save/composer-draft.ts): it restores only into an empty field and is cleared once the note is saved, so a closed tab no longer loses pasted text.",
   },
   {
     id: "research_notes",
     label: "Research source approval",
+    // Approving or rejecting a source is a single click that saves immediately
+    // (PATCH /api/research { source_id, action: approve|reject }). No text is typed
+    // anywhere in that flow, so there is nothing a draft could protect and nothing
+    // to recover after a refresh — the earlier "route-ready" label implied a missing
+    // editor that was never needed.
     table: "research_sources",
     route: "/api/research",
     method: "PATCH",
-    fields: ["approval"],
+    fields: [],
     versionFrom: null,
-    coverage: "route-ready",
+    coverage: "wired",
+    reason:
+      "A one-click approve or reject saves straight through the route; nothing is typed, so no draft is needed and no work can be lost.",
   },
   {
     id: "academic_memories",
@@ -153,7 +164,9 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
     table: "memories",
     route: "/api/memory/[id]",
     method: "PATCH",
-    fields: ["content", "category"],
+    // The route revises `statement` and `details`. The earlier entry named
+    // `content` and `category`, which the PATCH does not accept at all.
+    fields: ["statement", "details"],
     versionFrom: "data.updated_at",
     coverage: "wired",
     reason:

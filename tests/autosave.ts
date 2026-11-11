@@ -6,7 +6,8 @@
  * retries, conflicts never resolved silently, no localStorage-only saves,
  * and the Settings surface is actually wired to the engine.
  */
-import { readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { join } from "path";
 import {
   BACKOFF_CAP_MS,
   DEFAULT_DEBOUNCE_MS,
@@ -223,13 +224,76 @@ section("connector selections: a typed scope statement survives a closed page (P
     "the registry names the fields the route actually accepts, not the fictional enabled/folder_id pair");
 }
 
+section("autosave registry: shipped protection is not relabeled as missing (2026-11-10)");
+
+{
+  // The notebook composer already carried a device draft but was still filed as
+  // "no editor". Pin the real state so it cannot quietly regress.
+  const entry = targetById("notebook_note_composer")!;
+  assert(entry.coverage === "no-editor" && /device draft/i.test(entry.reason ?? ""),
+    "the notebook composer is not called server-autosaved, and its device draft is stated");
+  assert(/device draft/i.test(entry.label),
+    "its label says plainly that a draft exists and the row is appended on Save");
+  const page = readFileSync("src/app/notebooks/[id]/page.tsx", "utf8");
+  assert(page.includes("useComposerDraft"),
+    "the notebook page really keeps the draft the registry claims");
+  assert(targetById("research_notes")?.coverage === "wired" &&
+    targetById("research_notes")?.fields.length === 0,
+    "source approval is recorded as a click-through save with no typed field to protect");
+  assert(JSON.stringify(targetById("academic_memories")?.fields) === JSON.stringify(["statement", "details"]),
+    "academic memories name the fields the route accepts");
+}
+
+section("autosave registry: every entry matches the route it describes (2026-11-10)");
+
+{
+  // Four registry entries claimed tables, fields or requests that did not exist.
+  // This walks the real routes so the registry cannot drift into fiction again.
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) walk(full, out);
+      else out.push(full);
+    }
+    return out;
+  };
+  const srcFiles = walk("src");
+  const srcText = srcFiles.map((f) => readFileSync(f, "utf8")).join("\n");
+
+  let checkedRoutes = 0;
+  for (const t of AUTOSAVE_TARGETS) {
+    if (t.table) {
+      assert(srcText.includes(`"${t.table}"`) || srcText.includes(`'${t.table}'`),
+        `registry: table "${t.table}" for ${t.id} is really used somewhere in src`);
+    }
+    if (!t.route) continue;
+    checkedRoutes++;
+    const file = "src/app" + t.route + "/route.ts";
+    assert(existsSync(file), `registry: ${t.id} names a route that exists (${t.route})`);
+    if (!existsSync(file)) continue;
+    const code = readFileSync(file, "utf8");
+    assert(code.includes(`export async function ${t.method}`),
+      `registry: ${t.id} names the request the route really exports (${t.method} ${t.route})`);
+    for (const field of t.fields) {
+      assert(code.includes(field),
+        `registry: field "${field}" for ${t.id} is accepted by ${t.route}`);
+    }
+  }
+  assert(checkedRoutes > 0, "registry: route-backed entries were actually checked");
+  assert(AUTOSAVE_TARGETS.every((t) => t.coverage !== "route-ready"),
+    "registry: nothing is left described as waiting for an editor it already has");
+}
+
 section("autosave registry: honest coverage for every member-editable thing");
 
 assert(AUTOSAVE_TARGETS.length >= 13, "the registry covers the thirteen audited workflows");
 for (const t of AUTOSAVE_TARGETS) {
   const hasRoute = Boolean(t.route && t.method);
   assert(hasRoute || Boolean(t.reason), `${t.id}: either a write route or a stated reason, never a silent gap`);
-  assert(t.fields.length > 0, `${t.id}: names the fields a member can change`);
+  // A workflow made only of clicks (approve a source) has no typed field; it must
+  // then say so in its reason rather than quietly listing nothing.
+  assert(t.fields.length > 0 || Boolean(t.reason),
+    `${t.id}: names the fields a member can change, or explains why none exist`);
   // A wired surface may save through the typed Supabase client rather than an
   // HTTP route, provided it says so and how it detects a conflict.
   if (t.coverage === "wired") assert(hasRoute || Boolean(t.reason), `${t.id}: a wired target must have a write route or state how it saves`);
