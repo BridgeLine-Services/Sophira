@@ -66,7 +66,7 @@ import {
 } from "../src/lib/typing-profile";
 import {
   clampConfidence, recencyWeight, recomputeConfidence, confidenceAfterEvidence,
-  computeTrend, statusAfterRecompute, studentTransition, selectRelevantMemories,
+  computeTrend, statusAfterRecompute, studentTransition, selectRelevantMemories, SCOPE_BONUS,
   MEMORY_CATEGORIES, MAX_PROMPT_MEMORIES, RETRIEVABLE_STATUSES, MONITORING_BELOW,
   type StudentMemory, type MemoryEvidenceRow,
 } from "../src/lib/memory/engine";
@@ -1455,6 +1455,53 @@ function finish() {
   // SQL; scripts/verify-migrations-local.mjs applies the whole chain to a throwaway
   // PostgreSQL and checks the newest migration against existing rows. This pins the
   // facts that make that script trustworthy and keeps its honest SKIP path.
+  // FIVE MEMORY SCOPES (standing requirement, 2026-11-11). General < Subject <
+  // Course < Teacher < Assignment. The precedence is a real ordering, not a
+  // comment: these checks would fail if the bonuses were reshuffled or if a
+  // teacher/assignment-scoped memory could be retrieved somewhere else.
+  section("MEMORY SCOPES — General < Subject < Course < Teacher < Assignment, enforced");
+  {
+    const base = {
+      id: "m1", user_id: "u1", category: "learning_preference" as const, statement: "s", details: "",
+      subject_tags: [] as string[], confidence: 0.8, status: "active" as const,
+      improvement_trend: "" as const, origin: "student_supplied" as const, source: "",
+      first_observed: "2026-11-01T00:00:00Z", last_observed: "2026-11-01T00:00:00Z",
+      last_used_at: null, created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z",
+      subject: null as string | null, course_id: null as string | null,
+      teacher_id: null as string | null, assignment_id: null as string | null,
+    };
+    const ctx = { subject: "biology", courseId: "c1", teacherId: "t1", assignmentId: "a1" };
+    const general = { ...base, id: "g" };
+    const subjectScope = { ...base, id: "s", subject: "biology", subject_tags: ["biology"] };
+    const courseScope = { ...base, id: "c", course_id: "c1", subject: "biology", subject_tags: ["biology"] };
+    const teacherScope = { ...base, id: "t", course_id: "c1", teacher_id: "t1", subject: "biology", subject_tags: ["biology"] };
+    const assignmentScope = { ...base, id: "a", course_id: "c1", teacher_id: "t1", assignment_id: "a1", subject: "biology", subject_tags: ["biology"] };
+    const all = [general, subjectScope, courseScope, teacherScope, assignmentScope];
+    const order = selectRelevantMemories(all, ctx, "2026-11-11T00:00:00Z").decisions.map((d) => d.id);
+    assert(order.join(",") === "a,t,c,s,g",
+      "narrower scope always wins: assignment > teacher > course > subject > general");
+    assert(SCOPE_BONUS.assignment > SCOPE_BONUS.teacher && SCOPE_BONUS.teacher > SCOPE_BONUS.course &&
+      SCOPE_BONUS.course > SCOPE_BONUS.subjectTag && SCOPE_BONUS.subjectTag > SCOPE_BONUS.general,
+      "the scope bonuses are ordered, so the precedence cannot drift apart from the code");
+
+    const otherTeacher = selectRelevantMemories([teacherScope], { ...ctx, teacherId: "t2" }).decisions;
+    assert(otherTeacher.length === 0, "another teacher's memory is never retrieved");
+    const otherAssignment = selectRelevantMemories([assignmentScope], { ...ctx, assignmentId: "a2" }).decisions;
+    assert(otherAssignment.length === 0, "another assignment's memory is never retrieved");
+    const noScope = selectRelevantMemories([teacherScope, assignmentScope], { subject: "biology" }).decisions;
+    assert(noScope.length === 0,
+      "a general subject request gets neither teacher-scoped nor assignment-scoped memory");
+
+    const mig = readFileSync("supabase/migrations/0047_memory_teacher_assignment_scope.sql", "utf8");
+    assert(/add column if not exists teacher_id uuid/.test(mig) && /add column if not exists assignment_id uuid/.test(mig),
+      "both narrower scopes exist as nullable columns, so old memories keep their meaning");
+    assert(mig.includes("on delete set null"),
+      "deleting a teacher or assignment never deletes what the member learned");
+    const solve = readFileSync("src/app/api/ai/solve/route.ts", "utf8");
+    assert(solve.includes("teacherId:") && solve.includes("assignmentId:"),
+      "the answer route passes the teacher and assignment it is working with");
+  }
+
   section("MIGRATIONS — the chain is executed locally, and a skip never reads as a pass");
   {
     const verify = readFileSync("scripts/verify-migrations-local.mjs", "utf8");
