@@ -204,6 +204,25 @@ section("study schedule: plan inputs survive a closed panel (Phase 6)");
     "the registry names the real table and the real request instead of a table and field that never existed");
 }
 
+section("connector selections: a typed scope statement survives a closed page (Phase 6)");
+
+{
+  const browser = readFileSync("src/components/app/DocumentBrowser.tsx", "utf8");
+  assert(browser.includes("useComposerDraft") && browser.includes('draftKey(["doc-scope"'),
+    "the scope statement is kept on the device while it is typed");
+  assert(/setScope\(\(v\) => v \|\| kept\.text/.test(browser),
+    "a kept scope fills only an empty box, so it never overwrites a fresh statement");
+  assert(browser.indexOf("await clearScope()") > 0 &&
+    browser.indexOf("await clearScope()") < browser.indexOf("Selected \""),
+    "the draft is cleared once the selection is confirmed and saved");
+  assert(browser.includes("scopeMessage") && browser.includes('role="status"'),
+    "the member is told plainly that their statement is being kept");
+  const entry = targetById("integration_settings")!;
+  assert(entry.coverage === "wired", "integration selections are no longer listed as route-ready");
+  assert(JSON.stringify(entry.fields) === JSON.stringify(["scope_description", "status"]),
+    "the registry names the fields the route actually accepts, not the fictional enabled/folder_id pair");
+}
+
 section("autosave registry: honest coverage for every member-editable thing");
 
 assert(AUTOSAVE_TARGETS.length >= 13, "the registry covers the thirteen audited workflows");

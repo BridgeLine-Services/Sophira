@@ -205,12 +205,18 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
   {
     id: "integration_settings",
     label: "Integration selections",
+    // The earlier entry named "enabled" and "folder_id" fields; the route accepts
+    // neither. It revises scope_description and status only. The scope statement the
+    // member types before confirming a document is now kept in the encrypted device
+    // draft (src/components/app/DocumentBrowser.tsx) and cleared once it is saved.
     table: "integration_selections",
     route: "/api/integrations/selections/[id]",
     method: "PATCH",
-    fields: ["enabled", "folder_id"],
+    fields: ["scope_description", "status"],
     versionFrom: "data.updated_at",
-    coverage: "route-ready",
+    coverage: "wired",
+    reason:
+      "Scope statements are typed once and saved on confirm; the typed text lives in a durable encrypted device draft so a closed page does not lose it, and nothing is stored until the member confirms.",
   },
   {
     id: "document_revisions",
