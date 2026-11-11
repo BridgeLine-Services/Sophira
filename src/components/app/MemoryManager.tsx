@@ -2,6 +2,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
+import { useComposerDraft } from "@/lib/save/useComposerDraft";
+import { browserDraftStorage } from "@/lib/save/composer-draft-browser";
+import { draftKey } from "@/lib/save/composer-draft";
 import {
   MEMORY_CATEGORY_LABELS,
   MEMORY_CATEGORIES,
@@ -51,6 +54,12 @@ export function MemoryManager({
   const [editing, setEditing] = useState<MemoryWithCount | null>(null);
   const [editStatement, setEditStatement] = useState("");
   const [editDetails, setEditDetails] = useState("");
+  // Phase 6 (2026-11-10): half-written corrections live in the encrypted device
+  // store under this memory's id, so closing the panel loses nothing.
+  const editDraft = useComposerDraft({
+    storage: browserDraftStorage,
+    key: editing ? draftKey(["memory-edit", editing.id]) : null,
+  });
   const [adding, setAdding] = useState(false);
   const [newCategory, setNewCategory] = useState<MemoryCategory>("goal");
   const [newStatement, setNewStatement] = useState("");
@@ -93,6 +102,17 @@ export function MemoryManager({
     if (res.ok) void refresh();
   }
 
+  async function openEditor(m: MemoryWithCount) {
+    setEditing(m);
+    setEditStatement(m.statement);
+    setEditDetails(m.details);
+    // The saved memory fills the boxes first; a draft only replaces text the
+    // member had typed and not yet saved, so nothing the database holds is lost.
+    const kept = await editDraft.restore();
+    if (kept?.title) setEditDetails(kept.title);
+    if (kept?.text) setEditStatement(kept.text);
+  }
+
   async function saveEdit() {
     if (!editing) return;
     setBusyId(editing.id);
@@ -103,6 +123,7 @@ export function MemoryManager({
     });
     setBusyId(null);
     if (res.ok) {
+      await editDraft.clear();
       setEditing(null);
       void refresh();
     }
@@ -325,11 +346,7 @@ export function MemoryManager({
                     size="sm"
                     variant="ghost"
                     disabled={busyId === m.id}
-                    onClick={() => {
-                      setEditing(m);
-                      setEditStatement(m.statement);
-                      setEditDetails(m.details);
-                    }}
+                    onClick={() => void openEditor(m)}
                   >
                     <Pencil className="h-4 w-4" /> Edit
                   </Button>
@@ -339,8 +356,23 @@ export function MemoryManager({
                 </div>
                 {editing?.id === m.id && (
                   <div className="space-y-2 rounded-md border border-input p-3">
-                    <Input value={editStatement} onChange={(e) => setEditStatement(e.target.value)} aria-label="Statement" />
-                    <Input value={editDetails} onChange={(e) => setEditDetails(e.target.value)} aria-label="Details" />
+                    <Input
+                      value={editStatement}
+                      onChange={(e) => {
+                        setEditStatement(e.target.value);
+                        editDraft.keep({ text: e.target.value, title: editDetails });
+                      }}
+                      aria-label="Statement"
+                    />
+                    <Input
+                      value={editDetails}
+                      onChange={(e) => {
+                        setEditDetails(e.target.value);
+                        editDraft.keep({ text: editStatement, title: e.target.value });
+                      }}
+                      aria-label="Details"
+                    />
+                    <p role="status" className="text-xs text-ink/60">{editDraft.message}</p>
                     <div className="flex gap-2">
                       <Button size="sm" disabled={busyId === m.id} onClick={saveEdit}>Save</Button>
                       <Button size="sm" variant="secondary" onClick={() => setEditing(null)}>Cancel</Button>

@@ -155,7 +155,9 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
     method: "PATCH",
     fields: ["content", "category"],
     versionFrom: "data.updated_at",
-    coverage: "route-ready",
+    coverage: "wired",
+    reason:
+      "The correction panel saves through the memory PATCH route and, since 2026-11-10, keeps a half-written correction in the encrypted device draft under that memory's id: reopening the panel restores it, and a confirmed save clears it.",
   },
   {
     id: "teacher_preferences",

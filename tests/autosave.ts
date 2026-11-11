@@ -169,6 +169,23 @@ section("writing samples: a long paste survives a closed tab (Phase 6)");
     "the registry names the table it really writes instead of an unrelated profile route");
 }
 
+section("academic memories: a half-written correction is not lost (Phase 6)");
+
+{
+  const panel = readFileSync("src/components/app/MemoryManager.tsx", "utf8");
+  assert(panel.includes("useComposerDraft") && panel.includes('draftKey(["memory-edit"'),
+    "the correction panel keeps a device draft, keyed by the memory being corrected");
+  assert(panel.includes("async function openEditor") && panel.includes("await editDraft.restore()"),
+    "reopening a correction restores what was typed and never saved");
+  assert(panel.indexOf("await editDraft.clear()") > 0 &&
+    panel.indexOf("await editDraft.clear()") < panel.indexOf("setEditing(null)"),
+    "an accepted correction clears its draft, so a stale correction cannot reappear");
+  assert(panel.includes("editDraft.message") && panel.includes('role="status"'),
+    "the member is told plainly whether the correction is kept on this device");
+  assert(targetById("academic_memories")?.coverage === "wired",
+    "academic memories are no longer listed as waiting for an editor");
+}
+
 section("autosave registry: honest coverage for every member-editable thing");
 
 assert(AUTOSAVE_TARGETS.length >= 13, "the registry covers the thirteen audited workflows");
