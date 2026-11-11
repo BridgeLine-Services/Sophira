@@ -126,8 +126,35 @@ export async function runBackupToolTests(assert: (cond: boolean, msg: string) =>
   assert(attempted.code === 3, "backup tool: an backed-up run without access exits as incomplete (3)");
   const written = JSON.parse(readFileSync(join(runDir, "manifest.json"), "utf8"));
   assert(written.ok === false, "backup tool: the written record is marked incomplete");
-  assert(written.components.every((c: { status: string }) => c.status === "blocked"),
-    "backup tool: every component is recorded as could-not-check rather than passed");
+  const capture = written.components.filter((c: { key: string }) => c.key !== "restore_drill");
+  assert(capture.every((c: { status: string }) => c.status === "blocked"),
+    "backup tool: every data-capture component is recorded as could-not-check rather than passed");
+  const drill = written.components.find((c: { key: string }) => c.key === "restore_drill");
+  assert(drill?.status === "not_run",
+    "backup tool: member sign-in after a restore is reported as not checked, never as protected");
+  assert(!written.components.some((c: { key: string; status: string }) => c.key === "identities" && c.status === "pass"),
+    "backup tool: an unverified member-account step is never reported as protected");
   assert(!/eyJ|postgres(?:ql)?:\/\/[^\s/]+:[^\s@]+@/i.test(readFileSync(join(runDir, "manifest.json"), "utf8")),
     "backup tool: the written record contains no credentials");
+
+  // ---- a practice restore is the only proof that sign-in survives ----
+  const drillRun = (record: unknown, name: string) => {
+    const path = join(dir, name);
+    writeFileSync(path, typeof record === "string" ? record : JSON.stringify(record));
+    const out = join(dir, `out-${name}`);
+    run(["--run", "--out", out], { SOPHIRA_RESTORE_DRILL: path });
+    const m = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8"));
+    return m.components.find((c: { key: string }) => c.key === "restore_drill");
+  };
+  const recent = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  assert(drillRun({ verified_at: recent, signin_verified: true }, "drill-ok.json")?.status === "pass",
+    "backup tool: a recent practice restore that confirmed sign-in marks the drill step protected");
+  assert(drillRun({ verified_at: recent, signin_verified: false }, "drill-bad.json")?.status === "fail",
+    "backup tool: a practice restore that did NOT confirm sign-in fails instead of passing");
+  const stale = new Date(Date.now() - 400 * 86_400_000).toISOString();
+  const staleDrill = drillRun({ verified_at: stale, signin_verified: true }, "drill-stale.json");
+  assert(staleDrill?.status === "blocked" && String(staleDrill?.detail).includes(stale.slice(0, 10)),
+    "backup tool: a stale practice restore is reported with its date, not treated as current proof");
+  assert(drillRun("not json at all", "drill-broken.json")?.status === "blocked",
+    "backup tool: an unreadable practice-restore record is could-not-check, not protected");
 }
