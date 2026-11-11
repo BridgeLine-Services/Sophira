@@ -1,5 +1,8 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useComposerDraft } from "@/lib/save/useComposerDraft";
+import { browserDraftStorage } from "@/lib/save/composer-draft-browser";
+import { draftKey } from "@/lib/save/composer-draft";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Spinner, useToast } from "@/components/ui";
 import { CalendarClock, Pause, Play, SkipForward, CheckCircle2, AlertTriangle, Coffee, Clock4 } from "lucide-react";
 import { executionView, type ExecutionRow, type ExecutionView } from "@/lib/schedule-execution";
@@ -66,6 +69,25 @@ export function SchedulePanel({ assignmentId }: { assignmentId: string }) {
   const [urgency, setUrgency] = useState("normal");
   const [estimate, setEstimate] = useState("");
   const [now, setNow] = useState(Date.now());
+
+  // Plan inputs are typed once and used once. Keeping them on the device means a
+  // refresh or a closed panel does not make the member re-enter a due date.
+  const planDraft = useComposerDraft({
+    storage: browserDraftStorage,
+    key: draftKey(["schedule-plan", assignmentId]),
+  });
+  const { restore: restorePlan, keep: keepPlan, clear: clearPlan, message: planDraftMessage } = planDraft;
+  const planRestoredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (planRestoredRef.current === assignmentId) return;
+    planRestoredRef.current = assignmentId;
+    void (async () => {
+      const kept = await restorePlan();
+      if (!kept) return;
+      setDueLocal((v) => v || (kept.title ?? ""));
+      setEstimate((v) => v || (kept.text ?? ""));
+    })();
+  }, [assignmentId, restorePlan]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -164,6 +186,7 @@ export function SchedulePanel({ assignmentId }: { assignmentId: string }) {
       });
       const json = await res.json();
       if (res.ok) {
+        await clearPlan();
         setSchedule(json.data.schedule);
         if (json.data.workload_basis) {
           toast("info", "Workload estimated: " + json.data.workload_basis.join(" · "));
@@ -194,7 +217,7 @@ export function SchedulePanel({ assignmentId }: { assignmentId: string }) {
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <Label htmlFor="due">Due date &amp; time</Label>
-            <Input id="due" type="datetime-local" className="mt-1.5" value={dueLocal} onChange={(e) => setDueLocal(e.target.value)} />
+            <Input id="due" type="datetime-local" className="mt-1.5" value={dueLocal} onChange={(e) => { setDueLocal(e.target.value); keepPlan({ title: e.target.value, text: estimate }); }} />
           </div>
           <div>
             <Label htmlFor="urgency">Urgency</Label>
@@ -207,7 +230,10 @@ export function SchedulePanel({ assignmentId }: { assignmentId: string }) {
           </div>
           <div>
             <Label htmlFor="estimate">Est. minutes (optional)</Label>
-            <Input id="estimate" type="number" min={1} max={600} className="mt-1.5" value={estimate} onChange={(e) => setEstimate(e.target.value)} placeholder="Sophira estimates" />
+            <Input id="estimate" type="number" min={1} max={600} className="mt-1.5" value={estimate} onChange={(e) => { setEstimate(e.target.value); keepPlan({ title: dueLocal, text: e.target.value }); }} placeholder="Sophira estimates" />
+              {planDraftMessage ? (
+                <p role="status" className="mt-1 text-xs text-ink/60">{planDraftMessage}</p>
+              ) : null}
           </div>
         </div>
         <Button type="submit" disabled={planning}>{planning ? <Spinner className="h-4 w-4" /> : <><CalendarClock className="mr-1.5 h-4 w-4" /> Plan the schedule</>}</Button>

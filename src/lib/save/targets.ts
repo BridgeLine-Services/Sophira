@@ -172,13 +172,20 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
   },
   {
     id: "scheduling",
-    label: "Study schedule",
-    table: "study_schedule",
+    label: "Study schedule plan inputs",
+    // The schedule itself is produced by the server from these inputs; there is no
+    // "blocks" field to PATCH (the earlier entry named a table and field that do not
+    // exist). Since 2026-11-10 the inputs a member types are kept in the encrypted
+    // device draft (src/components/app/SchedulePanel.tsx), so a refresh does not
+    // make them re-enter a due date.
+    table: "work_schedules",
     route: "/api/schedule",
-    method: "PATCH",
-    fields: ["blocks"],
-    versionFrom: "data.updated_at",
-    coverage: "route-ready",
+    method: "POST",
+    fields: ["due_at", "urgency", "estimated_work_minutes"],
+    versionFrom: null,
+    coverage: "wired",
+    reason:
+      "The plan is created by the server on submit; the typed inputs live in a durable encrypted device draft that is cleared once the plan is saved.",
   },
   {
     id: "profile_settings",

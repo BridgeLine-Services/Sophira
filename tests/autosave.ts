@@ -186,6 +186,24 @@ section("academic memories: a half-written correction is not lost (Phase 6)");
     "academic memories are no longer listed as waiting for an editor");
 }
 
+section("study schedule: plan inputs survive a closed panel (Phase 6)");
+
+{
+  const panel = readFileSync("src/components/app/SchedulePanel.tsx", "utf8");
+  assert(panel.includes("useComposerDraft") && panel.includes('draftKey(["schedule-plan"'),
+    "the plan inputs are kept on the device while the member fills them in");
+  assert(/setDueLocal\(\(v\) => v \|\|/.test(panel) && /setEstimate\(\(v\) => v \|\|/.test(panel),
+    "a restored plan fills only empty inputs, so it cannot overwrite a fresh choice");
+  assert(panel.indexOf("await clearPlan()") > 0 && panel.indexOf("await clearPlan()") < panel.indexOf("setSchedule(json.data.schedule)"),
+    "the draft is cleared once the server accepts the plan");
+  assert(panel.includes("planDraftMessage") && panel.includes('role="status"'),
+    "the member is told in plain language what is happening with the kept inputs");
+  const entry = targetById("scheduling")!;
+  assert(entry.coverage === "wired", "the registry no longer calls the schedule route-ready");
+  assert(entry.table === "work_schedules" && entry.method === "POST",
+    "the registry names the real table and the real request instead of a table and field that never existed");
+}
+
 section("autosave registry: honest coverage for every member-editable thing");
 
 assert(AUTOSAVE_TARGETS.length >= 13, "the registry covers the thirteen audited workflows");
