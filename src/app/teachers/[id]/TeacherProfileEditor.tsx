@@ -1,5 +1,5 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -7,6 +7,12 @@ import {
 } from "@/components/ui";
 import type { Teacher, TeacherDoc, TeacherProfile } from "@/lib/types";
 import { ProfileVersionHistory } from "@/components/app/ProfileVersionHistory";
+import SaveStatus from "@/components/ui/SaveStatus";
+import { useAutosave } from "@/lib/save/useAutosave";
+import { RevisionConflictError } from "@/lib/save/draft";
+import { useComposerDraft } from "@/lib/save/useComposerDraft";
+import { browserDraftStorage } from "@/lib/save/composer-draft-browser";
+import { draftKey } from "@/lib/save/composer-draft";
 import { guardedAiFetch } from "@/lib/ai/offline-guard";
 
 type ReqField =
@@ -59,6 +65,74 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
   const [req, setReq] = useState<Record<ReqField, string>>(
     profile ? (Object.fromEntries(REQ_FIELDS.map((f) => [f.key, (profile as unknown as Record<string, string>)[f.key] || ""])) as Record<ReqField, string>) : emptyProfile()
   );
+  // Requirements save as the member types (2026-11-10). Before this they were
+  // written straight from the browser on a manual click with no version check, so
+  // two tabs — or a closed tab — silently lost what the teacher had said about how
+  // their work must be done. "Saved" now appears only once the server confirms.
+  const requirements = useAutosave<{ requirements: Record<ReqField, string> }>({
+    initialVersion: profile?.updated_at ?? null,
+    save: async (payload, baseVersion) => {
+      const res = await fetch(`/api/teachers/${teacher.id}/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(baseVersion ? { "x-sophira-base-version": baseVersion } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409) throw new RevisionConflictError(data?.data?.updated_at ?? null);
+      if (!res.ok) throw new Error(data?.error ?? "Could not save the requirements.");
+      return { version: data?.data?.updated_at ?? null };
+    },
+  });
+  const { markEdited: markRequirements, snapshot: requirementsSnapshot, retry: retryRequirements,
+    resolveConflict: resolveRequirementsConflict, flush: flushRequirements } = requirements;
+
+  // While typing, the text is also held in the encrypted device draft: a closed
+  // tab no longer loses a paragraph of teacher requirements nobody can retype.
+  const requirementsDraft = useComposerDraft({
+    storage: browserDraftStorage,
+    key: draftKey(["teacher-requirements", teacher.id]),
+  });
+  const { restore: restoreRequirements, keep: keepRequirements, clear: clearRequirements, message: draftMessage } = requirementsDraft;
+  const requirementsRestoredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (requirementsRestoredRef.current === teacher.id) return;
+    requirementsRestoredRef.current = teacher.id;
+    void (async () => {
+      const kept = await restoreRequirements();
+      if (!kept || !kept.text?.trim()) return;
+      let parsed: Partial<Record<ReqField, string>> | null = null;
+      try { parsed = JSON.parse(kept.text) as Partial<Record<ReqField, string>>; } catch { parsed = null; }
+      if (!parsed) return;
+      // Only fills fields the saved profile leaves empty: the server's copy wins.
+      setReq((cur) => {
+        const next = { ...cur };
+        for (const f of REQ_FIELDS) {
+          const value = parsed![f.key];
+          if (typeof value === "string" && value.trim() && !next[f.key].trim()) next[f.key] = value;
+        }
+        return next;
+      });
+    })();
+  }, [teacher.id, restoreRequirements]);
+
+  useEffect(() => {
+    if (requirementsSnapshot.phase !== "saved") return;
+    void clearRequirements();
+  }, [requirementsSnapshot.phase, clearRequirements]);
+
+  /** One requirement field, edited: state, autosave payload and device draft together. */
+  function setRequirement(key: ReqField, value: string) {
+    setReq((cur) => {
+      const next = { ...cur, [key]: value };
+      markRequirements({ requirements: next });
+      keepRequirements({ title: "", text: JSON.stringify(next) });
+      return next;
+    });
+  }
+
   const [docs, setDocs] = useState<Record<string, TeacherDoc[]>>({
     official_instructions: profile?.official_instructions ?? [],
     rubrics: profile?.rubrics ?? [],
@@ -112,23 +186,6 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
     }
     toast("success", "Saved.");
     router.refresh();
-  }
-
-  async function onSaveRequirements(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    const profileId = await ensureProfile();
-    if (!profileId) {
-      setBusy(false);
-      return;
-    }
-    const { error } = await supabase.from("teacher_profiles").update({ ...req }).eq("id", profileId);
-    setBusy(false);
-    if (error) {
-      toast("error", "Could not save: " + error.message);
-      return;
-    }
-    toast("success", "Requirements saved. New assignments will follow them.");
   }
 
   async function onDeleteTeacher() {
@@ -290,7 +347,16 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
       />
 
       {/* Requirements */}
-      <form onSubmit={onSaveRequirements} className="space-y-4">
+      <form onSubmit={(e) => { e.preventDefault(); void flushRequirements(); }} className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-ink-soft">These save as you type. New assignments follow them.</p>
+          <SaveStatus
+            snapshot={requirementsSnapshot}
+            onRetry={retryRequirements}
+            onKeepMine={() => resolveRequirementsConflict("mine")}
+            onUseTheirs={() => resolveRequirementsConflict("theirs")}
+          />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {REQ_FIELDS.map((f) => (
             <div key={f.key}>
@@ -299,16 +365,20 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
                 id={f.key}
                 className="mt-1.5 min-h-20"
                 value={req[f.key]}
-                onChange={(e) => setReq((r) => ({ ...r, [f.key]: e.target.value }))}
+                onChange={(e) => setRequirement(f.key, e.target.value)}
+                onBlur={() => void flushRequirements()}
                 placeholder="Leave empty if this teacher hasn't said"
               />
               {f.hint && <p className="mt-1 text-xs text-ink-soft">{f.hint}</p>}
             </div>
           ))}
         </div>
-        <Button type="submit" disabled={busy} className="w-full sm:w-auto">
-          {busy ? "Saving…" : "Save requirements"}
+        <Button type="submit" variant="secondary" className="w-full sm:w-auto">
+          Save now
         </Button>
+        {draftMessage ? (
+          <p role="status" className="text-xs text-ink-soft">{draftMessage}</p>
+        ) : null}
       </form>
 
       {/* Documents */}

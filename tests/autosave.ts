@@ -244,6 +244,38 @@ section("autosave registry: shipped protection is not relabeled as missing (2026
     "academic memories name the fields the route accepts");
 }
 
+section("teacher requirements: the text that shapes answers saves as you type (2026-11-10)");
+
+{
+  const route = readFileSync("src/app/api/teachers/[id]/profile/route.ts", "utf8");
+  assert(route.includes("export async function PUT"), "teacher requirements save through one revision-aware route");
+  assert(route.includes('x-sophira-base-version') && route.includes("409"),
+    "a stale tab is refused instead of overwriting newer requirements");
+  assert(route.includes('eq("user_id", user.id)'), "the write is scoped to the member in the query as well as RLS");
+  assert(route.includes("archived_at"),
+    "an archived teacher cannot have its requirements rewritten, since it is not active context");
+  assert(route.includes('error.code === "23505"') && route.includes("conflict: true"),
+    "two tabs creating the first profile collide as a visible conflict, not a duplicate row");
+  assert(route.includes("MAX_FIELD") || route.includes("4000"), "a pasted essay is bounded rather than unbounded");
+
+  const editor = readFileSync("src/app/teachers/[id]/TeacherProfileEditor.tsx", "utf8");
+  assert(editor.includes("useAutosave") && editor.includes("<SaveStatus"),
+    "the teacher page saves through the engine and shows its state");
+  assert(editor.includes("resolveRequirementsConflict(\"mine\")") && editor.includes("resolveRequirementsConflict(\"theirs\")"),
+    "a conflict stays the member's choice");
+  assert(editor.includes("setRequirement(f.key, e.target.value)"),
+    "each requirement field feeds the autosave payload, not a local-only state");
+  assert(editor.includes("useComposerDraft") && editor.includes('draftKey(["teacher-requirements"'),
+    "typed requirements survive a closed tab");
+  assert(!editor.includes("async function onSaveRequirements"),
+    "the manual-only save path is gone, so there is one way to write requirements");
+
+  const entry = targetById("teacher_preferences")!;
+  assert(entry.coverage === "wired" && entry.table === "teacher_profiles" && entry.method === "PUT",
+    "the registry points at the real table and route");
+  assert(entry.fields.length === 13, "the registry lists every requirement field the route can write");
+}
+
 section("response editor: a corrected answer stops claiming it was verified (2026-11-10)");
 
 {
