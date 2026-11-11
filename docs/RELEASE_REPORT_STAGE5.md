@@ -14,7 +14,7 @@ configuration was altered.
 | Check | Command | Result |
 |---|---|---|
 | Clean install | `npm ci` | **PASS** (exit 0, from lockfile) |
-| Lint | `npm run lint` | **PASS** — 0 errors, 107 warnings (all pre-existing and pinned) |
+| Lint | `npm run lint` | **PASS** — 0 errors, 107 warnings (all pre-existing and pinned) | *(2026-11-11: superseded — current is 0 errors / 33 warnings, ceiling 33; see docs/SECURITY_DEPENDENCIES.md.)*
 | Types | `npx tsc --noEmit -p tsconfig.json` | **PASS** (exit 0) |
 | Tests | `npm test` | **PASS** — 4,462 passed, 0 failed |
 | Build | `npm run build` | **PASS** — compiled, all routes emitted |
