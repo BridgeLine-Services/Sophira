@@ -1,3 +1,20 @@
+## 2026-11-10 — Phase 6: the runtime smoke suite now probes the editor writes
+
+Every signed-out page check in the smoke suite was a redirect test. The write paths were never
+touched: `npm test` proves the route logic, and nothing proved a signed-out visitor could not reach
+those handlers on a running build.
+
+The suite now sends a real signed-out request to every editor route added this phase
+(`PATCH /api/essay/sections`, `PUT /api/teachers/[id]/profile`, `PATCH /api/responses/[id]`,
+`PATCH /api/assignments/[id]`, plus a read of `GET /api/essay/plan`) and requires a refusal.
+
+The refusal is defined honestly for the environment: this smoke server has no Supabase credentials,
+so a guarded route reaching the guard answers 503 by design, which is the fail-closed degraded state
+in `src/lib/supabase/guard.ts`. A 2xx (the write was allowed) or a 500 (the handler broke before the
+guard spoke) both fail the check, and each result names the status actually seen.
+
+Live on merged master: **SMOKE PASS 100/100**, the first full runtime pass since PR #47.
+
 ## 2026-11-09 — Phase 5c: the lecture studio (/lectures)
 
 Every media capability shipped since Phase 3 was headless: upload, transcription,

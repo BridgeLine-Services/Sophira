@@ -198,7 +198,7 @@ upstream facts from crates.io and the GitHub API on 2026-11-09.
 | `npm run lint` | 0 errors, 104 warnings (ceiling 107) |
 | `npm test` (offline suite) | **5978 / 5978** at `770755b`; **6012 / 6012** with the CodeQL #43 fix applied |
 | `npm run build` | production build succeeded |
-| `npm run smoke:runtime` (live server, production build) | **SMOKE PASS 95/95**, including fail-closed redirects for every signed-out route |
+| `npm run smoke:runtime` (live server, production build) | **SMOKE PASS 100/100**, including fail-closed redirects for every signed-out page and a refusal for every editor write route |
 | CodeQL on the merge PR (`Analyze (javascript-typescript)`, `Analyze (actions)`) | both **success**; **no annotations** - no new alerts in the changed files |
 | CodeQL overall check | `neutral`, only because two stale `java-kotlin` / `rust` analysis configurations registered on `master` by older workflow versions are reported missing; those languages are not in `codeql.yml` |
 | `cargo tree -i glib` | **not run** (cargo absent from this environment) |
