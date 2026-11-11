@@ -1,3 +1,22 @@
+## 2026-11-11 — Database updates: the owner can finally apply migrations from the app
+
+The first-launch wizard deliberately refuses to touch a database that already has an owner, so a live
+deployment that drifted behind the repository had no way to be brought current: `/install` installs
+the app on a phone, and the Owner Dashboard had nothing. Production was nine tables behind.
+
+**Owner Dashboard → Database updates** now shows what the database has and what is missing, and
+applies exactly the missing pieces, in chain order, with one button. Nothing existing is replaced or
+removed, and every message is in plain words (no SQL, no file names).
+
+Safety properties, all server-side: owner-only (authenticated, active, role owner), the SQL is always
+the repository's embedded chain, the endpoint reads **no request body** so nothing can be injected,
+and a migration with no probe stops the run rather than being guessed at.
+
+Also fixed the marker gap that failed the Migrations workflow at #289: `0045_response_edits.sql` had
+no probe, exactly like `0044` before it. Beyond adding that probe, **every one of the 45 migrations
+now has a probe** (19 predated the marker table and were backfilled), and the pipeline self-test
+requires all of them, so an unmarked migration can no longer merge and then fail after deploy.
+
 ## 2026-11-10 — Phase 6: the runtime smoke suite now probes the editor writes
 
 Every signed-out page check in the smoke suite was a redirect test. The write paths were never

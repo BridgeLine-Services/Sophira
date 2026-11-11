@@ -62,7 +62,18 @@ function selfTest() {
   const newest = files[files.length - 1];
   if (!MARKERS[newest]) {
     throw new Error(`self-test: the newest migration (${newest}) has NO marker — unmarked tail migrations can be silently skipped by every apply path; add a probe marker for it in scripts/migration-markers.mjs`);
-  }
+  // 2026-11-11: the newest-only rule let 0045 through unmarked and the Migrations
+  // workflow failed AFTER merge (#289). EVERY migration must now have a probe, so a
+  // brand-new file without one fails here, in CI, before it can be silently skipped.
+  // The 19 files that predated the marker table got real probes backfilled the same
+  // day; there is no allowlist to hide behind.
+  const files = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
+  const unaccounted = files.filter((f) => !MARKERS[f]);
+  if (unaccounted.length > 0) {
+    throw new Error(
+      `self-test: ${unaccounted.length} migration(s) have NO probe: ${unaccounted.join(", ")} — add a probe in scripts/migration-markers.mjs; an unmarked migration can be silently skipped by every apply path`,
+    );
+  }  }
   console.log("apply-migrations self-test: PASS (chain files present, markers consistent, newest migration is probe-verifiable)");
 }
 
