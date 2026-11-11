@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
   // student's entire memory history.
   const { data: memoryRows } = await supabase
     .from("student_memories")
-    .select("id, user_id, category, statement, details, subject, subject_tags, confidence, status, improvement_trend, origin, source, first_observed, last_observed, last_used_at, created_at, updated_at")
+    .select("id, user_id, category, statement, details, subject, subject_tags, confidence, status, improvement_trend, origin, source, first_observed, last_observed, last_used_at, created_at, updated_at, course_id, teacher_id, assignment_id")
     .eq("user_id", user.id)
     .in("status", ["active", "monitoring", "improving"]);
   const memories = (memoryRows || []) as StudentMemory[];
@@ -208,6 +208,11 @@ export async function POST(request: NextRequest) {
     task_type: patternContext.task_type ?? null,
     mode,
     courseId: (body as { course_id?: string | null }).course_id ?? null,
+    // Scopes 4 and 5 (2026-11-11): a memory tied to this teacher or this
+    // assignment outranks the wider scopes, and one tied to a DIFFERENT teacher
+    // or assignment is not retrieved at all.
+    teacherId: (body as { teacher_id?: string | null }).teacher_id ?? null,
+    assignmentId: (body as { assignment_id?: string | null }).assignment_id ?? null,
   });
   // Genuinely used memories: record usage (drives recency ranking).
   if (memorySelection.decisions.length > 0) {

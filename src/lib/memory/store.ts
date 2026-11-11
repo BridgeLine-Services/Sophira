@@ -63,6 +63,8 @@ export async function recordMemoryEvidence(
     statement: string;
     subject?: string | null;
     course_id?: string | null;
+    teacher_id?: string | null;
+    assignment_id?: string | null;
     details?: string;
     evidence: MemoryEvidenceInput;
     source?: string;
@@ -92,6 +94,8 @@ export async function recordMemoryEvidence(
         details: args.details ?? "",
         subject: args.subject ?? null,
         course_id: args.course_id ?? null,
+        teacher_id: args.teacher_id ?? null,
+        assignment_id: args.assignment_id ?? null,
         subject_tags: tagsFor(args.subject),
         confidence: INITIAL_AI_CONFIDENCE,
         status: "monitoring",
@@ -229,7 +233,7 @@ export async function studentMemoryAction(
 export async function listMemories(
   supabase: SupabaseClient,
   userId: string,
-  filters: { q?: string; category?: string; status?: string; course_id?: string } = {},
+  filters: { q?: string; category?: string; status?: string; course_id?: string; teacher_id?: string; assignment_id?: string } = {},
 ): Promise<StudentMemory[]> {
   let query = supabase
     .from("student_memories")
@@ -239,6 +243,9 @@ export async function listMemories(
   if (filters.q) query = query.or(`statement.ilike.%${filters.q}%,details.ilike.%${filters.q}%`);
   if (filters.category) query = query.eq("category", filters.category);
   if (filters.status) query = query.eq("status", filters.status);
+  if (filters.course_id) query = query.eq("course_id", filters.course_id);
+  if (filters.teacher_id) query = query.eq("teacher_id", filters.teacher_id);
+  if (filters.assignment_id) query = query.eq("assignment_id", filters.assignment_id);
   const { data } = await query.order("last_observed", { ascending: false });
   return (data ?? []) as StudentMemory[];
 }

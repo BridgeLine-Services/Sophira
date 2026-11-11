@@ -95,6 +95,10 @@ export interface StudentMemory {
   evidence?: MemoryEvidenceRow[];
   evidence_count?: number;
   course_id?: string | null;
+  /** Scope 4 (2026-11-11): confined to one teacher. */
+  teacher_id?: string | null;
+  /** Scope 5, the narrowest (2026-11-11): confined to one assignment. */
+  assignment_id?: string | null;
 }
 
 export interface MemoryEvidenceInput {
@@ -263,8 +267,34 @@ export interface MemoryContext {
   subject?: string | null;
   task_type?: string | null;
   courseId?: string | null;
+  /** The teacher being worked with, if any (scope 4). */
+  teacherId?: string | null;
+  /** The assignment being worked on, if any (scope 5). */
+  assignmentId?: string | null;
   mode?: string | null;
 }
+
+/**
+ * FIVE MEMORY SCOPES, widest to narrowest (standing requirement, 2026-11-11):
+ *
+ *   General < Subject < Course < Teacher < Assignment
+ *
+ * Two rules make that a real hierarchy rather than a comment:
+ *   1. a memory scoped to a DIFFERENT teacher/assignment/course is never
+ *      retrieved (see selectRelevantMemories), so a rule cannot leak sideways;
+ *   2. when two memories disagree, the narrower one outranks the wider one —
+ *      the bonuses below are ordered so assignment > teacher > course > subject
+ *      > general, and no combination of the wider bonuses can overtake a
+ *      narrower match.
+ */
+export const SCOPE_BONUS = {
+  assignment: 1.4,
+  teacher: 1.1,
+  course: 0.8,
+  subjectTag: 0.5,
+  subjectField: 0.2,
+  general: 0.15,
+} as const;
 
 export interface MemoryPromptSection {
   /** Compact lines injected into the system prompt. */
@@ -291,12 +321,15 @@ export function relevanceScore(m: StudentMemory, ctx: MemoryContext, nowISO?: st
   // COURSE SCOPE (0031): an exact-course match outranks a subject-tag
   // match; a memory scoped to a DIFFERENT course is never selected for
   // this course (see selectRelevantMemories eligible filter).
-  if (ctx.courseId && m.course_id === ctx.courseId) score += 0.6;
-  if (subject && tags.includes(subject)) score += 0.5;
-  if (subject && (m.subject || "").toLowerCase() === subject) score += 0.2;
+  // Narrowest first: assignment, then teacher, then course, then subject.
+  if (ctx.assignmentId && m.assignment_id === ctx.assignmentId) score += SCOPE_BONUS.assignment;
+  if (ctx.teacherId && m.teacher_id === ctx.teacherId) score += SCOPE_BONUS.teacher;
+  if (ctx.courseId && m.course_id === ctx.courseId) score += SCOPE_BONUS.course;
+  if (subject && tags.includes(subject)) score += SCOPE_BONUS.subjectTag;
+  if (subject && (m.subject || "").toLowerCase() === subject) score += SCOPE_BONUS.subjectField;
   if (!subject || tags.includes(subject) || (m.subject || "").toLowerCase() === subject) {
     // cross-subject memories only when they carry no conflicting subject
-    if (!m.subject && !tags.length) score += 0.15;
+    if (!m.subject && !tags.length) score += SCOPE_BONUS.general;
   }
   score += 0.3 * clampConfidence(m.confidence);
   const lastSeen = Date.parse(m.last_observed);
@@ -324,9 +357,12 @@ export function selectRelevantMemories(
 ): MemoryPromptSection {
   const eligible = memories.filter((m) =>
     RETRIEVABLE_STATUSES.includes(m.status) &&
-    // Course-scoped memories apply ONLY inside their own course — never
-    // in another course, and never in a course-less subject prompt.
-    !(m.course_id && m.course_id !== ctx.courseId));
+    // A narrowly-scoped memory applies ONLY inside its own scope: never another
+    // course, never another teacher's work, and never on a different assignment.
+    // This is the rule that keeps scope 4 and 5 from leaking sideways.
+    !(m.course_id && m.course_id !== ctx.courseId) &&
+    !(m.teacher_id && m.teacher_id !== ctx.teacherId) &&
+    !(m.assignment_id && m.assignment_id !== ctx.assignmentId));
   const scored = eligible
     .map((m) => ({ m, score: relevanceScore(m, ctx, nowISO) }))
     .sort((a, b) => b.score - a.score)
