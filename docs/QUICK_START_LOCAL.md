@@ -101,3 +101,24 @@ production.
 `SOPHIRA_LOCAL_FIRST=true` also requires a non-production build, so a
 real deployment can never open this path by accident. Production keeps
 full sign-in and invitation-only access — unchanged.
+
+## Benchmarking the local model (Phase 2)
+
+Whether a self-hosted model can carry Sophira's work is a measurement, not an opinion. With your
+inference server running:
+
+```
+LOCAL_LLM_BASE_URL=http://127.0.0.1:11434 npm run bench:local -- --model llama3.1:8b
+```
+
+Four probes mirror what Sophira actually asks a model to do: a strict JSON reply the planner can
+parse, a checkable arithmetic step, a question whose context is missing (the right answer is to name
+what is missing), and a citation task where citing anything outside the supplied sources fails.
+
+- **BLOCKED** (exit 2) means nothing was measured: no server, or no model named. The harness never
+  substitutes a cloud provider, so a blocked result cannot be mistaken for a pass.
+- **PASS/FAIL per probe** with a median latency. Add `--out docs/local-model-benchmark.json` to record
+  a real run. Only commit a report that a real server produced.
+
+The harness itself is tested in both directions on every `npm test`: a stub that behaves well must
+score 4/4, and a stub that bluffs must score 0/4, so the numbers cannot drift generous.

@@ -109,6 +109,7 @@ import { planSchedule, clampBreak, MIN_BREAK_SECONDS, MAX_BREAK_SECONDS } from "
 import { readFileSync } from "fs";
 import { runOfflineTests } from "./offline";
 import { runAutosaveRegistryTests, runAutosaveTests } from "./autosave";
+import { runLocalModelBenchmarkTests } from "./local-model-benchmark";
 import { runEmailAttachmentTests } from "./email-attachments";
 import { runSpreadsheetFormulaTests } from "./spreadsheet-formulas";
 import { runSsrfTests } from "./ssrf";
@@ -1443,6 +1444,16 @@ function finish() {
   passed += sa.passed;
   {
     const r = runAutosaveTests();
+    passed += r.passed;
+    failed += r.failed;
+  }
+
+  // Phase 2: the local model benchmark must be trustworthy in both directions
+  // (2026-11-11). Runs the real script against a stub server: an honest model scores
+  // 4/4, a bluffing one scores 0/4, and neither is ever graded against a cloud call.
+  section("LOCAL MODEL BENCHMARK (Phase 2) — the harness judges a model honestly, not generously");
+  {
+    const r = runLocalModelBenchmarkTests();
     passed += r.passed;
     failed += r.failed;
   }
