@@ -1,6 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import AssignmentDetailsEditor from "@/components/app/AssignmentDetailsEditor";
+import ResponseEditor from "@/components/app/ResponseEditor";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -542,6 +543,12 @@ export function Workspace({
                 {savingToLibrary ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />} Save to library
               </Button>
             </div>
+            <ResponseEditor
+              responseId={latestResponse.id}
+              content={latestResponse.content}
+              updatedAt={latestResponse.updated_at ?? null}
+              onSaved={() => router.refresh()}
+            />
           </CardContent>
         </Card>
       )}

@@ -1,5 +1,5 @@
--- SOPHIRA COMPLETE DATABASE SETUP (regenerated 2026-11-09)
--- Applies every migration in order (0001_init.sql ... 0044_media_ingestion.sql).
+-- SOPHIRA COMPLETE DATABASE SETUP (regenerated 2026-11-11)
+-- Applies every migration in order (0001_init.sql ... 0045_response_edits.sql).
 -- Run this SINGLE file once in the Supabase SQL editor for a fresh
 -- installation. It is SAFE TO RUN MORE THAN ONCE: every table, index,
 -- policy, trigger and constraint is guarded, so re-running is harmless.
@@ -3256,3 +3256,24 @@ create index if not exists media_frames_asset_time_idx on public.media_frames (a
 -- member_note / recognised_text are MEMBER CONTENT: the backup inventory
 -- marks these tables sensitive, so their text is never printed in reports.
 -- ---------------------------------------------------------------------
+
+-- ===================== 0045_response_edits.sql =====================
+-- ---------------------------------------------------------------------
+-- responses.updated_at (Phase 6, 2026-11-10)
+--
+-- The member can now correct a draft answer in place. Revision-aware saving
+-- needs a version column on the row, and `responses` never had one: it was
+-- append-only (created_at only). Adding the column keeps the old rows valid
+-- (they inherit created_at) and lets a stale editor be refused instead of
+-- overwriting newer text from another device.
+-- ---------------------------------------------------------------------
+alter table public.responses
+  add column if not exists updated_at timestamptz not null default now();
+
+update public.responses
+  set updated_at = created_at
+  where updated_at is distinct from created_at
+    and updated_at > created_at;
+
+create index if not exists responses_assignment_updated_idx
+  on public.responses (assignment_id, updated_at desc);

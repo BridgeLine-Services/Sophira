@@ -216,6 +216,8 @@ export interface AiResponse {
   verification: Verification;
   model_used: string | null;
   created_at: string;
+  /** Present since migration 0045; older rows inherit created_at. */
+  updated_at?: string | null;
 }
 
 export interface Feedback {

@@ -244,6 +244,44 @@ section("autosave registry: shipped protection is not relabeled as missing (2026
     "academic memories name the fields the route accepts");
 }
 
+section("response editor: a corrected answer stops claiming it was verified (2026-11-10)");
+
+{
+  const route = readFileSync("src/app/api/responses/[id]/route.ts", "utf8");
+  assert(route.includes("export async function PATCH"), "the response route accepts an in-place edit");
+  assert(route.includes('x-sophira-base-version') && route.includes("409"),
+    "a concurrent edit is refused with 409 rather than overwriting newer text");
+  assert(route.includes('eq("user_id", user.id)'), "the write is scoped to the member in the query as well as RLS");
+  assert(route.includes('status: "unverified"') && route.includes("member_edited"),
+    "an edited answer is marked unverified and the original verdict is preserved, not deleted");
+  assert(/existing\.content === content/.test(route),
+    "saving unchanged text is a no-op, so it cannot mark a checked answer unverified");
+  assert(route.includes("200000"), "an oversized answer is refused instead of silently truncated");
+
+  const migration = readFileSync("supabase/migrations/0045_response_edits.sql", "utf8");
+  assert(migration.includes("add column if not exists updated_at"),
+    "the version column is added without breaking existing rows");
+  assert(migration.includes("set updated_at = created_at"),
+    "older rows inherit created_at so their version is honest");
+
+  const editor = readFileSync("src/components/app/ResponseEditor.tsx", "utf8");
+  assert(editor.includes("useAutosave") && editor.includes("<SaveStatus"),
+    "the editor saves through the engine and shows its state");
+  assert(editor.includes("resolveConflict(\"mine\")") && editor.includes("resolveConflict(\"theirs\")"),
+    "a conflict stays the member's choice");
+  assert(editor.includes("useComposerDraft") && editor.includes('draftKey(["response-edit"'),
+    "a half-rewritten answer survives a closed tab");
+  assert(/shown as unverified from your first change onward/.test(editor),
+    "the member is told plainly that their own wording is no longer checked");
+
+  const workspace = readFileSync("src/app/assignments/[id]/Workspace.tsx", "utf8");
+  assert(workspace.includes("<ResponseEditor"), "the assignment page really renders the response editor");
+
+  const entry = targetById("assignment_responses")!;
+  assert(entry.coverage === "wired" && entry.table === "responses" && entry.route === "/api/responses/[id]",
+    "the registry names the real table and route instead of the invented response field");
+}
+
 section("assignment editor: the member's own brief is editable and saved (2026-11-10)");
 
 {

@@ -110,15 +110,19 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
   },
   {
     id: "assignment_responses",
-    label: "Assignment responses",
-    table: "assignments",
-    route: null,
-    method: null,
-    fields: ["response"],
-    versionFrom: null,
-    coverage: "no-editor",
+    label: "A generated answer the member corrects",
+    // The earlier entry pointed at the `assignments` table and a `response` field.
+    // Neither exists: answers live in `responses`, the text column is `content`,
+    // and no page let a member type into one. Since 2026-11-10 the assignment page
+    // edits an answer in place through PATCH /api/responses/[id].
+    table: "responses",
+    route: "/api/responses/[id]",
+    method: "PATCH",
+    fields: ["content"],
+    versionFrom: "data.updated_at",
+    coverage: "wired",
     reason:
-      "Sections are written by the drafting pipeline, not by a member editor: no page lets a member type a section, and no API route writes this table. The declared route was removed after the audit because /api/essay/draft-section persists essay_sessions, not essay_sections.",
+      "Editing an answer saves in place through the revision-aware route; the server keeps the original check under verification.member_edited and marks the text unverified, because the check never saw the member's words.",
   },
   {
     id: "notebook_notes",
