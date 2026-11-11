@@ -6,7 +6,7 @@ not been touched. A route missing from that file is reported as not-started,
 never as complete.
 
 - Page routes: **70**
-- API routes: **94**
+- API routes: **95**
 - Redesigned: 0 | Partial: 8 | Intentionally unchanged: 0 | Not started: 62
 - Pages using the shared shell: 45 | client components: 31 | with an auth gate in-file: 24
 
@@ -173,6 +173,7 @@ data layer, `auth-gated` = redirects or reads the session itself. A page with no
 - `/api/research/audit`
 - `/api/research/resume`
 - `/api/research/verify-again`
+- `/api/responses/[id]`
 - `/api/rubric-audit`
 - `/api/schedule`
 - `/api/schedule/executions`
