@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useComposerDraft } from "@/lib/save/useComposerDraft";
+import { browserDraftStorage } from "@/lib/save/composer-draft-browser";
+import { draftKey } from "@/lib/save/composer-draft";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, EmptyState, Input, Label, Select, Spinner, Textarea, useToast } from "@/components/ui";
@@ -91,6 +94,28 @@ export default function NotebookWorkspace() {
   const [addText, setAddText] = useState("");
   const [addUrl, setAddUrl] = useState("");
   const [addBusy, setAddBusy] = useState(false);
+
+  // The source composer keeps a durable draft on this device (Phase 6): closing
+  // the tab no longer loses pasted text, and nothing is written to the database
+  // until the member presses "Add source".
+  const composer = useComposerDraft({
+    storage: browserDraftStorage,
+    key: id ? draftKey(["notebook-source", id]) : null,
+  });
+  const composerKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!id) return;
+    const key = draftKey(["notebook-source", id]);
+    if (composerKeyRef.current === key) return;
+    composerKeyRef.current = key;
+    void (async () => {
+      const draft = await composer.restore();
+      // Only fill empty fields: a restore must never overwrite text already typed.
+      if (!draft) return;
+      setAddTitle((cur) => (cur.trim() ? cur : draft.title));
+      setAddText((cur) => (cur.trim() ? cur : draft.text));
+    })();
+  }, [composer, id]);
 
   // research state
   const [topic, setTopic] = useState("");
@@ -201,6 +226,7 @@ export default function NotebookWorkspace() {
       }
       if (data) {
         setAddTitle(""); setAddText(""); setAddUrl("");
+        await composer.clear();
         const d = data as { notes?: string[] };
         if (d.notes?.length) say(d.notes[0]);
         await load();
@@ -351,7 +377,7 @@ export default function NotebookWorkspace() {
                       </div>
                       <div>
                         <Label>Title (optional)</Label>
-                        <Input value={addTitle} onChange={(e) => setAddTitle(e.target.value)} placeholder="Name this source" />
+                        <Input value={addTitle} onChange={(e) => { setAddTitle(e.target.value); composer.keep({ title: e.target.value, text: addText }); }} placeholder="Name this source" />
                       </div>
                     </div>
                     {addType === "web_url" ? (
@@ -362,10 +388,11 @@ export default function NotebookWorkspace() {
                     ) : (
                       <div>
                         <Label>Content</Label>
-                        <Textarea value={addText} onChange={(e) => setAddText(e.target.value)} rows={4} placeholder="Paste the text (instructions, notes, source content)…" />
+                        <Textarea value={addText} onChange={(e) => { setAddText(e.target.value); composer.keep({ title: addTitle, text: e.target.value }); }} rows={4} placeholder="Paste the text (instructions, notes, source content)…" />
                       </div>
                     )}
                     <div className="flex flex-wrap items-center gap-3">
+                      {composer.message ? <p className="text-xs text-ink/60">{composer.message}</p> : null}
                       <Button onClick={addSource} disabled={addBusy}>{addBusy ? <Spinner /> : "Add source"}</Button>
                       <label className="flex items-center gap-2 text-sm text-ink/70">
                         <FileText className="h-4 w-4" /> or upload PDF / DOCX / TXT

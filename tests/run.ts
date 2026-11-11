@@ -120,6 +120,7 @@ import { runEmailValidationTests } from "./email-validation";
 import { runDocumentHtmlTests } from "./document-html";
 import { runWorkflowPermissionTests } from "./workflow-permissions";
 import { runDependencyVersionTests } from "./dependency-versions";
+import { runComposerDraftTests } from "./composer-draft";
 import { runUrlHostHelperTests } from "./url-host-helpers";
 import { runWritingProfileExpansionTests } from "./writing-profile-expansion";
 import { runExtractionProvenanceTests } from "./extraction-provenance";
@@ -5372,6 +5373,9 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
   }).then(async () => {
     // Phase 0 security remediation: Dependabot (minimatch, glob) + glib record.
     runDependencyVersionTests(assert, section);
+  }).then(async () => {
+    // Phase 6: composer drafts survive a closed tab without a database row per pause.
+    await runComposerDraftTests(assert, section);
   }).then(async () => {
     // CodeQL #43: the hostname helper behind the native-URL assertions.
     runUrlHostHelperTests(assert, section);
