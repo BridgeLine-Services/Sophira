@@ -127,6 +127,30 @@ export async function runAutosaveRegistryTests(
   const essayPage = readFileSync("src/app/essay/page.tsx", "utf8");
   const draftRoute = readFileSync("src/app/api/essay/draft-section/route.ts", "utf8");
 
+section("notebook details: the editor exists, and a stale write is refused (Phase 6)");
+
+{
+  const route = readFileSync("src/app/api/notebooks/[id]/route.ts", "utf8");
+  assert(/x-sophira-base-version/.test(route),
+    "notebook route: the write carries the version the editor started from");
+  assert(/status: 409/.test(route) && /choose which version to keep/.test(route),
+    "notebook route: a stale write is refused with a plain-language conflict, not a silent overwrite");
+  assert(/\.eq\("updated_at", baseVersion\)/.test(route),
+    "notebook route: the conflict test is applied in the query, so two devices cannot both win");
+
+  const page = readFileSync("src/app/notebooks/[id]/page.tsx", "utf8");
+  assert(/useAutosave</.test(page) && /x-sophira-base-version/.test(page),
+    "notebook page: the name and description editor saves through the revision-aware path");
+  assert(/<SaveStatus/.test(page),
+    "notebook page: the member can see the save state instead of guessing");
+  assert(/adopt(?:Meta)?Version\(notebook\.updated_at/.test(page),
+    "notebook page: the version loaded from the server becomes the base for the first write");
+
+  const hook = readFileSync("src/lib/save/useAutosave.ts", "utf8");
+  assert(/const adoptVersion = useCallback/.test(hook) && /adoptVersion \}/.test(hook),
+    "autosave hook: a page can adopt a version once its record loads");
+}
+
 section("autosave registry: honest coverage for every member-editable thing");
 
 assert(AUTOSAVE_TARGETS.length >= 13, "the registry covers the thirteen audited workflows");

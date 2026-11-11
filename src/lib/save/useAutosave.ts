@@ -33,12 +33,19 @@ export interface UseAutosaveOptions<T> {
   maxWaitMs?: number;
   /** Set when the member explicitly chooses their own version after a conflict. */
   onConflictNeedsChoice?: (choose: (mode: "mine" | "theirs") => void) => void;
+  /**
+   * The server version the page LOADED (Phase 6, 2026-11-10). Without it the
+   * first write travels with no base version and cannot detect that another
+   * device changed the record in the meantime. Callers pass the version they
+   * rendered; omit it only when the record genuinely has no version.
+   */
+  initialVersion?: string | null;
 }
 
 export function useAutosave<T>(opts: UseAutosaveOptions<T>) {
   const [snapshot, setSnapshot] = useState<SaveSnapshot>(initialSaveSnapshot);
   const payloadRef = useRef<T | null>(null);
-  const baseRef = useRef<string | null>(null);
+  const baseRef = useRef<string | null>(opts.initialVersion ?? null);
   const firstDirtyRef = useRef<number | null>(null);
   const lastEditRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,6 +111,15 @@ export function useAutosave<T>(opts: UseAutosaveOptions<T>) {
     [attemptSave, clearTimer],
   );
 
+  /**
+   * Adopt the version that was just loaded from the server (Phase 6). Pages that
+   * render before the record arrives call this once it does, so the first write
+   * still detects that another device changed the record meanwhile.
+   */
+  const adoptVersion = useCallback((version: string | null) => {
+    baseRef.current = version;
+  }, []);
+
   /** Immediate save (blur, navigation, explicit button). */
   const flush = useCallback(() => {
     if (payloadRef.current !== null) void attemptSave();
@@ -146,5 +162,5 @@ export function useAutosave<T>(opts: UseAutosaveOptions<T>) {
     };
   }, [attemptSave, clearTimer]);
 
-  return { snapshot, markEdited, flush, retry, resolveConflict };
+  return { snapshot, markEdited, flush, retry, resolveConflict, adoptVersion };
 }

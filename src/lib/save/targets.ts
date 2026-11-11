@@ -121,7 +121,7 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
     method: "PATCH",
     fields: ["title", "description"],
     versionFrom: "notebook.updated_at",
-    coverage: "route-ready",
+    coverage: "wired",
   },
   {
     id: "notebook_note_composer",
