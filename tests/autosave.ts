@@ -151,6 +151,24 @@ section("notebook details: the editor exists, and a stale write is refused (Phas
     "autosave hook: a page can adopt a version once its record loads");
 }
 
+section("writing samples: a long paste survives a closed tab (Phase 6)");
+
+{
+  const page = readFileSync("src/app/writing/new/page.tsx", "utf8");
+  assert(page.includes("useComposerDraft") && page.includes('draftKey(["writing-sample"'),
+    "the sample editor keeps a device draft while the member types");
+  assert(/\.\.\.f, title: f\.title \|\| kept\.title, content: f\.content \|\| kept\.text/.test(page),
+    "a restored draft only fills empty boxes, so it can never overwrite what is being typed");
+  assert(page.indexOf("await draft.clear()") > 0 && page.indexOf("await draft.clear()") < page.indexOf('router.push("/writing")'),
+    "the draft is cleared before leaving the page, so a saved sample cannot come back as a ghost draft");
+  assert(page.includes("draft.message") && page.includes("role=\"status\""),
+    "the member is told in plain language what is happening with their draft");
+  const entry = targetById("writing_samples")!;
+  assert(entry.coverage === "wired", "the registry no longer lists writing samples as waiting for an editor");
+  assert(entry.table === "writing_samples" && entry.route === null,
+    "the registry names the table it really writes instead of an unrelated profile route");
+}
+
 section("autosave registry: honest coverage for every member-editable thing");
 
 assert(AUTOSAVE_TARGETS.length >= 13, "the registry covers the thirteen audited workflows");

@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/app/AppShell";
 import { Button, Input, Label, Select, Spinner, Textarea, useToast } from "@/components/ui";
 import type { Course } from "@/lib/types";
+import { useComposerDraft } from "@/lib/save/useComposerDraft";
+import { browserDraftStorage } from "@/lib/save/composer-draft-browser";
+import { draftKey } from "@/lib/save/composer-draft";
 
 const LEVELS = ["Kindergarten/Elementary", "Middle school", "High school", "College/Undergraduate", "Graduate/Master's", "PhD", "Other"];
 const GENRES = ["Essay", "Discussion post", "Short answer", "Lab report", "Reflection", "Research writing", "Other"];
@@ -20,13 +23,33 @@ export default function NewWritingSamplePage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // A sample is usually a long paste (Phase 6, 2026-11-10). The title and the writing
+  // itself are kept in the encrypted device store while the member types, so a refresh,
+  // a closed tab or a lost connection cannot throw away coursework. Nothing reaches the
+  // database until the member presses Save.
+  const draft = useComposerDraft({ storage: browserDraftStorage, key: draftKey(["writing-sample", "new"]) });
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    void (async () => {
+      const kept = await draft.restore();
+      if (!kept) return;
+      setForm((f) => ({ ...f, title: f.title || kept.title, content: f.content || kept.text }));
+    })();
+  }, [draft]);
 
   useEffect(() => {
     supabase.from("courses").select("*").order("name").then(({ data }) => setCourses(data ?? []));
   }, [supabase]);
 
   function set<K extends keyof typeof form>(key: K, value: string) {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+      // Only the two long fields are kept as a draft; the pickers are one tap to redo.
+      if (key === "title" || key === "content") draft.keep({ title: next.title, text: next.content });
+      return next;
+    });
   }
 
   async function onUpload(file: File) {
@@ -81,6 +104,7 @@ export default function NewWritingSamplePage() {
       toast("error", "Could not save: " + error.message);
       return;
     }
+    await draft.clear();
     toast("success", "Sample saved.");
     router.push("/writing");
   }
@@ -131,6 +155,11 @@ export default function NewWritingSamplePage() {
         <div>
           <Label htmlFor="content">Your writing *</Label>
           <Textarea id="content" className="mt-1.5 min-h-64" value={form.content} onChange={(e) => set("content", e.target.value)} placeholder="Paste your writing here" />
+          {/* Plain language, only when there is something to say: the writing is kept on
+              this device while the member types, and is not in the database until Save. */}
+          {draft.status !== "idle" ? (
+            <p className="mt-1 text-xs text-ink/60" role="status">{draft.message}</p>
+          ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <label className="inline-flex h-11 cursor-pointer items-center rounded-lg border border-line px-4 text-sm font-medium text-ink hover:bg-ink/5">
               {uploading ? <Spinner className="mr-2 h-4 w-4" /> : null}

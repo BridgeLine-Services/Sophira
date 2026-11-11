@@ -82,12 +82,14 @@ export const AUTOSAVE_TARGETS: AutosaveTarget[] = [
   {
     id: "writing_samples",
     label: "Writing samples (voice profile)",
-    table: "typing_profiles",
-    route: "/api/typing/profile",
-    method: "PATCH",
-    fields: ["samples"],
-    versionFrom: "data.updated_at",
-    coverage: "route-ready",
+    table: "writing_samples",
+    route: null,
+    method: null,
+    fields: ["title", "content"],
+    versionFrom: null,
+    coverage: "wired",
+    reason:
+      "A sample is inserted straight into writing_samples from the editor (one row per sample, no draft row exists to reconcile). Since 2026-11-10 the editor keeps the title and the writing in the encrypted device store while the member types and clears it after a confirmed insert, so a refresh or a closed tab cannot lose the paste.",
   },
   {
     id: "assignments",
