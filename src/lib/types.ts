@@ -218,6 +218,9 @@ export interface AiResponse {
   created_at: string;
   /** Present since migration 0045; older rows inherit created_at. */
   updated_at?: string | null;
+  /** Which engine wrote this answer (migration 0046). NULL = not recorded,
+   *  which is never the same as "cloud". */
+  provider_used?: "selfhost" | "gemini" | "openai" | "local" | null;
 }
 
 export interface Feedback {

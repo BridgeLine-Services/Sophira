@@ -14,7 +14,7 @@ import {
   explainPatternDecisions,
   recordPatternEvidence,
 } from "@/lib/learning/evidence";
-import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
+import { AiNotConfiguredError, aiChat, aiChatMeta, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import {
   buildClassificationPrompt,
   buildSystemPrompt,
@@ -372,6 +372,9 @@ export async function POST(request: NextRequest) {
   }
 
   let content = "";
+  // Which engine answered. Known only after the call; "" until then, and the
+  // insert records NULL rather than guessing (2026-11-11).
+  let answeredBy: { provider: string; model: string } | null = null;
   let observedMistakesRaw: unknown = null;
   let observedPatternConflictsRaw: unknown = null;
   let verification: {
@@ -390,7 +393,7 @@ export async function POST(request: NextRequest) {
     kinds: string[];
   } = { results: [], allPassed: false, kinds: [] };
   try {
-    const raw = await aiChat(
+    const answered = await aiChatMeta(
       [
         { role: "system", content: systemPrompt },
         ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -398,6 +401,8 @@ export async function POST(request: NextRequest) {
       ],
       { temperature: 0.4, maxTokens: 4096, jsonMode: true, images }
     );
+    const raw = answered.text;
+    answeredBy = { provider: answered.provider, model: answered.model };
     const parsed = parseJsonLoose<{
       answer?: string;
       machine_checks?: unknown;
@@ -742,7 +747,10 @@ export async function POST(request: NextRequest) {
     mode,
     verification,
     context_applied: contextApplied,
-    model_used: process.env.SOPHIRA_MODEL || "gpt-4o-mini",
+    // Provenance is RECORDED, not guessed: aiChatMeta reports the engine that
+    // actually answered (2026-11-11).
+    model_used: answeredBy?.model ?? null,
+    provider_used: answeredBy?.provider ?? null,
   }).select("id").single();
 
   if (researchSources.length > 0 && !rErr && resp?.id) {
@@ -815,7 +823,9 @@ export async function POST(request: NextRequest) {
       classification,
       context_applied: contextApplied,
       research_integrity: integrityReport,
-      model_used: process.env.SOPHIRA_MODEL || "gpt-4o-mini",
+      // The engine that actually replied (2026-11-11). Never a guessed name.
+      model_used: answeredBy?.model ?? null,
+      provider_used: answeredBy?.provider ?? null,
     },
   });
 }
