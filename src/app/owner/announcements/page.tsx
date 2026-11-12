@@ -5,6 +5,8 @@ import { AppShell } from "@/components/app/AppShell";
 import { isStaff, normalizeRole } from "@/lib/roles";
 import { staffBackHrefFor } from "@/lib/navigation/role-home";
 import { AnnouncementComposer } from "@/components/owner/AnnouncementComposer";
+import { needsDatabaseUpdate } from "@/lib/supabase/missing-object";
+import { DatabaseUpdateNotice } from "@/components/system/DatabaseUpdateNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +17,24 @@ export default async function AnnouncementsPage() {
   const role = normalizeRole(profile?.role);
   if (!isStaff(role)) redirect("/dashboard");
 
-  const { data: rows } = await supabase
+  const { data: rows, error } = await supabase
     .from("announcements")
     .select("id, title, body, status, published_at, created_at, author_id")
     .order("created_at", { ascending: false })
     .limit(50);
+
+  /*
+   * 2026-11-12: the composer below writes to this table, so an unread table must never be
+   * shown as "no announcements yet": a staff member would type an announcement, press send,
+   * and only then be refused. The notice comes before the composer, not after a failure.
+   */
+  if (needsDatabaseUpdate(error)) {
+    return (
+      <AppShell title="Announcements" variant="owner" role={role} backHref={staffBackHrefFor(role)}>
+        <DatabaseUpdateNotice feature="announcements" error={error} canUpdate={role === "owner"} />
+      </AppShell>
+    );
+  }
 
   return (
     /*
