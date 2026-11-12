@@ -5,7 +5,8 @@ import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user"
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { TrendChart } from "@/components/dashboard/TrendChart";
-import { dailySeries, weekActivity, type ActivityDayRow } from "@/lib/dashboard/overview";
+import { dailySeries, weekActivity } from "@/lib/dashboard/overview";
+import { readActivityDaily } from "@/lib/dashboard/activity";
 import { OwnerDashboard } from "@/components/app/OwnerDashboard";
 import { OwnerAreaGrid } from "@/components/owner/OwnerAreaGrid";
 import type { Role } from "@/lib/roles";
@@ -219,18 +220,11 @@ export default async function OwnerPage() {
    * network_activity_daily() rather than widening a policy. If that function is not in the
    * database yet, the read fails and the panel says so - it never draws zeros it did not read.
    */
-  const { data: dailyRows, error: dailyError } = await supabase.rpc("network_activity_daily", { p_days: 14 });
-  const activityDaily: ActivityDayRow[] = ((dailyRows ?? []) as unknown[])
-    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
-    .filter((row) => typeof row.day === "string")
-    .map((row) => ({
-      day: String(row.day),
-      signups: Number(row.signups) || 0,
-      study_sessions: Number(row.study_sessions) || 0,
-      answers: Number(row.answers) || 0,
-    }));
-  const signupSeries = dailySeries(activityDaily, "signups", new Date(), 14);
-  const studySeries = dailySeries(activityDaily, "study_sessions", new Date(), 14);
+  // Sign-ups, study sessions and answers are own-rows-only, so these are staff-gated COUNTS read
+  // through network_activity_daily(); no policy is widened to draw a chart (see migration 0056).
+  const activityRead = await readActivityDaily(supabase, 14);
+    const signupSeries = dailySeries(activityRead.rows, "signups", new Date(), 14);
+  const studySeries = dailySeries(activityRead.rows, "study_sessions", new Date(), 14);
 
 return (
     <AppShell
@@ -275,7 +269,12 @@ return (
               variant="line"
               series={signupSeries}
               compare={{ label: "study sessions", series: studySeries }}
-              unreadable={Boolean(dailyError)}
+              unreadable={activityRead.unreadable}
+              hint={
+                activityRead.needsDatabaseUpdate
+                  ? "This panel needs the latest database update. Nothing is wrong: press Update database on this page and it will fill in."
+                  : undefined
+              }
               unit="accounts created"
               sourceNote="Counted by network_activity_daily() from profiles, work_sessions and responses. Counts only, so no member's work is exposed to make the chart."
             />

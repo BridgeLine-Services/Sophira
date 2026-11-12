@@ -16,6 +16,11 @@ interface TrendChartProps {
   series: DayBar[];
   variant: "line" | "bars";
   unreadable?: boolean;
+  /**
+   * What to tell the reader when the read failed for a KNOWN, fixable reason - "the database
+   * update has not been applied" is a setup step, not a fault, and saying so saves a hunt.
+   */
+  hint?: string;
   sourceNote?: string;
   /** What one mark counts, named in the accessible description. */
   unit?: string;
@@ -33,6 +38,7 @@ export function TrendChart({
   series,
   variant,
   unreadable = false,
+  hint,
   sourceNote,
   unit = "events",
   compare,
@@ -86,8 +92,12 @@ export function TrendChart({
 
       {unreadable ? (
         <p className="mt-3 text-sm text-ink-soft">
-          We couldn&apos;t read this activity just now. That is not the same as a quiet week, so the
-          chart is left out rather than drawn flat at zero.
+          {hint ?? (
+            <>
+              We couldn&apos;t read this activity just now. That is not the same as a quiet week, so
+              the chart is left out rather than drawn flat at zero.
+            </>
+          )}
         </p>
       ) : (
         <>
