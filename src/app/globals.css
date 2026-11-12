@@ -129,3 +129,127 @@ input, textarea, select {
    be a place for the two to drift apart - which is what happened: the toggle and the
    OS-following path disagreed on accent and danger. One definition, one behaviour. */
 
+
+/* =====================================================================
+   PERSONAL LEARNING DASHBOARD (2026-11-12)
+   The owner's purple reference, scoped to this one page. Nothing here
+   changes a selector that already exists elsewhere: every class is new
+   and prefixed .dash-, so the rest of Sophira is untouched.
+   ===================================================================== */
+.dash-page {
+  color: #fff;
+  border-radius: 22px;
+  padding: clamp(14px, 2vw, 26px);
+  background:
+    radial-gradient(900px 460px at 8% -12%, #7c5cea 0%, rgba(124, 92, 234, 0) 58%),
+    radial-gradient(760px 420px at 100% 0%, #4a2f92 0%, rgba(74, 47, 146, 0) 55%),
+    linear-gradient(168deg, #2b1a56 0%, #221442 52%, #180f30 100%);
+}
+.dash-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+.dash-hero-title {
+  font-size: clamp(23px, 3vw, 32px);
+  font-weight: 700;
+  line-height: 1.16;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+.dash-hero-sub { color: rgba(255, 255, 255, 0.72); font-size: 14px; line-height: 1.5; }
+.dash-glass {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+}
+.dash-stat-value {
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 700;
+  line-height: 1.1;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.dash-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+.dash-stat-note { font-size: 12px; color: rgba(255, 255, 255, 0.72); line-height: 1.4; }
+.dash-panel {
+  background: #ffffff;
+  color: #23263a;
+  border-radius: 18px;
+  padding: clamp(14px, 1.6vw, 20px);
+  box-shadow: 0 18px 38px rgba(12, 6, 30, 0.26);
+}
+.dash-panel-title { font-size: 15px; font-weight: 700; color: #241a44; letter-spacing: -0.01em; }
+.dash-panel-sub { font-size: 13px; color: #5d6178; line-height: 1.5; }
+.dash-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #6d4bd8;
+  color: #fff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  box-shadow: 0 10px 22px rgba(109, 75, 216, 0.35);
+}
+.dash-cta:hover { background: #5c3ec7; transform: translateY(-1px); }
+.dash-cta-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+.dash-cta-quiet:hover { background: rgba(255, 255, 255, 0.2); }
+.dash-path-track {
+  height: 10px;
+  width: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.16);
+}
+.dash-path-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #c9b2ff 0%, #8b5cf6 100%);
+  transition: width 0.4s ease;
+}
+.dash-bars { display: flex; align-items: flex-end; gap: 6px; height: 62px; }
+.dash-bar-col { display: flex; min-width: 0; flex: 1; flex-direction: column; justify-content: flex-end; gap: 6px; }
+.dash-bar { width: 100%; border-radius: 6px 6px 3px 3px; background: rgba(255, 255, 255, 0.3); }
+.dash-bar[data-on="true"] { background: linear-gradient(180deg, #d3c0ff 0%, #8b5cf6 100%); }
+.dash-bar-day { font-size: 10px; text-align: center; color: rgba(255, 255, 255, 0.66); }
+.dash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f1ecff;
+  color: #55389f;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-cta, .dash-path-fill { transition: none; }
+}
+
+.dash-path-value { font-size: 14px; font-weight: 700; color: #fff; }
+.dash-path-basis { font-size: 12px; line-height: 1.55; color: rgba(255, 255, 255, 0.7); }
+.dash-note { font-size: 12px; color: rgba(255, 255, 255, 0.7); }
+.dash-range { accent-color: #6d4bd8; }

@@ -10,13 +10,17 @@ import { LearningGoals } from "@/components/dashboard/LearningGoals";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { buildActivityEvents } from "@/lib/activity/feed";
 import {
+  buildMilestones,
   buildProgress,
   buildRecommendations,
   buildResumeItems,
   buildUpcoming,
   countRows,
+  overallProgress,
   readCount,
   readList,
+  weekActivity,
+  type StudySessionRow,
 } from "@/lib/dashboard/overview";
 import { Bell, BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone, Sparkles, AlertTriangle } from "lucide-react";
 import { safeLink } from "@/lib/notifications/store";
@@ -70,9 +74,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // RECENT ACTIVITY (owner-approved definition): derived from real rows only -
   // no click log, no surveillance - read through the RLS-scoped client.
-  const [{ data: actAssignments }, { data: actResponses }, { data: actNotebooks }, { data: actNotes }, actGoalsResult, { data: actCourses }, { data: actWriting }, { data: actNotifications }, { data: actFeedback }] = await Promise.all([
+  const [{ data: actAssignments }, actResponsesResult, { data: actNotebooks }, { data: actNotes }, actGoalsResult, { data: actCourses }, { data: actWriting }, { data: actNotifications }, { data: actFeedback }] = await Promise.all([
     supabase.from("assignments").select("id, title, status, mode, updated_at").order("updated_at", { ascending: false }).limit(12),
-    supabase.from("responses").select("id, assignment_id, created_at").order("created_at", { ascending: false }).limit(40),
+    // A conversation is a `responses` row; the assignment it belongs to is its destination,
+    // so the assignment title and status travel with it (no second lookup, no invented thread).
+    supabase.from("responses").select("id, assignment_id, created_at, assignments ( title, status )").order("created_at", { ascending: false }).limit(40),
     supabase.from("notebooks").select("id, title, created_at").order("created_at", { ascending: false }).limit(6),
     supabase.from("notebook_notes").select("id, notebook_id, created_at").order("created_at", { ascending: false }).limit(40),
     supabase.from("learning_goals").select("id, title, status, progress, target_date, updated_at").order("updated_at", { ascending: false }).limit(6),
@@ -84,6 +90,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // 2026-11-12: the goals rows serve the activity feed AND the progress/recommendation
   // logic, and a failed read must be visible rather than silently zero.
   const actGoals = actGoalsResult.data;
+  const actResponses = actResponsesResult.data;
   const activityEvents = buildActivityEvents({
     assignments: actAssignments ?? [],
     responses: actResponses ?? [],
@@ -120,6 +127,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     activeCountResult,
     completedCountResult,
     lecturesResult,
+    studyPlansResult,
   ] = await Promise.all([
     supabase.from("courses").select("*").order("created_at", { ascending: false }),
     supabase.from("teachers").select("id, name, notes").is("archived_at", null).order("created_at", { ascending: false }),
@@ -146,6 +154,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     // Lecture studio recordings: a "continue" link is only offered for one that can be
     // reopened there, so the row is read from the member's own media assets.
     supabase.from("media_assets").select("id, original_filename, status, updated_at").order("updated_at", { ascending: false }).limit(4),
+    // Persisted study plans (work_schedules). This is the only scheduling record Sophira has:
+    // there is no calendar, no reminder table and no events feed, so Upcoming Work claims
+    // nothing beyond real deadlines and real plans.
+    supabase
+      .from("work_schedules")
+      .select("id, assignment_id, deadline, status, assignments ( title )")
+      .in("status", ["planned", "running", "paused"])
+      .order("deadline", { ascending: true })
+      .limit(10),
   ]);
 
   const courses = coursesResult.data;
@@ -163,24 +180,73 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
    */
   const notebooksRead = { ...readList(notebooksResult), capped: true };
   const goalsRead = readList(actGoalsResult);
+  const completedRead = readCount(completedCountResult);
+  const activeRead = readCount(activeCountResult);
+
+  /**
+   * A conversation's destination is the assignment it was held in, so the assignment title is
+   * needed to name it. It arrives embedded with the response row; a response with no
+   * assignment is a one-off question that has no screen to restore, and is simply not offered.
+   */
+  type ConversationRow = {
+    id: string;
+    assignment_id: string | null;
+    created_at: string | null;
+    assignments?: { title?: string | null; status?: string | null } | Array<{ title?: string | null; status?: string | null }> | null;
+  };
+  const conversationRows = (actResponses ?? []) as ConversationRow[];
+  const conversationTitles: Record<string, string> = {};
+  for (const row of conversationRows) {
+    const related = Array.isArray(row.assignments) ? row.assignments[0] : row.assignments;
+    if (row.assignment_id && related?.title) conversationTitles[row.assignment_id] = related.title;
+  }
+
+  type PlanRow = {
+    id: string;
+    assignment_id: string | null;
+    deadline: string | null;
+    status: string | null;
+    assignments?: { title?: string | null } | Array<{ title?: string | null }> | null;
+  };
+  const planRows = ((studyPlansResult.data ?? []) as PlanRow[]).map((plan) => {
+    const related = Array.isArray(plan.assignments) ? plan.assignments[0] : plan.assignments;
+    return { ...plan, title: related?.title ?? null } satisfies StudySessionRow;
+  });
+
   const progress = buildProgress({
-    completed: readCount(completedCountResult),
-    active: readCount(activeCountResult),
+    completed: completedRead,
+    active: activeRead,
     courses: countRows(coursesResult),
     teachers: countRows(teachersResult),
     notebooks: notebooksRead,
     goals: goalsRead,
   });
+  const overall = overallProgress(completedRead, activeRead);
+  const milestones = buildMilestones({
+    completed: completedRead,
+    notebooks: notebooksRead,
+    lectures: readList(lecturesResult),
+    goals: goalsRead,
+    courses: countRows(coursesResult),
+  });
+  const week = weekActivity(activityEvents, now);
+  const weekMax = Math.max(1, ...week.map((d) => d.count));
+  const weekTotal = week.reduce((total, d) => total + d.count, 0);
   const resume = buildResumeItems(
     {
       assignments: readList(assignmentsResult),
       notebooks: notebooksRead,
       lectures: readList(lecturesResult),
       goals: goalsRead,
+      responses: readList(actResponsesResult),
+      assignmentTitles: conversationTitles,
     },
     4,
   );
-  const upcoming = buildUpcoming(readList(datedAssignmentsResult), now, 4);
+  const upcoming = buildUpcoming(readList(datedAssignmentsResult), now, 4, {
+    state: studyPlansResult.error ? "unavailable" : "ready",
+    rows: planRows,
+  });
   const recommendations = buildRecommendations({
     now,
     assignments: readList(assignmentsResult),
@@ -218,15 +284,284 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <AppShell title={`Welcome${greetingName}`} role={profile.role}>
-      <div className="space-y-8">
+      <div className="dash-page">
+        {/* HERO (2026-11-12): the owner's purple reference. Who you are, where your learning
+            stands, and the two things you can start right now - before any navigation. */}
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="dash-eyebrow">Your learning home</p>
+            <h1 className="dash-hero-title mt-1">Welcome back{greetingName}!</h1>
+            <p className="dash-hero-sub mt-2 max-w-xl">{overall.detail}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/assignments/new" className="dash-cta">
+              <FileText className="h-4 w-4" aria-hidden /> Start an assignment
+            </Link>
+            <Link href="/assignments/new?mode=learn" className="dash-cta-quiet">
+              <HelpCircle className="h-4 w-4" aria-hidden /> Ask a question
+            </Link>
+          </div>
+        </header>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          {/* Your learning path: the documented calculation, drawn. */}
+          <div className="dash-glass p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="dash-eyebrow">Your learning path</p>
+              <p className="dash-path-value">
+                {overall.percent === null ? "Nothing to measure yet" : `${overall.percent}% of assignments finished`}
+              </p>
+            </div>
+            <div
+              className="dash-path-track mt-3"
+              role="img"
+              aria-label={
+                overall.percent === null
+                  ? "Overall learning progress is not available yet"
+                  : `Overall learning progress: ${overall.percent} percent of assignments finished`
+              }
+            >
+              <div className="dash-path-fill" style={{ width: `${overall.percent ?? 0}%` }} />
+            </div>
+            <p className="dash-path-basis mt-2">{overall.basis}</p>
+          </div>
+
+          {/* This week: seven days of the same events the activity feed shows. */}
+          <div className="dash-glass p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="dash-eyebrow">This week</p>
+              <p className="dash-note">
+                {weekTotal === 0 ? "No activity recorded yet" : `${weekTotal} thing${weekTotal === 1 ? "" : "s"} recorded`}
+              </p>
+            </div>
+            <div
+              className="dash-bars mt-3"
+              role="img"
+              aria-label={`Recorded activity over the last seven days: ${week.map((day) => `${day.label} ${day.count}`).join(", ")}`}
+            >
+              {week.map((day) => (
+                <div key={day.key} className="dash-bar-col">
+                  <div
+                    className="dash-bar"
+                    data-on={day.count > 0}
+                    style={{ height: `${day.count === 0 ? 4 : Math.max(8, Math.round((day.count / weekMax) * 44))}px` }}
+                  />
+                  <p className="dash-bar-day">{day.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* MY PROGRESS: the summary cards. Each tile carries its own state, so "you have none
+            yet" and "we could not read it" can never look the same. */}
+        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {progress.map((stat) => (
+            <div key={stat.key} className="dash-glass p-4">
+              <p className="dash-stat-label">{stat.label}</p>
+              <p
+                className="dash-stat-value mt-1"
+                aria-label={stat.state === "unavailable" ? `${stat.label}: not available right now` : `${stat.label}: ${stat.value}`}
+              >
+                {stat.value}
+              </p>
+              <p className="dash-stat-note mt-1">{stat.note}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* MILESTONES: counters over real rows, each showing how far along it is. */}
+        <section className="dash-panel mt-3" aria-labelledby="dashboard-milestones-heading">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="dashboard-milestones-heading" className="dash-panel-title">Learning milestones</h2>
+            <p className="text-xs text-ink-soft">
+              {milestones.state === "ready"
+                ? `${milestones.achieved} of ${milestones.total} reached`
+                : "We couldn't check every milestone just now, so this list may be short."}
+            </p>
+          </div>
+          <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {milestones.items.map((milestone) => (
+              <li
+                key={milestone.id}
+                className={
+                  milestone.achieved
+                    ? "rounded-xl border border-accent/30 bg-accent-soft/50 p-3"
+                    : "rounded-xl border border-line bg-card-elevated/40 p-3"
+                }
+              >
+                <p className="flex items-start gap-1.5 text-sm font-medium text-ink">
+                  <span aria-hidden className={milestone.achieved ? "text-accent" : "text-ink-soft"}>
+                    {milestone.achieved ? "★" : "☆"}
+                  </span>
+                  <span className="min-w-0">{milestone.label}</span>
+                </p>
+                <p className="mt-0.5 text-xs text-ink-soft">{milestone.detail}</p>
+              </li>
+            ))}
+          </ul>
+          {milestones.next && (
+            <p className="mt-3 text-xs text-ink-soft">
+              Next up: <span className="font-medium text-ink">{milestones.next.label}</span> ({milestones.next.detail}).
+            </p>
+          )}
+        </section>
+        {/* CONTINUE WHERE YOU LEFT OFF (2026-11-12): only destinations that genuinely
+            reopen, newest first, with an honest note when a source could not be read. */}
+        <section aria-labelledby="dashboard-resume-heading" className="dash-panel">
+          <h2 id="dashboard-resume-heading" className="dash-panel-title">Continue where you left off</h2>
+          <p className="dash-panel-sub mb-3 mt-1">The work you were last in, newest first. Each one opens the screen it belongs to.</p>
+          {resume.items.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {resume.items.map((item) => (
+                <Link key={item.id} href={item.href} className="block">
+                  <Card className="transition hover:border-accent/40">
+                    <CardContent className="flex items-center gap-3 p-4">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+                        {item.kind === "assignment" ? <FileText className="h-4 w-4" />
+                          : item.kind === "notebook" ? <BookOpen className="h-4 w-4" />
+                            : item.kind === "lecture" ? <Library className="h-4 w-4" />
+                              : <ClipboardCheck className="h-4 w-4" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-ink">{item.title}</p>
+                        <p className="text-xs text-ink-soft">{item.detail} · updated {fmtDate(item.at)}</p>
+                      </div>
+                      <span className="shrink-0 text-sm text-accent">{item.action} →</span>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-4 text-sm text-ink-soft">
+                Nothing to resume yet. Start an assignment above and it will appear here, ready to
+                pick up where you stopped.
+              </CardContent>
+            </Card>
+          )}
+          {resume.unreadable.length > 0 && (
+            <p className="mt-2 text-xs text-ink-soft">
+              Sophira couldn&apos;t read your {resume.unreadable.join(" or ")} just now, so something
+              recent may be missing from this list. Nothing has been lost.
+            </p>
+          )}
+        </section>
+
+
+        {/* UPCOMING WORK (2026-11-12): real deadlines only, overdue first, in plain words. */}
+        <section aria-labelledby="dashboard-upcoming-heading" className="dash-panel">
+          <h2 id="dashboard-upcoming-heading" className="dash-panel-title">Upcoming work</h2>
+          <p className="dash-panel-sub mb-3 mt-1">Deadlines and saved study plans, most urgent first, with anything overdue at the top.</p>
+          {upcoming.unreadable ? (
+            <Card>
+              <CardContent className="p-4 text-sm text-ink-soft">
+                Sophira couldn&apos;t read your deadlines just now, so this list may be incomplete.
+                Nothing has been lost — try again in a moment.
+              </CardContent>
+            </Card>
+          ) : upcoming.items.length > 0 ? (
+            <Card>
+              <CardContent className="divide-y divide-line p-0">
+                {upcoming.items.map((a) => (
+                  <Link key={a.id} href={a.href} className="flex items-center gap-3 p-4 transition hover:bg-accent-soft/40">
+                    <span
+                      className={
+                        a.tone === "overdue"
+                          ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger"
+                          : "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"
+                      }
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-ink">{a.title}</p>
+                      <p className="text-xs text-ink-soft">{a.when}</p>
+                    </div>
+                    <span className="shrink-0 text-xs text-ink-soft">{fmtDate(a.due_at)}</span>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-4 text-sm text-ink-soft">
+                No deadlines on file. Set a due date when you start an assignment and it will show
+                up here.
+              </CardContent>
+            </Card>
+          )}
+          {upcoming.studyUnreadable && (
+            <p className="mt-2 text-xs text-ink-soft">
+              Sophira couldn&apos;t read your saved study plans just now, so a planned session may be
+              missing from this list. Nothing has been lost.
+            </p>
+          )}
+        </section>
+
+
+        {/* SOPHIRA'S RECOMMENDATIONS (2026-11-12): worked out from this member's own rows,
+            never from an AI guess, and each one says WHY it is being suggested. */}
+        <section aria-labelledby="dashboard-recommendations-heading" className="dash-panel">
+          <h2 id="dashboard-recommendations-heading" className="dash-panel-title flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-accent" aria-hidden /> Sophira&apos;s Recommendations
+          </h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            What to work on next, based on what is actually in your workspace.
+          </p>
+          {recommendations.items.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {recommendations.items.map((rec) => (
+                <li key={rec.id}>
+                  <Card className="transition hover:border-accent/40">
+                    <CardContent className="flex flex-wrap items-center gap-3 p-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-ink">{rec.title}</p>
+                        <p className="text-sm text-ink-soft">{rec.reason}</p>
+                      </div>
+                      <Link
+                        href={rec.href}
+                        className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-accent hover:border-accent/60 hover:bg-accent-soft/40"
+                      >
+                        {rec.action}
+                      </Link>
+                    </CardContent>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Card className="mt-3">
+              <CardContent className="p-4 text-sm text-ink-soft">{recommendations.note}</CardContent>
+            </Card>
+          )}
+          <p className="mt-2 text-xs text-ink-soft">
+            These come from your own assignments, notebooks and goals. Sophira does not guess at
+            what you find difficult, and nothing here needs the AI to be available.
+          </p>
+        </section>
+
+
+        <div id="learning-goals" className="dash-panel">
+          <LearningGoals />
+        </div>
+
+
+<div className="dash-panel">
+        <RecentActivity events={activityEvents} />
+
+        </div>
+
+        <div className="dash-panel">
         {/* Primary actions */}
         <section aria-labelledby="dashboard-start-heading">
-          <h2 id="dashboard-start-heading" className="text-xl font-semibold tracking-tight text-ink">What would you like to work on?</h2>
-          <p className="mt-1 text-sm text-ink-soft">Start with an assignment or ask a question. Your courses and teacher preferences stay in context.</p>
+          <h2 id="dashboard-start-heading" className="dash-panel-title">Ways to work</h2>
+          <p className="dash-panel-sub mb-3 mt-1">Start with an assignment or ask a question. Your courses and teacher preferences stay in context.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <Link
               href="/assignments/new"
-              className="group flex min-h-28 flex-col justify-center gap-1.5 rounded-card bg-gradient-to-br from-accent to-accent-deep p-5 text-on-accent shadow-[0_12px_24px_rgba(81,69,232,0.18)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(81,69,232,0.24)] active:scale-[0.99]"
+              className="group flex min-h-24 flex-col justify-center gap-1.5 rounded-card bg-gradient-to-br from-accent to-accent-deep p-5 text-on-accent shadow-[0_12px_24px_rgba(81,69,232,0.18)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(81,69,232,0.24)] active:scale-[0.99]"
             >
               <span className="flex items-center gap-2 font-semibold">
                 <FileText className="h-5 w-5" /> Start an assignment
@@ -235,7 +570,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </Link>
             <Link
               href="/assignments/new?mode=learn"
-              className="flex min-h-28 flex-col justify-center gap-1.5 rounded-card border border-line bg-card p-5 shadow-[0_1px_3px_rgba(37,43,58,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-md active:scale-[0.99]"
+              className="flex min-h-24 flex-col justify-center gap-1.5 rounded-card border border-line bg-card p-5 shadow-[0_1px_3px_rgba(37,43,58,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-md active:scale-[0.99]"
             >
               <span className="flex items-center gap-2 font-semibold text-ink">
                 <HelpCircle className="h-5 w-5 text-accent" /> Ask a question
@@ -245,6 +580,37 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
         </section>
 
+        </div>
+
+        <div className="dash-panel">
+        {/* More ways to work — quick launch (all modes are real, from MODES) */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {[
+            { id: "check", label: "Check my work" },
+            { id: "writing", label: "Writing" },
+            { id: "study", label: "Study" },
+            { id: "explain", label: "Explain simply" },
+            { id: "custom", label: "Custom help" },
+          ].map((m) => (
+            <Link
+              key={m.id}
+              href={`/assignments/new?mode=${m.id}`}
+              className="flex min-h-16 items-center justify-center rounded-card border border-line bg-card p-2 text-center text-sm font-medium text-ink shadow-sm transition active:scale-[0.99] hover:border-accent/40"
+            >
+              {m.label}
+            </Link>
+          ))}
+        </div>
+
+        </div>
+
+        {/* YOUR WORKSPACE: everything that keeps the learning running. Deliberately below the
+            journey, because these are settings, not progress. */}
+        <div className="pt-2">
+          <p className="dash-eyebrow">Your workspace</p>
+          <p className="dash-hero-sub mt-1">Courses, teachers, your writing voice and notifications.</p>
+        </div>
+        <div className="dash-panel">
         {/* Your own notifications: a summary, not an administrative feed. */}
         <section aria-labelledby="dashboard-notifications-heading">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -294,180 +660,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
         </section>
 
-        {/* MY PROGRESS (2026-11-12): real counts, and a read that failed says so instead of
-            claiming zero. Each tile carries its own state, so "you have none yet" and "we
-            could not ask" can never look the same. */}
-        <section aria-labelledby="dashboard-progress-heading">
-          <h2 id="dashboard-progress-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">My progress</h2>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {progress.map((stat) => (
-              <Card key={stat.key}>
-                <CardContent className="p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-soft">{stat.label}</p>
-                  <p
-                    className={stat.state === "unavailable" ? "mt-1 text-2xl font-semibold text-ink-soft" : "mt-1 text-2xl font-semibold text-ink"}
-                    aria-label={stat.state === "unavailable" ? `${stat.label}: not available right now` : `${stat.label}: ${stat.value}`}
-                  >
-                    {stat.value}
-                  </p>
-                  <p className="text-xs text-ink-soft">{stat.note}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        {/* SOPHIRA'S RECOMMENDATIONS (2026-11-12): worked out from this member's own rows,
-            never from an AI guess, and each one says WHY it is being suggested. */}
-        <section aria-labelledby="dashboard-recommendations-heading">
-          <h2 id="dashboard-recommendations-heading" className="flex items-center gap-2 text-base font-semibold text-ink">
-            <Sparkles className="h-4 w-4 text-accent" aria-hidden /> Sophira&apos;s Recommendations
-          </h2>
-          <p className="mt-1 text-sm text-ink-soft">
-            What to work on next, based on what is actually in your workspace.
-          </p>
-          {recommendations.items.length > 0 ? (
-            <ul className="mt-3 space-y-2">
-              {recommendations.items.map((rec) => (
-                <li key={rec.id}>
-                  <Card className="transition hover:border-accent/40">
-                    <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-ink">{rec.title}</p>
-                        <p className="text-sm text-ink-soft">{rec.reason}</p>
-                      </div>
-                      <Link
-                        href={rec.href}
-                        className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-accent hover:border-accent/60 hover:bg-accent-soft/40"
-                      >
-                        {rec.action}
-                      </Link>
-                    </CardContent>
-                  </Card>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Card className="mt-3">
-              <CardContent className="p-4 text-sm text-ink-soft">{recommendations.note}</CardContent>
-            </Card>
-          )}
-          <p className="mt-2 text-xs text-ink-soft">
-            These come from your own assignments, notebooks and goals. Sophira does not guess at
-            what you find difficult, and nothing here needs the AI to be available.
-          </p>
-        </section>
-
-        {/* CONTINUE WHERE YOU LEFT OFF (2026-11-12): only destinations that genuinely
-            reopen, newest first, with an honest note when a source could not be read. */}
-        <section aria-labelledby="dashboard-resume-heading">
-          <h2 id="dashboard-resume-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Continue where you left off</h2>
-          {resume.items.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              {resume.items.map((item) => (
-                <Link key={item.id} href={item.href} className="block">
-                  <Card className="transition hover:border-accent/40">
-                    <CardContent className="flex items-center gap-3 p-4">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
-                        {item.kind === "assignment" ? <FileText className="h-4 w-4" />
-                          : item.kind === "notebook" ? <BookOpen className="h-4 w-4" />
-                            : item.kind === "lecture" ? <Library className="h-4 w-4" />
-                              : <ClipboardCheck className="h-4 w-4" />}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-ink">{item.title}</p>
-                        <p className="text-xs text-ink-soft">{item.detail} · updated {fmtDate(item.at)}</p>
-                      </div>
-                      <span className="shrink-0 text-sm text-accent">{item.action} →</span>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-4 text-sm text-ink-soft">
-                Nothing to resume yet. Start an assignment above and it will appear here, ready to
-                pick up where you stopped.
-              </CardContent>
-            </Card>
-          )}
-          {resume.unreadable.length > 0 && (
-            <p className="mt-2 text-xs text-ink-soft">
-              Sophira couldn&apos;t read your {resume.unreadable.join(" or ")} just now, so something
-              recent may be missing from this list. Nothing has been lost.
-            </p>
-          )}
-        </section>
-
-        <div id="learning-goals">
-          <LearningGoals />
         </div>
 
-        <RecentActivity events={activityEvents} />
-
-        {/* UPCOMING WORK (2026-11-12): real deadlines only, overdue first, in plain words. */}
-        <section aria-labelledby="dashboard-upcoming-heading">
-          <h2 id="dashboard-upcoming-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Upcoming work</h2>
-          {upcoming.unreadable ? (
-            <Card>
-              <CardContent className="p-4 text-sm text-ink-soft">
-                Sophira couldn&apos;t read your deadlines just now, so this list may be incomplete.
-                Nothing has been lost — try again in a moment.
-              </CardContent>
-            </Card>
-          ) : upcoming.items.length > 0 ? (
-            <Card>
-              <CardContent className="divide-y divide-line p-0">
-                {upcoming.items.map((a) => (
-                  <Link key={a.id} href={a.href} className="flex items-center gap-3 p-4 transition hover:bg-accent-soft/40">
-                    <span
-                      className={
-                        a.tone === "overdue"
-                          ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger"
-                          : "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"
-                      }
-                    >
-                      <AlertTriangle className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-ink">{a.title}</p>
-                      <p className="text-xs text-ink-soft">{a.when}</p>
-                    </div>
-                    <span className="shrink-0 text-xs text-ink-soft">{fmtDate(a.due_at)}</span>
-                  </Link>
-                ))}
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-4 text-sm text-ink-soft">
-                No deadlines on file. Set a due date when you start an assignment and it will show
-                up here.
-              </CardContent>
-            </Card>
-          )}
-        </section>
-
-        {/* More ways to work — quick launch (all modes are real, from MODES) */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {[
-            { id: "check", label: "Check my work" },
-            { id: "writing", label: "Writing" },
-            { id: "study", label: "Study" },
-            { id: "explain", label: "Explain simply" },
-            { id: "custom", label: "Custom help" },
-          ].map((m) => (
-            <Link
-              key={m.id}
-              href={`/assignments/new?mode=${m.id}`}
-              className="flex min-h-16 items-center justify-center rounded-card border border-line bg-card p-2 text-center text-sm font-medium text-ink shadow-sm transition active:scale-[0.99] hover:border-accent/40"
-            >
-              {m.label}
-            </Link>
-          ))}
-        </div>
-
+        <div className="dash-panel">
         {/* What I remember — real counts from your data (workflow §6) */}
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">What I remember</h2>
         <p className="text-sm text-ink-soft">
@@ -480,6 +675,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           (<Link href="/learning" className="text-accent hover:underline">corrections &amp; methods</Link>).
         </p>
 
+        </div>
+
+        <div className="dash-panel">
         {/* Pending profile changes */}
         {(pendingProposals ?? 0) > 0 && (
           <Link href="/proposals" className="block">
@@ -500,6 +698,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </Link>
         )}
 
+        </div>
+
+        <div className="dash-panel">
         {/* Learning & corrections shortcut */}
         {(activePatterns ?? 0) > 0 && (
           <Link href="/learning" className="block">
@@ -520,6 +721,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </Link>
         )}
 
+        </div>
+
+        <div className="dash-panel">
         <div className="grid gap-6 xl:grid-cols-2">
         {/* My courses */}
         <section>
@@ -595,6 +799,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </section>
 
         </div>
+        </div>
+
+        <div className="dash-panel">
         {/* Writing profile */}
         <section>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">My Writing Profile</h2>
@@ -625,6 +832,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </Card>
         </section>
 
+        </div>
+
+        <div className="dash-panel">
         {/* Recent assignments */}
         <section>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Recent assignments</h2>
@@ -649,6 +859,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
         </section>
 
+        </div>
+
+        <div className="dash-panel">
         {/* Recent feedback */}
         {recentFeedback && recentFeedback.length > 0 && (
           <section>
@@ -667,6 +880,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </div>
           </section>
         )}
+
+        </div>
 
         {/* Footer links */}
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-5 text-sm text-ink-soft">

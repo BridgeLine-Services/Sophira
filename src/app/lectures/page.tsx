@@ -188,6 +188,22 @@ export default function LecturesPage() {
     void load();
   }, [load]);
 
+  /*
+   * REOPENING ONE RECORDING (2026-11-12). The dashboard's "continue" link names the recording
+   * in the URL (?asset=<id>) instead of dropping everyone on the studio's top. Nothing is
+   * invented: if the id is not one of this member's recordings, nothing is highlighted.
+   */
+  const [focusAsset, setFocusAsset] = useState("");
+  useEffect(() => {
+    const named = new URLSearchParams(window.location.search).get("asset");
+    if (named) setFocusAsset(named);
+  }, []);
+  useEffect(() => {
+    if (!focusAsset || !assets) return;
+    const target = document.getElementById(`recording-${focusAsset}`);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusAsset, assets]);
+
   async function upload(file: File) {
     setUploadError("");
     setUploading({ name: file.name, step: "Checking the file" });
@@ -418,7 +434,8 @@ export default function LecturesPage() {
               const frameSet = frames[asset.id];
               const canStudy = asset.status === "ready" || asset.status === "partial";
               return (
-                <Card key={asset.id}>
+                <div key={asset.id} id={`recording-${asset.id}`}>
+                <Card className={focusAsset === asset.id ? "ring-2 ring-accent" : undefined}>
                   <CardContent className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {asset.kind === "video" ? (
@@ -507,6 +524,7 @@ export default function LecturesPage() {
                     ) : null}
                   </CardContent>
                 </Card>
+                </div>
               );
             })}
           </div>

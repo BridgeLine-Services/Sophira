@@ -15,6 +15,9 @@ import {
   buildProgress,
   buildRecommendations,
   buildResumeItems,
+  overallProgress,
+  weekActivity,
+  buildMilestones,
   buildUpcoming,
   countRows,
   dashboardHeadingFor,
@@ -147,8 +150,8 @@ export function runDashboardOverviewTests(
     const hrefs = result.items.map((i) => i.href);
     assert(result.items[0].kind === "assignment" && result.items[0].href === "/assignments/a-new",
       "dashboard: the most recently touched work is offered first");
-    assert(hrefs.includes("/notebooks/n1") && hrefs.includes("/lectures") && hrefs.includes("/dashboard#learning-goals"),
-      "dashboard: notebooks, lectures and goals are all resumable destinations");
+    assert(hrefs.includes("/notebooks/n1") && hrefs.includes("/lectures?asset=l1") && hrefs.includes("/dashboard#learning-goals"),
+      "dashboard: notebooks, the named lecture and goals are all resumable destinations");
     assert(!hrefs.includes("/assignments/a-done"),
       "dashboard: a COMPLETED assignment is not offered as 'continue where you left off'");
     assert(!result.items.some((i) => i.title === "Broken.mp4"),
@@ -311,5 +314,174 @@ export function runDashboardOverviewTests(
       "dashboard: the shell receives the server-verified rank");
     assert(page.includes('id="learning-goals"'),
       "dashboard: the goals panel has the anchor the goal recommendation links to");
+  }
+
+  // ==== H. Overall learning progress ====
+  section("dashboard: overall progress is arithmetic on real counts, never a guess");
+  {
+    const third = overallProgress(count(3), count(7));
+    assert(third.state === "ready" && third.percent === 30 && third.done === 3 && third.total === 10,
+      "dashboard: overall progress is finished / (finished + open)");
+    assert(third.basis.toLowerCase().includes("course") && third.detail.includes("not a percentage of a course"),
+      "dashboard: the calculation states in words that it is NOT course completion");
+    assert(overallProgress(count(2), count(0)).percent === 100,
+      "dashboard: everything finished reads 100%");
+    const none = overallProgress(count(0), count(0));
+    assert(none.percent === null && none.state === "ready" && none.detail.includes("No assignments yet"),
+      "dashboard: with no assignments there is NO percentage rather than a reassuring 0%");
+    const broken = overallProgress(count(null), count(4));
+    assert(broken.state === "unavailable" && broken.percent === null,
+      "dashboard: a failed count is reported as unavailable, not rendered as 0%");
+    assert(overallProgress(count(0), count(3)).detail.includes("starting line"),
+      "dashboard: zero finished is described without judgement");
+  }
+
+  // ==== I. Milestones ====
+  section("dashboard: milestones count real rows and show how far along they are");
+  {
+    const result = buildMilestones({
+      completed: count(6),
+      notebooks: ready([{ id: "n1" }, { id: "n2" }]),
+      lectures: ready([{ id: "l1", status: "ready" }, { id: "l2", status: "failed" }]),
+      goals: ready([{ id: "g1", title: "Read more", status: "achieved", progress: 100 }]),
+      courses: count(2),
+    });
+    assert(result.state === "ready", "dashboard: milestones are only claimed when every source read");
+    assert(result.achieved > 0 && result.total === result.items.length,
+      "dashboard: reached milestones are counted against the full list");
+    assert(result.items.find((m) => m.id === "five-assignments")?.achieved === true,
+      "dashboard: six finished assignments reaches the five-assignment milestone");
+    assert(result.items.find((m) => m.id === "ten-assignments")?.achieved === false &&
+      result.items.find((m) => m.id === "ten-assignments")?.detail === "6 of 10",
+      "dashboard: an unreached milestone shows the real count, not a bare false");
+    assert(result.items.find((m) => m.id === "first-lecture")?.achieved === true,
+      "dashboard: only a READY or PARTIAL recording counts as a transcribed lecture");
+    assert(result.next?.id === "ten-assignments",
+      "dashboard: the next milestone is named so the page can point at it");
+
+    const blind = buildMilestones({
+      completed: count(null),
+      notebooks: ready([]),
+      lectures: ready([]),
+      goals: ready([]),
+      courses: count(0),
+    });
+    assert(blind.state === "unavailable",
+      "dashboard: an unreadable source marks the milestone set unverified instead of reporting zeros");
+  }
+
+  // ==== J. This week ====
+  section("dashboard: the weekly bars count real events and keep empty days visible");
+  {
+    const week = weekActivity(
+      [{ at: iso(0) }, { at: iso(0) }, { at: iso(-2) }, { at: "not-a-date" }],
+      NOW,
+      7,
+    );
+    assert(week.length === 7, "dashboard: the chart always covers seven days");
+    assert(week[6].count === 2 && week[6].isToday,
+      "dashboard: today's events land in the last bar");
+    assert(week[4].count === 1 && week[0].count === 0,
+      "dashboard: older events land on their own day and empty days stay as empty bars");
+    assert(week.reduce((total, day) => total + day.count, 0) === 3,
+      "dashboard: an unparseable timestamp is skipped rather than counted");
+  }
+
+  // ==== K. AI conversations ====
+  section("dashboard: an AI conversation resumes where it was actually held");
+  {
+    const result = buildResumeItems({
+      assignments: ready([
+        { id: "a1", title: "Cell essay", status: "active", updated_at: iso(-5) },
+        { id: "a2", title: "Finished lab", status: "completed", updated_at: iso(-4) },
+      ]),
+      responses: ready([
+        { id: "r1", assignment_id: "a1", created_at: iso(0) },
+        { id: "r2", assignment_id: "a2", created_at: iso(0) },
+        { id: "r3", assignment_id: null, created_at: iso(0) },
+      ]),
+      assignmentTitles: { a1: "Cell essay", a2: "Finished lab" },
+      notebooks: ready([]),
+      lectures: ready([]),
+      goals: ready([]),
+    }, 10);
+    const conversation = result.items.find((i) => i.kind === "conversation");
+    assert(Boolean(conversation) && conversation!.href === "/assignments/a1",
+      "dashboard: a conversation reopens the assignment screen that restores it");
+    assert(conversation!.action === "Reopen conversation",
+      "dashboard: the resume action names what it reopens");
+    assert(!result.items.some((i) => i.href === "/assignments/a2"),
+      "dashboard: a conversation on finished work is not offered as unfinished work");
+    assert(!result.items.some((i) => i.kind === "conversation" && !i.href.includes("/assignments/")),
+      "dashboard: a free question with no assignment has no destination and is not faked");
+    assert(new Set(result.items.map((i) => i.href)).size === result.items.length,
+      "dashboard: the newest activity wins when two sources share one destination");
+  }
+
+  // ==== L. Study sessions ====
+  section("dashboard: saved study plans appear in upcoming work, without inventing a calendar");
+  {
+    const result = buildUpcoming(
+      ready([{ id: "u1", title: "Essay", due_at: iso(2), status: "active" }]),
+      NOW,
+      6,
+      ready([{ id: "s1", assignment_id: "u1", deadline: iso(2), status: "planned", title: "Essay" }]),
+    );
+    assert(result.items.length === 1,
+      "dashboard: a study plan for the same assignment does not duplicate its deadline row");
+    assert(result.items[0].kind === "assignment",
+      "dashboard: the submission deadline is the row kept when they share a destination");
+
+    const separate = buildUpcoming(
+      ready([]),
+      NOW,
+      6,
+      ready([
+        { id: "s2", assignment_id: "a9", deadline: iso(1), status: "paused", title: "Reading" },
+        { id: "s3", assignment_id: "a8", deadline: iso(1), status: "done", title: "Finished plan" },
+      ]),
+    );
+    assert(separate.items.length === 1 && separate.items[0].kind === "study",
+      "dashboard: a paused plan is shown, a finished plan is history and is excluded");
+    assert(separate.items[0].href === "/assignments/a9" &&
+      separate.items[0].title.startsWith("Paused study session"),
+      "dashboard: a paused session is named and links to the work it plans");
+
+    const broken = buildUpcoming(ready([]), NOW, 6, unavailable());
+    assert(broken.studyUnreadable === true && broken.unreadable === false,
+      "dashboard: a failed study-plan read is reported separately from a failed deadline read");
+  }
+
+  // ==== M. The composed page and the goals panel ====
+  section("dashboard: the page is composed as one journey in the owner's purple reference");
+  {
+    const page = readFileSync("src/app/dashboard/page.tsx", "utf8");
+    assert(page.includes("dash-page") && page.includes("dash-panel") && page.includes("dash-glass"),
+      "dashboard: the page uses the scoped purple skin, not ad-hoc colours");
+    assert(page.includes("Your learning path") && page.includes("This week"),
+      "dashboard: the hero carries the learning path and the weekly chart");
+    assert(page.includes("buildMilestones(") && page.includes("weekActivity("),
+      "dashboard: the new panels come from the tested module too");
+    for (const heading of ["Continue where you left off", "Upcoming work", "Sophira&apos;s Recommendations"]) {
+      assert(page.includes(heading), `dashboard: the ${heading} section is present`);
+    }
+    const goalsPanel = readFileSync("src/components/dashboard/LearningGoals.tsx", "utf8");
+    assert(goalsPanel.includes("My learning goals"), "dashboard: the My learning goals section is present");
+    const activityPanel = readFileSync("src/components/dashboard/RecentActivity.tsx", "utf8");
+    assert(activityPanel.includes("Recent activity"), "dashboard: the Recent activity section is present");
+
+    const goals = readFileSync("src/components/dashboard/LearningGoals.tsx", "utf8");
+    assert(goals.includes("auth.getUser()"),
+      "dashboard: the goals panel checks the session before it writes");
+    assert(!goals.includes("user_id: user?.id"),
+      "dashboard: a goal can no longer be inserted with an undefined user id");
+    assert(goals.includes('setState("error")'),
+      "dashboard: a failed goal read has its own state instead of an empty list");
+    assert(goals.includes("Mark achieved") && goals.includes("Reopen") && goals.includes("Update progress"),
+      "dashboard: a goal can be progressed, achieved and reopened");
+
+    const lectures = readFileSync("src/app/lectures/page.tsx", "utf8");
+    assert(lectures.includes('get("asset")') && lectures.includes("recording-"),
+      "dashboard: the lecture studio can reopen the recording it was asked for");
   }
 }
