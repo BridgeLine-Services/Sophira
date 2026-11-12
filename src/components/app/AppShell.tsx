@@ -781,7 +781,9 @@ export function AppShell({ title, subtitle, backHref, actions, variant = "worksp
       </header>
 
       <main id="main-content" tabIndex={-1} className="w-full flex-1 pb-28 md:pb-12 lg:pl-64">
-        <div className="mx-auto w-full max-w-content px-4 pt-6 sm:px-6 sm:pt-7">{children}</div>
+        {/* One rhythm for every screen: children stack at the shared 24px gap, so a page
+            body never has to remember to add its own top-level spacing. */}
+        <div className="page-stack mx-auto w-full max-w-content px-4 pt-6 pb-10 sm:px-6 sm:pt-7">{children}</div>
       </main>
 
       {/* MOBILE SLIDE-OUT DRAWER: the full navigation hierarchy on phones.
