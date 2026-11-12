@@ -43,9 +43,9 @@ interface HealthData {
 }
 
 const STATE_CLASS: Record<string, string> = {
-  Ready: "bg-emerald-100 text-emerald-900",
-  "Needs attention": "bg-amber-100 text-amber-900",
-  Failed: "bg-red-100 text-red-900",
+  Ready: "bg-success/10 text-success",
+  "Needs attention": "bg-warn/10 text-ink",
+  Failed: "bg-danger/10 text-danger",
   "Not verified": "border border-line bg-card text-ink-soft",
 };
 
@@ -143,7 +143,7 @@ export function SystemHealthPanel() {
       </div>
 
       {err && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+        <div className="rounded-lg border border-danger/30 bg-danger/[0.06] p-4 text-sm text-ink">
           {err} You can also start the full checkup yourself: open{" "}
           <a
             className="underline"
@@ -163,7 +163,7 @@ export function SystemHealthPanel() {
             {Object.entries(data.runtime_environment).map(([k, v]) => (
               <li key={k} className="text-sm">
                 <span className="font-medium text-ink">{k.replace(/_/g, " ")}</span>
-                <span className={"ml-2 text-xs font-semibold " + (v.status === "CONFIGURED" ? "text-emerald-600" : v.status === "OPTIONAL" ? "text-ink-soft" : "text-danger")}>{v.status}</span>
+                <span className={"ml-2 text-xs font-semibold " + (v.status === "CONFIGURED" ? "text-success" : v.status === "OPTIONAL" ? "text-ink-soft" : "text-danger")}>{v.status}</span>
                 <span className="block text-xs text-ink-soft">{v.detail}</span>
               </li>
             ))}
@@ -217,7 +217,7 @@ export function SystemHealthPanel() {
             <p className="text-xs uppercase tracking-wide text-ink-soft">Overall release status</p>
             <p
               className={`mt-1 text-2xl font-semibold ${
-                data.verdict === "READY FOR RELEASE" ? "text-emerald-700" : "text-red-700"
+                data.verdict === "READY FOR RELEASE" ? "text-success" : "text-danger"
               }`}
             >
               {data.verdict}
@@ -243,7 +243,7 @@ export function SystemHealthPanel() {
             );
             if (open.length === 0) return null;
             return (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 p-6">
+              <div className="rounded-lg border border-warn/30 bg-warn/[0.07] p-6">
                 <h2 className="text-base font-semibold text-ink">What you can do next</h2>
                 <ol className="mt-2 space-y-2">
                   {open.map(([g, list]) => {

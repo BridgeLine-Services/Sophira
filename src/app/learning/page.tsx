@@ -64,7 +64,8 @@ export default async function LearningPage({
   const { profile, reason: profileReason } = await readProfileWithRepair(supabase, user.id);
   if (!profile) {
     return (
-      <AppShell title="Account problem">
+      <AppShell
+      subtitle="What Sophira has learned about how you work, and the corrections you have made." title="Account problem">
         <div className="mx-auto max-w-md space-y-3 py-10 text-center">
           <h1 className="text-xl font-semibold text-ink">Your account could not be loaded</h1>
           <p className="text-sm text-ink-soft">
@@ -163,7 +164,7 @@ export default async function LearningPage({
           </p>
           <ul className="grid gap-2 sm:grid-cols-2">
             {setupItems.map((item) => (
-              <li key={item.href + item.label} className="flex items-start justify-between gap-2 rounded-card border border-line p-3">
+              <li key={item.href + item.label} className="flex items-start justify-between gap-2 panel-flat p-3">
                 <div>
                   <p className="text-sm font-medium text-ink">{item.label}</p>
                   <p className="text-xs text-ink-soft">{item.note}</p>
@@ -182,8 +183,8 @@ export default async function LearningPage({
 
       {/* Section 1: corrections, recurring mistakes, approved learning patterns */}
       <section aria-label="Corrections and learning patterns" className="mb-6">
-        <h2 className="mb-2 text-base font-semibold text-ink">Corrections &amp; learning patterns</h2>
-        <p className="mb-4 text-sm leading-relaxed text-ink-soft">
+        <h2 className="section-title mb-2">Corrections &amp; learning patterns</h2>
+        <p className="page-sub mb-4">
           Recurring mistakes, methods you actually use, and corrections you&apos;ve confirmed — with
           each pattern&apos;s scope, confidence, and lifecycle under your control.
         </p>
@@ -206,14 +207,14 @@ export default async function LearningPage({
 
       {/* Section 2: long-term memories */}
       <section aria-label="Long-term memories" className="mb-6">
-        <h2 className="mb-2 text-base font-semibold text-ink">Subject &amp; course memories</h2>
-        <p className="mb-4 text-sm leading-relaxed text-ink-soft">
+        <h2 className="section-title mb-2">Subject &amp; course memories</h2>
+        <p className="page-sub mb-4">
           Your long-term academic memory — goals, strengths, weaknesses, habits, and strategies,
           scoped by subject and course. Inspect the evidence behind any AI-inferred memory,
           disable it, or permanently forget it.
         </p>
         {subjectScope && (
-          <p className="rounded-lg border border-line bg-paper p-3 text-sm text-ink-soft">
+          <p className="callout">
             Subject workspace view: memories narrowed to {subjectScope.label} plus intentionally
             global memories. <Link href="/learning" className="text-accent underline">View all memories</Link>
           </p>
@@ -232,13 +233,13 @@ export default async function LearningPage({
 
       {/* Section 3: history + GLOBAL CHANGES (merged destination, spec §3.4) */}
       <section aria-label="Profile and version history">
-        <h2 className="mb-2 text-base font-semibold text-ink">Changes &amp; versions</h2>
+        <h2 className="section-title mb-2">Changes &amp; versions</h2>
         <p className="mb-3 text-sm text-ink-soft">
           Your global change history: decided profile updates, recorded corrections, and
           configuration changes. Subject-specific changes stay in each subject workspace.
         </p>
         {(changeHistory ?? []).length === 0 ? (
-          <p className="rounded-lg border border-line bg-paper p-3 text-sm text-ink-soft">
+          <p className="callout">
             No decided changes yet. When you approve a proposed correction or profile update,
             it is recorded here with its reason and timestamp — nothing is invented.
           </p>

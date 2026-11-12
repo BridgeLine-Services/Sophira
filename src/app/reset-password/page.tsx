@@ -183,7 +183,7 @@ export default function ResetPasswordPage() {
       </div>
 
       {mode === "request" && !sent && (
-        <form onSubmit={onRequest} className="rounded-card border border-line bg-card p-5 shadow-sm" noValidate>
+        <form onSubmit={onRequest} className="panel p-5" noValidate>
           <div className="space-y-4">
             <div>
               <Label htmlFor="email">Email</Label>
@@ -227,7 +227,7 @@ export default function ResetPasswordPage() {
       )}
 
       {mode === "set" && (
-        <form onSubmit={onSet} className="rounded-card border border-line bg-card p-5 shadow-sm" noValidate>
+        <form onSubmit={onSet} className="panel p-5" noValidate>
           <div className="space-y-4">
             <div>
               <Label htmlFor="password">New password</Label>

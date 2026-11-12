@@ -54,7 +54,8 @@ export default function NewCoursePage() {
   }
 
   return (
-    <AppShell title="New course" backHref="/courses">
+    <AppShell
+      subtitle="Add a course so Sophira knows the subject, level and teacher rules to follow." title="New course" backHref="/courses">
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
           <Label htmlFor="name">Course name *</Label>

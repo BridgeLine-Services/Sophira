@@ -253,7 +253,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <AppShell title="Settings">
+    <AppShell
+      subtitle="Your account, availability and notification choices." title="Settings">
       <div className="space-y-6">
         {/* Profile */}
         <Card>

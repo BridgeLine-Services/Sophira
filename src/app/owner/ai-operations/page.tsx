@@ -48,7 +48,8 @@ export default async function OwnerAiOperationsPage() {
   });
 
   return (
-    <AppShell title="AI Operations" variant="owner">
+    <AppShell
+      subtitle="How AI requests are being served, and by which provider." title="AI Operations" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -106,7 +107,7 @@ export default async function OwnerAiOperationsPage() {
             <p className="font-medium text-ink">What the record says</p>
             <p className="mt-1 text-sm text-ink-soft">{describeAiActivity(report)}</p>
             {report.reading === "unavailable" && (
-              <p role="status" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm text-ink">
+              <p role="status" className="mt-2 rounded-lg border border-warn/30 bg-warn/[0.07] p-2 text-sm text-ink">
                 {report.unavailableReason}
               </p>
             )}

@@ -22,7 +22,8 @@ export default async function TypingCalibrationPage() {
   const { profile, reason: profileReason } = await readProfileWithRepair(supabase, user.id);
   if (!profile) {
     return (
-      <AppShell title="Account problem">
+      <AppShell
+      subtitle="Practise typing accuracy and speed." title="Account problem">
         <div className="mx-auto max-w-md space-y-3 py-10 text-center">
           <h1 className="text-xl font-semibold text-ink">Your account could not be loaded</h1>
           <p className="text-sm text-ink-soft">

@@ -39,7 +39,8 @@ export default async function OwnerSecurityPage({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <AppShell title="Security and Billing" variant="owner">
+    <AppShell
+      subtitle="Security history and the account-protection settings in force." title="Security and Billing" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

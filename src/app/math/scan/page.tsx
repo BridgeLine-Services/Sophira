@@ -148,7 +148,8 @@ function MathScanInner() {
   };
 
   return (
-    <AppShell title="Math • Scan to Solve">
+    <AppShell
+      subtitle="Scan or paste a problem and get the working explained." title="Math • Scan to Solve">
       {/* three-step workflow indicator (approved scan concept) */}
       <div className="flex items-center gap-2 text-xs">
         {["Upload", "Review transcription", "Solve & verify"].map((lbl, i) => (

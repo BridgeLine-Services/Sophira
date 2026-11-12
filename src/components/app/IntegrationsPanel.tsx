@@ -17,7 +17,7 @@ type Status = {
   account?: string | null;
 };
 
-const card = "rounded-lg border border-line p-4";
+const card = "panel-flat p-4";
 const btn = "rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50";
 
 function ProviderCard({

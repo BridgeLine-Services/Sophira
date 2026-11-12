@@ -42,7 +42,8 @@ export default async function AssignmentWorkspacePage({ params }: { params: Prom
   const canvasContext = await loadCanvasContext(supabase, user.id, assignment.id);
 
   return (
-    <AppShell title={assignment.title} backHref="/dashboard">
+    <AppShell
+      subtitle="Read the brief, work through it, and submit when you are ready." title={assignment.title} backHref="/dashboard">
       {canvasContext && <CanvasAssignmentContext context={canvasContext} />}
       <Workspace
         assignment={assignment as Assignment}

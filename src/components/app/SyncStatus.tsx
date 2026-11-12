@@ -70,11 +70,11 @@ export function SyncStatus() {
     state === "syncing" ? "Syncing…" :
     state === "done" ? "Sync complete" : "Sync failed";
   const cls =
-    state === "online" ? "bg-emerald-100 text-emerald-800" :
+    state === "online" ? "bg-success/10 text-success" :
     state === "offline" ? "border border-line bg-card text-ink-soft" :
-    state === "syncing" ? "bg-blue-100 text-blue-800" :
-    state === "done" ? "bg-emerald-100 text-emerald-800" :
-    "bg-red-100 text-red-800";
+    state === "syncing" ? "bg-accent-soft text-accent" :
+    state === "done" ? "bg-success/10 text-success" :
+    "bg-danger/10 text-danger";
 
   return (
     <button
@@ -82,7 +82,7 @@ export function SyncStatus() {
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cls}`}
       title={pending > 0 ? `${pending} offline change(s) waiting to sync — click to sync` : "Sync status — click to sync"}
     >
-      <span className={`inline-block h-1.5 w-1.5 rounded-full ${state === "offline" ? "bg-ink-soft" : state === "failed" ? "bg-red-500" : "bg-emerald-600"}`} />
+      <span className={`inline-block h-1.5 w-1.5 rounded-full ${state === "offline" ? "bg-ink-soft" : state === "failed" ? "bg-danger" : "bg-success"}`} />
       {label}
       {pending > 0 && <span className="rounded-full bg-ink/10 px-1.5 font-semibold">{pending} pending</span>}
     </button>

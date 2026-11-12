@@ -234,6 +234,7 @@ function LibraryPageInner() {
 
   return (
     <AppShell
+      subtitle="Everything you have saved: documents, notes and sources, in one place."
       title={courseId ? (courseName ? `Library — ${courseName}` : "Course library") : "Library"}
       backHref={courseId ? `/courses/${courseId}` : undefined}
       actions={

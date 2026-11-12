@@ -78,7 +78,8 @@ export default function OnlinePage() {
   }
 
   return (
-    <AppShell title="Online" variant={ownerEnvironment ? "owner" : "workspace"}>
+    <AppShell
+      subtitle="Who is online right now across your network." title="Online" variant={ownerEnvironment ? "owner" : "workspace"}>
       <div className="mx-auto max-w-2xl space-y-4">
         {ownerEnvironment && (
           <Link href="/owner" className="text-sm text-accent hover:underline">
@@ -93,7 +94,7 @@ export default function OnlinePage() {
         <Card>
           <CardContent className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
-              {online ? <Wifi className="h-5 w-5 text-emerald-600" /> : <WifiOff className="h-5 w-5 text-amber-600" />}
+              {online ? <Wifi className="h-5 w-5 text-success" /> : <WifiOff className="h-5 w-5 text-warn" />}
               <div>
                 <p className="text-sm font-medium text-ink">{online ? "Connected to the internet" : "No internet connection"}</p>
                 <p className="text-xs text-ink-soft">Device network status (browser-reported).</p>
@@ -106,7 +107,7 @@ export default function OnlinePage() {
         <Card>
           <CardContent className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
-              {healthBusy ? <Spinner /> : health ? <Wifi className="h-5 w-5 text-emerald-600" /> : <CloudOff className="h-5 w-5 text-amber-600" />}
+              {healthBusy ? <Spinner /> : health ? <Wifi className="h-5 w-5 text-success" /> : <CloudOff className="h-5 w-5 text-warn" />}
               <div>
                 <p className="text-sm font-medium text-ink">
                   {healthBusy ? "Checking Sophira service…" : health ? "Sophira service reachable" : "Sophira service unreachable"}

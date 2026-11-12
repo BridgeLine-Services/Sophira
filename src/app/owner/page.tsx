@@ -228,6 +228,7 @@ export default async function OwnerPage() {
 
 return (
     <AppShell
+      subtitle="The operator console: members, invitations, system health and settings."
       title="Owner Dashboard"
       variant="owner"
       role={profile.role}

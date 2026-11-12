@@ -110,7 +110,8 @@ export default function NewWritingSamplePage() {
   }
 
   return (
-    <AppShell title="Add a writing sample" backHref="/writing">
+    <AppShell
+      subtitle="Start a new piece of writing and choose what kind of help you want." title="Add a writing sample" backHref="/writing">
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
           <Label htmlFor="title">Title *</Label>

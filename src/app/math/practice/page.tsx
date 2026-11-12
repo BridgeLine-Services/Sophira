@@ -66,7 +66,8 @@ function PracticeInner() {
   }
 
   return (
-    <AppShell title="Practice problems" backHref={courseId ? `/courses/${courseId}` : "/math"}>
+    <AppShell
+      subtitle="Practise problems by topic, at your own pace." title="Practice problems" backHref={courseId ? `/courses/${courseId}` : "/math"}>
       <div className="mx-auto max-w-3xl space-y-4">
         <p className="text-sm text-ink-soft">
           Practice problems generated from material you provide — your notes, worksheets,
@@ -108,7 +109,7 @@ function PracticeInner() {
                 <Button size="sm" variant="secondary" onClick={() => setRevealed((r) => (r.includes(p.id) ? r : [...r, p.id]))}>Reveal answer</Button>
               </div>
               {checks[p.id] && (
-                <div className={`rounded-card border p-3 text-sm ${checks[p.id].correct ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+                <div className={`rounded-card border p-3 text-sm ${checks[p.id].correct ? "border-success/30 bg-success/[0.07]" : "border border-warn/30 bg-warn/[0.07]"}`}>
                   <p className="font-medium text-ink">{checks[p.id].correct ? "Correct — nicely done." : "Not quite yet."}</p>
                   {checks[p.id].where && <p className="mt-1 text-ink-soft">{checks[p.id].where}</p>}
                   {checks[p.id].explanation && <p className="mt-1 text-ink-soft">{checks[p.id].explanation}</p>}
@@ -116,7 +117,7 @@ function PracticeInner() {
                 </div>
               )}
               {revealed.includes(p.id) && p.answer && (
-                <div className="rounded-card border border-line p-3 text-sm">
+                <div className="panel-flat p-3 text-sm">
                   <p className="font-medium text-ink">Answer: {p.answer}</p>
                   {p.steps?.length ? (
                     <ol className="mt-2 list-inside list-decimal space-y-1 text-xs text-ink-soft">

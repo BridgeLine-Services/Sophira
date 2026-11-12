@@ -1,94 +1,322 @@
 {
+  "/": {
+    "reason": "Server-side redirect to /dashboard. It renders no content of its own, so there is nothing to re-skin; the destination page carries the design.",
+    "status": "intentionally-unchanged"
+  },
   "/access-denied": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/assignments/[id]": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/assignments/new": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/co-owner": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/corrections": {
+    "reason": "Server-side redirect to /learning. It renders no content of its own, so there is nothing to re-skin; the destination page carries the design.",
+    "status": "intentionally-unchanged"
+  },
+  "/courses": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/courses/[id]": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/courses/english": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/courses/foreign-language": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/courses/foreign-language/language-selector": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/courses/health-education": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/courses/history-social-science": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/courses/math": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/courses/new": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/courses/other-subject": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/courses/science": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/courses/science/biology": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/courses/science/chemistry": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/courses/science/physics": {
+    "reason": "Thin wrapper around the shared SubjectWorkspace component, which carries the design (page frame, panels, tables, tokens). Wrapper verified by source; the rendered page has not been inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/create-owner": {
+    "reason": "Public page, no shell. Brought onto the shared vocabulary this round (panel surfaces with the standard elevation, semantic tokens only). Not marked complete: not inspected in a browser in either theme at any width.",
+    "status": "partial"
   },
   "/dashboard": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/downloads": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/essay": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/install": {
+    "reason": "Public page, no shell. Brought onto the shared vocabulary this round (panel surfaces with the standard elevation, semantic tokens only). Not marked complete: not inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/learning": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/lectures": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/library": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/license": {
+    "reason": "Renders the shared LegalDocPage: prose column, panel header, token-based callout (the hardcoded amber notice that broke dark mode is gone). Not marked complete: not inspected in a browser in either theme.",
+    "status": "partial"
+  },
+  "/local": {
+    "reason": "Public page, no shell. Brought onto the shared vocabulary this round (panel surfaces with the standard elevation, semantic tokens only). Not marked complete: not inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/login": {
+    "reason": "Public page, no shell. Brought onto the shared vocabulary this round (panel surfaces with the standard elevation, semantic tokens only). Not marked complete: not inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/math": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/math/practice": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/math/scan": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/math/test-prep": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/memories": {
+    "reason": "Server-side redirect to /learning. It renders no content of its own, so there is nothing to re-skin; the destination page carries the design.",
+    "status": "intentionally-unchanged"
+  },
+  "/notebooks": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/notebooks/[id]": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/notebooks/archive": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/notifications": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/offline": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/onboarding": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/online": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/activity": {
-    "status": "partial",
-    "reason": "Dedicated route reading stored timestamps through the existing buildActivity. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/ai-operations": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/ai-providers": {
-    "status": "partial",
-    "reason": "Dedicated route reporting existing provider diagnostics; no key or token rendered. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/analytics": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/owner/announcements": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/backup": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/owner/database": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/features": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/owner/health": {
+    "reason": "Server-side redirect to /owner. It renders no content of its own, so there is nothing to re-skin; the destination page carries the design.",
+    "status": "intentionally-unchanged"
+  },
+  "/owner/integrations": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/invitations": {
-    "status": "partial",
-    "reason": "Dedicated route; mutations reuse the shared invitation-actions module and delivery wording is unchanged. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/members": {
-    "status": "partial",
-    "reason": "Dedicated route; actions reuse the shared member-actions module. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/qa": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/owner/release-readiness": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/requests": {
-    "status": "partial",
-    "reason": "Dedicated route; approving still requires the owner's click. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/security": {
-    "status": "partial",
-    "reason": "Dedicated route reporting the server-side charge policy; it cannot change it. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/owner/status": {
-    "status": "partial",
-    "reason": "Dedicated route using the existing buildStatusRows. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/privacy": {
+    "reason": "Renders the shared LegalDocPage: prose column, panel header, token-based callout (the hardcoded amber notice that broke dark mode is gone). Not marked complete: not inspected in a browser in either theme.",
+    "status": "partial"
+  },
+  "/proposals": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/reset-password": {
+    "reason": "Public page, no shell. Brought onto the shared vocabulary this round (panel surfaces with the standard elevation, semantic tokens only). Not marked complete: not inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/settings": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/settings/integrations": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/setup": {
+    "reason": "Public page, no shell. Brought onto the shared vocabulary this round (panel surfaces with the standard elevation, semantic tokens only). Not marked complete: not inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/signup": {
+    "reason": "Public page, no shell. Brought onto the shared vocabulary this round (panel surfaces with the standard elevation, semantic tokens only). Not marked complete: not inspected in a browser in either theme at any width.",
+    "status": "partial"
+  },
+  "/teachers": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/teachers/[id]": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/teachers/new": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/terms": {
+    "reason": "Renders the shared LegalDocPage: prose column, panel header, token-based callout (the hardcoded amber notice that broke dark mode is gone). Not marked complete: not inspected in a browser in either theme.",
+    "status": "partial"
   },
   "/tester": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/tutor": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   },
   "/writing": {
-    "status": "partial",
-    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/writing/grammar": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/writing/new": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/writing/planning": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/writing/review": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
+  },
+  "/writing/typing": {
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
+    "status": "partial"
   }
 }

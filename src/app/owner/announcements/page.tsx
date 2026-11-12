@@ -30,7 +30,8 @@ export default async function AnnouncementsPage() {
    */
   if (needsDatabaseUpdate(error)) {
     return (
-      <AppShell title="Announcements" variant="owner" role={role} backHref={staffBackHrefFor(role)}>
+      <AppShell
+      subtitle="Messages shown to everyone in the network." title="Announcements" variant="owner" role={role} backHref={staffBackHrefFor(role)}>
         <DatabaseUpdateNotice feature="announcements" error={error} canUpdate={role === "owner"} />
       </AppShell>
     );

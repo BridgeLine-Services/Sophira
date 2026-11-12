@@ -15,7 +15,7 @@ export function LegalDocPage({ doc }: { doc: LegalDocName }) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-12">
         <h1 className="text-2xl font-bold text-ink">{title}</h1>
-        <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-ink">
+        <p className="mt-4 rounded-lg border border-warn/30 bg-warn/[0.07] p-4 text-sm text-ink">
           This document is not available in the current deployment bundle. It is
           not substituted with placeholder text. The source document lives in
           the Sophira repository
@@ -37,7 +37,7 @@ export function LegalDocPage({ doc }: { doc: LegalDocName }) {
       <h1 className="text-2xl font-bold text-ink">{title}</h1>
 
       {hasPlaceholders && (
-        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-ink">
+        <div className="mt-4 rounded-lg border border-warn/30 bg-warn/[0.07] p-4 text-sm text-ink">
           <p className="font-semibold">TEMPLATE — PLACEHOLDER NOTICE</p>
           <p className="mt-1">
             This document is a template with unresolved owner-fact placeholders

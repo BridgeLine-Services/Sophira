@@ -41,7 +41,8 @@ export default async function OwnerActivityPage({
   const result = await loadAuditPage(supabase, names, filters);
 
   return (
-    <AppShell title="Recent Activity" variant="owner">
+    <AppShell
+      subtitle="What has happened across the network, newest first." title="Recent Activity" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

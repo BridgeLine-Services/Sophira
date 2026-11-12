@@ -20,7 +20,7 @@ export default function AnswerProvenance({
 }) {
   if (provider === "selfhost" || provider === "local") {
     return (
-      <p className="mt-4 flex items-start gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-ink-soft">
+      <p className="mt-4 flex items-start gap-2 rounded-md bg-ink/[0.04] px-3 py-2 text-xs text-ink-soft">
         <Server className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <span>
           Written {provider === "local" ? "on this device" : "on your own server"}
@@ -31,7 +31,7 @@ export default function AnswerProvenance({
   }
   if (provider === "gemini" || provider === "openai") {
     return (
-      <p className="mt-4 flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <p className="mt-4 flex items-start gap-2 rounded-md border border-warn/30 bg-warn/[0.07] px-3 py-2 text-xs text-ink">
         <Cloud className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <span>
           Your own inference server was not available, so this answer came from a cloud service
@@ -41,7 +41,7 @@ export default function AnswerProvenance({
     );
   }
   return (
-    <p className="mt-4 flex items-start gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-ink-soft">
+    <p className="mt-4 flex items-start gap-2 rounded-md bg-ink/[0.04] px-3 py-2 text-xs text-ink-soft">
       <Laptop className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
       <span>
         This answer predates the record of where it was written, so Sophira will not claim either way.

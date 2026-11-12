@@ -223,7 +223,8 @@ function Wizard() {
   const stepLabels = ["What do you need?", "Course & teacher", "Your assignment"];
 
   return (
-    <AppShell title="New assignment" backHref="/dashboard">
+    <AppShell
+      subtitle="Create an assignment: add the brief, the rubric and the due date." title="New assignment" backHref="/dashboard">
       <div className="space-y-5">
         <div aria-hidden className="flex gap-1.5">
           {[1, 2, 3].map((n) => (

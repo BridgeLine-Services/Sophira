@@ -117,8 +117,8 @@ export function GradualInsertPanel({ documentId, documentTitle }: { documentId: 
       <input id="gi-heading" className="mt-1 w-full rounded-md border border-line bg-paper p-2 text-xs"
         value={heading} onChange={(e) => setHeading(e.target.value)} disabled={running || status === "paused"} />
 
-      <div className="mt-2 h-2 w-full overflow-hidden rounded bg-muted" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-        <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+      <div className="mt-2 h-2 w-full overflow-hidden rounded bg-card-elevated" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
       </div>
       <p className="mt-1 text-xs text-ink">{progressText}</p>
       {note && <p className="mt-1 text-xs text-ink-soft">{note}</p>}

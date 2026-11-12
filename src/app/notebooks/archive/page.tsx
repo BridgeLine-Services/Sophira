@@ -84,7 +84,8 @@ export default function ArchivePage() {
     };
 
   return (
-    <AppShell title="Archive" backHref="/notebooks">
+    <AppShell
+      subtitle="Notebooks you have archived. Nothing is deleted; restore any of them." title="Archive" backHref="/notebooks">
       <p className="mb-4 text-sm text-ink-soft">
         Records you removed from your workspace. Nothing here is deleted — restore anything and it returns exactly as it was.
       </p>

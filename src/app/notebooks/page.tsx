@@ -78,7 +78,8 @@ export default function NotebooksPage() {
   };
 
   return (
-    <AppShell title="Notebooks">
+    <AppShell
+      subtitle="Your notebooks: write, organise and come back to your notes." title="Notebooks">
       <div className="mx-auto max-w-3xl space-y-6">
         <Card>
           <CardHeader>

@@ -20,7 +20,8 @@ export default async function OwnerMembersPage() {
     await loadOwnerRoster(supabase);
 
   return (
-    <AppShell title="Members" variant="owner">
+    <AppShell
+      subtitle="Everyone with access, and the role each one holds." title="Members" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

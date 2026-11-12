@@ -48,7 +48,8 @@ export default async function TesterPage() {
    */
   if (needsDatabaseUpdate(reportsError)) {
     return (
-      <AppShell title="Tester Dashboard" role={profile.role}>
+      <AppShell
+      subtitle="Quality reports: see what was reported and send a new report." title="Tester Dashboard" role={profile.role}>
         <DatabaseUpdateNotice
           feature="your QA reports"
           error={reportsError}

@@ -84,8 +84,8 @@ function InstallCard() {
         )}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-line p-4">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
+          <div className="panel-flat p-4">
+            <div className="section-title mb-2 flex items-center gap-2">
               <Apple className="h-4 w-4" /> iPhone / iPad (Safari)
             </div>
             <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-soft">
@@ -95,8 +95,8 @@ function InstallCard() {
               <li>Tap <strong>Add</strong>. Sophira now has its own icon, like any app.</li>
             </ol>
           </div>
-          <div className="rounded-lg border border-line p-4">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
+          <div className="panel-flat p-4">
+            <div className="section-title mb-2 flex items-center gap-2">
               <Smartphone className="h-4 w-4" /> Android (Chrome)
             </div>
             <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-soft">
@@ -108,8 +108,8 @@ function InstallCard() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-line p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
+        <div className="panel-flat p-4">
+          <div className="section-title mb-2 flex items-center gap-2">
             <Monitor className="h-4 w-4" /> Desktop (Chrome, Edge, Safari)
           </div>
           <p className="text-sm text-ink-soft">

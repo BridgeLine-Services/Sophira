@@ -228,8 +228,14 @@ function CourseTree({ userId, pathname, onNavigate }: {
   );
 }
 
-export function AppShell({ title, backHref, actions, variant = "workspace", role: initialRole, children }: {
+export function AppShell({ title, subtitle, backHref, actions, variant = "workspace", role: initialRole, children }: {
   title: string;
+  /**
+   * One plain-language sentence saying what this screen is for. Optional and additive
+   * (2026-11-12 phase 2): it gives every route the same quiet explanation under its
+   * title, so a first-time member never has to guess from the heading alone.
+   */
+  subtitle?: string;
   backHref?: string;
   actions?: ReactNode;
   variant?: "workspace" | "owner";
@@ -695,7 +701,14 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
               <span className="hidden sm:inline">Sophira</span>
             </Link>
           )}
-          <h1 className="flex-1 truncate text-[16px] font-semibold tracking-[-0.01em] text-ink sm:text-[17px]">{title}</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[16px] font-semibold tracking-[-0.01em] text-ink sm:text-[17px]">{title}</h1>
+            {subtitle && (
+              <p className="mt-0.5 hidden truncate text-[12px] leading-tight text-ink-soft sm:block" title={subtitle}>
+                {subtitle}
+              </p>
+            )}
+          </div>
           <ScopeChip />
           <ThemeToggle />
           <span className="mr-1 hidden sm:inline-flex"><SyncStatus /></span>

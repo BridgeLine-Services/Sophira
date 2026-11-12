@@ -46,7 +46,8 @@ export default async function OwnerAiProvidersPage() {
   ];
 
   return (
-    <AppShell title="AI Providers and Models" variant="owner">
+    <AppShell
+      subtitle="Which AI providers are configured and available." title="AI Providers and Models" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -63,7 +64,7 @@ export default async function OwnerAiProvidersPage() {
           <CardContent className="divide-y divide-line p-0">
             {rows.map((row) => (
               <div key={row.key} className="flex items-start gap-3 p-4">
-                <span aria-hidden className={"mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " + (row.on ? "bg-emerald-500" : "bg-line")} />
+                <span aria-hidden className={"mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " + (row.on ? "bg-success" : "bg-line")} />
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
                     {row.label}

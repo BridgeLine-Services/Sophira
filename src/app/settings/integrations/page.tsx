@@ -19,8 +19,9 @@ export default async function IntegrationsPage() {
   if (!guard.ok) {
     if (guard.response.status === 401) redirect("/login");
     return (
-      <AppShell title="Integrations">
-        <p className="mx-auto max-w-xl rounded-card border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
+      <AppShell
+      subtitle="Connect the outside services Sophira is allowed to use for you." title="Integrations">
+        <p className="mx-auto max-w-xl rounded-card border border-warn/30 bg-warn/[0.07] p-4 text-sm text-ink" role="alert">
           We couldn&apos;t verify your access to integrations. Please try again later or contact the owner.
         </p>
       </AppShell>

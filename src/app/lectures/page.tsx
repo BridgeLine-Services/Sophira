@@ -373,7 +373,8 @@ export default function LecturesPage() {
   }
 
   return (
-    <AppShell title="Lectures" actions={<Badge tone="neutral">Private to you</Badge>}>
+    <AppShell
+      subtitle="Lecture recordings, transcripts and the notes taken from them." title="Lectures" actions={<Badge tone="neutral">Private to you</Badge>}>
       <div className="space-y-5">
         <Card>
           <CardContent className="space-y-3">

@@ -32,7 +32,8 @@ export default async function OwnerBackupPage() {
   const done = report.steps.filter((s) => s.state === "done").length;
 
   return (
-    <AppShell title="Backup and recovery" variant="owner">
+    <AppShell
+      subtitle="Backups and recovery: what is saved and when it was verified." title="Backup and recovery" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -163,9 +164,9 @@ export default async function OwnerBackupPage() {
 }
 
 function dotFor(state: StepState): string {
-  if (state === "done") return "bg-emerald-500";
-  if (state === "failed") return "bg-red-500";
-  if (state === "blocked") return "bg-amber-400";
+  if (state === "done") return "bg-success";
+  if (state === "failed") return "bg-danger";
+  if (state === "blocked") return "bg-warn";
   if (state === "unknown") return "bg-line";
   return "bg-ink-soft/40";
 }

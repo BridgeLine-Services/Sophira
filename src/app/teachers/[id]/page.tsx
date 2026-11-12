@@ -22,7 +22,8 @@ export default async function TeacherDetailPage({ params }: { params: Promise<{ 
   ]);
 
   return (
-    <AppShell title={teacher.name} backHref="/teachers">
+    <AppShell
+      subtitle="This teacher's preferences, and the courses and work they are attached to." title={teacher.name} backHref="/teachers">
       <div className="space-y-6">
         <ProposalsPanel targetType="teacher" targetId={profile?.id} />
         {courses && courses.length > 0 && (

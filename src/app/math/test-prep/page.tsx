@@ -44,7 +44,8 @@ function TestPrepInner() {
   }
 
   return (
-    <AppShell title="Test preparation" backHref={courseId ? `/courses/${courseId}` : "/math"}>
+    <AppShell
+      subtitle="Prepare for a test with focused practice." title="Test preparation" backHref={courseId ? `/courses/${courseId}` : "/math"}>
       <div className="mx-auto max-w-3xl space-y-4">
         <p className="text-sm text-ink-soft">
           Review concepts, build a study plan, and prepare for exams from the topics you name and
@@ -81,7 +82,7 @@ function TestPrepInner() {
             {prep.concepts?.length ? (
               <Card><CardHeader><CardTitle>Concept review</CardTitle></CardHeader><CardContent className="space-y-2">
                 {prep.concepts.map((c, i) => (
-                  <div key={i} className="rounded-card border border-line p-3">
+                  <div key={i} className="panel-flat p-3">
                     <p className="text-sm font-medium text-ink">{c.concept}</p>
                     {c.review && <p className="mt-1 text-xs text-ink-soft">{c.review}</p>}
                   </div>
@@ -91,7 +92,7 @@ function TestPrepInner() {
             {prep.study_plan?.length ? (
               <Card><CardHeader><CardTitle>Study plan</CardTitle></CardHeader><CardContent className="space-y-2">
                 {prep.study_plan.map((s) => (
-                  <div key={s.session} className="rounded-card border border-line p-3">
+                  <div key={s.session} className="panel-flat p-3">
                     <p className="text-sm font-medium text-ink"><Badge tone="accent">Session {s.session}</Badge> {s.focus}</p>
                     {s.activities && <p className="mt-1 text-xs text-ink-soft">{s.activities}</p>}
                   </div>

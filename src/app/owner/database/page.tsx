@@ -18,7 +18,8 @@ export default async function OwnerDatabasePage() {
   const scan = await scanMigrations();
 
   return (
-    <AppShell title="Database updates" variant="owner">
+    <AppShell
+      subtitle="Database updates, and whether everything is in place." title="Database updates" variant="owner">
       <div className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-ink">Keep your database in step with Sophira</h2>

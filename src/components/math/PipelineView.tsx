@@ -47,7 +47,7 @@ export function PipelineView({ result, confirming, onConfirmChange, onConfirm }:
             <Badge tone={result.recognized.ocrEngine === "deterministic" ? "neutral" : "accent"}>{result.recognized.ocrEngine} OCR</Badge>
             <Badge tone={result.recognized.confidence >= 0.8 ? "success" : "warn"}>{(result.recognized.confidence * 100).toFixed(0)}% confidence</Badge>
           </div>
-          <p className="rounded-lg border border-line bg-muted/40 p-3 font-mono text-lg">{result.recognized.expression || "(nothing recognized)"}</p>
+          <p className="rounded-lg border border-line bg-ink/[0.04] p-3 font-mono text-lg">{result.recognized.expression || "(nothing recognized)"}</p>
           {result.recognized.rawText && result.recognized.rawText !== result.recognized.expression && (
             <p className="text-xs text-ink/50">raw OCR text: {result.recognized.rawText}</p>
           )}
@@ -78,7 +78,7 @@ export function PipelineView({ result, confirming, onConfirmChange, onConfirm }:
               ))}
             </ol>
             {result.solution.finalAnswer && (
-              <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 text-center">
+              <div className="rounded-lg border-2 border-accent/30 bg-accent/5 p-4 text-center">
                 <p className="mb-1 text-xs uppercase tracking-wide text-ink/50">Answer</p>
                 <div className="text-lg"><TypesetMath expr={result.solution.finalAnswer} display /></div>
               </div>

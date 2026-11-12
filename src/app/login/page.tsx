@@ -196,7 +196,7 @@ function LoginForm() {
         </div>
       </Link>
 
-      <form onSubmit={onSubmit} className="rounded-card border border-line bg-card p-5 shadow-sm" noValidate>
+      <form onSubmit={onSubmit} className="panel p-5" noValidate>
         <div className="space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
@@ -229,7 +229,7 @@ function LoginForm() {
           )}
           {error && <p className="text-sm text-danger" role="alert">{error}</p>}
           {error && (
-            <div className="rounded-card border border-line bg-card p-3 shadow-sm">
+            <div className="panel-flat p-3">
               <button
                 type="button"
                 className="text-sm font-medium text-accent underline underline-offset-2"

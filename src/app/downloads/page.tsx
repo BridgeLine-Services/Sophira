@@ -146,7 +146,7 @@ export default function DownloadsPage() {
           )}
 
           {state === "none" && (
-            <div className="rounded-lg bg-muted/40 p-4 text-sm">
+            <div className="rounded-lg bg-ink/[0.04] p-4 text-sm">
               <p className="font-medium">No native release has been published yet.</p>
               <p className="mt-1 text-ink-soft">
                 Native packages (.apk, .ipa, Windows/macOS/Linux installers) appear here automatically once the release
@@ -157,7 +157,7 @@ export default function DownloadsPage() {
           )}
 
           {state === "ready" && appAssets.length === 0 && (
-            <div className="rounded-lg bg-muted/40 p-4 text-sm">
+            <div className="rounded-lg bg-ink/[0.04] p-4 text-sm">
               <p className="font-medium">Release v{version} has no native packages attached.</p>
               <p className="mt-1 text-ink-soft">
                 The release exists, but no native artifact was attached to it. The PWA above is the supported install.
@@ -174,7 +174,7 @@ export default function DownloadsPage() {
                   // iOS honesty: no .ipa in this release — never claim an
                   // unsigned archive installs like a normal app.
                   return (
-                    <div key={pl.key} className="rounded-lg bg-muted/40 p-3 text-sm">
+                    <div key={pl.key} className="rounded-lg bg-ink/[0.04] p-3 text-sm">
                       <p className="font-medium">iPhone / iPad — no installable .ipa in this release</p>
                       <p className="mt-1 text-ink-soft">
                         Apple devices cannot install an unsigned app, and iOS has no &quot;install unknown apps&quot;
@@ -245,7 +245,7 @@ export default function DownloadsPage() {
                             )}
                             <p className="text-xs text-ink-soft">{pl.note}</p>
                             {unsigned && /\.apk$/i.test(a.name) && (
-                              <p className="text-xs text-amber-700">
+                              <p className="text-xs text-warn">
                                 Installation requirements: this APK has no release signature. Install it with{" "}
                                 <code>adb install Sophira-release-unsigned.apk</code> from Android platform-tools, or
                                 sign it first with your own key (<code>apksigner</code>) and then enable
@@ -262,7 +262,7 @@ export default function DownloadsPage() {
               })}
 
               <p className="border-t pt-4 text-xs text-ink-soft">
-                Verify a download: <code className="rounded bg-muted px-1 py-0.5">sha256sum Sophira-release.apk</code>{" "}
+                Verify a download: <code className="rounded bg-card-elevated px-1 py-0.5">sha256sum Sophira-release.apk</code>{" "}
                 and compare with the hash above or in the release&apos;s checksum files. Full release notes:{" "}
                 <a href={release!.html_url} className="underline" target="_blank" rel="noreferrer">{release!.html_url}</a>
               </p>

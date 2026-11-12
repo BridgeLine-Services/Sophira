@@ -102,7 +102,8 @@ export default async function ProposalsPage({
   const scopedMemories = (memories ?? []).filter((m) => inScope(m));
 
   return (
-    <AppShell title={course ? `Changes — ${course.name}` : subjectScope ? `Changes — ${subjectScope.label}` : "Changes"} backHref={course ? `/courses/${course.id}` : subjectScope ? `/courses/${subjectScope.slug}` : "/dashboard"}>
+    <AppShell
+      subtitle="Suggested changes to your profile. Nothing applies until you accept it." title={course ? `Changes — ${course.name}` : subjectScope ? `Changes — ${subjectScope.label}` : "Changes"} backHref={course ? `/courses/${course.id}` : subjectScope ? `/courses/${subjectScope.slug}` : "/dashboard"}>
       <div className="mb-4 space-y-1">
         <p className="text-sm text-ink-soft">
           A chronological record of meaningful changes to your learning profile — proposed updates,
@@ -136,13 +137,13 @@ export default async function ProposalsPage({
 
       {/* Decided proposals — the global profile-change history */}
       <section aria-label="Profile update decisions" className="mb-6">
-        <h2 className="mb-2 text-base font-semibold text-ink">Profile update history</h2>
+        <h2 className="section-title mb-2">Profile update history</h2>
         {scopedDecisions.length === 0 ? (
           <p className="text-sm text-ink-soft">No decided profile updates yet.</p>
         ) : (
           <ul className="space-y-2">
             {scopedDecisions.map((d) => (
-              <li key={d.id} className="rounded-card border border-line p-3">
+              <li key={d.id} className="panel-flat p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={d.status === "approved" ? "success" : "neutral"}>{d.status}</Badge>
                   <span className="text-sm font-medium text-ink">{d.target_type} profile</span>
@@ -157,13 +158,13 @@ export default async function ProposalsPage({
 
       {/* Learning patterns timeline (subject-aware) */}
       <section aria-label="Learning pattern changes" className="mb-6">
-        <h2 className="mb-2 text-base font-semibold text-ink">Learning patterns</h2>
+        <h2 className="section-title mb-2">Learning patterns</h2>
         {scopedPatterns.length === 0 ? (
           <p className="text-sm text-ink-soft">No learning patterns recorded yet.</p>
         ) : (
           <ul className="space-y-2">
             {scopedPatterns.map((p) => (
-              <li key={p.id} className="rounded-card border border-line p-3">
+              <li key={p.id} className="panel-flat p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {p.subject && <Badge tone="accent">{p.subject}</Badge>}
                   <Badge tone="neutral">{p.scope}</Badge>
@@ -180,13 +181,13 @@ export default async function ProposalsPage({
 
       {/* Memory update timeline (subject-aware) */}
       <section aria-label="Memory changes" className="mb-6">
-        <h2 className="mb-2 text-base font-semibold text-ink">Memory updates</h2>
+        <h2 className="section-title mb-2">Memory updates</h2>
         {scopedMemories.length === 0 ? (
           <p className="text-sm text-ink-soft">No memory updates yet.</p>
         ) : (
           <ul className="space-y-2">
             {scopedMemories.map((m) => (
-              <li key={m.id} className="rounded-card border border-line p-3">
+              <li key={m.id} className="panel-flat p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {m.subject && <Badge tone="accent">{m.subject}</Badge>}
                   <Badge tone="neutral">{m.category}</Badge>

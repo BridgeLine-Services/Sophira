@@ -31,6 +31,7 @@ export default function CoursesPage() {
 
   return (
     <AppShell
+      subtitle="Your courses and subjects, with the teacher and level each one uses."
       title="Courses"
       actions={
         <Link href="/courses/new">
@@ -64,7 +65,7 @@ export default function CoursesPage() {
                       {group.engines.map((eid: EngineId) => {
                         const subjectCourses = grouped.filter((c) => classifyEngine(c.subject) === eid);
                         return (
-                          <div key={eid} className="rounded-card border border-line p-3">
+                          <div key={eid} className="panel-flat p-3">
                             <p className="text-sm font-medium text-ink">{ENGINES[eid].label}</p>
                             <ul className="mt-2 space-y-2">
                               {subjectCourses.length === 0 && (
