@@ -1,3 +1,22 @@
+## 2026-11-11 — The Overview now says when the database is behind
+
+The dashboard learned that its database was out of date only when a member read failed as "column
+missing", which an ADDITIVE update never causes. So the owner could sit two updates behind - the AI
+response-time column and the complete administrative history - with nothing on the Overview saying
+so, and only find out by thinking to open the database page.
+
+`/owner` now scans each migration's own marker and, when it can, says how many updates are missing
+("found 2 updates it has not been given yet"), that nothing was lost, that an update only adds
+things, that pressing the button twice is safe, and that until they are in some pages will say a
+fact is "not recorded" or "not measured" instead of showing it. One known count beats an old guess,
+so the two signals are never two items. A scan that cannot reach the database (or has no channel to
+it) returns "could not ask" and the Overview claims nothing - it never says "up to date" by default.
+The scan is cached for five minutes per server instance, so the page stays fast; the database page
+is never cached.
+
+Verified: 7276/7276 tests (8 new assertions), tsc clean, lint 0 errors (32 warnings), production
+build OK, runtime smoke 100/100.
+
 ## 2026-11-11 — The administrative history now records everything an owner needs to see
 
 The Security page could read role changes, and said plainly that invitations, suspensions,

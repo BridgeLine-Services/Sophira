@@ -23,6 +23,7 @@ import { legalPlaceholdersRemain, loadLegalDoc } from "@/lib/legal";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
 import { canvasConfigured } from "@/lib/integrations/canvas";
 import { buildActionItems, describeUnreadableMembers } from "@/lib/owner/action-items";
+import { scanMigrations } from "@/lib/db-ddl";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,37 @@ export const dynamic = "force-dynamic";
  * Server-side authorization: a non-owner who types /owner by hand is sent
  * back to the user dashboard — this is a redirect, not hidden UI.
  */
+
+/**
+ * HOW FAR BEHIND IS THE DATABASE? (2026-11-11)
+ *
+ * The dashboard used to learn this only when a member read failed as "column missing", which an
+ * ADDITIVE update never causes: the owner could sit two updates behind with no word about it.
+ * This asks every migration's own marker directly and returns how many are missing.
+ *
+ * Null means "could not ask" (no database connection, or the read failed) and nothing is claimed
+ * in that case. The answer is cached for five minutes because it costs one round trip per
+ * migration and the dashboard is reloaded often; an update the owner just applied shows up within
+ * five minutes at worst, and the database page itself is never cached.
+ */
+let pendingCache: { at: number; value: number | null } | null = null;
+const PENDING_TTL_MS = 5 * 60 * 1000;
+
+async function databasePendingCount(): Promise<number | null> {
+  const now = Date.now();
+  if (pendingCache && now - pendingCache.at < PENDING_TTL_MS) return pendingCache.value;
+  let value: number | null = null;
+  try {
+    const scan = await scanMigrations();
+    // An unreachable database, or one Sophira has no channel to, is not "up to date".
+    value = scan.reachable ? scan.pending.length : null;
+  } catch {
+    value = null;
+  }
+  pendingCache = { at: now, value };
+  return value;
+}
+
 export default async function OwnerPage() {
   const supabase = createClient();
   // Shared session validation (redirect-loop fix): a dead session is
@@ -143,6 +175,7 @@ export default async function OwnerPage() {
     requestsWaiting: roster.requestsAvailable ? requests.length : null,
     suspendedMembers,
     databaseOutdated: roster.directoryMissing,
+    databasePending: await databasePendingCount(),
     membersUnreadable: Boolean(roster.statsError),
     aiReady: Boolean(pageDiag.activeProvider),
     microsoftReady: setup.microsoft,

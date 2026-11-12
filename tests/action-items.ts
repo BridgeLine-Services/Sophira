@@ -23,6 +23,32 @@ export function runActionItemTests(
       "action items: the count and the urgent flag agree with the empty list");
   }
 
+  section("1b. A real count of missing updates reaches the Owner (2026-11-11)");
+  {
+    const two = buildActionItems({ ...HEALTHY, databasePending: 2 });
+    assert(two.length === 1 && two[0].key === "database" && two[0].tone === "urgent",
+      "action items: a database missing two updates produces one urgent item");
+    assert(two[0].body.includes("2 updates"),
+      "action items: the item says how many, because a number is what tells the owner this is small");
+    assert(!two[0].body.toLowerCase().includes("sql") && two[0].href === "/owner/database",
+      "action items: it names no technical word and points at the database page");
+
+    const one = buildActionItems({ ...HEALTHY, databasePending: 1 });
+    assert(one.length === 1 && one[0].body.includes("one update") && !one[0].body.includes("1 update"),
+      "action items: one missing update is written as \"one update\", not as \"1 update\"");
+
+    assert(buildActionItems({ ...HEALTHY, databasePending: 0 }).length === 0,
+      "action items: an up-to-date database produces nothing");
+    assert(buildActionItems({ ...HEALTHY, databasePending: null }).length === 0,
+      "action items: a scan that could not be read claims nothing, rather than inventing an update");
+
+    const both = buildActionItems({ ...HEALTHY, databasePending: 3, databaseOutdated: true });
+    assert(both.filter((i) => i.key === "database").length === 1,
+      "action items: the count and the older signal never produce two items for one problem");
+    assert(both[0].body.includes("3 updates"),
+      "action items: the known count wins over the older guess");
+  }
+
   section("2. A database that has not been updated is said so, in the Owner's language");
   {
     const items = buildActionItems({ ...HEALTHY, databaseOutdated: true });

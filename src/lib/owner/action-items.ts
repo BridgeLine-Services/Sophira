@@ -41,6 +41,12 @@ export interface ActionInputs {
   suspendedMembers: number | null;
   /** True when the newest database pieces are not installed (a directory read failed as missing). */
   databaseOutdated: boolean;
+  /**
+   * How many database updates this database is actually missing, from a scan of its own
+   * markers. Null (or absent) means the scan could not be read, and then nothing is claimed -
+   * "could not ask" is not "up to date".
+   */
+  databasePending?: number | null;
   /** True when membership statistics could not be loaded at all. */
   membersUnreadable: boolean;
   /** True when the AI service has an active provider. */
@@ -96,7 +102,32 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
   const urgent: ActionItem[] = [];
   const info: ActionItem[] = [];
 
-  if (input.databaseOutdated) {
+  // A KNOWN NUMBER BEATS A GUESS (2026-11-11). The old signal only fired when a member read
+  // failed, which never happens for an update that merely adds things - so a database missing
+  // two updates said nothing at all. When the real count is known it is used, and the older
+  // signal is not repeated as a second item saying the same thing.
+  const pendingUpdates =
+    typeof input.databasePending === "number" && input.databasePending > 0
+      ? input.databasePending
+      : null;
+
+  if (pendingUpdates !== null) {
+    urgent.push({
+      key: "database",
+      tone: "urgent",
+      title: "Your database needs its newest update",
+      body:
+        `Sophira asked your database what it has and found ${
+          pendingUpdates === 1 ? "one update" : `${pendingUpdates} updates`
+        } it has not been given yet. ` +
+        "Nothing has been lost, and nobody's access has changed. An update only adds things, " +
+        "and pressing the button twice is safe. Until they are in, some pages say a fact is " +
+        "\"not recorded\" or \"not measured\" instead of showing it.",
+      href: "/owner/database",
+      linkLabel: "Open the database page",
+      membersAffected: true,
+    });
+  } else if (input.databaseOutdated) {
     urgent.push({
       key: "database",
       tone: "urgent",
