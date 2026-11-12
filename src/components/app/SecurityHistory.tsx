@@ -1,150 +1,256 @@
-"use client";
-
-import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Badge } from "@/components/ui/Badge";
+import {
+  auditHref,
+  describeAction,
+  hasFilters,
+  RECORDED_ACTIONS,
+  type AuditEntry,
+  type AuditFilters,
+  type AuditQueryResult,
+} from "@/lib/owner/audit-page";
 
 /**
- * SECURITY HISTORY, SEARCHABLE (2026-11-13).
+ * SECURITY HISTORY, SEARCHABLE AND PAGED (2026-11-13; server-side filters 2026-11-11).
  *
- * The role-change audit was readable only as the last few rows on the Members page, which is the
- * wrong shape for the question an owner actually asks: "did anything happen that I did not
- * expect?" It now has its own searchable list.
+ * The browser no longer receives the whole history and filters it. It asks for one page, and the
+ * database applies the date range, the kind of event, the administrator, the member and the
+ * outcome. That is both less data on the wire and a search that reaches further back than the
+ * first screenful.
  *
  * Two rules the interface keeps:
  *   - a REFUSED change is shown, not hidden: "Sophira stopped this" is the entry an owner most
  *     needs to see;
- *   - searching filters what is already recorded. Nothing is re-read, re-sorted by guess or
- *     summarised by the client, so what you see is exactly what the server returned.
+ *   - an empty result is described as "nothing matched", never as "nothing happened".
+ *
+ * The filters are a plain form, so the page works without JavaScript and the back button behaves.
  */
-
-export interface SecurityHistoryEntry {
-  id: string;
-  at: string;
-  actorName: string;
-  targetName: string;
-  fromRole: string;
-  toRole: string;
-  success: boolean;
-  reason: string | null;
-}
-
-export function SecurityHistory({
-  entries,
-  available,
-}: {
-  entries: SecurityHistoryEntry[];
-  available: boolean;
-}) {
-  const [query, setQuery] = useState("");
-  const [refusalsOnly, setRefusalsOnly] = useState(false);
-
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return entries.filter((entry) => {
-      if (refusalsOnly && entry.success) return false;
-      if (!needle) return true;
-      const haystack = [
-        entry.actorName,
-        entry.targetName,
-        entry.fromRole,
-        entry.toRole,
-        entry.reason ?? "",
-        entry.success ? "allowed changed" : "refused blocked stopped",
-        formatWhen(entry.at),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(needle);
-    });
-  }, [entries, query, refusalsOnly]);
-
-  if (!available) {
-    return (
-      <Card>
-        <CardContent className="p-4 text-sm text-ink-soft">
-          This database cannot show a change history yet, so none is displayed. That is different
-          from &quot;nothing has happened&quot;: Sophira is not going to claim a quiet history it
-          cannot read.
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <label className="flex-1">
-          <span className="sr-only">Search the change history</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by person, role or reason"
-            className="w-full rounded-card border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-sm text-ink-soft">
-          <input
-            type="checkbox"
-            checked={refusalsOnly}
-            onChange={(event) => setRefusalsOnly(event.target.checked)}
-            className="h-4 w-4 rounded border-line"
-          />
-          Only refusals
-        </label>
-      </div>
-
-      <p className="text-xs text-ink-soft" role="status">
-        {visible.length === entries.length
-          ? `${entries.length} ${entries.length === 1 ? "entry" : "entries"} recorded.`
-          : `Showing ${visible.length} of ${entries.length} entries.`}
-      </p>
-
-      {entries.length === 0 ? (
-        <EmptyState
-          icon={<span aria-hidden className="text-lg">·</span>}
-          title="No role changes recorded yet"
-          description="When someone's role is changed, or Sophira refuses a change, it will appear here."
-        />
-      ) : visible.length === 0 ? (
-        <Card>
-          <CardContent className="p-4 text-sm text-ink-soft">
-            Nothing matches that search. Clear the box to see all {entries.length} entries.
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="divide-y divide-line p-0">
-            {visible.map((entry) => (
-              <div key={entry.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-baseline sm:gap-4">
-                <time className="shrink-0 text-xs text-ink-soft sm:w-40" dateTime={entry.at}>
-                  {formatWhen(entry.at)}
-                </time>
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
-                    {entry.success ? "Role changed" : "Change refused"}
-                    <Badge>{entry.success ? "allowed" : "refused"}</Badge>
-                  </p>
-                  <p className="mt-0.5 text-sm text-ink-soft">
-                    {entry.actorName} changed {entry.targetName} from {entry.fromRole} to {entry.toRole}.
-                  </p>
-                  {!entry.success && entry.reason && (
-                    <p className="mt-1 text-xs text-ink-soft">Sophira refused it: {entry.reason}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
 
 function formatWhen(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "Date not recorded";
   return date.toLocaleString();
+}
+
+function Entry({ entry }: { entry: AuditEntry }) {
+  return (
+    <div className="flex flex-col gap-1 p-4 sm:flex-row sm:items-baseline sm:gap-4">
+      <time className="shrink-0 text-xs text-ink-soft sm:w-40" dateTime={entry.at}>
+        {formatWhen(entry.at)}
+      </time>
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+          {describeAction(entry.action)}
+          <Badge>{entry.success ? "allowed" : "refused"}</Badge>
+        </p>
+        <p className="mt-0.5 text-sm text-ink-soft">
+          {entry.actorName} changed {entry.targetName} from {entry.fromRole} to {entry.toRole}.
+        </p>
+        {!entry.success && entry.reason && (
+          <p className="mt-1 text-xs text-ink-soft">Sophira refused it: {entry.reason}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function SecurityHistory({
+  result,
+  filters,
+  people,
+}: {
+  result: AuditQueryResult;
+  filters: AuditFilters;
+  people: Array<{ id: string; name: string }>;
+}) {
+  if (!result.available) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-sm text-ink-soft">
+          This database cannot show a change history yet, so none is displayed. That is different
+          from &quot;nothing has happened&quot;: Sophira is not going to claim a quiet history it
+          cannot read. Press <span className="font-medium text-ink">Update database</span> on the
+          database page to add it.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const filtered = hasFilters(filters);
+
+  return (
+    <div className="space-y-3">
+      <Card>
+        <CardContent className="p-4">
+          <form method="get" action="/owner/security" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <label className="text-xs text-ink-soft">
+              Search by person
+              <input
+                type="search"
+                name="q"
+                defaultValue={filters.search}
+                placeholder="Name or email"
+                className="mt-0.5 w-full rounded-card border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-soft"
+              />
+            </label>
+
+            <label className="text-xs text-ink-soft">
+              Kind of event
+              <select
+                name="action"
+                defaultValue={filters.action ?? ""}
+                className="mt-0.5 w-full rounded-card border border-line bg-card px-3 py-2 text-sm text-ink"
+              >
+                <option value="">Every recorded event</option>
+                {RECORDED_ACTIONS.map((action) => (
+                  <option key={action.value} value={action.value}>{action.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs text-ink-soft">
+              Outcome
+              <select
+                name="outcome"
+                defaultValue={filters.outcome ?? ""}
+                className="mt-0.5 w-full rounded-card border border-line bg-card px-3 py-2 text-sm text-ink"
+              >
+                <option value="">Allowed and refused</option>
+                <option value="allowed">Allowed only</option>
+                <option value="refused">Refused only</option>
+              </select>
+            </label>
+
+            <label className="text-xs text-ink-soft">
+              Administrator
+              <select
+                name="actor"
+                defaultValue={filters.actorId ?? ""}
+                className="mt-0.5 w-full rounded-card border border-line bg-card px-3 py-2 text-sm text-ink"
+              >
+                <option value="">Anyone</option>
+                {people.map((person) => (
+                  <option key={person.id} value={person.id}>{person.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs text-ink-soft">
+              Member affected
+              <select
+                name="target"
+                defaultValue={filters.targetId ?? ""}
+                className="mt-0.5 w-full rounded-card border border-line bg-card px-3 py-2 text-sm text-ink"
+              >
+                <option value="">Anyone</option>
+                {people.map((person) => (
+                  <option key={person.id} value={person.id}>{person.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs text-ink-soft">
+                From
+                <input
+                  type="date"
+                  name="from"
+                  defaultValue={filters.from ?? ""}
+                  className="mt-0.5 w-full rounded-card border border-line bg-card px-3 py-2 text-sm text-ink"
+                />
+              </label>
+              <label className="text-xs text-ink-soft">
+                To
+                <input
+                  type="date"
+                  name="to"
+                  defaultValue={filters.to ?? ""}
+                  className="mt-0.5 w-full rounded-card border border-line bg-card px-3 py-2 text-sm text-ink"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-end gap-2 sm:col-span-2 xl:col-span-3">
+              <button
+                type="submit"
+                className="rounded-card border border-line bg-card px-3 py-2 text-sm font-medium text-ink hover:bg-accent/5"
+              >
+                Show matching entries
+              </button>
+              {filtered && (
+                <Link href="/owner/security" className="px-2 py-2 text-sm text-accent hover:underline">
+                  Clear the filters
+                </Link>
+              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-ink-soft" role="status">
+        {result.total === 0
+          ? filtered
+            ? "No recorded entry matches those filters."
+            : "No entry is recorded yet."
+          : `${result.total.toLocaleString("en-US")} ${result.total === 1 ? "entry matches" : "entries match"}. Showing page ${result.page} of ${result.pageCount}.`}
+      </p>
+
+      {result.error && (
+        <Card>
+          <CardContent className="p-4 text-sm text-ink-soft">{result.error}</CardContent>
+        </Card>
+      )}
+
+      {result.entries.length === 0 ? (
+        filtered ? (
+          <Card>
+            <CardContent className="p-4 text-sm text-ink-soft">
+              Nothing matches those filters. That is not a statement that nothing happened: widen the
+              dates or clear the filters to see the whole record.
+            </CardContent>
+          </Card>
+        ) : (
+          <EmptyState
+            icon={<span aria-hidden className="text-lg">·</span>}
+            title="No role changes recorded yet"
+            description="When someone's role is changed, or Sophira refuses a change, it will appear here."
+          />
+        )
+      ) : (
+        <Card>
+          <CardContent className="divide-y divide-line p-0">
+            {result.entries.map((entry) => (
+              <Entry key={entry.id} entry={entry} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {result.pageCount > 1 && (
+        <nav aria-label="Security history pages" className="flex flex-wrap items-center gap-2">
+          {result.page > 1 && (
+            <Link
+              href={auditHref(filters, { page: result.page - 1 })}
+              className="rounded-card border border-line bg-card px-3 py-1.5 text-sm text-ink hover:bg-accent/5"
+            >
+              Previous page
+            </Link>
+          )}
+          <span className="text-xs text-ink-soft">
+            Page {result.page} of {result.pageCount}
+          </span>
+          {result.page < result.pageCount && (
+            <Link
+              href={auditHref(filters, { page: result.page + 1 })}
+              className="rounded-card border border-line bg-card px-3 py-1.5 text-sm text-ink hover:bg-accent/5"
+            >
+              Next page
+            </Link>
+          )}
+        </nav>
+      )}
+    </div>
+  );
 }

@@ -171,12 +171,138 @@ if (!(await rpcRefusesAnon("presence_set_availability", { p_availability: "avail
   if (!unchanged) failed += 1;
 }
 
-record("INFO", "not checked here: a signed-in member appearing Online", "needs a member test account");
-record("INFO", "not checked here: RLS stopping one member reading another's rows", "verified at SQL level by npm run db:verify:local");
 record("INFO", "not checked here: which migration number the database is at", "Supabase does not expose its history table");
-record("INFO", "not checked here: a real invitation email arriving", "needs a working mail provider on the deployment");
+
+// ---------------------------------------------------------------------------
+// SIGNED-IN CHECKS (2026-11-11)
+//
+// Everything above asks the live project with the service key. These checks are different: they
+// need a REAL member session, because the whole point is what a signed-in member may and may not
+// do. Two states are used and neither is ever PASS:
+//
+//   BLOCKED  - the accounts to test with were not supplied, so nothing was attempted.
+//   NOT RUN  - the accounts exist but this check needs something this script does not do yet.
+//
+// Test accounts only. The Owner's own account must never be used as a disposable test account.
+// Set SOPHIRA_TEST_MEMBER_EMAIL / SOPHIRA_TEST_MEMBER_PASSWORD for one member, and optionally
+// SOPHIRA_TEST_MEMBER2_EMAIL / SOPHIRA_TEST_MEMBER2_PASSWORD for a second.
+// ---------------------------------------------------------------------------
+const MEMBER1 = {
+  email: process.env.SOPHIRA_TEST_MEMBER_EMAIL || "",
+  password: process.env.SOPHIRA_TEST_MEMBER_PASSWORD || "",
+};
+const MEMBER2 = {
+  email: process.env.SOPHIRA_TEST_MEMBER2_EMAIL || "",
+  password: process.env.SOPHIRA_TEST_MEMBER2_PASSWORD || "",
+};
+const ANON = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+function signedIn(state, name, detail) {
+  results.push({ state, name, detail });
+  console.log(`${state}  ${name}${detail ? ` — ${detail}` : ""}`);
+}
+
+/** Sign in with a test member's own credentials. Returns { token } or { error }. */
+async function signIn(account) {
+  if (!ANON) return { error: "no public key is available to sign in with" };
+  const res = await fetch(`${URL_BASE}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: ANON, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: account.email, password: account.password }),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body?.access_token) {
+    return { error: `sign-in was refused (HTTP ${res.status})` };
+  }
+  return { token: body.access_token };
+}
+
+/** Call an RPC as the member. */
+async function rpcAs(token, fn, args = {}) {
+  const res = await fetch(`${URL_BASE}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  const body = await res.json().catch(() => null);
+  return { status: res.status, body };
+}
+
+const SIGNED_IN_CHECKS = [
+  ["a signed-in member is allowed to report presence (heartbeat accepted)", "heartbeat"],
+  ["a signed-in member can read their own presence row", "own-presence"],
+  ["a member is refused the staff directory (network_directory)", "directory-refused"],
+  ["two devices from one member both keep the member Online", "multi-session"],
+  ["a heartbeat stops counting after the presence windows expire", "expiry"],
+  ["one member cannot read another member's presence or private rows", "cross-member"],
+  ["a User or Tester cannot perform a staff action (direct API call)", "role-restriction"],
+  ["a suspended account is refused a heartbeat", "suspended"],
+  ["a revoked account is refused a heartbeat", "revoked"],
+  ["a real invitation email arrives", "invitation-email"],
+];
+
+if (!MEMBER1.email || !MEMBER1.password) {
+  for (const [label] of SIGNED_IN_CHECKS) {
+    signedIn("BLOCKED", label, "no test member account was supplied, so this was not attempted");
+  }
+} else {
+  const session = await signIn(MEMBER1);
+  if (session.error) {
+    for (const [label] of SIGNED_IN_CHECKS) {
+      signedIn("BLOCKED", label, `the test member could not sign in: ${session.error}`);
+    }
+  } else {
+    // 1. The heartbeat must be accepted for a real member.
+    const beat = await rpcAs(session.token, "presence_heartbeat", { p_state: "online", p_connection: "connected" });
+    const beatOk = beat.status === 200 && !(beat.body && beat.body.ok === false);
+    signedIn(beatOk ? "PASS" : "FAIL", "a signed-in member is allowed to report presence (heartbeat accepted)", beatOk ? "the function accepted the member's own call" : `refused (HTTP ${beat.status})`);
+    if (!beatOk) failed += 1;
+
+    // 2. The member can read their own row.
+    const own = await rest("member_presence?select=user_id,state,last_seen_at&limit=1", {
+      headers: { Authorization: `Bearer ${session.token}`, apikey: ANON },
+    });
+    const ownOk = own.status === 200 && Array.isArray(own.body);
+    signedIn(ownOk ? "PASS" : "FAIL", "a signed-in member can read their own presence row", ownOk ? `${own.body.length} row(s) visible to the member` : `HTTP ${own.status}`);
+    if (!ownOk) failed += 1;
+
+    // 3. The staff directory must refuse a member.
+    const directory = await rpcAs(session.token, "network_directory");
+    const refused = directory.status >= 400 || (directory.body && directory.body.ok === false) || directory.body === null || (Array.isArray(directory.body) && directory.body.length === 0);
+    signedIn(refused ? "PASS" : "FAIL", "a member is refused the staff directory (network_directory)", refused ? `refused (HTTP ${directory.status})` : "the directory answered a member, which is a security failure");
+    if (!refused) failed += 1;
+
+    // The rest need a second session, time passing, or a suspended/revoked account. They are
+    // listed as NOT RUN rather than quietly dropped, and never as PASS.
+    for (const [label, key] of SIGNED_IN_CHECKS) {
+      if (["heartbeat", "own-presence", "directory-refused"].includes(key)) continue;
+      const reason =
+        key === "cross-member"
+          ? "needs BOTH test member accounts plus a private row to probe; the SQL-level RLS matrix is covered by npm run db:verify:local"
+          : key === "multi-session"
+            ? "needs two concurrent sessions for the same member"
+            : key === "expiry"
+              ? "needs the presence windows to elapse, which this read-only run cannot wait for"
+              : key === "invitation-email"
+                ? "needs a working mail provider on the deployment"
+                : key === "suspended" || key === "revoked"
+                  ? "needs a dedicated test account in that condition; Sophira will not suspend a real member to test"
+                  : "not implemented in this script yet";
+      signedIn("NOT RUN", label, reason);
+    }
+    if (MEMBER1.email === MEMBER2.email && MEMBER2.email) {
+      signedIn("NOT RUN", "the two test accounts are the same account", "supply a second, different member to test isolation");
+    }
+  }
+}
+
+const blocked = results.filter((r) => r.state === "BLOCKED").length;
+const notRun = results.filter((r) => r.state === "NOT RUN").length;
+const passed = results.filter((r) => r.state === "PASS").length;
 
 console.log("");
+console.log(`SUMMARY: ${passed} passed, ${failed} failed, ${blocked} blocked, ${notRun} not run.`);
+console.log("A blocked or unrun check is NOT a pass: the signed-in checks above only pass when a real member session proved them.");
 if (failed > 0) {
   console.log(`LIVE CHECK FAILED: ${failed} check(s) did not answer as expected. The app's presence and`);
   console.log("notification features need the database update at /owner/database before they can work.");

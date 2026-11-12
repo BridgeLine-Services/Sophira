@@ -53,18 +53,6 @@ export default function CreateOwnerPage() {
   // page repairs it on arrival. The owner never clicks "Check again" and
   // never needs to understand why it was needed.
   const [autoRepairTried, setAutoRepairTried] = useState(false);
-  useEffect(() => {
-    if (autoRepairTried) return;
-    if (status?.state === "SETUP_REQUIRED" && status.repair?.available) {
-      setAutoRepairTried(true);
-      void repair();
-    }
-    // `repair` is a plain function declared below, so its identity changes every
-    // render. It is listed for correctness; the autoRepairTried guard above is what
-    // keeps this a single automatic attempt.
-  }, [status, autoRepairTried, repair]);
-
-
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -77,12 +65,14 @@ export default function CreateOwnerPage() {
 
   useEffect(() => { refreshStatus(); }, [refreshStatus]);
 
-  const ownerExists = status?.probe?.ownerAccount === "active" || status?.probe?.ownerAccount === "revoked";
-  const mayCreate = status?.ownerCreation?.possible === true;
-  const needsRepair = status?.state === "SETUP_REQUIRED" && !ownerExists && status?.repair !== undefined;
-  const staleCount = typeof status?.staleAuthUsers === "number" ? status.staleAuthUsers : 0;
-
-  async function repair() {
+  // 2026-11-11: the automatic repair effect listed `repair` as a dependency while `repair` was a
+  // plain function declared below, so its identity changed on every render and the effect re-ran
+  // every render. The single-attempt guard kept it from firing twice, but the hook warning was
+  // real: the effect's dependency genuinely was unstable. `repair` is now a useCallback whose
+  // only dependency is refreshStatus, so the effect runs when the status changes and at no other
+  // time. Behaviour is unchanged: one automatic attempt, no repeats, and the manual button still
+  // calls exactly the same code.
+  const repair = useCallback(async () => {
     setRepairing(true);
     setRepairResult(null);
     try {
@@ -99,7 +89,20 @@ export default function CreateOwnerPage() {
     } finally {
       setRepairing(false);
     }
-  }
+  }, [refreshStatus]);
+
+  useEffect(() => {
+    if (autoRepairTried) return;
+    if (status?.state === "SETUP_REQUIRED" && status.repair?.available) {
+      setAutoRepairTried(true);
+      void repair();
+    }
+  }, [status, autoRepairTried, repair]);
+
+  const ownerExists = status?.probe?.ownerAccount === "active" || status?.probe?.ownerAccount === "revoked";
+  const mayCreate = status?.ownerCreation?.possible === true;
+  const needsRepair = status?.state === "SETUP_REQUIRED" && !ownerExists && status?.repair !== undefined;
+  const staleCount = typeof status?.staleAuthUsers === "number" ? status.staleAuthUsers : 0;
 
   async function cleanupStale() {
     setRepairing(true);

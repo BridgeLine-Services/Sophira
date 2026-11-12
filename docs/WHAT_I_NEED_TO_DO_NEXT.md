@@ -129,3 +129,19 @@ complete (private testing with invited users is fine meanwhile).
 - Owner Dashboard -> Invite someone. That is the whole step.
 
 That is everything. Everything else runs automatically.
+
+## Added 2026-11-11 (Owner Dashboard, membership and release work)
+
+1. **Press Update database once.** Migration 0052 (`provider_usage.latency_ms`) is not applied on
+   the live database yet. Until it is, AI request counts still work and the AI page says response
+   time is not measured rather than showing 0 ms.
+2. **Give me one test member account** (email + password you create for testing only, never the
+   Owner's account). Ten live checks are BLOCKED without it: a member appearing Online, two devices,
+   presence expiry, member-to-member isolation, suspended and revoked refusals, and a real
+   invitation email arriving.
+3. **Optional: repository secrets for scheduled backups.** The new daily workflow reports BLOCKED
+   (not failed) until these exist: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`.
+   Nothing is ever printed from them.
+4. **Optional: `SOPHIRA_TEST_MEMBER_EMAIL` / `SOPHIRA_TEST_MEMBER_PASSWORD`** (and a second
+   `..._MEMBER2_...`) make the signed-in half of `npm run verify:live-membership` run instead of
+   reporting BLOCKED.

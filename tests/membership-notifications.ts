@@ -362,8 +362,17 @@ export function runMembershipNotificationTests(
   assert(/console\.log\([^)]*\$\{KEY\}/.test(liveCheck) === false
       && /JSON\.stringify\(process\.env\)/.test(liveCheck) === false,
     "live check: the key value is never printed, only its name");
-  assert(liveCheck.includes("needs a member test account") && liveCheck.includes("npm run db:verify:local"),
-    "live check: it names the two things it cannot check instead of implying full coverage");
+  // 2026-11-11: the signed-in half was one INFO line saying "needs a member test account". It is
+  // now a real list with two distinct states - BLOCKED when the accounts were not supplied, NOT RUN
+  // when the check needs something the script cannot do yet - and neither may ever read as PASS.
+  assert(/signedIn\("BLOCKED"/.test(liveCheck) && /signedIn\("NOT RUN"/.test(liveCheck),
+    "live check: the signed-in checks report BLOCKED and NOT RUN as separate, non-passing states");
+  assert(!/signedIn\("PASS"/.test(liveCheck) || /SIGNED_IN_CHECKS\.includes/.test(liveCheck),
+    "live check: a signed-in check only reads PASS when a real member session proved it");
+  assert(liveCheck.includes("no test member account was supplied") && liveCheck.includes("npm run db:verify:local"),
+    "live check: it names what it cannot check, and points at the SQL-level RLS matrix instead of implying coverage");
+  assert(liveCheck.includes("SUMMARY:") && /blocked, \$\{notRun\} not run/.test(liveCheck),
+    "live check: the footer counts passed, failed, blocked and not run separately");
   assert(/"verify:live-membership": "node scripts\/verify-live-membership\.mjs"/.test(pkg),
     "live check: it is one npm command, so nobody has to reconstruct the probes by hand");
   // 2026-11-13: the AI response-time column is optional and additive, so its absence must read as

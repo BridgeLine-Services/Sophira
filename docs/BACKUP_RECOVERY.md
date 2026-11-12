@@ -71,3 +71,22 @@ the CI job and the runtime wizard detect the gap and apply the idempotent
 migrations. Status after fix: **code verified; live schema verification
 Blocked** until the owner runs /setup repair or configures the CI credentials —
 only then can "backspaces exists in production" be claimed as Verified.
+
+## Scheduled backups (2026-11-11)
+
+`/owner/backup` reads a report; something has to produce it. `.github/workflows/backup.yml` runs the
+same `scripts/backup-sophira.mjs` daily at 05:20 UTC and keeps the result as an artifact for seven
+days. It is a reporter, not a second backup: the script, its five steps and its refusal to call an
+incomplete backup "ok" are unchanged.
+
+- Missing secrets produce **BLOCKED**, not a red build. A repository that has not been given the
+  credentials should not look broken every night.
+- A run that is not verified opens **one** issue labelled `backup`, and the issue closes itself
+  when a later run is verified.
+- The artifact holds member records. It is retained for seven days and never published.
+
+Required secrets: `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL`), `SUPABASE_SERVICE_ROLE_KEY`,
+`DATABASE_URL`. Optional: `SOPHIRA_RESTORE_DRILL` (JSON from a restore rehearsal).
+
+A scheduled, verified backup is still **not** a rehearsed restore. Those remain two facts, and the
+Owner page shows them separately.

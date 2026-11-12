@@ -39,7 +39,8 @@
     "smoke:prod": "node scripts/smoke-prod.mjs",
     "bench:local": "node scripts/benchmark-local-model.mjs",
     "db:verify:local": "node scripts/verify-migrations-local.mjs",
-    "verify:live-membership": "node scripts/verify-live-membership.mjs"
+    "verify:live-membership": "node scripts/verify-live-membership.mjs",
+    "release:report": "node scripts/release-gate.mjs --report --json > docs/release-gate-report.json"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

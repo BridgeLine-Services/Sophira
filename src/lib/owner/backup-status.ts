@@ -281,6 +281,38 @@ export function buildBackupReport(input: BackupReportInput, nowIso: string = new
 /** Where the backup report is expected, and how it gets there - one source of truth. */
 export const BACKUP_REPORT_ENV = "SOPHIRA_BACKUP_REPORT";
 
+/**
+ * Did the backup verify the members' UPLOADED FILES as well as the database?
+ *
+ * A database dump does not include the files in storage, and the owner's page must not imply it
+ * does. The report records two components for this - the file listing and the file checksums -
+ * and both have to pass. Anything else (absent, failed, unreadable) is null or false, never a
+ * quiet yes.
+ */
+export function storageVerifiedIn(raw: string | null): boolean | null {
+  const text = (raw ?? "").trim();
+  if (!text) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const components = (parsed as { components?: unknown }).components;
+  if (!Array.isArray(components)) return null;
+  const byKey = new Map<string, unknown>();
+  for (const component of components) {
+    if (typeof component !== "object" || component === null) continue;
+    const key = (component as { key?: unknown }).key;
+    if (typeof key === "string") byKey.set(key, component);
+  }
+  const storage = byKey.get("storage") as { status?: unknown } | undefined;
+  const checksums = byKey.get("storage_checksums") as { status?: unknown } | undefined;
+  if (!storage || !checksums) return null;
+  return storage.status === "pass" && checksums.status === "pass";
+}
+
 export function readBackupReport(env: NodeJS.ProcessEnv = process.env): BackupReportInput {
   const raw = (env[BACKUP_REPORT_ENV] ?? "").trim();
   if (!raw) {

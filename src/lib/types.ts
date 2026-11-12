@@ -42,6 +42,8 @@ export interface Invitation {
   created_at: string;
   accepted_at: string | null;
   expires_at: string;
+  /** Delivery result recorded by the invitation email step (0036). Absent on older rows. */
+  email_status?: "sent" | "failed" | "not_configured" | null;
 }
 
 export interface InvitationRequest {

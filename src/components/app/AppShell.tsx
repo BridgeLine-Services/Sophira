@@ -85,6 +85,9 @@ const OWNER_NAV_GROUPS: Array<{
       { href: "/owner/features", label: "Feature health", icon: Sparkles },
       { href: "/owner/ai-operations", label: "AI operations", icon: Gauge },
       { href: "/owner/backup", label: "Backup and recovery", icon: HardDriveDownload },
+      // 2026-11-11: "is the app ready to go out?" had no single answer. The page reuses the
+      // release gate's own results; it is not a second gate.
+      { href: "/owner/release-readiness", label: "Release readiness", icon: ShieldCheck },
     ],
   },
   {

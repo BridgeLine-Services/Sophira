@@ -227,3 +227,16 @@ repository still ships its native shells. Both are now scanned, each with `build
 Known gap: `ios/App/App/AppDelegate.swift` is still not analysed. CodeQL Swift requires a
 macOS runner, which this repository does not use; adding one is a separate, deliberate change
 rather than a silent omission.
+
+## iOS Swift analysis (2026-11-11)
+
+CodeQL's Swift extractor runs only on macOS runners and cannot use `build-mode: none`, so it could
+not join the main multi-language CodeQL workflow. Rather than claim coverage that did not exist,
+`.github/workflows/codeql-swift.yml` adds a **separate macOS job**, run weekly and on demand - not
+on every push, because a macOS runner is the slowest and most expensive and a red Swift job should
+not block an unrelated change.
+
+The job analyses `ios/` with `security-and-quality` queries and no signing identity. If a future
+Xcode release requires signing to build, the job fails and this note stays: the gap is then real
+again and must not be described as covered. The main workflow continues to analyse actions,
+JavaScript/TypeScript, Java/Kotlin and Rust on every push, unchanged.

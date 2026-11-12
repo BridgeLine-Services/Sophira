@@ -23,6 +23,10 @@ import path from "node:path";
 const args = new Set(process.argv.slice(2));
 const FAST = args.has("--fast");
 const REPORT_ONLY = args.has("--report");
+// 2026-11-11: a machine-readable report, so the Owner's release-readiness page can show the SAME
+// results the gate produced instead of a second, drifting opinion. The JSON is written by the
+// release process and read by /owner/release-readiness.
+const JSON_OUT = args.has("--json");
 const SELF_TEST = args.has("--self-test");
 
 const STATUSES = ["PASS", "FAIL", "BLOCKED", "NOT RUN"];
@@ -500,12 +504,31 @@ function report() {
 // ---------------------------------------------------------------------------
 async function main() {
   if (SELF_TEST) return selfTest();
-  if (args.size !== (FAST ? 1 : 0) + (REPORT_ONLY ? 1 : 0)) {
-    console.error("usage: node scripts/release-gate.mjs [--fast] [--report] | --self-test");
+  if (args.size !== (FAST ? 1 : 0) + (REPORT_ONLY ? 1 : 0) + (JSON_OUT ? 1 : 0)) {
+    console.error("usage: node scripts/release-gate.mjs [--fast] [--report] [--json] | --self-test");
     process.exit(2);
   }
   runGate();
   await dbMigrations();
+  if (JSON_OUT) {
+    // Every status is preserved verbatim; nothing is promoted on the way out.
+    const counts = { PASS: 0, FAIL: 0, BLOCKED: 0, "NOT RUN": 0 };
+    for (const r of results) counts[r.status]++;
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      verdict: counts.PASS === results.length ? "GO" : "BLOCKED",
+      counts: {
+        total: results.length,
+        pass: counts.PASS,
+        fail: counts.FAIL,
+        blocked: counts.BLOCKED,
+        notRun: counts["NOT RUN"],
+      },
+      checks: results.map((r) => ({ id: r.id, name: r.name, status: r.status, detail: r.detail ?? "" })),
+    };
+    console.log(JSON.stringify(payload, null, 2));
+    process.exit(0);
+  }
   const { go, text } = report();
   console.log(text);
   if (REPORT_ONLY) process.exit(0);

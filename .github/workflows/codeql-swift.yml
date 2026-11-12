@@ -1,0 +1,59 @@
+name: CodeQL (Swift, macOS)
+
+# SWIFT ANALYSIS, FOR iOS SOURCE (2026-11-11).
+#
+# CodeQL's Swift extractor only runs on macOS runners and cannot use "build-mode: none", so it
+# cannot join the main CodeQL workflow (which analyses actions, JavaScript/TypeScript, Java/Kotlin
+# and Rust). Before this file, docs/SECURITY_DEPENDENCIES.md recorded the gap honestly: the iOS
+# AppDelegate.swift was not analysed at all.
+#
+# Two deliberate choices:
+#   1. MANUAL OR WEEKLY, NOT ON EVERY PUSH. A macOS runner is the most expensive and slowest
+#      runner available, and a red Swift job on a documentation commit would block unrelated work.
+#      The main CodeQL workflow keeps analysing everything else on every push.
+#   2. NO SIGNING. Analysis builds the app without any Apple developer identity. If the build
+#      needs signing on the runner, this job reports that rather than pretending to have run.
+#
+# If this job cannot build without signing, the gap stays documented as a limitation. It is never
+# reported as covered.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, Monday 05:00 UTC.
+    - cron: "0 5 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze-swift:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Is there Swift source to analyse?
+        id: has-swift
+        run: |
+          if find ios -name "*.swift" -print -quit 2>/dev/null | grep -q .; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No Swift source found; nothing to analyse."
+          fi
+
+      - uses: github/codeql-action/init@v3
+        if: steps.has-swift.outputs.found == 'true'
+        with:
+          languages: swift
+          queries: security-and-quality
+
+      - uses: github/codeql-action/autobuild@v3
+        if: steps.has-swift.outputs.found == 'true'
+
+      - uses: github/codeql-action/analyze@v3
+        if: steps.has-swift.outputs.found == 'true'
+        with:
+          category: "/language:swift"

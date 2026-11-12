@@ -34,6 +34,8 @@ export interface AnalyticsInvitation {
   status?: string | null;
   created_at?: string | null;
   accepted_at?: string | null;
+  /** 'sent' | 'failed' | 'not_configured' | null (copied links and older rows). */
+  email_status?: string | null;
 }
 
 export interface WeeklyPoint {

@@ -78,3 +78,23 @@ expose its history table).
 
 Result on 2026-11-13: all thirteen checks passed against the live project, and the live
 `member_presence` table holds recent heartbeats from real signed-in sessions.
+
+## `npm run verify:live-membership` — signed-in checks (2026-11-11)
+
+The script now has two halves with different states:
+
+- **Anonymous half** (service key): tables, columns, presence functions refusing an unsigned
+  caller, the staff directory refusing non-staff, and a before/after row count proving the probes
+  changed nothing. These are PASS or FAIL.
+- **Signed-in half**: a member appearing Online, two sessions, presence expiry, member-to-member
+  isolation, suspended and revoked refusals, a User/Tester being refused a staff action, and a real
+  invitation email.
+
+The signed-in half reports **BLOCKED** when no test member account is supplied and **NOT RUN** when
+the check needs something the script cannot do yet (a second concurrent session, time passing, a
+suspended test account, a mail provider). Neither state is ever counted as PASS, and the footer
+prints the four counts separately.
+
+Dedicated test accounts only: `SOPHIRA_TEST_MEMBER_EMAIL` / `SOPHIRA_TEST_MEMBER_PASSWORD`, and
+optionally `SOPHIRA_TEST_MEMBER2_EMAIL` / `SOPHIRA_TEST_MEMBER2_PASSWORD`. The Owner's production
+account is never used as a test account, and no production member record is created or modified.

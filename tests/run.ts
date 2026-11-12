@@ -106,6 +106,7 @@ import { runMemberIdentityTests } from "./member-identity";
 import { runMembershipRoleTests } from "./membership-roles";
 import { runMemberPresenceTests } from "./member-presence";
 import { runActionItemTests } from "./action-items";
+import { runOwnerReadinessTests } from "./owner-readiness";
 import { runOwnerCommandCenterTests } from "./owner-command-center";
 import { runMembershipNotificationTests } from "./membership-notifications";
 import { runMemberRefreshContractTests } from "./member-refresh-contract";
@@ -5483,5 +5484,9 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     // 2026-11-13: the owner's command centre - AI operations, feature health, analytics and
     // backup - where a wrong "everything is fine" is the failure that matters.
     runOwnerCommandCenterTests(assert, section);
+  }).then(async () => {
+    // 2026-11-11: release readiness, reporting periods, delivery and the searchable audit page -
+    // where showing "ready" without evidence is the failure that matters.
+    runOwnerReadinessTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

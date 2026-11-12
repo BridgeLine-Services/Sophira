@@ -1,0 +1,136 @@
+name: Scheduled backup
+
+# AUTOMATED BACKUP (2026-11-11).
+#
+# The backup tool existed but nothing ran it, so "are backups working?" had no answer that was
+# not a guess. This workflow runs the SAME script the owner's Backup page documents - it does not
+# implement a second backup - once a day, and keeps the result as a downloadable artifact.
+#
+# Three rules, because a backup that lies is worse than no backup:
+#   1. Missing credentials produce BLOCKED, never a green run and never a false failure. A repo
+#      without the secrets should not show a red build every night.
+#   2. A real verification failure FAILS the job and opens one pinned issue, so it is not missed.
+#   3. No credential value is ever printed. The script refuses to write secrets into a manifest,
+#      and this workflow only echoes the script's own summary.
+#
+# Secrets this needs (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL   the project address
+#   SUPABASE_SERVICE_ROLE_KEY                  read access to the database and the files
+#   DATABASE_URL                               direct database connection for identities
+# Optional:
+#   SOPHIRA_RESTORE_DRILL                      JSON from a restore rehearsal (see docs/BACKUP_RECOVERY.md)
+
+on:
+  schedule:
+    # Daily at 05:20 UTC, before the weekly health check.
+    - cron: "20 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+
+      - name: Do we have what a backup needs?
+        id: preflight
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          missing=""
+          [ -z "$SUPABASE_URL" ] && missing="$missing the project address,"
+          [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && missing="$missing permission to read files,"
+          [ -z "$DATABASE_URL" ] && missing="$missing a direct database connection,"
+          if [ -n "$missing" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "BLOCKED: this repository is missing$missing so no backup can be taken from here."
+            echo "Nothing failed. Add the missing values as repository secrets (docs/BACKUP_RECOVERY.md)."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Take the backup and verify it
+        id: backup
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SOPHIRA_RESTORE_DRILL: ${{ secrets.SOPHIRA_RESTORE_DRILL }}
+        run: |
+          set +e
+          node scripts/backup-sophira.mjs --run --out backups | tee backup-output.txt
+          code=${PIPESTATUS[0]}
+          echo "exit=$code" >> "$GITHUB_OUTPUT"
+          # 0 = verified, 3 = incomplete, 2 = blocked, 1 = verification failed.
+          if [ "$code" = "0" ]; then echo "status=verified" >> "$GITHUB_OUTPUT"; fi
+          if [ "$code" = "3" ]; then echo "status=incomplete" >> "$GITHUB_OUTPUT"; fi
+          if [ "$code" = "2" ]; then echo "status=blocked" >> "$GITHUB_OUTPUT"; fi
+          if [ "$code" = "1" ]; then echo "status=failed" >> "$GITHUB_OUTPUT"; fi
+          exit 0
+
+      - name: Keep the backup as evidence
+        if: steps.backup.outputs.status == 'verified' || steps.backup.outputs.status == 'incomplete'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sophira-backup
+          path: backups/
+          # A backup is sensitive: it holds member records. Kept briefly, never published.
+          retention-days: 7
+
+      - name: Say the result in plain words
+        if: steps.preflight.outputs.ready == 'true'
+        run: |
+          echo "BACKUP RESULT: ${{ steps.backup.outputs.status }}"
+
+      - name: Open or update one issue when a backup is not verified
+        if: steps.backup.outputs.status == 'incomplete' || steps.backup.outputs.status == 'failed'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = "${{ steps.backup.outputs.status }}";
+            const title = "Backup is not verified";
+            const body = [
+              "The scheduled backup did not come out verified (`" + status + "`).",
+              "",
+              "A backup that is not verified is not a backup. The run's artifact and log show which step",
+              "did not pass; docs/BACKUP_RECOVERY.md lists the steps in order, in plain language.",
+              "",
+              "This issue closes itself when a scheduled run is verified.",
+            ].join("\n");
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: "open", labels: "backup",
+            });
+            const found = existing.data.find((i) => i.title === title);
+            if (found) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: found.number, body });
+            } else {
+              await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ["backup"] });
+            }
+
+      - name: Close the backup issue when a run is verified
+        if: steps.backup.outputs.status == 'verified'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: "open", labels: "backup",
+            });
+            for (const issue of open.data.filter((i) => i.title === "Backup is not verified")) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number,
+                body: "A scheduled backup is verified again. Closing this.",
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number, state: "closed",
+              });
+            }

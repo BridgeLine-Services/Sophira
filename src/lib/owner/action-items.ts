@@ -58,6 +58,19 @@ export interface ActionInputs {
   legalIncomplete?: boolean | null;
   /** AI requests that failed in the recent window, or null when that was not read. */
   aiFailures?: number | null;
+  /**
+   * Whether a restore has ever been rehearsed. Optional so older callers keep compiling; when it
+   * is undefined nothing is claimed, because "not asked" is not "not done".
+   */
+  restoreRehearsed?: boolean | null;
+  /** Whether the uploaded files were included in a verified backup; null when unknown. */
+  storageVerified?: boolean | null;
+  /** Release checks that have not run, or null when there is no report to count. */
+  securityChecksNotRun?: number | null;
+  /** The release-readiness word, or null when it could not be worked out. */
+  release?: "READY" | "NOT READY" | "BLOCKED" | "UNKNOWN" | null;
+  /** True when the Canvas connection is registered. Optional; undefined claims nothing. */
+  canvasReady?: boolean;
 }
 
 const BODY_LIMIT = 400;
@@ -248,6 +261,100 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
         "This matters before you invite people outside your own household.",
       href: "/owner/status",
       linkLabel: "See what is outstanding",
+      membersAffected: false,
+    });
+  }
+
+  // RESTORE AND STORAGE (2026-11-11). The backup item above speaks about the whole picture. These
+  // two speak about the parts an owner cannot infer from "a backup ran", and they are only added
+  // when a report genuinely exists - otherwise the backup item already says the picture is missing
+  // and a second sentence would just repeat it.
+  if (input.backup?.reported) {
+    if (input.restoreRehearsed === false) {
+      info.push({
+        key: "restore-rehearsal",
+        tone: "info",
+        title: "A backup has never been restored in a test",
+        body:
+          "A backup exists, but nobody has proved it can be put back. Until one is restored somewhere " +
+          "that is not your live site, recovery is a hope rather than a fact. The Backup page lists " +
+          "the steps in order and keeps your live data untouched.",
+        href: "/owner/backup",
+        linkLabel: "Open Backup and recovery",
+        membersAffected: false,
+      });
+    }
+    if (input.storageVerified === false) {
+      info.push({
+        key: "storage-backup",
+        tone: "info",
+        title: "Your uploaded files are not proven to be backed up",
+        body:
+          "A database backup does not automatically include the files members uploaded. The backup " +
+          "report says the file copies were not verified, so a restore could bring back the records " +
+          "and lose the documents. No member sees a problem today.",
+        href: "/owner/backup",
+        linkLabel: "Open Backup and recovery",
+        membersAffected: false,
+      });
+    }
+  }
+
+  if (input.canvasReady === false) {
+    info.push({
+      key: "canvas",
+      tone: "info",
+      title: "Canvas import is not set up",
+      body:
+        "Members cannot bring their Canvas courses and due dates across automatically yet. Everything " +
+        "else works, including typing an assignment in by hand. It needs your Canvas developer details " +
+        "once, on the Integrations page.",
+      href: "/owner/integrations",
+      linkLabel: "Open Integrations",
+      membersAffected: false,
+    });
+  }
+
+  if (input.securityChecksNotRun !== null && input.securityChecksNotRun !== undefined && input.securityChecksNotRun > 0) {
+    info.push({
+      key: "security-checks",
+      tone: "info",
+      title: `${input.securityChecksNotRun} security ${input.securityChecksNotRun === 1 ? "check has" : "checks have"} not run`,
+      body:
+        "These checks prove that one member cannot reach another member's work. They have not been " +
+        "run, which is not the same as passing. The System Health page names what each one is waiting " +
+        "for.",
+      href: "/owner/health",
+      linkLabel: "Open System Health",
+      membersAffected: false,
+    });
+  }
+
+  // RELEASE (2026-11-11). Only when a readiness word could actually be worked out from a report.
+  if (input.release === "NOT READY") {
+    urgent.push({
+      key: "release",
+      tone: "urgent",
+      title: "A release cannot go out yet",
+      body:
+        "At least one release check failed, so publishing now would ship a known problem. The release " +
+        "page shows which check failed and what it protects. Members keep using the current version " +
+        "in the meantime.",
+      href: "/owner/release-readiness",
+      linkLabel: "Open Release readiness",
+      membersAffected: false,
+    });
+  } else if (input.release === "BLOCKED") {
+    info.push({
+      key: "release",
+      tone: "info",
+      title: "The release checks are not finished",
+      body:
+        "Some release checks are waiting on something that is not set up, or have not run. A blocked " +
+        "check is never counted as a pass, so Sophira will not call the next release ready. The release " +
+        "page lists them in the order they can be resolved.",
+      href: "/owner/release-readiness",
+      linkLabel: "Open Release readiness",
       membersAffected: false,
     });
   }

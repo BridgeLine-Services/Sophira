@@ -1,0 +1,259 @@
+{
+  "generatedAt": "2026-11-12T04:30:59.153Z",
+  "verdict": "BLOCKED",
+  "counts": {
+    "total": 41,
+    "pass": 25,
+    "fail": 1,
+    "blocked": 14,
+    "notRun": 1
+  },
+  "checks": [
+    {
+      "id": "production-url",
+      "name": "Production URL works",
+      "status": "FAIL",
+      "detail": "verify-deployment failed for https://sophira.vercel.app/: Deployment NOT ready: AI provider key.\nOptional: web-search provider (research degrades gracefully — not blocking)\n::error::Release blocked — the target deployment is not configured: AI provider key\n"
+    },
+    {
+      "id": "db-migrations",
+      "name": "Database migrations applied",
+      "status": "PASS",
+      "detail": "newest migration markers (0035-0038) verified in the LIVE production schema via REST — the strictly linear chain 0001-0038 is applied"
+    },
+    {
+      "id": "ai-provider",
+      "name": "AI provider configured",
+      "status": "BLOCKED",
+      "detail": "no AI provider configured — GEMINI_API_KEY (free tier) is the free path; OPENAI_API_KEY only counts when paid use is explicitly allowed"
+    },
+    {
+      "id": "search-provider",
+      "name": "Search provider configured",
+      "status": "BLOCKED",
+      "detail": "SEARCH_API_KEY is not configured (provider: brave)"
+    },
+    {
+      "id": "search-live",
+      "name": "Search provider live test passes",
+      "status": "BLOCKED",
+      "detail": "cannot live-test the search provider — SEARCH_API_KEY is not configured"
+    },
+    {
+      "id": "invitation-signup",
+      "name": "Invitation-only signup tested",
+      "status": "BLOCKED",
+      "detail": "SUPABASE_TEST_URL / SUPABASE_TEST_ANON_KEY / SUPABASE_TEST_SERVICE_ROLE_KEY are not configured — the live matrices cannot run — invitation-only signup has offline conformance (npm test §23) but is not LIVE-tested"
+    },
+    {
+      "id": "invitation-approval",
+      "name": "Invitation approval tested",
+      "status": "BLOCKED",
+      "detail": "SUPABASE_TEST_URL / SUPABASE_TEST_ANON_KEY / SUPABASE_TEST_SERVICE_ROLE_KEY are not configured — the live matrices cannot run — the owner approval path is not LIVE-tested"
+    },
+    {
+      "id": "owner-privacy",
+      "name": "Owner privacy tested",
+      "status": "BLOCKED",
+      "detail": "SUPABASE_TEST_URL / SUPABASE_TEST_ANON_KEY / SUPABASE_TEST_SERVICE_ROLE_KEY are not configured — the live matrices cannot run — owner-sees-aggregates-only is not LIVE-tested"
+    },
+    {
+      "id": "rls-isolation",
+      "name": "RLS isolation tested",
+      "status": "BLOCKED",
+      "detail": "SUPABASE_TEST_URL / SUPABASE_TEST_ANON_KEY / SUPABASE_TEST_SERVICE_ROLE_KEY are not configured — the live matrices cannot run — RLS isolation is not LIVE-tested"
+    },
+    {
+      "id": "student-isolation",
+      "name": "Student-to-student isolation tested",
+      "status": "BLOCKED",
+      "detail": "SUPABASE_TEST_URL / SUPABASE_TEST_ANON_KEY / SUPABASE_TEST_SERVICE_ROLE_KEY are not configured — the live matrices cannot run — cross-student isolation is not LIVE-tested"
+    },
+    {
+      "id": "writing-profile",
+      "name": "Writing profile tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §3/§5 (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "teacher-rules",
+      "name": "Teacher-specific rules tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §1/§4 (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "teacher-override-habits",
+      "name": "Teacher rules override old personal habits",
+      "status": "PASS",
+      "detail": "offline suite green — suite §8/§12a + §18 conflict loop (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "learning-corrections",
+      "name": "Learning corrections tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §9-§12 (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "stale-patterns",
+      "name": "Learning stale-pattern detection tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §8d + §18 decay (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "typing-test",
+      "name": "Typing test tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §13/§15d (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "typing-paced",
+      "name": "Typing-paced output tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §14/§15b (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "deadline-scheduler",
+      "name": "Deadline scheduler tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §15/§15c (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "break-session-state",
+      "name": "Persisted break/session state tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §19 execution state machine (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "rubric-audit",
+      "name": "Rubric audit tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §15e (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "submission-readiness",
+      "name": "Submission readiness gate tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §15j/§15k + §16b-§16d (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "research-retrieval",
+      "name": "Research retrieval tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §15i (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "claim-to-source",
+      "name": "Claim-to-source verification tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §16b (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "citation-integrity",
+      "name": "Citation integrity tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §15h/§16d (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "source-authority",
+      "name": "Source authority ranking tested",
+      "status": "PASS",
+      "detail": "offline suite green — suite §16c (npm test RESULTS: 7129 passed, 0 failed, 7129 total)"
+    },
+    {
+      "id": "pwa-android",
+      "name": "PWA tested on Android",
+      "status": "BLOCKED",
+      "detail": "docs/DEVICE_ACCEPTANCE.md row is NOT TESTED — NOT TESTED — no physical device available"
+    },
+    {
+      "id": "pwa-iphone",
+      "name": "PWA tested on iPhone",
+      "status": "BLOCKED",
+      "detail": "docs/DEVICE_ACCEPTANCE.md row is NOT TESTED — NOT TESTED — no physical device available to the agent"
+    },
+    {
+      "id": "apk-built",
+      "name": "APK built if supported",
+      "status": "NOT RUN",
+      "detail": "no built APK found — run the android Gradle build (see docs/NATIVE_BUILDS.md) before deployment"
+    },
+    {
+      "id": "apk-device",
+      "name": "APK tested on physical Android device if available",
+      "status": "BLOCKED",
+      "detail": "docs/DEVICE_ACCEPTANCE.md row is NOT TESTED — NOT TESTED — requires release APK + real deployment URL (SOPHIRA_APP_URL)"
+    },
+    {
+      "id": "native-url",
+      "name": "Native URL configured",
+      "status": "PASS",
+      "detail": "native shells resolve a valid production URL (release mode)"
+    },
+    {
+      "id": "capacitor-versions",
+      "name": "Capacitor versions aligned",
+      "status": "PASS",
+      "detail": "all @capacitor/* toolchain packages are on major 8 (@capacitor/android@^8.5.2, @capacitor/app@^8.1.1, @capacitor/camera@^8.2.4, @capacitor/core@^8.5.2, @capacitor/ios@^8.5.2, @capacitor/cli@^8.4.3)"
+    },
+    {
+      "id": "legal-placeholders",
+      "name": "Legal placeholders removed or explicitly blocked pending owner input",
+      "status": "BLOCKED",
+      "detail": "legal documents still carry unresolved owner-fact placeholders (see docs/legal/LEGAL_CONFIGURATION.md) — explicitly blocked pending owner input; agent must not invent them"
+    },
+    {
+      "id": "prod-env",
+      "name": "Production environment variables verified",
+      "status": "BLOCKED",
+      "detail": "missing production environment variables: SEARCH_API_KEY"
+    },
+    {
+      "id": "no-secrets",
+      "name": "No secrets committed",
+      "status": "PASS",
+      "detail": "no secret patterns in 893 tracked files (private keys, sk-/rk-, AWS, ghp_, xox)"
+    },
+    {
+      "id": "npm-test",
+      "name": "npm test passes",
+      "status": "PASS",
+      "detail": "npm test RESULTS: 7129 passed, 0 failed, 7129 total"
+    },
+    {
+      "id": "npm-build",
+      "name": "npm build passes",
+      "status": "PASS",
+      "detail": "next build succeeded"
+    },
+    {
+      "id": "secret-scan",
+      "name": "Client bundle secret scan passes",
+      "status": "PASS",
+      "detail": "client chunks / SW / native assets contain no secret names (OPENAI_API_KEY, GEMINI_API_KEY, SEARCH_API_KEY, SUPABASE_SERVICE_ROLE_KEY)"
+    },
+    {
+      "id": "typecheck",
+      "name": "Type checking passes",
+      "status": "PASS",
+      "detail": "tsc --noEmit clean"
+    },
+    {
+      "id": "security-tests",
+      "name": "Security tests pass",
+      "status": "BLOCKED",
+      "detail": "security suites pass offline; SUPABASE_TEST_URL / SUPABASE_TEST_ANON_KEY / SUPABASE_TEST_SERVICE_ROLE_KEY are not configured — the live matrices cannot run"
+    },
+    {
+      "id": "ai-evals",
+      "name": "Offline AI evaluation suite passes",
+      "status": "PASS",
+      "detail": "deterministic academic corpus passes; live-model cases are skipped, never counted as passes"
+    },
+    {
+      "id": "info-scope",
+      "name": "Information-scope boundary tests pass",
+      "status": "PASS",
+      "detail": "restricted government material and SSRF destinations are refused in code; lawful .gov research still allowed"
+    }
+  ]
+}

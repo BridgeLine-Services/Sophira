@@ -56,6 +56,9 @@ const nextConfig = {
     "/terms": ["./docs/legal/TERMS_OF_SERVICE.md"],
     "/privacy": ["./docs/legal/PRIVACY_POLICY.md"],
     "/license": ["./LICENSE"],
+    // The owner's release-readiness page reads the gate's machine-readable report. Without this,
+    // a serverless deployment would not include the file and the page would always say "unknown".
+    "/owner/release-readiness": ["./docs/release-gate-report.json"],
   },
 };
 export default nextConfig;

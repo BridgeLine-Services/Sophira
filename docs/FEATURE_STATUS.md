@@ -161,3 +161,20 @@ and now also reports whether migration 0052 has been applied. It has **not**: th
 the AI Operations page says response time is not measured yet, and the usage insert now retries
 without the column so an un-applied migration cannot silently stop usage logging. To get response
 times, the owner presses **Update database** on the Owner Dashboard.
+
+## Owner command centre additions (2026-11-11)
+
+Five things the Owner could not previously see, now on their own pages. Every one of them refuses
+to show a number it did not read.
+
+| Area | Page | What it says, and what it refuses to say |
+|---|---|---|
+| Release readiness | `/owner/release-readiness` | Deployment, application, database, security, recovery and legal, side by side. The verdict is READY only when a stored release report exists, is less than a week old, and every check in it passed. No report means UNKNOWN. No deploy or rollback buttons exist. |
+| Network analytics | `/owner/analytics` | Reporting periods of 7 / 30 / 90 days or a chosen range; membership, invitations, AI requests per day, response time (measured only), provider mix, invitation delivery and a per-feature footprint. A feature with no record says "not measured" instead of 0. |
+| Security history | `/owner/security` | Role changes and refusals, filtered and paged **by the database**: date range, kind of event, administrator, member, allowed or refused. Sign-ins, invitation emails, suspensions and integration changes are listed as NOT recorded rather than shown as quiet. |
+| Backup | `/owner/backup` | Unchanged five-step picture (tooling, configured, completed, verified, restore rehearsal), now fed by a scheduled workflow (`.github/workflows/backup.yml`) that runs the existing script daily and opens one issue when a run is not verified. |
+| Action list | `/owner` | Adds: an unrehearsed restore, unverified uploaded files, an unconfigured Canvas connection, unrun security checks and an unfinished release. Each is only shown when the underlying fact was actually read. |
+
+Status words used in the table above: **implemented and automated-tested** for the pure logic
+(`tests/owner-readiness.ts`), **live-verification pending** for anything that needs a signed-in
+member session or a live deployment.

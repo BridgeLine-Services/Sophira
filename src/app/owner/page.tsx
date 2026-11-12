@@ -13,10 +13,13 @@ import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
 import { capabilityRegistry, noUnexpectedCharges } from "@/lib/ai/capabilities";
 import { tallyPresenceStates } from "@/lib/owner/member-view";
 import { loadOwnerRoster } from "@/lib/owner/roster";
-import { buildBackupReport, readBackupReport } from "@/lib/owner/backup-status";
+import { buildBackupReport, readBackupReport, storageVerifiedIn } from "@/lib/owner/backup-status";
+import { quickReleaseWord, securityNotRunCount } from "@/lib/owner/release-readiness";
+import { readReleaseReport } from "@/lib/owner/release-report";
 import { countAiFailures, loadAiUsage } from "@/lib/owner/ai-usage";
 import { legalPlaceholdersRemain, loadLegalDoc } from "@/lib/legal";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
+import { canvasConfigured } from "@/lib/integrations/canvas";
 import { buildActionItems, describeUnreadableMembers } from "@/lib/owner/action-items";
 
 export const dynamic = "force-dynamic";
@@ -103,7 +106,16 @@ export default async function OwnerPage() {
   // Backups and legal paperwork are reported from real sources only: the backup report the
   // backup tool leaves behind, and the actual legal documents on disk. If either cannot be read,
   // nothing is claimed about it (null), rather than an invented "needs attention".
-  const backupReport = buildBackupReport(readBackupReport());
+  const backupSource = readBackupReport();
+  const backupReport = buildBackupReport(backupSource);
+  // Whether the uploaded FILES were verified is a separate fact from whether a database backup
+  // ran; the overview says nothing about it when the report does not record it.
+  const storageVerified = storageVerifiedIn(backupSource.raw);
+
+  // RELEASE (2026-11-11): read from the stored release report only - no database connection from
+  // the dashboard. No report means no release line at all, never an implied "all clear".
+  const release = quickReleaseWord(readReleaseReport().text);
+  const securityNotRun = securityNotRunCount(release.snapshot);
 
   // AI FAILURES (2026-11-13). Read through the same loader the AI Operations page uses, over the
   // last week, so "the AI is failing requests" reaches this list instead of hiding on a page the
@@ -130,6 +142,12 @@ export default async function OwnerPage() {
     backup: { recoverable: backupReport.recoverable, reported: backupReport.reported },
     legalIncomplete,
     aiFailures,
+    restoreRehearsed: backupReport.reported ? Boolean(backupReport.lastRestoreTestAt) : null,
+    storageVerified,
+    securityChecksNotRun: securityNotRun,
+    release: release.word,
+    // Undefined (not false) when the integration picture could not be read, so no item is invented.
+    canvasReady: canvasConfigured(),
   });
 
   return (

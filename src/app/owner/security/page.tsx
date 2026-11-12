@@ -6,14 +6,10 @@ import { requireOwnerPage } from "@/lib/owner/page-context";
 import { noUnexpectedCharges } from "@/lib/ai/capabilities";
 import { readAiEnv, paidAllowed } from "@/lib/ai/provider";
 import { loadOwnerRoster } from "@/lib/owner/roster";
-import { loadRoleAudit } from "@/lib/owner/role-audit";
+import { loadAuditPage, parseAuditFilters } from "@/lib/owner/audit-page";
 import { SecurityHistory } from "@/components/app/SecurityHistory";
 
 export const dynamic = "force-dynamic";
-
-/** How many audit entries the history page asks for. More than the Members panel's handful,
- *  because this page exists to be searched. */
-const HISTORY_LIMIT = 200;
 
 /**
  * Security and Billing (2026-11-03, phase 1; history added 2026-11-13). Reads the same
@@ -23,14 +19,24 @@ const HISTORY_LIMIT = 200;
  * The change history below is read with the signed-in staff member's own session, so the
  * database's own policy - not this page - decides who may see it.
  */
-export default async function OwnerSecurityPage() {
+export default async function OwnerSecurityPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { supabase } = await requireOwnerPage();
   const charges = noUnexpectedCharges(paidAllowed(readAiEnv()));
   const roster = await loadOwnerRoster(supabase);
   const names = new Map<string, string>(
     roster.members.map((m) => [m.user_id, m.display_name || m.email || "A member"]),
   );
-  const audit = await loadRoleAudit(supabase, names, HISTORY_LIMIT);
+  const filters = parseAuditFilters(await searchParams);
+  // ONE PAGE AT A TIME (2026-11-11): the filters and the paging are applied by the database, so
+  // the browser never receives a history it has to filter itself.
+  const audit = await loadAuditPage(supabase, names, filters);
+  const people = roster.members
+    .map((m) => ({ id: m.user_id, name: m.display_name || m.email || "A member" }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <AppShell title="Security and Billing" variant="owner">
@@ -62,7 +68,7 @@ export default async function OwnerSecurityPage() {
             Every role change Sophira has recorded, newest first, including the ones it refused.
             Search it whenever something about someone&apos;s access does not look right.
           </p>
-          <SecurityHistory entries={audit.changes} available={audit.available} />
+          <SecurityHistory result={audit} filters={filters} people={people} />
         </section>
 
         <Card>
@@ -81,6 +87,25 @@ export default async function OwnerSecurityPage() {
             </p>
             <p>
               Deeper verification lives on <Link href="/owner/health" className="text-accent hover:underline">System Health</Link>.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="space-y-2 p-4 text-sm text-ink-soft">
+            <p className="font-medium text-ink">What this history does and does not contain</p>
+            <p>
+              Recorded here: every role change, and every change Sophira refused, with who asked,
+              who was affected, and the moment it happened.
+            </p>
+            <p>
+              Not recorded yet: sign-ins and failed sign-in attempts, invitation emails, suspensions
+              and restorations, and integration changes. Sophira will not display those as
+              &quot;nothing happened&quot; while it does not keep them; they are listed here so you
+              know the difference between a quiet week and an unrecorded one.
+            </p>
+            <p>
+              This page is Owner-only. A Co-Owner can manage members, but not read this history.
             </p>
           </CardContent>
         </Card>
