@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
  * system instead of a stack of grey boxes.
  */
 const base =
-  "w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-[15px] text-ink shadow-e1 placeholder:text-ink-soft/60 transition-colors duration-150 ease-calm hover:border-ink-soft/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:bg-ink/5 disabled:shadow-none disabled:text-ink-soft min-h-[44px]";
+  "w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-[15px] text-ink shadow-e1 placeholder:text-ink-soft/60 transition-colors duration-150 ease-calm hover:border-ink-soft/40 focus:border-accent disabled:cursor-not-allowed disabled:bg-ink/5 disabled:shadow-none disabled:text-ink-soft min-h-[44px]";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...props }, ref) => <input ref={ref} className={cn(base, className)} {...props} />

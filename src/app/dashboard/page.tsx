@@ -544,25 +544,23 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </section>
 
 
-        <div id="learning-goals" className="dash-panel">
+        <section id="learning-goals" className="dash-panel" aria-labelledby="dashboard-goals-heading">
           <LearningGoals />
-        </div>
+        </section>
 
 
-<div className="dash-panel">
-        <RecentActivity events={activityEvents} />
+        <section className="dash-panel" aria-labelledby="dashboard-activity-heading">
+          <RecentActivity events={activityEvents} />
+        </section>
 
-        </div>
-
-        <div className="dash-panel">
+        <section className="dash-panel" aria-labelledby="dashboard-start-heading">
         {/* Primary actions */}
-        <section aria-labelledby="dashboard-start-heading">
           <h2 id="dashboard-start-heading" className="dash-panel-title">Ways to work</h2>
           <p className="dash-panel-sub mb-3 mt-1">Start with an assignment or ask a question. Your courses and teacher preferences stay in context.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <Link
               href="/assignments/new"
-              className="group flex min-h-24 flex-col justify-center gap-1.5 rounded-card bg-gradient-to-br from-accent to-accent-deep p-5 text-on-accent shadow-[0_12px_24px_rgba(81,69,232,0.18)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(81,69,232,0.24)] active:scale-[0.99]"
+              className="group flex min-h-24 flex-col justify-center gap-1.5 rounded-card bg-gradient-to-br from-accent to-accent-deep p-5 text-on-accent shadow-e2 transition duration-200 hover:-translate-y-0.5 hover:shadow-e3 active:scale-[0.99]"
             >
               <span className="flex items-center gap-2 font-semibold">
                 <FileText className="h-5 w-5" /> Start an assignment
@@ -581,9 +579,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
         </section>
 
-        </div>
-
-        <div className="dash-panel">
+        <section className="dash-panel" aria-labelledby="dashboard-quick-heading">
+        <h2 id="dashboard-quick-heading" className="dash-panel-title">Quick start</h2>
+        <p className="dash-panel-sub mb-3 mt-1">The other five ways in, one tap each.</p>
         {/* More ways to work — quick launch (all modes are real, from MODES) */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           {[
@@ -603,7 +601,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           ))}
         </div>
 
-        </div>
+        </section>
 
         {/* YOUR WORKSPACE: everything that keeps the learning running. Deliberately below the
             journey, because these are settings, not progress. */}
@@ -611,13 +609,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p className="dash-eyebrow">Your workspace</p>
           <p className="dash-hero-sub mt-1">Courses, teachers, your writing voice and notifications.</p>
         </div>
-        <div className="dash-panel">
+                <section className="dash-panel" aria-labelledby="dashboard-notifications-heading">
         {/* Your own notifications: a summary, not an administrative feed. */}
-        <section aria-labelledby="dashboard-notifications-heading">
+        <div>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2
               id="dashboard-notifications-heading"
-              className="flex items-center gap-2 text-base font-semibold text-ink"
+              className="dash-panel-title flex items-center gap-2"
             >
               <Bell className="h-4 w-4 text-accent" aria-hidden /> Notifications
             </h2>
@@ -659,13 +657,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </div>
             )}
           </div>
-        </section>
-
         </div>
 
-        <div className="dash-panel">
+        </section>
+
+        <section className="dash-panel" aria-labelledby="dashboard-memory-heading">
         {/* What I remember — real counts from your data (workflow §6) */}
-        <h2 className="mb-3 meta-strong">What I remember</h2>
+        <h2 id="dashboard-memory-heading" className="dash-panel-title">What I remember</h2>
+        <p className="dash-panel-sub mb-3 mt-1">The courses, teachers and rules Sophira works from when it helps you.</p>
         <p className="text-sm text-ink-soft">
           Working from <strong className="text-ink">{courses?.length ?? 0} course{(courses?.length ?? 0) === 1 ? "" : "s"}</strong>,{" "}
           <strong className="text-ink">{teachers?.length ?? 0} teacher{(teachers?.length ?? 0) === 1 ? "" : "s"}</strong> with their profiles,{" "}
@@ -676,11 +675,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           (<Link href="/learning" className="text-accent hover:underline">corrections &amp; methods</Link>).
         </p>
 
-        </div>
+        </section>
 
-        <div className="dash-panel">
-        {/* Pending profile changes */}
         {(pendingProposals ?? 0) > 0 && (
+        <section className="dash-panel" aria-labelledby="dashboard-proposals-heading">
+        <h2 id="dashboard-proposals-heading" className="dash-panel-title mb-3">Profile updates waiting for you</h2>
+        {/* Pending profile changes */}
           <Link href="/proposals" className="block">
             <Card className="border-accent/40 bg-accent-soft/40 transition hover:border-accent">
               <CardContent className="flex items-center gap-3 p-4">
@@ -697,13 +697,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </CardContent>
             </Card>
           </Link>
+        </section>
         )}
 
-        </div>
-
-        <div className="dash-panel">
-        {/* Learning & corrections shortcut */}
         {(activePatterns ?? 0) > 0 && (
+        <section className="dash-panel" aria-labelledby="dashboard-patterns-heading">
+        <h2 id="dashboard-patterns-heading" className="dash-panel-title mb-3">What Sophira has learned about your work</h2>
+        {/* Learning & corrections shortcut */}
           <Link href="/learning" className="block">
             <Card className="transition hover:border-accent/40">
               <CardContent className="flex items-center gap-3 p-4">
@@ -720,16 +720,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </CardContent>
             </Card>
           </Link>
+        </section>
         )}
 
-        </div>
-
-        <div className="dash-panel">
-        <div className="grid gap-6 xl:grid-cols-2">
+        {/* COURSES AND TEACHERS (2026-11-12): two unrelated lists, so two separate containers
+            instead of one card holding both. */}
+        {/* Two separate containers, side by side on a wide screen and stacked below it, so
+            courses and teachers never share one surface. */}
+        <div className="grid gap-3 xl:grid-cols-2">
+        <section className="dash-panel" aria-labelledby="dashboard-courses-heading">
         {/* My courses */}
-        <section>
+        <div>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-ink">My Courses</h2>
+            <h2 id="dashboard-courses-heading" className="dash-panel-title">My Courses</h2>
             {(courses?.length ?? 0) > 0 && (
               <Link href="/courses" className="text-sm text-accent hover:underline">All courses</Link>
             )}
@@ -761,12 +764,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               action={<Link href="/courses/new"><Button size="sm">Add your first course</Button></Link>}
             />
           )}
+        </div>
         </section>
 
+        <section className="dash-panel" aria-labelledby="dashboard-teachers-heading">
         {/* My teachers */}
-        <section>
+        <div>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-ink">My Teachers</h2>
+            <h2 id="dashboard-teachers-heading" className="dash-panel-title">My Teachers</h2>
             {(teachers?.length ?? 0) > 0 && (
               <Link href="/teachers" className="text-sm text-accent hover:underline">All teachers</Link>
             )}
@@ -797,15 +802,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               action={<Link href="/teachers/new"><Button size="sm">Add a teacher</Button></Link>}
             />
           )}
+        </div>
         </section>
-
-        </div>
         </div>
 
-        <div className="dash-panel">
+        <section className="dash-panel" aria-labelledby="dashboard-writing-heading">
         {/* Writing profile */}
-        <section>
-          <h2 className="mb-3 meta-strong">My Writing Profile</h2>
+        <div>
+          <h2 id="dashboard-writing-heading" className="dash-panel-title mb-3">My Writing Profile</h2>
           <Card>
             <CardContent className="flex items-start gap-3 p-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
@@ -831,14 +835,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               )}
             </CardContent>
           </Card>
+        </div>
         </section>
 
-        </div>
-
-        <div className="dash-panel">
+        <section className="dash-panel" aria-labelledby="dashboard-assignments-heading">
         {/* Recent assignments */}
-        <section>
-          <h2 className="mb-3 meta-strong">Recent assignments</h2>
+        <div>
+          <h2 id="dashboard-assignments-heading" className="dash-panel-title mb-3">Recent assignments</h2>
           {assignments?.length ? (
             <div className="divide-y divide-ink/5 rounded-card border border-line bg-card">
               {assignments.map((a) => (
@@ -858,15 +861,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               description="Your recent work and conversations will show up here."
             />
           )}
+        </div>
         </section>
 
-        </div>
-
-        <div className="dash-panel">
-        {/* Recent feedback */}
         {recentFeedback && recentFeedback.length > 0 && (
-          <section>
-            <h2 className="mb-3 meta-strong">Recent feedback</h2>
+          <section className="dash-panel" aria-labelledby="dashboard-feedback-heading">
+            <h2 id="dashboard-feedback-heading" className="dash-panel-title mb-3">Recent feedback</h2>
             <div className="divide-y divide-ink/5 rounded-card border border-line bg-card">
               {recentFeedback.map((f) => (
                 <div key={f.id} className="p-4">
@@ -881,8 +881,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </div>
           </section>
         )}
-
-        </div>
 
         {/* Footer links */}
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-5 text-sm text-ink-soft">
