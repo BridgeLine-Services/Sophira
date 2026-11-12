@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app/AppShell";
 import { MembersPanel } from "@/components/app/MembersPanel";
+import { PresenceSettings } from "@/components/app/PresenceSettings";
 import { requireStaffPage } from "@/lib/owner/page-context";
 import { loadOwnerRoster } from "@/lib/owner/roster";
 import { isRole } from "@/lib/roles";
+import { DEFAULT_THRESHOLDS } from "@/lib/presence/thresholds";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +39,13 @@ export default async function OwnerMembersPage() {
             </Link>
           </div>
         </div>
+
+        {profile.role === "owner" && (
+          <PresenceSettings
+            initial={thresholds ?? DEFAULT_THRESHOLDS}
+            available={presenceAvailable}
+          />
+        )}
 
         <MembersPanel
           initialMembers={members}

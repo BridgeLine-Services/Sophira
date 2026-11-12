@@ -30,6 +30,59 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
   });
   const base = { accountStatus: "active", thresholds: DEFAULT_THRESHOLDS, now };
 
+  section("0. The six thresholds the Owner can actually reach, and the bounds nobody can break");
+  {
+    const sql = readFileSync("supabase/migrations/0050_member_presence.sql", "utf8");
+    const routeSrc = readFileSync("src/app/api/network/presence-settings/route.ts", "utf8");
+    const ui = readFileSync("src/components/app/PresenceSettings.tsx", "utf8");
+    const page = readFileSync("src/app/owner/members/page.tsx", "utf8");
+
+    // The code bounds and the database CHECK bounds must be the same numbers, or the Owner is
+    // told a value is allowed and then refused by the database (or the reverse, and a stored
+    // value can never be saved again).
+    const columnBounds: Array<[string, keyof typeof THRESHOLD_BOUNDS]> = [
+      ["heartbeat_interval_seconds", "heartbeatIntervalSeconds"],
+      ["connection_timeout_seconds", "connectionTimeoutSeconds"],
+      ["active_threshold_seconds", "activeThresholdSeconds"],
+      ["idle_threshold_seconds", "idleThresholdSeconds"],
+      ["session_expiration_seconds", "sessionExpirationSeconds"],
+      ["presence_update_interval_seconds", "presenceUpdateIntervalSeconds"],
+    ];
+    for (const [column, key] of columnBounds) {
+      const b = THRESHOLD_BOUNDS[key];
+      const re = new RegExp(`${column}[^\\n]*between (\\d+) and (\\d+)`);
+      const found = re.exec(sql);
+      assert(found !== null, `thresholds: ${column} carries a database CHECK, not just a code guard`);
+      assert(Number(found?.[1]) === b.min && Number(found?.[2]) === b.max,
+        `thresholds: ${column} has the same bounds in SQL (${found?.[1]}–${found?.[2]}) and in code (${b.min}–${b.max})`);
+    }
+
+    // Owner only, in the three places that matter.
+    assert(/requireOwner\(/.test(routeSrc) && !/requireStaff\(|requireUser\(/.test(routeSrc),
+      "thresholds: saving them is Owner-only at the route, not Co-Owner and not any signed-in member");
+    assert(/presence_settings_owner_write[\s\S]{0,120}is_owner\(\)/.test(sql),
+      "thresholds: the database also restricts the write to the Owner, so a direct call is refused too");
+    assert(/validateThresholds/.test(routeSrc),
+      "thresholds: the route runs the shared validator before writing");
+    assert(/\{ error: problems\[0\]/.test(routeSrc),
+      "thresholds: a refusal is a sentence the Owner can act on, not a constraint name");
+    assert(/clampThresholds/.test(routeSrc),
+      "thresholds: the stored value is clamped to the same bounds the form showed");
+
+    // The form shows the range instead of letting the Owner discover it by failing, and it
+    // never claims a save that did not happen.
+    assert(/THRESHOLD_BOUNDS\[key\]/.test(ui) && /seconds, \{bounds\.min\} to \{bounds\.max\}/.test(ui),
+      "thresholds: the form states each allowed range next to the field");
+    assert(/setSaved\(next\)/.test(ui) && /json\.thresholds \?\? values/.test(ui),
+      "thresholds: the form shows what the SERVER stored, never an optimistic guess");
+    assert(/problems\.map/.test(ui) && /role="alert"/.test(ui),
+      "thresholds: a refusal is shown as an alert listing every problem");
+    assert(/profile\.role === "owner" && \(/.test(page) && /<PresenceSettings/.test(page),
+      "thresholds: the panel is rendered for the Owner only (a Co-Owner does not retune the clock)");
+    assert(/available/.test(ui) && /unavailable until the database has the presence tables/.test(ui),
+      "thresholds: on a database without the tables the panel says so and changes nothing");
+  }
+
   section("1. The eight presence states, and never a colour without a word");
   assert(PRESENCE_STATES.length === 8, "presence: eight states exist");
   assert(PRESENCE_STATES.join(",") === "active,online,idle,away,busy,dnd,offline,unknown",
