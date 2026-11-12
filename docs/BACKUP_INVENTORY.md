@@ -9,7 +9,7 @@ migrations, the tables they create (minus any dropped later) and the storage buc
 and fails the suite when they disagree. A migration added without updating this line
 is a test failure, not a stale document.
 
-**Scope at time of writing:** 54 migrations, 61 application tables, 1 private storage bucket (`private-docs`).
+**Scope at time of writing:** 55 migrations, 62 application tables, 1 private storage bucket (`private-docs`).
 
 ---
 
@@ -249,3 +249,7 @@ recreates the parts Supabase provides (the `auth` schema, the three roles, the `
 
 On 2026-11-11 it reported 45 migrations, 55 public tables, 74 RLS policies, zero tables without RLS,
 and `0045` backfilling `updated_at = created_at` with the text intact.
+
+## Added in migration 0055
+
+- `announcements` - staff-authored network-wide messages (published rows readable by every member; drafts staff-only).

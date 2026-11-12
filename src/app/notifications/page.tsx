@@ -36,6 +36,17 @@ export default async function NotificationsPage() {
 
   const { items, unread } = await listNotifications(supabase, user.id);
 
+  // Network announcements (0055): published by staff, readable by every member.
+  // Kept beside the personal notices rather than mixed into them - an announcement
+  // has one author and many readers, and retracting it must not rewrite history.
+  const { data: announcementRows } = await supabase
+    .from("announcements")
+    .select("id, title, body, published_at")
+    .eq("status", "published")
+    .order("published_at", { ascending: false })
+    .limit(5);
+  const announcements = announcementRows ?? [];
+
   // Newest-first order is preserved: a heading appears where its newest notice would have.
   const order: PresentationGroup[] = [];
   const grouped = new Map<PresentationGroup, NotificationRow[]>();
@@ -52,6 +63,21 @@ export default async function NotificationsPage() {
     <AppShell title="Notifications" backHref="/dashboard">
       {/* Refreshes this list in place when a notice arrives; renders nothing itself. */}
       <NotificationsLive userId={user.id} />
+      {announcements.length > 0 && (
+        <section aria-labelledby="ann-h" className="mb-6">
+          <h2 id="ann-h" className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-soft">Announcements</h2>
+          <div className="space-y-2">
+            {announcements.map((a) => (
+              <div key={a.id} className="rounded-card border border-line bg-card p-4">
+                <p className="font-medium text-ink">{a.title}</p>
+                {a.body && <p className="mt-1 whitespace-pre-line text-sm text-ink-soft">{a.body}</p>}
+                {a.published_at && <p className="mt-1 text-xs text-ink-soft">{new Date(a.published_at).toLocaleDateString()}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="text-sm text-ink-soft">
           {unread > 0 ? `${unread} unread` : "You're all caught up"} — {items.length} notification

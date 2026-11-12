@@ -68,6 +68,13 @@ export default async function CoOwnerPage() {
     { href: "/owner/ai-operations", title: "AI operations", body: "Whether AI requests are succeeding and how quickly." },
   ];
 
+  const { data: announcementRows } = await supabase
+    .from("announcements")
+    .select("id, title, body, status, published_at")
+    .order("created_at", { ascending: false })
+    .limit(4);
+  const announcements = announcementRows ?? [];
+
   return (
     <AppShell title="Co-Owner workspace">
       <div className="space-y-6">
@@ -169,12 +176,29 @@ export default async function CoOwnerPage() {
 
         <section aria-labelledby="co-announce-h">
           <h2 id="co-announce-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Network announcements</h2>
-          <Card><CardContent className="p-4">
-            <p className="text-sm text-ink-soft">
-              Sophira has no announcement channel yet, so there is nothing to publish or read here. Notifications members
-              receive today come from their own account and deadline activity.
-            </p>
-          </CardContent></Card>
+          {announcements.length === 0 ? (
+            <Card><CardContent className="p-4">
+              <p className="text-sm text-ink-soft">
+                Nothing announced yet. Published announcements appear here and in every member&apos;s notifications.
+              </p>
+              <Link href="/owner/announcements" className="mt-2 inline-block text-sm text-accent hover:underline">
+                Write the first announcement &rarr;
+              </Link>
+            </CardContent></Card>
+          ) : (
+            <div className="space-y-2">
+              {announcements.map((a) => (
+                <Card key={a.id}><CardContent className="p-4">
+                  <p className="font-medium text-ink">{a.title}</p>
+                  {a.body && <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm text-ink-soft">{a.body}</p>}
+                  <p className="mt-1 text-xs text-ink-soft">
+                    {a.status === "published" ? "Published" : "Draft"} {a.published_at ? `· ${new Date(a.published_at).toLocaleDateString()}` : ""}
+                  </p>
+                </CardContent></Card>
+              ))}
+              <Link href="/owner/announcements" className="inline-block text-sm text-accent hover:underline">Manage announcements &rarr;</Link>
+            </div>
+          )}
         </section>
 
         <section aria-labelledby="co-tasks-h">

@@ -43,7 +43,7 @@ export function runAccountExportTests(assert: (c: boolean, n: string) => void, s
   const tableLines = migrationTables();
   const userOwned = tableLines.filter((t) =>
     !["invitations", "invitation_requests", "app_config", "sophira_meta", "owner_bootstrap",
-      "provider_usage",
+      "provider_usage", "announcements",
       // Operator records, not member data: the role-change audit names the ADMIN who made each
       // change (exporting it to a member would hand them another person's actions), and the
       // presence thresholds are one global owner setting, not a member's own row.

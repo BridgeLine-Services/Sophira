@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { Activity, BookOpen, Brain, Briefcase, ChevronDown, ChartColumn, HardDriveDownload, Home, LogOut, MailQuestion, Menu, NotebookPen, Settings, ShieldCheck, Mic, Sparkles, UserPlus, Users, Wifi, X } from "lucide-react";
-import { FlaskConical, Gauge, Keyboard } from "lucide-react";
+import { FlaskConical, Gauge, Keyboard, Megaphone } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
@@ -70,6 +70,7 @@ export const OWNER_NAV_GROUPS: Array<{
       // Co-Owner workspace (2026-11-12): the people-facing home for the co_owner role,
       // rendered from the authority already defined in src/lib/auth/permissions.ts.
       { href: "/co-owner", label: "Co-Owner workspace", icon: Briefcase, minimum: "co_owner" },
+      { href: "/owner/announcements", label: "Announcements", icon: Megaphone, minimum: "co_owner" },
     ],
   },
   {
