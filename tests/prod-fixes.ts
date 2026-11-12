@@ -47,7 +47,11 @@ export function runProdFixTests(assert: (c: boolean, n: string) => void, section
   // The overview keeps one anchor (its own tiles); the other sections are routes now, so a
   // stale anchor cannot be relied on. The dashboard must not scroll-jack to fake them.
   const dash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-  assert(dash.includes('id="overview"'), "nav: the overview anchor still exists for the dashboard link");
+  // 2026-11-12 (reskin): the anchor now sits on the Administrative overview section of
+  // /owner, which is where the "Overview" nav item scrolls to. Still exactly one anchor.
+  const ownerPage = readFileSync("src/app/owner/page.tsx", "utf8");
+  assert(ownerPage.includes('id="overview"') && !dash.includes('id="overview"'),
+    "nav: the overview anchor still exists for the dashboard link");
   for (const gone of ['id="requests"', 'id="invite"', 'id="members"']) {
     assert(!dash.includes(gone),
       `nav: ${gone} is no longer a dashboard anchor - that section is its own page`);

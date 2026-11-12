@@ -92,7 +92,7 @@ export default async function TesterPage() {
           ].map((s) => (
             <Card key={s.label}>
               <CardContent className="p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-ink-soft">{s.label}</p>
+                <p className="meta-strong">{s.label}</p>
                 <p className="mt-1 text-2xl font-semibold text-ink">{s.value}</p>
                 <p className="text-xs text-ink-soft">{s.note}</p>
               </CardContent>
@@ -104,7 +104,7 @@ export default async function TesterPage() {
           <QaReportForm userId={user.id} />
 
           <div className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-soft">Your reports</h2>
+            <h2 className="meta-strong">Your reports</h2>
             {rows.length === 0 ? (
               <Card>
                 <CardContent className="flex items-start gap-3 p-4 text-sm text-ink-soft">

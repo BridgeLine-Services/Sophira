@@ -22,7 +22,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className={
-              "mb-2 rounded-card border px-4 py-3 text-sm shadow-lg " +
+              "mb-2 rounded-panel border px-4 py-3 text-sm font-medium shadow-e3 backdrop-blur " +
               (t.kind === "success" ? "border-success/30 bg-card text-success"
               : t.kind === "error" ? "border-danger/30 bg-card text-danger"
               : "border-line bg-card text-ink")}

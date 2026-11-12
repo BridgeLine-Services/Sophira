@@ -60,7 +60,7 @@ export function AnnouncementComposer({ rows, authorId }: { rows: Row[]; authorId
   return (
     <div className="space-y-4">
       <Card><CardContent className="space-y-3 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-ink-soft">New announcement</p>
+        <p className="meta-strong">New announcement</p>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What is this about?" aria-label="Announcement title" />
         <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} placeholder="The message itself. Plain and short is best." aria-label="Announcement body" />
         {error && <p className="text-sm text-danger">{error}</p>}
@@ -71,7 +71,7 @@ export function AnnouncementComposer({ rows, authorId }: { rows: Row[]; authorId
       </CardContent></Card>
 
       <section aria-labelledby="ann-list-h">
-        <h2 id="ann-list-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">All announcements</h2>
+        <h2 id="ann-list-h" className="mb-3 meta-strong">All announcements</h2>
         {rows.length === 0 ? (
           <EmptyState icon={<Megaphone className="h-5 w-5" aria-hidden />} title="Nothing announced yet" description="When you publish an update it appears here and in every member's notifications." />
         ) : (

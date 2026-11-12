@@ -356,11 +356,11 @@ function DeviceRecommendation() {
     <div className={`rounded-md border p-3 text-sm ${tone}`}>
       <div className="flex items-center justify-between">
         <p className="font-medium">{analysis.recommendation.resourceClass}</p>
-        <span className="text-xs text-muted-foreground">{analysis.recommendation.policy}</span>
+        <span className="text-xs text-ink-soft">{analysis.recommendation.policy}</span>
       </div>
       <p className="mt-1 font-medium">Recommended for this device: {m?.label}</p>
-      <p className="mt-1 text-muted-foreground">{analysis.recommendation.reason}</p>
-      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-3">
+      <p className="mt-1 text-ink-soft">{analysis.recommendation.reason}</p>
+      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-ink-soft sm:grid-cols-3">
         <span>WebGPU: {c.webgpu ? "available" : "not available (WASM)"}</span>
         <span>RAM estimate: ~{analysis.ramEstimateGB} GB</span>
         <span>CPU cores: {c.cpuCores ?? "unknown"}</span>
@@ -371,14 +371,14 @@ function DeviceRecommendation() {
         </span>
       </div>
       {c.detectionNotes.length > 0 && (
-        <details className="mt-1 text-xs text-muted-foreground">
+        <details className="mt-1 text-xs text-ink-soft">
           <summary className="cursor-pointer">Detection notes ({c.detectionNotes.length})</summary>
           {c.detectionNotes.map((n, i) => (
             <p key={i}>• {n}</p>
           ))}
         </details>
       )}
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 text-xs text-ink-soft">
         The recommendation is only a starting point — you can override it by picking any model below. Nothing downloads
         without your explicit consent.
       </p>
@@ -404,7 +404,7 @@ function QualityHonesty() {
         substantially better reasoning and accuracy. If the local model is weaker, this page says so; it never
         pretends otherwise.
       </p>
-      <p className="mt-1 text-muted-foreground">
+      <p className="mt-1 text-ink-soft">
         Estimated performance per tier: TIER 1 (phone/lightweight) — basic drafts; TIER 2 (1–4B) — meaningful
         assistance; TIER 3 (4B q4) — the strongest local quality Sophira can verify, still below remote quality.
       </p>

@@ -12,7 +12,7 @@ import type { Role } from "@/lib/roles";
 import { Badge, Button, Card, CardContent } from "@/components/ui";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import Link from "next/link";
-import { Briefcase, CheckCircle2, ClipboardList, Gauge, XCircle } from "lucide-react";
+import { Briefcase, Gauge } from "lucide-react";
 import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
 import { capabilityRegistry, noUnexpectedCharges } from "@/lib/ai/capabilities";
 import { tallyPresenceStates } from "@/lib/owner/member-view";
@@ -221,10 +221,10 @@ return (
         <>
         <Link
           href="/owner/health"
-          className="flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs font-medium text-ink shadow-sm hover:border-accent/40"
+          className="flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs font-medium text-ink-soft shadow-e1 transition-colors hover:border-accent/40 hover:text-accent"
           title="Your live AI service mode — details on the System Health page"
         >
-          <span className={"h-2 w-2 rounded-full " + (pageDiag.activeProvider ? "bg-emerald-500" : "bg-amber-400")} aria-hidden />
+          <span className={"dot " + (pageDiag.activeProvider ? "dot-ok" : "dot-warn")} aria-hidden />
           {pageDiag.activeProvider ? "AI service ready" : "Local AI mode"}
         </Link>
         <Link href="/dashboard?view=workspace">
@@ -252,7 +252,7 @@ return (
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-2 text-sm text-ink-soft">
-          <Briefcase className="h-4 w-4 text-accent" />
+          <Briefcase className="h-4 w-4 text-accent" aria-hidden />
           You manage this private network.
         </span>
         <Badge>owner</Badge>
@@ -265,8 +265,9 @@ return (
       />
       {tally && (
         <div className="mb-4">
-          <Card><CardContent className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 text-sm">
-            <span className="font-medium text-ink">
+          <Card className="bg-card-elevated/50"><CardContent className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 text-sm">
+            <span className="flex items-center gap-2 font-medium text-ink">
+              <span className="dot dot-ok" aria-hidden />
               {tally.active + tally.online} {(tally.active + tally.online) === 1 ? "member is" : "members are"} active or online right now
             </span>
             <span className="text-ink-soft">
@@ -279,15 +280,22 @@ return (
           </CardContent></Card>
         </div>
       )}
-      <section id="needs-attention" className="scroll-mt-4">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">
-          Needs attention
-          {actionItems.length > 0 && <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium normal-case tracking-normal text-accent">{actionItems.length}</span>}
-        </h2>
+      <section id="needs-attention" className="panel scroll-mt-4">
+        <div className="panel-head">
+          <h2 className="panel-title">
+            Needs attention
+            {actionItems.length > 0 && <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 align-middle text-[11px] font-semibold text-accent">{actionItems.length}</span>}
+          </h2>
+          <p className="panel-sub">What is not right yet, whether it affects ordinary members, and where to fix it.</p>
+        </div>
+        <div className="panel-body">
         <div className="grid gap-2">
           {actionItems.map((item) => (
-            <Card key={item.key}><CardContent className="p-4">
-              <p className={"font-medium " + (item.tone === "urgent" ? "text-danger" : "text-ink")}>{item.title}</p>
+            <Card key={item.key} className={item.tone === "urgent" ? "border-danger/40 bg-danger/[0.04]" : ""}><CardContent className="p-4">
+              <p className="flex items-start gap-2 font-medium text-ink">
+                <span className={"dot mt-1.5 " + (item.tone === "urgent" ? "dot-bad" : "dot-warn")} aria-hidden />
+                <span className={item.tone === "urgent" ? "text-danger" : "text-ink"}>{item.title}</span>
+              </p>
               <p className="mt-1 text-sm text-ink-soft">{item.body}</p>
               {item.href && (
                 <Link href={item.href} className="mt-2 inline-block text-sm text-accent hover:underline">
@@ -316,12 +324,13 @@ return (
             </CardContent></Card>
           )}
         </div>
+        </div>
       </section>
 
       <OwnerAreaGrid role={(profile.role ?? "user") as Role} />
       <div id="security" className="scroll-mt-4"><NoUnexpectedChargesCard /></div>
       {statsError && (
-        <div className="mb-4 rounded-card border border-danger/30 bg-danger/5 p-3" role="alert">
+        <div className="callout-danger mb-4" role="alert">
           <p className="text-sm font-medium text-danger">{statsError}</p>
         </div>
       )}
@@ -340,9 +349,9 @@ return (
           membersLoaded,
         }}
       />
-      <section className="mt-8" aria-labelledby="owner-providers-h">
-        <h2 id="owner-providers-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">AI Providers and Models</h2>
-        <p className="mb-3 text-xs text-muted-foreground">
+      <section className="mt-8 space-y-3" aria-labelledby="owner-providers-h">
+        <h2 id="owner-providers-h" className="meta-strong">AI Providers and Models</h2>
+        <p className="text-xs text-ink-soft">
           Detailed capability registry and live provider diagnostics. Registered capability is not the same as an
           active, verified connection — the diagnostics card shows what is actually configured.
         </p>
@@ -414,18 +423,22 @@ function OwnerOverviewCard({ members, invitations, requests, statsError }: {
   ];
   return (
     <section id="overview" className="mb-6 scroll-mt-4" aria-labelledby="owner-overview-h">
-      <h2 id="owner-overview-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Administrative overview</h2>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="section-head mb-3">
+        <h2 id="owner-overview-h" className="section-title">Administrative overview</h2>
+        <p className="meta">Read live from the database and the running services</p>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-lg border bg-card p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{c.label}</p>
-            <p className="mt-1 flex items-center gap-2 text-lg font-semibold">
-              {c.tone === "ok" && <CheckCircle2 className="h-4 w-4 text-success" aria-hidden />}
-              {c.tone === "warn" && <ClipboardList className="h-4 w-4 text-accent" aria-hidden />}
-              {c.tone === "bad" && <XCircle className="h-4 w-4 text-danger" aria-hidden />}
+          <div key={c.label} className="stat">
+            <p className="stat-label">{c.label}</p>
+            <p className="stat-value flex items-center gap-2 text-[20px]">
+              <span
+                className={"dot " + (c.tone === "ok" ? "dot-ok" : c.tone === "warn" ? "dot-warn" : c.tone === "bad" ? "dot-bad" : "dot-idle")}
+                aria-hidden
+              />
               {c.value}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">{c.note}</p>
+            <p className="stat-note">{c.note}</p>
           </div>
         ))}
       </div>
@@ -459,7 +472,7 @@ function ProviderDiagnosticsCard() {
     ],
   ];
   return (
-    <div className="mb-6 rounded-lg border bg-card p-4">
+    <div className="mb-6 panel p-4">
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
         <Gauge className="h-4 w-4 text-accent" />
         AI provider diagnostics
@@ -469,14 +482,14 @@ function ProviderDiagnosticsCard() {
         <tbody>
           {rows.map(([k, v]) => (
             <tr key={k} className="border-b last:border-b-0">
-              <td className="py-1.5 pr-4 text-muted-foreground align-top">{k}</td>
+              <td className="py-1.5 pr-4 align-top text-ink-soft">{k}</td>
               <td className="py-1.5">{v}</td>
             </tr>
           ))}
         </tbody>
       </table>
       </div>
-      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+      <ul className="mt-2 space-y-1 text-xs text-ink-soft">
         {Object.entries(diag.reasons).map(([p, r]) => (
           <li key={p}>
             <span className="font-medium">{p}:</span> {r}
@@ -486,7 +499,7 @@ function ProviderDiagnosticsCard() {
           <li key={`note-${i}`}>{n}</li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="mt-2 text-xs text-ink-soft">
         Request counts and failure rates: <code>GET /api/provider-status</code> (owner session required; migration 0021).
       </p>
     </div>
@@ -503,15 +516,15 @@ function NoUnexpectedChargesCard() {
   const env = readAiEnv();
   const state = noUnexpectedCharges(paidAllowed(env));
   return (
-    <div className={`mb-6 rounded-lg border p-4 ${state.enabled ? "border-emerald-600/40 bg-emerald-500/5" : "border-destructive/40 bg-destructive/5"}`}>
+    <div className={`panel mb-6 p-4 ${state.enabled ? "border-success/40" : "border-danger/40"}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-semibold">Security setting: No Unexpected Charges</div>
-        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${state.enabled ? "bg-emerald-600/15 text-emerald-700 dark:text-emerald-400" : "bg-destructive/15 text-destructive"}`}>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${state.enabled ? "bg-success/10 text-success ring-success/25" : "bg-danger/10 text-danger ring-danger/25"}`}>
           {state.enabled ? "ON" : "OFF"}
         </span>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">{state.detail}</p>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-2 text-sm text-ink-soft">{state.detail}</p>
+      <p className="mt-1 text-xs text-ink-soft">
         Controlled by the server environment (ALLOW_PAID_AI, MONTHLY_AI_BUDGET_USD), not by the browser — the frontend can
         never enable a paid provider on its own. Rejection happens server-side before any network call.
       </p>
@@ -528,12 +541,12 @@ function CapabilityRegistryCard() {
   const env = readAiEnv();
   const rows = capabilityRegistry(env);
   return (
-    <div className="mb-6 rounded-lg border bg-card p-4">
+    <div className="mb-6 panel p-4">
       <div className="mb-2 text-sm font-semibold">Provider capability registry (shown before activation)</div>
       <div className="overflow-x-auto">
         <table className="data-table w-full min-w-[760px] text-xs">
           <thead>
-            <tr className="border-b text-left text-muted-foreground">
+            <tr className="border-b border-line text-left text-ink-soft">
               <th className="py-1.5 pr-3">provider</th>
               <th className="py-1.5 pr-3">model</th>
               <th className="py-1.5 pr-3">online</th>
@@ -564,7 +577,7 @@ function CapabilityRegistryCard() {
           </tbody>
         </table>
       </div>
-      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+      <ul className="mt-2 space-y-1 text-xs text-ink-soft">
         {rows[0]?.notes.slice(0, 1).map((n, i) => (
           <li key={`ln-${i}`}>{n}</li>
         ))}

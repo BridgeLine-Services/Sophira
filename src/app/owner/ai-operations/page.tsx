@@ -76,19 +76,19 @@ export default async function OwnerAiOperationsPage() {
             </p>
             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Paid AI allowed</dt>
+                <dt className="text-xs uppercase tracking-wide text-ink-soft">Paid AI allowed</dt>
                 <dd className="text-ink">{paidAllowed(env) ? "Yes, by your configuration" : "No - zero-billing policy"}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Mode</dt>
+                <dt className="text-xs uppercase tracking-wide text-ink-soft">Mode</dt>
                 <dd className="text-ink">{diag.configuredMode}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Monthly budget setting</dt>
+                <dt className="text-xs uppercase tracking-wide text-ink-soft">Monthly budget setting</dt>
                 <dd className="text-ink">${env.MONTHLY_AI_BUDGET_USD}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Local AI service</dt>
+                <dt className="text-xs uppercase tracking-wide text-ink-soft">Local AI service</dt>
                 <dd className="text-ink">
                   {diag.activeProvider === "selfhost"
                     ? "Active - answers are produced on your own machine"
@@ -162,7 +162,7 @@ export default async function OwnerAiOperationsPage() {
               <div className="overflow-x-auto">
                 <table className="data-table w-full min-w-[720px] text-sm">
                   <thead>
-                    <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-soft">
                       <th className="px-4 py-2">Provider</th>
                       <th className="px-4 py-2">Model</th>
                       <th className="px-4 py-2">Requests</th>
@@ -235,7 +235,7 @@ export default async function OwnerAiOperationsPage() {
 function Metric({ label, value, note }: { label: string; value: string; note: string }) {
   return (
     <div className="rounded-lg border border-line bg-card p-3">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-ink-soft">{label}</p>
       <p className="mt-1 text-lg font-semibold text-ink">{value}</p>
       <p className="mt-0.5 text-xs text-ink-soft">{note}</p>
     </div>

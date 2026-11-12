@@ -534,4 +534,22 @@ export function runDashboardOverviewTests(
     assert(css.includes(".trend-line") && css.includes(".trend-bar"),
       "dashboard: the chart classes exist in the stylesheet");
   }
+
+  // ==== P. The hero stays the purple reference, through one variable ====
+  // The 2026-11-12 reskin tried to repaint this hero teal while it was in flight. The
+  // owner's chosen reference is the purple one, so the palette is pinned here: the page
+  // reads --hero-bg, the variable carries the reference gradient, and the teal hero the
+  // reskin substituted can never come back by accident.
+  section("dashboard: the hero keeps the owner's purple reference");
+  {
+    const css = readFileSync("src/app/globals.css", "utf8");
+    assert(/\.dash-page\s*\{[^}]*background:\s*var\(--hero-bg\)/.test(css),
+      "dashboard: the dashboard page takes its hero from --hero-bg, not a second palette");
+    assert(css.includes("#2b1a56") && css.includes("#7c5cea"),
+      "dashboard: --hero-bg still carries the purple reference gradient");
+    assert(!css.includes("#10302f") && !css.includes("#0d2a33"),
+      "dashboard: the teal hero the reskin substituted is gone");
+    assert((css.match(/--hero-bg:/g) ?? []).length === 2,
+      "dashboard: one hero gradient per theme, light and dark");
+  }
 }

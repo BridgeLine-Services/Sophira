@@ -427,7 +427,7 @@ export function TeacherProfileEditor({ teacher, profile }: { teacher: Teacher; p
           )}
 
           {openDocForm === s.key && (
-            <div className="space-y-3 rounded-lg border border-line bg-card p-4">
+            <div className="space-y-3 panel p-4">
               <div>
                 <Label>Document title *</Label>
                 <Input

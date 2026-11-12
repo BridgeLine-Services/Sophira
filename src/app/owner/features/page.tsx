@@ -116,7 +116,7 @@ export default async function OwnerFeaturesPage() {
             <section key={group} aria-labelledby={`feature-group-${group.replace(/\s+/g, "-").toLowerCase()}`}>
               <h3
                 id={`feature-group-${group.replace(/\s+/g, "-").toLowerCase()}`}
-                className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-soft"
+                className="mb-2 meta-strong"
               >
                 {group}
               </h3>

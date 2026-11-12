@@ -138,14 +138,14 @@ return (
         </div>
 
         <section aria-labelledby="co-tiles-h">
-          <h2 id="co-tiles-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">At a glance</h2>
+          <h2 id="co-tiles-h" className="mb-3 meta-strong">At a glance</h2>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {tiles.map((t) => {
               const Icon = t.icon;
               return (
                 <Link key={t.label} href={t.href} className="block">
                   <Card><CardContent className="p-4">
-                    <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    <p className="flex items-center gap-2 meta-strong">
                       <Icon className="h-4 w-4 text-accent" aria-hidden /> {t.label}
                     </p>
                     <p className="mt-1 text-2xl font-semibold text-ink">{t.value === null ? "unavailable" : t.value}</p>
@@ -158,7 +158,7 @@ return (
         </section>
 
         <section aria-labelledby="co-member-activity-h">
-          <h2 id="co-member-activity-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Member activity</h2>
+          <h2 id="co-member-activity-h" className="mb-3 meta-strong">Member activity</h2>
           <Card><CardContent className="p-4">
             {recentSignups.data && recentSignups.data.length > 0 ? (
               <ul className="divide-y divide-line">
@@ -180,7 +180,7 @@ return (
         </section>
 
         <section aria-labelledby="co-qa-h">
-          <h2 id="co-qa-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">QA command center</h2>
+          <h2 id="co-qa-h" className="mb-3 meta-strong">QA command center</h2>
           <Card><CardContent className="p-4">
             <p className="text-sm text-ink-soft">
               {qa.data
@@ -192,7 +192,7 @@ return (
         </section>
 
         <section aria-labelledby="co-team-h">
-          <h2 id="co-team-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Team activity</h2>
+          <h2 id="co-team-h" className="mb-3 meta-strong">Team activity</h2>
           <Card><CardContent className="p-4">
             {teamAudit.data && teamAudit.data.length > 0 ? (
               <ul className="divide-y divide-line">
@@ -217,7 +217,7 @@ return (
         </section>
 
         <section aria-labelledby="co-courses-h">
-          <h2 id="co-courses-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Course oversight</h2>
+          <h2 id="co-courses-h" className="mb-3 meta-strong">Course oversight</h2>
           <Card><CardContent className="p-4">
             <p className="text-sm text-ink-soft">
               Every member&apos;s courses belong to their own private workspace, so network-wide course lists are never shown here. Counts about the network (members, invitations, requests, tester reports) are in the tiles above, and they are counts only.
@@ -229,7 +229,7 @@ return (
         </section>
 
         <section aria-labelledby="co-announce-h">
-          <h2 id="co-announce-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Network announcements</h2>
+          <h2 id="co-announce-h" className="mb-3 meta-strong">Network announcements</h2>
           {announcementsUnreadable ? (
             <Card><CardContent className="p-4">
               <p className="text-sm text-ink-soft">
@@ -266,7 +266,7 @@ return (
         </section>
 
         <section aria-labelledby="co-tasks-h">
-          <h2 id="co-tasks-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">My responsibilities</h2>
+          <h2 id="co-tasks-h" className="mb-3 meta-strong">My responsibilities</h2>
           <Card><CardContent className="p-4">
             <ul className="space-y-2 text-sm text-ink-soft">
               <li><strong className="text-ink">Members.</strong> Keep the directory accurate, help with account problems, suspend when needed - within your limits.</li>
@@ -279,7 +279,7 @@ return (
         </section>
 
         <section aria-labelledby="co-areas-h">
-          <h2 id="co-areas-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Your areas</h2>
+          <h2 id="co-areas-h" className="mb-3 meta-strong">Your areas</h2>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {areas.map((a) => (
               <Link key={a.href} href={a.href} className="block">

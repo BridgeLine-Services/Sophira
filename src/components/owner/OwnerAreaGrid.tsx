@@ -16,13 +16,13 @@ export function OwnerAreaGrid({ role }: { role: Role }) {
 
   return (
     <section aria-labelledby="owner-areas-h" className="mt-8">
-      <h2 id="owner-areas-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">
+      <h2 id="owner-areas-h" className="mb-3 meta-strong">
         Administrative areas
       </h2>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {visible.map((group) => (
           <div key={group.heading} className="rounded-card border border-line bg-card p-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">{group.heading}</p>
+            <p className="mb-2 meta-strong">{group.heading}</p>
             <ul className="space-y-1.5">
               {group.items.map((item) => (
                 <li key={item.href}>

@@ -165,7 +165,7 @@ export function MemberDirectory({
     <div className="space-y-3">
       {/* md and up: the table */}
       <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
-        <table className="w-full min-w-[54rem] border-collapse text-left text-sm">
+        <table className="data-table w-full min-w-[54rem] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-soft">
               <th scope="col" className="px-4 py-3 font-medium">Member</th>

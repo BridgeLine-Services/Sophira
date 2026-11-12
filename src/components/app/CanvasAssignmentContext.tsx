@@ -37,13 +37,13 @@ export default function CanvasAssignmentContext({ context }: { context: Context 
 
       <dl className="mt-4 grid gap-3 sm:grid-cols-3">
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Due</dt>
+          <dt className="meta-strong">Due</dt>
           <dd className="mt-1 text-sm text-ink">
             {context.dueAt ? <LocalDateTime iso={context.dueAt} /> : "No due date was set in Canvas"}
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Worth</dt>
+          <dt className="meta-strong">Worth</dt>
           <dd className="mt-1 text-sm text-ink">
             {context.pointsPossible !== null
               ? `${context.pointsPossible} point${context.pointsPossible === 1 ? "" : "s"}`
@@ -51,7 +51,7 @@ export default function CanvasAssignmentContext({ context }: { context: Context 
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">How you turn it in</dt>
+          <dt className="meta-strong">How you turn it in</dt>
           <dd className="mt-1 text-sm text-ink">
             {context.submissionTypes.length > 0
               ? context.submissionTypes.map(submissionTypeLabel).join(" or ")

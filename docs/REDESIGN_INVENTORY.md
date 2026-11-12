@@ -7,8 +7,8 @@ never as complete.
 
 - Page routes: **80**
 - API routes: **101**
-- Redesigned: 0 | Partial: 8 | Intentionally unchanged: 0 | Not started: 68
-- Pages using the shared shell: 51 | client components: 31 | with an auth gate in-file: 24
+- Redesigned: 0 | Partial: 23 | Intentionally unchanged: 0 | Not started: 57
+- Pages using the shared shell: 55 | client components: 31 | with an auth gate in-file: 28
 
 `Signals` is detected from the source, not declared: `shell` = renders AppShell,
 `client` = "use client", `supabase`/`ai`/`offline`/`integrations` = imports that
@@ -20,12 +20,13 @@ data layer, `auth-gated` = redirects or reads the session itself. A page with no
 | Route | Status | Signals | Note |
 |---|---|---|---|
 | `/` | not-started | auth-gated |  |
-| `/access-denied` | not-started | client, supabase |  |
+| `/access-denied` | partial | client, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/assignments/[id]` | not-started | auth-gated, integrations, shell, supabase |  |
 | `/assignments/new` | not-started | ai, auth-gated, client, shell, supabase |  |
+| `/co-owner` | partial | auth-gated, shell, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/corrections` | not-started | auth-gated |  |
 | `/courses` | not-started | client, shell, supabase |  |
-| `/courses/[id]` | not-started | auth-gated, shell, supabase |  |
+| `/courses/[id]` | partial | auth-gated, shell, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/courses/english` | not-started | - |  |
 | `/courses/foreign-language` | not-started | - |  |
 | `/courses/foreign-language/language-selector` | not-started | auth-gated, shell, supabase |  |
@@ -39,12 +40,12 @@ data layer, `auth-gated` = redirects or reads the session itself. A page with no
 | `/courses/science/chemistry` | not-started | - |  |
 | `/courses/science/physics` | not-started | - |  |
 | `/create-owner` | not-started | client, supabase |  |
-| `/dashboard` | not-started | auth-gated, shell, supabase |  |
-| `/downloads` | not-started | client |  |
+| `/dashboard` | partial | auth-gated, shell, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
+| `/downloads` | partial | client | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/essay` | not-started | client, shell |  |
 | `/install` | not-started | client |  |
 | `/learning` | not-started | auth-gated, shell, supabase |  |
-| `/lectures` | not-started | client, shell, supabase |  |
+| `/lectures` | partial | client, shell, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/library` | not-started | auth-gated, client, shell, supabase |  |
 | `/license` | not-started | - |  |
 | `/local` | not-started | - |  |
@@ -57,22 +58,24 @@ data layer, `auth-gated` = redirects or reads the session itself. A page with no
 | `/notebooks` | not-started | client, shell |  |
 | `/notebooks/[id]` | not-started | client, shell |  |
 | `/notebooks/archive` | not-started | client, shell |  |
-| `/notifications` | not-started | auth-gated, shell, supabase |  |
-| `/offline` | not-started | ai, client, offline, shell |  |
+| `/notifications` | partial | auth-gated, shell, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
+| `/offline` | partial | ai, client, offline, shell | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/onboarding` | not-started | auth-gated, client, shell, supabase |  |
 | `/online` | not-started | client, offline, shell |  |
-| `/owner` | partial | ai, auth-gated, integrations, shell, supabase | Now a real overview: four aggregate tiles that link to their pages, a status line, and cards to each management page. Automated tests pass; light/dark and mobile visual review not yet done, so it is not marked complete. |
+| `/owner` | partial | ai, auth-gated, integrations, shell, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/owner/activity` | partial | shell | Dedicated route reading stored timestamps through the existing buildActivity. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete. |
-| `/owner/ai-operations` | not-started | ai, shell |  |
+| `/owner/ai-operations` | partial | ai, shell | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/owner/ai-providers` | partial | ai, integrations, shell | Dedicated route reporting existing provider diagnostics; no key or token rendered. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete. |
-| `/owner/analytics` | not-started | shell |  |
-| `/owner/backup` | not-started | shell |  |
+| `/owner/analytics` | partial | shell | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
+| `/owner/announcements` | not-started | auth-gated, shell, supabase |  |
+| `/owner/backup` | partial | shell | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/owner/database` | not-started | shell |  |
-| `/owner/features` | not-started | ai, integrations, shell |  |
+| `/owner/features` | partial | ai, integrations, shell | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/owner/health` | not-started | auth-gated, shell, supabase |  |
 | `/owner/integrations` | not-started | auth-gated, shell, supabase |  |
 | `/owner/invitations` | partial | shell | Dedicated route; mutations reuse the shared invitation-actions module and delivery wording is unchanged. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete. |
 | `/owner/members` | partial | shell | Dedicated route; actions reuse the shared member-actions module. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete. |
+| `/owner/qa` | partial | auth-gated, shell, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/owner/release-readiness` | not-started | shell |  |
 | `/owner/requests` | partial | shell | Dedicated route; approving still requires the owner's click. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete. |
 | `/owner/security` | partial | ai, shell | Dedicated route reporting the server-side charge policy; it cannot change it. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete. |
@@ -88,8 +91,9 @@ data layer, `auth-gated` = redirects or reads the session itself. A page with no
 | `/teachers/[id]` | not-started | auth-gated, shell, supabase |  |
 | `/teachers/new` | not-started | auth-gated, client, shell, supabase |  |
 | `/terms` | not-started | - |  |
+| `/tester` | partial | auth-gated, shell, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/tutor` | not-started | client, shell |  |
-| `/writing` | not-started | ai, client, shell, supabase |  |
+| `/writing` | partial | ai, client, shell, supabase | Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in. |
 | `/writing/grammar` | not-started | client, shell |  |
 | `/writing/new` | not-started | auth-gated, client, shell, supabase |  |
 | `/writing/planning` | not-started | client, shell |  |
