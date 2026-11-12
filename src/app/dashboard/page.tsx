@@ -56,7 +56,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // Activity tracking for privacy-safe aggregate owner analytics.
   await supabase.from("profiles").update({ last_active_at: new Date().toISOString() }).eq("id", user.id).then(() => undefined);
 
-  const [{ data: courses }, { data: teachers }, { data: writingProfile }, { data: assignments }, { count: pendingProposals }, { data: recentFeedback }, { count: activePatterns }] = await Promise.all([
+  const nowIso = new Date().toISOString();
+  const [{ data: courses }, { data: teachers }, { data: writingProfile }, { data: assignments }, { count: pendingProposals }, { data: recentFeedback }, { count: activePatterns }, { data: notebooks }, { data: dueSoon }, { count: activeAssignmentCount }, { count: completedAssignmentCount }] = await Promise.all([
     supabase.from("courses").select("*").order("created_at", { ascending: false }),
     supabase.from("teachers").select("id, name, notes").is("archived_at", null).order("created_at", { ascending: false }),
     supabase.from("writing_profiles").select("*").order("created_at", { ascending: false }).limit(1),
@@ -71,6 +72,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       .from("learning_patterns")
       .select("id", { count: "exact", head: true })
       .in("status", ["candidate", "active", "recurring", "temporary"]),
+    // Command center (2026-11-12): notebooks + deadlines, straight from the
+    // user's own rows - never invented, and honest empty states below.
+    supabase.from("notebooks").select("id, title, updated_at").is("archived_at", null).order("updated_at", { ascending: false }).limit(3),
+    supabase.from("assignments").select("id, title, due_at, urgency, status").not("due_at", "is", null).gte("due_at", nowIso).order("due_at", { ascending: true }).limit(4),
+    supabase.from("assignments").select("id", { count: "exact", head: true }).eq("status", "active"),
+    supabase.from("assignments").select("id", { count: "exact", head: true }).eq("status", "completed"),
   ]);
 
   /**
@@ -175,6 +182,86 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             )}
           </div>
         </section>
+
+        {/* MY PROGRESS — real counts only */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: "Active work", value: activeAssignmentCount ?? 0, note: "assignments in progress" },
+            { label: "Completed", value: completedAssignmentCount ?? 0, note: "finished assignments" },
+            { label: "Courses", value: courses?.length ?? 0, note: `with ${teachers?.length ?? 0} teacher${(teachers?.length ?? 0) === 1 ? "" : "s"} on file` },
+            { label: "Notebooks", value: notebooks?.length ? `${notebooks.length}${notebooks.length === 3 ? "+" : ""}` : 0, note: "research notebooks" },
+          ].map((stat) => (
+            <Card key={stat.label}>
+              <CardContent className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-ink-soft">{stat.label}</p>
+                <p className="mt-1 text-2xl font-semibold text-ink">{stat.value}</p>
+                <p className="text-xs text-ink-soft">{stat.note}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* CONTINUE WHERE YOU LEFT OFF — the real most-recent items, or an honest empty state */}
+        <div>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Continue where you left off</h2>
+          {(assignments?.length ?? 0) > 0 || (notebooks?.length ?? 0) > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {(assignments ?? []).slice(0, 2).map((a) => (
+                <Link key={a.id} href={`/assignments/${a.id}`} className="block">
+                  <Card className="transition hover:border-accent/40">
+                    <CardContent className="flex items-center gap-3 p-4">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><FileText className="h-4 w-4" /></span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-ink">{a.title}</p>
+                        <p className="text-xs text-ink-soft">Assignment · {a.status} · updated {fmtDate(a.updated_at)}</p>
+                      </div>
+                      <span className="text-sm text-accent">Resume →</span>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+              {(notebooks ?? []).slice(0, 2).map((n) => (
+                <Link key={n.id} href={`/notebooks/${n.id}`} className="block">
+                  <Card className="transition hover:border-accent/40">
+                    <CardContent className="flex items-center gap-3 p-4">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink/5 text-accent"><BookOpen className="h-4 w-4" /></span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-ink">{n.title}</p>
+                        <p className="text-xs text-ink-soft">Notebook · updated {fmtDate(n.updated_at)}</p>
+                      </div>
+                      <span className="text-sm text-accent">Open →</span>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <Card><CardContent className="p-4 text-sm text-ink-soft">Nothing to resume yet. Start an assignment above and it will appear here, ready to pick up where you stopped.</CardContent></Card>
+          )}
+        </div>
+
+        {/* UPCOMING WORK — real deadlines only */}
+        <div>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Upcoming work</h2>
+          {(dueSoon?.length ?? 0) > 0 ? (
+            <Card>
+              <CardContent className="divide-y divide-line p-0">
+                {(dueSoon ?? []).map((a) => (
+                  <Link key={a.id} href={`/assignments/${a.id}`} className="flex items-center gap-3 p-4 transition hover:bg-accent-soft/40">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><AlertTriangle className="h-4 w-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-ink">{a.title}</p>
+                      <p className="text-xs text-ink-soft">Due {fmtDate(a.due_at)}</p>
+                    </div>
+                    {a.urgency && <Badge tone="neutral">{a.urgency}</Badge>}
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card><CardContent className="p-4 text-sm text-ink-soft">No deadlines on file. Set a due date when you start an assignment and it will show up here.</CardContent></Card>
+          )}
+        </div>
 
         {/* More ways to work — quick launch (all modes are real, from MODES) */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
