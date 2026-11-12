@@ -98,7 +98,11 @@ existing table and preferences from migration 0042 — no new migration, no seco
 
 **Co-Owner request visibility** now matches their decision authority.
 
-Verified: `npm test` 6906/6906, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings
+**2026-11-13 (second push):** approving a request now emails the invitation through the existing
+delivery layer and records the provider's answer; the sidebar shows staff how many requests are
+waiting; and the notification centre refreshes itself in place.
+
+Verified: `npm test` 6930/6930, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings
 (the existing ceiling), production build OK.
 
 Not live-verified: actual signed-in presence beats and inbox writes against the production

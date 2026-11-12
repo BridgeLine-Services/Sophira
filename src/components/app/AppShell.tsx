@@ -16,6 +16,7 @@ import { ThemeToggle } from "@/components/app/ThemeToggle";
 import { usePresenceReporter } from "@/lib/presence/use-presence-reporter";
 import { DEFAULT_THRESHOLDS } from "@/lib/presence/thresholds";
 import { useNotificationBell } from "@/lib/notifications/use-notification-bell";
+import { usePendingRequests } from "@/lib/notifications/use-pending-requests";
 
 // Active subject/course scope indicator (course-aware engines round):
 // shows the real subject or course this engine is working within.
@@ -364,6 +365,12 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
   });
 
   const { unread, known: unreadKnown } = useNotificationBell(userId);
+  /**
+   * 2026-11-13: a Co-Owner cannot see the Owner's dashboard, so the sidebar carries the count of
+   * invitation requests waiting for a decision. Only staff roles cause the read; a plain member
+   * has no such number and never asks for one.
+   */
+  const { pending: pendingRequests, known: pendingKnown } = usePendingRequests(role);
 
   // Blank-screen/redirect-loop fix (2026-10-08): if the session dies while
   // the user is inside the app (token revoked, cookie cleared, signed out
@@ -513,18 +520,26 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
 
   /** The unread badge is drawn only for a count that was actually read, never for zero. */
   const unreadBadge = unreadKnown && unread > 0 ? unread : 0;
+  /** Waiting invitation requests, for the staff who may decide one. Same rule: known and above zero. */
+  const requestBadge = pendingKnown && pendingRequests > 0 ? pendingRequests : 0;
 
   const navLink = (href: string, label: string, Icon: typeof Home) => {
     const base = href.split("?")[0];
     const active = pathname === base || pathname.startsWith(base + "/");
-    const badge = href === "/notifications" ? unreadBadge : 0;
+    const badge = href === "/notifications" ? unreadBadge : href === "/owner/requests" ? requestBadge : 0;
     return (
       <Link
         key={href}
         href={href}
         onClick={drawerOpen ? closeDrawer : undefined}
         aria-current={active ? "page" : undefined}
-        aria-label={badge ? `${label}, ${badge} unread` : undefined}
+        aria-label={
+          href === "/notifications" && badge
+            ? `${label}, ${badge} unread`
+            : href === "/owner/requests" && badge
+              ? `${label}, ${badge} waiting for a decision`
+              : undefined
+        }
         className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
           active ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
       >

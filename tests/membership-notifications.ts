@@ -29,6 +29,7 @@ import {
 import {
   ACCOUNT_RESTORED_NOTE,
   invitationAcceptedNote,
+  invitationRequestApprovedNote,
   roleChangedNote,
 } from "../src/lib/notifications/membership-notes";
 
@@ -284,4 +285,63 @@ export function runMembershipNotificationTests(
     "schema: exactly one migration creates the notification table, so nothing was recreated");
   assert(migrations.length === 51,
     "schema: this cycle needed no new migration, because every new event fits the existing fields");
+
+  section("approving a request actually sends the invitation");
+
+  const approvedSection = requests.slice(requests.indexOf('if (decision === "reject")'));
+  assert(approvedSection.includes("deliverInvitation({"),
+    "requests: approval goes through the same delivery layer the Invitations page uses, not a second process");
+  assert(/channels: \["email"\]/.test(approvedSection),
+    "requests: email is the channel, because a request carries an address and not a mobile number");
+  assert(approvedSection.indexOf("deliverInvitation") > approvedSection.indexOf('.from("invitations")'),
+    "requests: nothing is sent before the invitation row genuinely exists");
+  assert(approvedSection.includes("email_status") && approvedSection.includes("email_error"),
+    "requests: what the provider said is recorded, not assumed");
+  assert(!/if \(emailStatus !== "sent"\) return/.test(approvedSection),
+    "requests: a refused or unconfigured send never fails an approval that already succeeded");
+  assert(approvedSection.includes("delivery: delivery.overall") && approvedSection.includes("email_status: emailStatus"),
+    "requests: the staff member sees the real delivery outcome in the response");
+  assert(approvedSection.lastIndexOf("notifyMember") > approvedSection.indexOf("await deliverInvitation"),
+    "requests: the requester is told AFTER delivery was attempted, so the sentence can say what happened");
+  assert(!/token/.test(approvedSection.slice(approvedSection.indexOf("invitationRequestApprovedNote"), approvedSection.indexOf("dedupeKey: `invitation-request-${req.id}-approved`") + 60)),
+    "requests: the requester's notice still carries no token");
+
+  const sent = invitationRequestApprovedNote("person@example.com", "sent");
+  const unsent = invitationRequestApprovedNote("person@example.com", "failed");
+  assert(/emailed/i.test(sent.body) && !/could not/i.test(sent.body),
+    "wording: an accepted send is described as sent");
+  assert(/could not email/i.test(unsent.body) && /yourself/i.test(unsent.body),
+    "wording: a failed send states the truthful next step instead of implying contact happened");
+  assert(sent.body !== unsent.body,
+    "wording: the two outcomes never read the same");
+
+  section("staff can see that a request is waiting (without a broadcast)");
+
+  const pendingHook = read("src/lib/notifications/use-pending-requests.ts");
+  assert(/role === "owner" \|\| role === "co_owner"/.test(pendingHook),
+    "requests: only the roles that may decide one ever ask for the count");
+  assert(pendingHook.includes('row.status === "pending"'),
+    "requests: the number counts waiting requests, not decided history");
+  assert(pendingHook.includes("setKnown(true)") && pendingHook.includes("if (!res.ok) return"),
+    "requests: an unreadable count is not shown as zero waiting work");
+  assert(/document.hidden/.test(pendingHook),
+    "requests: a hidden tab does not poll");
+  assert(/usePendingRequests\(role\)/.test(shell) && shell.includes('href === "/owner/requests" ? requestBadge'),
+    "requests: the sidebar shows the count beside Invitation requests");
+  assert(shell.includes("waiting for a decision"),
+    "requests: the count is described in words for a screen reader, not only as a number");
+
+  section("the notification list refreshes itself while open");
+
+  const live = read("src/components/app/NotificationsLive.tsx");
+  assert(live.includes("router.refresh()"),
+    "centre: a notice arriving re-renders the server list in place");
+  assert(live.includes("member_notifications") && live.includes("filter: `user_id=eq.${userId}`"),
+    "centre: only this member's own rows are watched");
+  assert(live.includes("removeChannel"),
+    "centre: the subscription is removed on unmount, so revisiting cannot stack listeners");
+  assert(/return null;/.test(live),
+    "centre: the watcher renders nothing, so it cannot hide or replace the real list");
+  assert(read("src/app/notifications/page.tsx").includes("<NotificationsLive userId={user.id} />"),
+    "centre: the watcher is mounted by the page it refreshes");
 }

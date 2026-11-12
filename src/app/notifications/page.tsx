@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app/AppShell";
 import LocalDateTime from "@/components/app/LocalDateTime";
 import { MarkAllReadButton, MarkReadButton } from "@/components/app/NotificationActions";
+import NotificationsLive from "@/components/app/NotificationsLive";
 import {
   listNotifications,
   safeLink,
@@ -49,6 +50,8 @@ export default async function NotificationsPage() {
 
   return (
     <AppShell title="Notifications" backHref="/dashboard">
+      {/* Refreshes this list in place when a notice arrives; renders nothing itself. */}
+      <NotificationsLive userId={user.id} />
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="text-sm text-ink-soft">
           {unread > 0 ? `${unread} unread` : "You're all caught up"} — {items.length} notification

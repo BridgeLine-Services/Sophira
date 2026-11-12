@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireNetworkManagement, requireUser } from "@/lib/supabase/guard";
 import { checkEmail, emailProblemMessage, EMAIL_MAX_INPUT } from "@/lib/validation/email";
 import { notifyMember } from "@/lib/notifications/notify";
+import { invitationRequestApprovedNote } from "@/lib/notifications/membership-notes";
+import { deliverInvitation } from "@/lib/invitations/delivery";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -197,21 +199,62 @@ export async function PATCH(request: NextRequest) {
   if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+  const link = `${origin}/signup?invite=${invitation.token}`;
 
   /**
-   * The requester is told their request was approved, AFTER the invitation genuinely exists.
-   * The notice never carries the token: the live link stays on the Invitations page and in the
-   * email or text delivery, which is the only place a working token belongs.
+   * THE INVITATION IS ACTUALLY SENT (2026-11-13).
+   *
+   * Approving used to create the row and hand the caller a link, so an approved person could
+   * wait forever unless a staff member remembered to copy the link out by hand. Delivery now
+   * goes through the SAME layer the Invitations page uses (`deliverInvitation`), so there is
+   * one delivery process, one token and one row - never a second system.
+   *
+   * Email only, deliberately: an invitation request carries an address, not a mobile number,
+   * and Sophira binds the invitation to that address anyway. A staff member who also wants a
+   * text message adds the number on the Invitations page, which is the existing flow.
+   *
+   * A refused or unconfigured send NEVER fails the approval: the invitation exists, the
+   * requester is told the truth about what happened, and the link stays on the Invitations page.
+   * Only "sent" means the provider accepted it, and only then is it reported as sent.
    */
+  const delivery = await deliverInvitation({ channels: ["email"], email: req.email, phone: null, link, siteUrl: origin });
+  const emailStatus = delivery.email.status;
+  // Record what the provider said. An older database without the delivery-metadata columns
+  // must not turn a completed approval into an error, so this is best-effort bookkeeping.
+  await supabase
+    .from("invitations")
+    .update(
+      emailStatus === "sent"
+        ? { email_status: "sent", email_sent_at: new Date().toISOString(), email_error: null }
+        : { email_status: emailStatus, email_error: delivery.email.reason ?? null }
+    )
+    .eq("id", invitation.id)
+    .then(() => undefined);
+
+  /**
+   * The requester is told their request was approved, AFTER the invitation genuinely exists and
+   * after delivery was attempted, so the sentence can say what actually happened. The notice
+   * never carries the token: the live link stays on the Invitations page and in the email, which
+   * is the only place a working token belongs.
+   */
+  const words = invitationRequestApprovedNote(req.email, emailStatus);
   const notice = await notifyMember(req.requester_id, {
     kind: "invitation_request_approved",
-    title: "Your invitation request was approved",
-    body: `An invitation for ${req.email} has been created. The invitation link is on the Invitations page and works only for that email address.`,
+    title: words.title,
+    body: words.body,
     link: "/settings",
     dedupeKey: `invitation-request-${req.id}-approved`,
   });
 
   return NextResponse.json({
-    data: { ok: true, status: "approved", link: `${origin}/signup?invite=${token}`, notification: notice },
+    data: {
+      ok: true,
+      status: "approved",
+      link,
+      delivery: delivery.overall,
+      email_status: emailStatus,
+      email_note: delivery.email.reason ?? null,
+      notification: notice,
+    },
   });
 }

@@ -761,3 +761,15 @@ executed verification that observed the behavior.
 | Member dashboard | Own unread count and latest notice; "could not check" is distinct from "empty" | PASSED (source) |
 | Schema | No new migration; the notification table is still created only by 0042 and RLS is unchanged | PASSED |
 | Full verification | `npm test` 6906/6906, `npx tsc --noEmit`, `npm run lint` (0 errors / 33 warnings), production build | PASSED |
+
+### 2026-11-13 (second push) — approval delivery, staff awareness, live centre
+
+| Item | Verification | Result |
+| --- | --- | --- |
+| Approved request is emailed | Approval calls the shared `deliverInvitation` layer after the row exists; only `sent` is reported as sent | PASSED (source + suite) |
+| Delivery failure cannot fail an approval | No early return on a non-`sent` status; the invitation, the decision and the notice all stand | PASSED (source) |
+| Requester's wording matches reality | `invitationRequestApprovedNote` has distinct sent / not-sent sentences | PASSED (unit) |
+| Staff see waiting requests | Pending count in the sidebar for Owner and Co-Owner only; unknown never shown as zero | PASSED (source) |
+| Centre refreshes in place | Realtime watcher filtered to the member's own rows, removed on unmount, renders nothing | PASSED (source + build) |
+| Live email actually arriving | Needs a verified sending configuration and a real inbox | NOT VERIFIED |
+| Full verification | `npm test` 6930/6930, `npx tsc --noEmit`, `npm run lint` (0 errors / 33 warnings), production build, secret scan | PASSED |

@@ -324,3 +324,33 @@ from the event kind — presentation only, nothing stored differently.
 in-app notice would be a message into a room they cannot enter; access is never delayed to send
 one. They hear from Sophira on restoration, when they can actually read it. Nothing changed
 about revocation itself: status is set and sessions are invalidated immediately.
+
+### Approving a request now sends the invitation (2026-11-13)
+
+Approving used to create the invitation row and hand the caller a link, so an approved person
+could wait indefinitely unless a staff member remembered to copy the link out by hand. Approval
+now calls the same `deliverInvitation` layer the Invitations page uses — one delivery process,
+one token, one row — for **email only**, because a request carries an address rather than a
+mobile number and the invitation is bound to that address anyway. A staff member who also wants
+a text message adds the number on the Invitations page, as before.
+
+Only `sent` means the provider accepted it. The provider's answer is recorded on the invitation
+(`email_status`, `email_sent_at`, `email_error`) and returned to the staff member, and the
+requester's notice is worded differently depending on it: "has been emailed to them" versus
+"could not email it — the link is on the Invitations page, please send it yourself". A refused
+or unconfigured send never fails an approval that already succeeded.
+
+### Staff can see a waiting request (2026-11-13)
+
+A Co-Owner cannot open the Owner dashboard, so the sidebar now shows the count of **pending
+invitation requests** beside "Invitation requests". Only the two roles that may decide one cause
+the read; a plain member never asks. A failed read shows no number at all, so an unavailable
+count is never displayed as zero waiting work.
+
+### The notification centre updates itself (2026-11-13)
+
+The centre is server-rendered, so a notice arriving while the page was open used to require a
+reload. A watcher component (`NotificationsLive`) listens on the existing realtime connection,
+filtered to the member's own rows, and asks the server to re-render the list. It renders nothing
+itself, so an unreachable realtime service leaves the already-loaded list intact rather than
+replacing it with a spinner. The subscription is removed on unmount.

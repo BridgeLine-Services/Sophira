@@ -56,3 +56,20 @@ export function invitationAcceptedNote(email: string): MembershipNote {
     body: `${email} has joined Sophira and can now sign in with that address.`,
   };
 }
+
+/**
+ * Told to a requester once their approved invitation has actually been sent (2026-11-13).
+ *
+ * Two different situations, two different sentences: "we emailed them" is only said when the
+ * provider accepted it, and a failed send tells the staff requester the truthful next step
+ * instead of implying the person has been contacted.
+ */
+export function invitationRequestApprovedNote(email: string, emailStatus: string): MembershipNote {
+  const sent = emailStatus === "sent";
+  return {
+    title: "Your invitation request was approved",
+    body: sent
+      ? `An invitation for ${email} has been emailed to them. The same link is on the Invitations page and works only for that email address.`
+      : `An invitation for ${email} has been created, but Sophira could not email it. The link is on the Invitations page — please send it to them yourself.`,
+  };
+}
