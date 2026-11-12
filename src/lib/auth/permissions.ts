@@ -49,6 +49,18 @@ export function canViewPresence(actorRole: Role | string | null | undefined): bo
   return isStaff(actorRole);
 }
 
+/**
+ * The staff-wide NETWORK MANAGEMENT authority: the member directory, role changes within a
+ * Co-Owner's limits, suspending and removing a User or Tester, and the member-facing APIs.
+ *
+ * It is NOT the authority to issue an invitation. That reads as one label covering two
+ * different powers, so it is spelled out here: invitations create accounts, the database
+ * policy on `invitations` is per-issuer (`invited_by = auth.uid()`), and issuing one stays
+ * Owner-only in both the route (`requireOwner`) and the page (`requireOwnerPage`). A
+ * Co-Owner therefore sees no "Invite someone" link and cannot reach the page. Nothing in
+ * this file may be read as widening that: `canManageInvitations` is about managing people
+ * who are already in the network.
+ */
 export function canManageInvitations(actorRole: Role | string | null | undefined): boolean {
   return isStaff(actorRole);
 }

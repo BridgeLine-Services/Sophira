@@ -52,6 +52,29 @@ export function runMembershipRoleTests(assert: (cond: boolean, msg: string) => v
     "access: membership contact details are administrative only");
   assert(canViewPresence("co_owner") && !canViewPresence("user"),
     "access: presence is administrative information");
+  section("The invitation authority is stated where it is enforced");
+  {
+    const route = readFileSync("src/app/api/invitations/route.ts", "utf8");
+    const pageSrc = readFileSync("src/app/owner/invitations/page.tsx", "utf8");
+    const membersPage = readFileSync("src/app/owner/members/page.tsx", "utf8");
+    const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+    const doc = readFileSync("docs/MEMBERSHIP_ROLES_AND_PRESENCE.md", "utf8");
+    assert(/requireOwner\(/.test(route) && !/requireNetworkManagement\(/.test(route),
+      "invitations: issuing one is Owner-only at the route, not staff-wide");
+    assert(/requireOwnerPage\(/.test(pageSrc),
+      "invitations: the page is Owner-only, so a Co-Owner cannot reach it by typing the address");
+    assert(/profile\.role === "owner" && \(/.test(membersPage),
+      "invitations: the Members page shows the invite link to the Owner only");
+    assert(/href: "\/owner\/invitations"[^}]*minimum:/.test(shell) === false,
+      "invitations: the navigation entry carries no staff minimum, so a Co-Owner never sees it");
+    assert(/href: "\/owner\/members"[^}]*minimum: "co_owner"/.test(shell),
+      "invitations: the directory itself stays open to a Co-Owner");
+    assert(!/co_owner` \| See the member directory, invite people/.test(doc),
+      "invitations: the documented role table no longer grants a Co-Owner the invite screen");
+    assert(/Only the Owner issues invitations/.test(doc),
+      "invitations: the document says plainly who invites, so the mismatch cannot silently return");
+  }
+
   assert(canManageInvitations("co_owner") && !canManageInvitations("user"),
     "access: invitations are administrative");
   assert(canAccessOwnerSecurity("owner") && !canAccessOwnerSecurity("co_owner"),
