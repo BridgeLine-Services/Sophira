@@ -33,7 +33,10 @@
   --elev-2: 0 1px 2px rgb(26 33 46 / 0.05), 0 10px 24px -16px rgb(26 33 46 / 0.22);
   --elev-3: 0 2px 6px rgb(26 33 46 / 0.06), 0 26px 60px -30px rgb(26 33 46 / 0.30);
   --elev-accent: 0 10px 24px -14px rgb(13 112 118 / 0.55);
-  --hero-bg: linear-gradient(158deg, #10302f 0%, #0d2a33 46%, #161d33 100%);
+  --hero-bg:
+    radial-gradient(900px 460px at 8% -12%, #7c5cea 0%, rgba(124, 92, 234, 0) 58%),
+    radial-gradient(760px 420px at 100% 0%, #4a2f92 0%, rgba(74, 47, 146, 0) 55%),
+    linear-gradient(168deg, #2b1a56 0%, #221442 52%, #180f30 100%);
   --hero-ink: 255 255 255;
 }
 
@@ -64,7 +67,10 @@
   --elev-2: 0 1px 2px rgb(0 0 0 / 0.45), 0 12px 28px -18px rgb(0 0 0 / 0.65);
   --elev-3: 0 2px 8px rgb(0 0 0 / 0.45), 0 30px 70px -32px rgb(0 0 0 / 0.80);
   --elev-accent: 0 12px 28px -16px rgb(94 210 202 / 0.30);
-  --hero-bg: linear-gradient(158deg, #0d2429 0%, #101d2e 50%, #171a35 100%);
+  --hero-bg:
+    radial-gradient(900px 460px at 8% -12%, #6a4bd6 0%, rgba(106, 75, 214, 0) 58%),
+    radial-gradient(760px 420px at 100% 0%, #3d2678 0%, rgba(61, 38, 120, 0) 55%),
+    linear-gradient(168deg, #241548 0%, #1b1036 52%, #120b26 100%);
   --hero-ink: 255 255 255;
 }
 
@@ -249,13 +255,10 @@ input, textarea, select {
 }
 
 /* =====================================================================
-   PERSONAL LEARNING DASHBOARD (2026-11-12, re-skinned to the enterprise
-   system). The owner's reference gave this page its composition - hero,
-   stat row, path bar, seven-day chart, then the six learning panels - and
-   that composition is kept. The palette is now the product's own teal /
-   charcoal-navy hero with the purple brand mark, not a second theme, so
-   the dashboard reads as the same product as every other screen.
-   Scoped to .dash-* only: no existing selector is changed by this block.
+   PERSONAL LEARNING DASHBOARD (2026-11-12)
+   The owner's purple reference, scoped to this one page. Nothing here
+   changes a selector that already exists elsewhere: every class is new
+   and prefixed .dash-, so the rest of Sophira is untouched.
    ===================================================================== */
 .dash-page {
   color: rgb(var(--hero-ink));
@@ -269,21 +272,20 @@ input, textarea, select {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.66);
+  color: rgba(255, 255, 255, 0.62);
 }
 .dash-hero-title {
   font-size: clamp(23px, 3vw, 32px);
   font-weight: 700;
   line-height: 1.16;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   color: #fff;
 }
-.dash-hero-sub { color: rgba(255, 255, 255, 0.76); font-size: 14px; line-height: 1.55; }
+.dash-hero-sub { color: rgba(255, 255, 255, 0.72); font-size: 14px; line-height: 1.5; }
 .dash-glass {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 16px;
-  backdrop-filter: blur(6px);
 }
 .dash-stat-value {
   font-size: clamp(22px, 2.4vw, 28px);
@@ -297,21 +299,18 @@ input, textarea, select {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.66);
+  color: rgba(255, 255, 255, 0.62);
 }
-.dash-stat-note { font-size: 12px; color: rgba(255, 255, 255, 0.74); line-height: 1.45; }
-/* Panels follow the theme: they were pinned white, which is exactly the
-   "permanently white in dark mode" defect the redesign has to avoid. */
+.dash-stat-note { font-size: 12px; color: rgba(255, 255, 255, 0.72); line-height: 1.4; }
 .dash-panel {
-  background: rgb(var(--c-card));
-  color: rgb(var(--c-ink));
-  border: 1px solid rgb(var(--c-line));
+  background: #ffffff;
+  color: #23263a;
   border-radius: 18px;
   padding: clamp(14px, 1.6vw, 20px);
-  box-shadow: var(--elev-2);
+  box-shadow: 0 18px 38px rgba(12, 6, 30, 0.26);
 }
-.dash-panel-title { font-size: 15px; font-weight: 700; color: rgb(var(--c-ink)); letter-spacing: -0.01em; }
-.dash-panel-sub { font-size: 13px; color: rgb(var(--c-ink-soft)); line-height: 1.55; }
+.dash-panel-title { font-size: 15px; font-weight: 700; color: #241a44; letter-spacing: -0.01em; }
+.dash-panel-sub { font-size: 13px; color: #5d6178; line-height: 1.5; }
 .dash-cta {
   display: inline-flex;
   align-items: center;
@@ -320,12 +319,12 @@ input, textarea, select {
   padding: 10px 18px;
   font-size: 14px;
   font-weight: 600;
-  background: #fff;
-  color: #0d2a33;
+  background: #6d4bd8;
+  color: #fff;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 10px 22px rgba(109, 75, 216, 0.35);
 }
-.dash-cta:hover { background: #eaf6f4; transform: translateY(-1px); }
+.dash-cta:hover { background: #5c3ec7; transform: translateY(-1px); }
 .dash-cta-quiet {
   display: inline-flex;
   align-items: center;
@@ -349,14 +348,14 @@ input, textarea, select {
 .dash-path-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #7ee0d4 0%, #5ed2ca 55%, #b8a6ff 100%);
+  background: linear-gradient(90deg, #c9b2ff 0%, #8b5cf6 100%);
   transition: width 0.4s ease;
 }
 .dash-bars { display: flex; align-items: flex-end; gap: 6px; height: 62px; }
 .dash-bar-col { display: flex; min-width: 0; flex: 1; flex-direction: column; justify-content: flex-end; gap: 6px; }
-.dash-bar { width: 100%; border-radius: 6px 6px 3px 3px; background: rgba(255, 255, 255, 0.28); }
-.dash-bar[data-on="true"] { background: linear-gradient(180deg, #9ff0e6 0%, #5ed2ca 100%); }
-.dash-bar-day { font-size: 10px; text-align: center; color: rgba(255, 255, 255, 0.7); }
+.dash-bar { width: 100%; border-radius: 6px 6px 3px 3px; background: rgba(255, 255, 255, 0.3); }
+.dash-bar[data-on="true"] { background: linear-gradient(180deg, #d3c0ff 0%, #8b5cf6 100%); }
+.dash-bar-day { font-size: 10px; text-align: center; color: rgba(255, 255, 255, 0.66); }
 .dash-chip {
   display: inline-flex;
   align-items: center;
@@ -365,14 +364,41 @@ input, textarea, select {
   padding: 3px 9px;
   font-size: 11px;
   font-weight: 600;
-  background: rgb(var(--c-accent-soft));
-  color: rgb(var(--c-accent));
+  background: #f1ecff;
+  color: #55389f;
 }
 @media (prefers-reduced-motion: reduce) {
   .dash-cta, .dash-path-fill { transition: none; }
 }
 
 .dash-path-value { font-size: 14px; font-weight: 700; color: #fff; }
-.dash-path-basis { font-size: 12px; line-height: 1.55; color: rgba(255, 255, 255, 0.72); }
-.dash-note { font-size: 12px; color: rgba(255, 255, 255, 0.72); }
-.dash-range { accent-color: #7ee0d4; }
+.dash-path-basis { font-size: 12px; line-height: 1.55; color: rgba(255, 255, 255, 0.7); }
+.dash-note { font-size: 12px; color: rgba(255, 255, 255, 0.7); }
+.dash-range { accent-color: #6d4bd8; }
+
+/*
+ * ROLE DASHBOARDS (2026-11-12): the same purple language as the member home, applied as a
+ * shell. The role pages keep their existing markup; only their top-level blocks are lifted
+ * onto white panels, so every semantic token inside them still resolves as before.
+ */
+.dash-page > .dash-stack { display: flex; flex-direction: column; gap: 12px; }
+.dash-page > .dash-stack > * {
+  background: #ffffff;
+  color: #23263a;
+  border-radius: 18px;
+  padding: clamp(12px, 1.4vw, 18px);
+  box-shadow: 0 18px 38px rgba(12, 6, 30, 0.24);
+}
+.dash-page > .dash-stack > .dash-hero {
+  background: transparent;
+  box-shadow: none;
+  padding: 2px 4px 6px;
+  color: #fff;
+}
+.dash-page > .dash-stack > .dash-hero .dash-hero-sub { color: rgba(255, 255, 255, 0.72); }
+
+/* Trend chart (2026-11-12): purple on the white role panels, no literal colour in the tsx. */
+.trend-line { stroke: #6d4bd8; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend-dot { fill: #6d4bd8; }
+.trend-bar { fill: #d9cdf7; }
+.trend-bar[data-on="true"] { fill: #6d4bd8; }

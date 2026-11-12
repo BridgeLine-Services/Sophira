@@ -3,6 +3,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user";
 import { AppShell } from "@/components/app/AppShell";
+import { TrendChart } from "@/components/dashboard/TrendChart";
+import { weekActivity } from "@/lib/dashboard/overview";
 import { Badge, Card, CardContent } from "@/components/ui";
 import { Briefcase, CheckCircle2, ClipboardList, Users } from "lucide-react";
 import { canUseTesterFeatures, canAccessOwnerSecurity } from "@/lib/auth/permissions";
@@ -84,7 +86,23 @@ export default async function CoOwnerPage() {
   const announcements = announcementRows ?? [];
   const announcementsUnreadable = Boolean(announcementError) || !announcementRows;
 
-  return (
+    /*
+   * YOUR TEAM'S WEEK (2026-11-12). The reference's bar chart, drawn from the same membership
+   * audit rows the team feed reads: seven days, real counts, an empty day is an empty bar.
+   */
+  const weekSince = new Date(Date.now() - 6 * 86_400_000).toISOString();
+  const { data: weekRows, error: weekError } = await supabase
+    .from("membership_audit")
+    .select("created_at")
+    .gte("created_at", weekSince)
+    .limit(1000);
+  const teamWeek = weekActivity(
+    (weekRows ?? []).map((row) => ({ at: String(row.created_at ?? "") })),
+    new Date(),
+    7,
+  );
+
+return (
     /*
    * 2026-11-12: this page is the Co-Owner's administrative HOME, so it renders inside the
    * administrative environment (variant="owner") with the role-filtered staff sidebar - the
@@ -94,6 +112,23 @@ export default async function CoOwnerPage() {
    * academic workspace.
    */
   <AppShell title="Co-Owner Dashboard" variant="owner" role={role}>
+        <div className="dash-page">
+          <div className="dash-stack">
+            <div className="dash-hero">
+              <p className="dash-eyebrow">Co-Owner Dashboard</p>
+              <h2 className="dash-hero-title mt-1">The network you help run</h2>
+              <p className="dash-hero-sub mt-2 max-w-2xl">Your areas, member activity and QA work, read live from the database. Anything unreadable says so.</p>
+            </div>
+            <TrendChart
+              title="Your team this week"
+              subtitle="Membership events in the last seven days, so you can see where the work actually landed."
+              variant="bars"
+              series={teamWeek}
+              unreadable={Boolean(weekError)}
+              unit="membership events"
+              sourceNote="Read from membership_audit. A day with no events is drawn as an empty bar."
+            />
+
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Co-Owner</Badge>
@@ -269,6 +304,9 @@ export default async function CoOwnerPage() {
           </CardContent></Card>
         )}
       </div>
-    </AppShell>
+    
+          </div>
+        </div>
+</AppShell>
   );
 }

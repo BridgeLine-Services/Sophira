@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user";
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
+import { TrendChart } from "@/components/dashboard/TrendChart";
+import { weekActivity } from "@/lib/dashboard/overview";
 import { OwnerDashboard } from "@/components/app/OwnerDashboard";
 import { OwnerAreaGrid } from "@/components/owner/OwnerAreaGrid";
 import type { Role } from "@/lib/roles";
@@ -192,7 +194,25 @@ export default async function OwnerPage() {
     canvasReady: canvasConfigured(),
   });
 
-  return (
+    /*
+   * NETWORK ACTIVITY (2026-11-12). The reference's analytics panel, drawn only from rows that
+   * exist: membership_audit records every membership event this network has actually seen, so a
+   * day with nothing in it is a real zero. If the read fails the panel says so instead of
+   * drawing a flat line, because "quiet" and "unreadable" are different facts.
+   */
+  const activitySince = new Date(Date.now() - 13 * 86_400_000).toISOString();
+  const { data: activityRows, error: activityError } = await supabase
+    .from("membership_audit")
+    .select("created_at")
+    .gte("created_at", activitySince)
+    .limit(1000);
+  const networkSeries = weekActivity(
+    (activityRows ?? []).map((row) => ({ at: String(row.created_at ?? "") })),
+    new Date(),
+    14,
+  );
+
+return (
     <AppShell
       title="Owner Dashboard"
       variant="owner"
@@ -213,7 +233,24 @@ export default async function OwnerPage() {
         </>
       }
     >
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <div className="dash-page">
+          <div className="dash-stack">
+            <div className="dash-hero">
+              <p className="dash-eyebrow">Owner Dashboard</p>
+              <h2 className="dash-hero-title mt-1">Your network, at a glance</h2>
+              <p className="dash-hero-sub mt-2 max-w-2xl">Everything below is read live from your database. Anything that could not be read says so, rather than showing a zero.</p>
+            </div>
+            <TrendChart
+              title="Network activity"
+              subtitle="Membership events across the last 14 days: invitations, role changes, joins and suspensions."
+              variant="line"
+              series={networkSeries}
+              unreadable={Boolean(activityError)}
+              unit="membership events"
+              sourceNote="Read from membership_audit. A day with no events is drawn as zero, not skipped, and nothing is estimated."
+            />
+
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-2 text-sm text-ink-soft">
           <Briefcase className="h-4 w-4 text-accent" aria-hidden />
           You manage this private network.
@@ -321,7 +358,10 @@ export default async function OwnerPage() {
         <CapabilityRegistryCard />
         <ProviderDiagnosticsCard />
       </section>
-    </AppShell>
+    
+          </div>
+        </div>
+</AppShell>
   );
 }
 

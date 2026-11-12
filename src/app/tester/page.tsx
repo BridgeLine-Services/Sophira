@@ -70,6 +70,14 @@ export default async function TesterPage() {
    * Dashboard" - never the Owner's or the Co-Owner's, and never at all for an ordinary member.
    */
   <AppShell title="Tester Dashboard" role={profile.role}>
+        <div className="dash-page">
+          <div className="dash-stack">
+            <div className="dash-hero">
+              <p className="dash-eyebrow">Tester Dashboard</p>
+              <h2 className="dash-hero-title mt-1">Help make Sophira better</h2>
+              <p className="dash-hero-sub mt-2 max-w-2xl">Your reports and the workspace you are testing. Nothing here is shared with other members.</p>
+            </div>
+
       <div className="space-y-6">
         <p className="max-w-2xl text-sm text-ink-soft">
           You&apos;re a tester. Use Sophira normally, and when something misbehaves, breaks, or could be better,
@@ -144,6 +152,9 @@ export default async function TesterPage() {
           </CardContent>
         </Card>
       </div>
-    </AppShell>
+    
+          </div>
+        </div>
+</AppShell>
   );
 }
