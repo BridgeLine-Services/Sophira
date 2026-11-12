@@ -25,8 +25,13 @@ export function runProdFixTests(assert: (c: boolean, n: string) => void, section
   }
   assert(!shell.includes('label: "Online status"'),
     "nav: no redundant owner-nav Online entry remains (the sidebar connectivity indicator already links to /online; two entries to the same page was the reported defect)");
-  assert((shell.match(/href="\/online"/g) ?? []).length === 1,
+  // 2026-11-12: the chip keeps the environment it was opened from (?env=owner), so the
+  // literal changes shape. The rule is unchanged: exactly ONE Online entry in the shell.
+  const onlineEntries = shell.match(/href=\{variant === "owner" \? "\/online\?env=owner" : "\/online"\}|href="\/online"/g) ?? [];
+  assert(onlineEntries.length === 1,
     "nav: exactly ONE /online entry exists in the shell (the real-time connectivity indicator), opening the real Online page");
+  assert(shell.includes('"/online?env=owner"'),
+    "nav: the owner environment is carried into the Online page instead of being dropped");
   assert(shell.includes('href.includes("#")'),
     "nav: active styling is route-aware; a section link is never marked active from another page");
 

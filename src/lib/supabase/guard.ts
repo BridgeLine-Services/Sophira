@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/types";
+import { canManageInvitations, canUseTesterFeatures, canViewMemberDirectory } from "../auth/permissions";
 
 /**
  * Server-side authorization guard for API routes (workflow §21).
@@ -114,6 +115,58 @@ export async function requireOwner(
       ok: false,
       response: NextResponse.json({ error: "Only the owner can do this." }, { status: 403 }),
     };
+  }
+  return result;
+}
+
+/**
+ * FOUR-ROLE GUARDS (2026-11-12).
+ *
+ * The role decision itself lives in src/lib/auth/permissions.ts, so a route asks for
+ * the AUTHORITY it needs instead of comparing role strings itself. Every one of these
+ * builds on requireUser, which means the account-status, revocation and self-healing
+ * rules above apply unchanged: a suspended Co-Owner cannot act either.
+ *
+ * requireOwner above is deliberately left exactly as it was — every existing
+ * owner-only route keeps its current behaviour, and Co-Owner authority is only ever
+ * granted by a route that explicitly asks for it.
+ */
+function forbidden(error: string): { ok: false; response: NextResponse } {
+  return { ok: false, response: NextResponse.json({ error }, { status: 403 }) };
+}
+
+/** Owner or Co-Owner. */
+export async function requireStaff(
+  supabase: SupabaseClient
+): Promise<{ ok: true; data: GuardResult } | { ok: false; response: NextResponse }> {
+  const result = await requireUser(supabase);
+  if (!result.ok) return result;
+  if (!canViewMemberDirectory(result.data.profile.role)) {
+    return forbidden("Only an Owner or Co-Owner can do this.");
+  }
+  return result;
+}
+
+/** Owner or Co-Owner: the same authority the Members page requires. */
+export async function requireNetworkManagement(
+  supabase: SupabaseClient
+): Promise<{ ok: true; data: GuardResult } | { ok: false; response: NextResponse }> {
+  const result = await requireUser(supabase);
+  if (!result.ok) return result;
+  if (!canManageInvitations(result.data.profile.role)) {
+    return forbidden("Only an Owner or Co-Owner can manage members.");
+  }
+  return result;
+}
+
+/** Tester or above: approved testing features only, never administration. */
+export async function requireTester(
+  supabase: SupabaseClient
+): Promise<{ ok: true; data: GuardResult } | { ok: false; response: NextResponse }> {
+  const result = await requireUser(supabase);
+  if (!result.ok) return result;
+  if (!canUseTesterFeatures(result.data.profile.role)) {
+    return forbidden("This area is open to Testers and administrators only.");
   }
   return result;
 }

@@ -76,6 +76,10 @@ const USER_TABLES = [
   "media_transcripts",
   "media_segments",
   "media_frames",
+  // Added with 0050: a member's own presence sessions and availability choice are their data,
+  // so a member can see exactly what Sophira recorded about them being online.
+  "member_presence",
+  "member_availability",
 ] as const;
 
 const ROW_CAP = 10000;

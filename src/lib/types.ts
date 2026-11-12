@@ -1,5 +1,11 @@
 export type Mode = "learn" | "assignment" | "check" | "writing" | "study" | "explain" | "custom";
-export type Role = "owner" | "user";
+
+/**
+ * The four Sophira roles live in src/lib/roles.ts (2026-11-12) and are re-exported here so
+ * every existing `import type { Role } from "@/lib/types"` keeps working unchanged.
+ */
+export type { Role } from "@/lib/roles";
+import type { Role } from "@/lib/roles";
 
 export interface Profile {
   id: string;
@@ -13,7 +19,8 @@ export interface Profile {
   accessibility_prefs: Record<string, unknown>;
   preferred_language: string | null;
   onboarded: boolean;
-  status: "active" | "revoked";
+  /** pending | accepted | active are all usable accounts; revoked is not (mirrors the API guard). */
+  status: "active" | "pending" | "accepted" | "revoked";
   last_active_at: string | null;
   can_request_invites: boolean;
   created_at: string;
@@ -52,8 +59,10 @@ export interface NetworkMemberStats {
   email: string | null;
   /** Owner-visible only; null when the member has not shared one. */
   phone?: string | null;
-  role: "owner" | "user";
-  status: "active" | "revoked";
+  /** True only when the authentication provider itself confirmed the number. */
+  phone_verified?: boolean | null;
+  role: Role;
+  status: "active" | "pending" | "accepted" | "revoked";
   access_revoked_at: string | null;
   onboarded: boolean;
   can_request_invites: boolean;
@@ -62,6 +71,14 @@ export interface NetworkMemberStats {
   assignment_count: number;
   response_count: number;
   subject_usage: { subject: string; count: number }[];
+  /** Server-computed presence (2026-11-12). Absent means "not reported", which reads Unknown. */
+  presence?: {
+    state: string | null;
+    session_count: number | null;
+    last_interaction: string | null;
+  } | null;
+  /** The member's own availability choice: available | away | busy | dnd. */
+  manual_availability?: string | null;
 }
 
 export interface Teacher {

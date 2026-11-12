@@ -7,15 +7,27 @@ reinstatement work, and how every enforcement point is server-side.
 
 ## Roles
 
-There are exactly two roles, stored in `public.profiles.role`:
+There are four roles, stored in `public.profiles.role` (migration 0048).
+The full rules live in **docs/MEMBERSHIP_ROLES_AND_PRESENCE.md**; this is
+the summary:
 
 | Role | Meaning |
 |---|---|
-| `owner` | The single designated owner: manages membership and invitations. The only role that can revoke or reinstate access. |
-| `user` | A regular invited member. Their academic data is private to them — even the owner cannot read it. |
+| `owner` | The single designated owner. The only role that can appoint or demote another Owner, change a Co-Owner into an Owner, suspend or remove a Co-Owner, or edit security settings. |
+| `co_owner` | Staff. Sees the member directory, invites people, and suspends or removes Users and Testers. **Cannot** act on an Owner or another Co-Owner, cannot appoint anyone, and cannot promote themselves. |
+| `tester` | A member with access to approved testing features plus the normal member workspace. No membership authority. |
+| `user` | A regular invited member. Their academic data is private to them — even the Owner and Co-Owners cannot read it. |
 
-No `admin` role exists; the existing architecture never required one,
-so none was added.
+Two limits are enforced in the database, not in the interface:
+
+- **The last Owner cannot be demoted.** An installation always keeps one
+  Owner, so there is never an installation nobody can administer.
+- **Nobody can change their own role.** A User cannot promote themselves,
+  and an Owner cannot quietly hand themselves extra rights. Ordinary
+  profile edits (name, phone, availability) still work normally.
+
+Every role change is written to `public.membership_audit`: who acted, who
+was affected, the old role, the new role, when, and why.
 
 ## How the initial owner account is created
 
@@ -141,8 +153,10 @@ The owner does it from `/owner` → Members → **Revoke access** (or by
 calling `POST /api/network/members` with `{"action":"revoke"}`). The
 server then:
 
-1. Verifies the caller is authenticated AND active AND `role = 'owner'`
-   (`requireOwner` — no other role can reach this).
+1. Verifies the caller is authenticated AND active AND is staff
+   (`requireStaff` + the shared permission matrix). A Co-Owner may suspend
+   a User or Tester; suspending an Owner or another Co-Owner needs the
+   Owner. The last remaining Owner cannot be revoked, by anyone.
 2. Sets `profiles.status = 'revoked'` and records
    `profiles.access_revoked_at = now()` in the database.
 3. Calls the admin sign-out API for that user: ALL their refresh tokens
@@ -202,7 +216,7 @@ authenticated user → active access (profiles.status) → appropriate role → 
 ```
 
 Applied at: middleware (pages), the API guard (`requireUser` /
-`requireOwner`, every protected route), and the database (RLS policies +
+`requireOwner` / `requireStaff`, every protected route), and the database (RLS policies +
 owner checks in RPCs like `network_stats()`). Migrations: 0001 (roles),
 0005 (status + owner management), 0008 (fail-closed owner bootstrap),
 0019 (revocation audit trail).

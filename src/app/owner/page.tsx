@@ -134,7 +134,9 @@ export default async function OwnerPage() {
             <Card><CardContent className="p-4">
               <p className="font-medium text-ink">Word &amp; Google document saving is not set up yet</p>
               <p className="mt-1 text-sm text-ink-soft">Members cannot connect their own Microsoft or Google accounts until the two provider apps are registered. This does not affect any other feature.</p>
-              <Link href="/settings/integrations" className="mt-2 inline-block text-sm text-accent hover:underline">Open Integrations settings &rarr;</Link>
+              {/* 2026-11-12: this pointed at the member Settings page, which renders in the
+                  personal-workspace shell and drops the owner out of their dashboard. */}
+              <Link href="/owner/integrations" className="mt-2 inline-block text-sm text-accent hover:underline">Open Integrations settings &rarr;</Link>
               <p className="mt-1 text-xs text-ink-soft">Step-by-step: docs/WORD_GOOGLE_DOCS_SETUP.md</p>
             </CardContent></Card>
           )}

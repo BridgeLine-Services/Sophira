@@ -9,7 +9,7 @@ migrations, the tables they create (minus any dropped later) and the storage buc
 and fails the suite when they disagree. A migration added without updating this line
 is a test failure, not a stale document.
 
-**Scope at time of writing:** 47 migrations, 55 application tables, 1 private storage bucket (`private-docs`).
+**Scope at time of writing:** 50 migrations, 59 application tables, 1 private storage bucket (`private-docs`).
 
 ---
 
@@ -138,6 +138,20 @@ sensitive and is never printed by any backup report.
 
 ---
 
+## 7b. Presence and role records (0050)
+
+| Table | Why it is protected | Member-owned | Sensitive |
+|---|---|---|---|
+| `member_presence` | One row per signed-in tab: when it last reported in and when it last saw a genuine interaction. It holds no address, no device fingerprint and no page history. A member can export exactly what was recorded about them being online. | yes | yes |
+| `member_availability` | The member's own choice (Available, Away, Busy, Do Not Disturb) and whether other members may see it. Restoring it preserves their choice instead of silently resetting it to the default. | yes | no |
+
+Two more tables came with the same migration and are deliberately **not** kept in a member
+backup: `presence_settings` (one global Owner setting) and `membership_audit` (who changed whose
+role, and when — it names the administrator who acted, so it is operator evidence rather than a
+member's content). Both are listed in section 8.
+
+---
+
 ## 8. Deliberately excluded from the member backup scope
 
 These are operator or system tables. They are listed so the exclusion stays a visible
@@ -149,6 +163,8 @@ decision rather than an oversight:
 | `app_config` | Non-secret application settings, rebuilt from the environment. |
 | `provider_usage` | Spend telemetry, not member content. |
 | `owner_bootstrap` | Included above, not excluded — listed here because it is the one system table that must survive, since it protects the single-owner rule. |
+| `presence_settings` | One Owner-owned set of presence thresholds for the whole installation, not any member's row (rebuilt with its defaults). |
+| `membership_audit` | Evidence of administrative actions: which administrator changed which role, when, and why. It is retained as an audit trail, not handed to the member it describes. |
 
 If a future migration adds a table, `checkCoverage` in `src/lib/backup/inventory.ts` reports
 it as **missing** until the backup scope includes it. That is the mechanism preventing silent

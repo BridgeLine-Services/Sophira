@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { selectRow, updateProfileColumns, callDbFunction, privilegedChannelReachable } from "@/lib/db-privileged";
-import { requireOwner } from "@/lib/supabase/guard";
+import { requireStaff } from "@/lib/supabase/guard";
+import { canManageAccount } from "@/lib/auth/permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Owner membership management (workflow §4).
+ * Membership management (workflow §4; four roles 2026-11-12).
  *
- * Actions (all owner-only, enforced server-side):
+ * Actions (Owner or Co-Owner, enforced server-side):
  *   revoke      — set profile.status = 'revoked' and sign the user out.
  *                 Middleware + API guards then block every protected route.
  *   restore     — set status back to 'active'.
@@ -19,14 +20,20 @@ export const dynamic = "force-dynamic";
  *   set_invite_permission — grant/revoke this member's right to REQUEST
  *                 invitations (never to issue them directly).
  *
- * Owner changes to other profiles go through the service-role admin client
- * here; regular RLS keeps profiles strictly own-row for everyone else.
+ * Changes to other profiles go through the service-role admin client here;
+ * regular RLS keeps profiles strictly own-row for everyone else.
+ *
+ * 2026-11-12: the gate widened from owner to staff, but the DECISION is the shared permission
+ * matrix: a Co-Owner may act on a User or a Tester and never on a Co-Owner or an Owner, and
+ * nobody can act on their own account. The existing "Owners cannot be modified here" refusal
+ * is deliberately KEPT — owner-level account changes (suspending or removing an Owner) are
+ * not part of this flow for any role, so nothing that used to be blocked is now allowed.
  */
 export async function POST(request: NextRequest) {
   const supabase = createClient();
-  const guard = await requireOwner(supabase);
+  const guard = await requireStaff(supabase);
   if (!guard.ok) return guard.response;
-  const ownerId = guard.data.user.id;
+  const actorId = guard.data.user.id;
 
   let body: { action?: string; user_id?: string; value?: boolean };
   try {
@@ -39,8 +46,8 @@ export async function POST(request: NextRequest) {
   if (!action || !user_id) {
     return NextResponse.json({ error: "Missing action or user id." }, { status: 400 });
   }
-  if (user_id === ownerId) {
-    return NextResponse.json({ error: "You cannot manage your own owner account here." }, { status: 400 });
+  if (user_id === actorId) {
+    return NextResponse.json({ error: "You cannot manage your own account here." }, { status: 400 });
   }
 
   // 2026-10-07: privileged reads/writes prefer the VERIFIED direct
@@ -56,7 +63,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "That member could not be found." }, { status: 404 });
   }
   if (target.role === "owner") {
-    return NextResponse.json({ error: "Owners cannot be modified." }, { status: 400 });
+    return NextResponse.json({ error: "Owners cannot be modified here. Use Change role to hand ownership over." }, { status: 400 });
+  }
+
+  // The shared matrix: a Co-Owner may not touch a Co-Owner, and nobody may touch an Owner.
+  const decision = canManageAccount(
+    { id: actorId, role: guard.data.profile.role },
+    { id: user_id, role: (target.role as string) ?? "user" },
+  );
+  if (!decision.allowed) {
+    return NextResponse.json({ error: decision.reason ?? "That action is not allowed." }, { status: 403 });
   }
 
   switch (action) {

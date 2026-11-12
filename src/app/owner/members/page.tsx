@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app/AppShell";
 import { MembersPanel } from "@/components/app/MembersPanel";
-import { requireOwnerPage } from "@/lib/owner/page-context";
+import { requireStaffPage } from "@/lib/owner/page-context";
 import { loadOwnerRoster } from "@/lib/owner/roster";
+import { isRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,8 @@ export const dynamic = "force-dynamic";
  * the existing management actions, with the server-side owner check applied before any data loads.
  */
 export default async function OwnerMembersPage() {
-  const { supabase } = await requireOwnerPage();
-  const { members, statsError } = await loadOwnerRoster(supabase);
+  const { supabase, user, profile } = await requireStaffPage();
+  const { members, statsError, thresholds, presenceAvailable } = await loadOwnerRoster(supabase);
 
   return (
     <AppShell title="Members" variant="owner">
@@ -22,20 +23,29 @@ export default async function OwnerMembersPage() {
             <h2 className="text-lg font-semibold text-ink">Everyone in your network</h2>
             <p className="mt-1 max-w-2xl text-sm text-ink-soft">
               Revoke access to switch someone off temporarily; you can restore them later. Removing
-              an account permanently is a separate action and asks for confirmation. Only the owner can grant, revoke, or reinstate access.
+              an account permanently is a separate action and asks for confirmation. Owners and
+              Co-Owners can grant, revoke or reinstate access for Users and Testers; only an Owner
+              can manage another Owner or change an administrator&apos;s role.
             </p>
           </div>
           <div className="flex gap-3 text-sm font-medium">
-            <Link href="/owner/invitations" className="text-accent hover:underline">Invite someone</Link>
-            <Link href="/owner" className="text-accent hover:underline">Back to overview</Link>
+            {profile.role === "owner" && (
+              <Link href="/owner/invitations" className="text-accent hover:underline">Invite someone</Link>
+            )}
+            <Link href={profile.role === "owner" ? "/owner" : "/dashboard"} className="text-accent hover:underline">
+              {profile.role === "owner" ? "Back to overview" : "Back to my workspace"}
+            </Link>
           </div>
         </div>
 
-        {statsError && (
-          <div role="status" className="rounded-card border border-amber-300 bg-amber-50 p-3 text-sm text-ink">{statsError}</div>
-        )}
-
-        <MembersPanel initialMembers={members} />
+        <MembersPanel
+          initialMembers={members}
+          viewerId={user.id}
+          viewerRole={isRole(profile.role) ? profile.role : "user"}
+          thresholds={thresholds}
+          presenceAvailable={presenceAvailable}
+          initialNotice={statsError}
+        />
       </div>
     </AppShell>
   );

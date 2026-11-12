@@ -78,7 +78,10 @@ export function runDataPreservationTests(
     "/api/complete-owner",
     "/api/invitations/accept",
   ]);
-  const OWNER_OR_MEMBER = /requireUser|requireOwner/;
+    // 2026-11-12: the guard family gained requireStaff / requireNetworkManagement / requireTester
+  // with the four-role model. The audit still demands a SHARED guard call on every route; it
+  // simply recognises all of its names.
+  const OWNER_OR_MEMBER = /require(User|Owner|Staff|NetworkManagement|Tester|Admin)\b/;
 
   const routes = walk("src/app/api").filter((f) => f.endsWith("route.ts"));
   const unguarded = routes

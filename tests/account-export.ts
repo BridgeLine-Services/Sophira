@@ -42,14 +42,20 @@ export function runAccountExportTests(assert: (c: boolean, n: string) => void, s
   // Complete table coverage: every user-owned table in the migrations is exported
   const tableLines = migrationTables();
   const userOwned = tableLines.filter((t) =>
-    !["invitations", "invitation_requests", "app_config", "sophira_meta", "owner_bootstrap", "provider_usage"].includes(t)
+    !["invitations", "invitation_requests", "app_config", "sophira_meta", "owner_bootstrap",
+      "provider_usage",
+      // Operator records, not member data: the role-change audit names the ADMIN who made each
+      // change (exporting it to a member would hand them another person's actions), and the
+      // presence thresholds are one global owner setting, not a member's own row.
+      "membership_audit", "presence_settings"].includes(t)
   );
   for (const t of userOwned) {
     assert(route.includes(`"${t}"`),
       `export: user-owned table ${t} is included in the export scope`);
   }
   // The exclusions are exactly the non-user tables (system/operator/telemetry) — nothing silently dropped
-  for (const t of ["invitations", "invitation_requests", "app_config", "sophira_meta", "owner_bootstrap", "provider_usage"]) {
+  for (const t of ["invitations", "invitation_requests", "app_config", "sophira_meta", "owner_bootstrap",
+    "provider_usage", "membership_audit", "presence_settings"]) {
     assert(!route.includes(`"${t}"`),
       `export: non-user table ${t} is NOT exported (it is not the member's personal data)`);
   }
