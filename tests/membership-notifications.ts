@@ -344,4 +344,24 @@ export function runMembershipNotificationTests(
     "centre: the watcher renders nothing, so it cannot hide or replace the real list");
   assert(read("src/app/notifications/page.tsx").includes("<NotificationsLive userId={user.id} />"),
     "centre: the watcher is mounted by the page it refreshes");
+
+  section("the live membership check (one command, read-only, honest)");
+
+  const liveCheck = read("scripts/verify-live-membership.mjs");
+  const pkg = read("package.json");
+  assert(/no live credentials in this environment/.test(liveCheck) && /process\.exit\(3\)/.test(liveCheck),
+    "live check: with no credentials it says so and exits 3, exactly like the other verifiers");
+  assert(liveCheck.includes("that would be a security hole"),
+    "live check: a presence function answering an unsigned caller is a FAILURE, not a pass");
+  assert(!/\.insert\(|method: "PATCH"|method: "DELETE"|method: "PUT"/.test(liveCheck),
+    "live check: it never writes - no insert, update, patch or delete exists in it");
+  assert(liveCheck.includes("the probes changed nothing") && liveCheck.includes("row count identical"),
+    "live check: it proves its own probes created nothing");
+  assert(/console\.log\([^)]*\$\{KEY\}/.test(liveCheck) === false
+      && /JSON\.stringify\(process\.env\)/.test(liveCheck) === false,
+    "live check: the key value is never printed, only its name");
+  assert(liveCheck.includes("needs a member test account") && liveCheck.includes("npm run db:verify:local"),
+    "live check: it names the two things it cannot check instead of implying full coverage");
+  assert(/"verify:live-membership": "node scripts\/verify-live-membership\.mjs"/.test(pkg),
+    "live check: it is one npm command, so nobody has to reconstruct the probes by hand");
 }

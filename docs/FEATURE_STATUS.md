@@ -105,6 +105,11 @@ waiting; and the notification centre refreshes itself in place.
 Verified: `npm test` 6930/6930, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings
 (the existing ceiling), production build OK.
 
+**Live database checked 2026-11-13** with `npm run verify:live-membership` (new): the presence
+and notification tables exist, the presence functions refuse unsigned callers, the directory
+refuses non-staff, and the live `member_presence` table holds recent heartbeats from real
+signed-in sessions. So the database update has been applied for these features.
+
 Not live-verified: actual signed-in presence beats and inbox writes against the production
 database (needs a member test account), and whether the deployment's notification write channel
 is reachable (`insertNotification` direct connection, or the service-role fallback).

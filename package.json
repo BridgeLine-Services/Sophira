@@ -38,7 +38,8 @@
     "backup:verify": "node scripts/backup-sophira.mjs --verify",
     "smoke:prod": "node scripts/smoke-prod.mjs",
     "bench:local": "node scripts/benchmark-local-model.mjs",
-    "db:verify:local": "node scripts/verify-migrations-local.mjs"
+    "db:verify:local": "node scripts/verify-migrations-local.mjs",
+    "verify:live-membership": "node scripts/verify-live-membership.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

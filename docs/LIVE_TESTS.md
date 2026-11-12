@@ -56,3 +56,25 @@ BLOCKED without database credentials.
 - Gemini LIVE: NOT RUN (no GEMINI_API_KEY).
 - AI application route LIVE: NOT RUN (no deployed backend credentials).
 - Release gate: BLOCKED (production env + live prerequisites missing).
+
+## Live membership check (2026-11-13)
+
+`npm run verify:live-membership` asks the live project whether the presence and notification
+features have what they need, and prints one plain verdict per check. It exits 3 when no live
+credentials are present, 1 when a check does not answer as expected, 0 when everything does.
+
+What it asks: that `member_presence`, `member_availability`, `presence_settings`,
+`member_notifications`, `notification_preferences`, `invitation_requests` and
+`invitations.email_status` are readable; that `presence_heartbeat`, `presence_release` and
+`presence_set_availability` exist and **refuse a caller who is not signed in** (an `ok: true`
+answer would be a security hole and fails the check); that `network_directory` refuses anyone who
+is not staff; and that the presence row count is identical before and after, so the check itself
+wrote nothing.
+
+What it cannot ask, and says so: whether a real signed-in member appears Online (needs a member
+account), whether RLS stops one member reading another's rows (verified at SQL level by
+`npm run db:verify:local`), and which migration number the database is at (Supabase does not
+expose its history table).
+
+Result on 2026-11-13: all thirteen checks passed against the live project, and the live
+`member_presence` table holds recent heartbeats from real signed-in sessions.
