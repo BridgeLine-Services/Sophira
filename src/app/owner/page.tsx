@@ -82,6 +82,12 @@ export default async function OwnerPage() {
   // database reason and offers reload as the retry.
   // 2026-11-12: the wording now comes from the shared action-item vocabulary, so the banner and
   // the "Needs attention" card cannot drift into saying different things about the same failure.
+  // Tester reports awaiting triage (staff count; RLS lets staff read all).
+  const { count: openQaReports } = await supabase
+    .from("qa_reports")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["open", "triaged"]);
+
   const statsError = roster.statsError
     ? describeUnreadableMembers(roster.directoryError ?? roster.statsError)
     : null;
@@ -131,6 +137,7 @@ export default async function OwnerPage() {
       : Boolean((terms && legalPlaceholdersRemain(terms)) || (privacy && legalPlaceholdersRemain(privacy)));
 
   const actionItems = buildActionItems({
+    openQaReports: openQaReports ?? 0,
     requestsWaiting: roster.requestsAvailable ? requests.length : null,
     suspendedMembers,
     databaseOutdated: roster.directoryMissing,

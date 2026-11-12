@@ -69,6 +69,8 @@ export interface ActionInputs {
   securityChecksNotRun?: number | null;
   /** The release-readiness word, or null when it could not be worked out. */
   release?: "READY" | "NOT READY" | "BLOCKED" | "UNKNOWN" | null;
+  /** Open tester reports awaiting triage; null when they could not be counted. */
+  openQaReports?: number | null;
   /** True when the Canvas connection is registered. Optional; undefined claims nothing. */
   canvasReady?: boolean;
 }
@@ -246,6 +248,21 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
         membersAffected: false,
       });
     }
+  }
+
+  // TESTER REPORTS (2026-11-12). Counted only; the reports themselves stay with
+  // the tester, and staff triage them from the dedicated screen.
+  if ((input.openQaReports ?? 0) > 0) {
+    info.push({
+      key: "qa-reports",
+      tone: "info",
+      title: `${input.openQaReports} tester report${input.openQaReports === 1 ? "" : "s"} awaiting triage`,
+      body:
+        "Testers filed these from their own workspace. Mark them being reviewed, fixed or declined so the tester can see what happened.",
+      href: "/owner/qa",
+      linkLabel: "Open QA reports",
+      membersAffected: false,
+    });
   }
 
   // LEGAL PAPERWORK (2026-11-13). Only shown when the documents were actually read and still
