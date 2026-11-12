@@ -11,6 +11,7 @@
  * fabricated weakness, never dependent on an AI provider.
  */
 import { existsSync, readFileSync } from "fs";
+import { readActivityDaily } from "../src/lib/dashboard/activity";
 import {
   buildProgress,
   buildRecommendations,
@@ -38,10 +39,10 @@ const ready = <T,>(rows: T[]) => ({ state: "ready" as const, rows });
 const unavailable = <T,>() => ({ state: "unavailable" as const, rows: [] as T[] });
 const count = (value: number | null): CountRead => ({ state: value === null ? "unavailable" : "ready", value });
 
-export function runDashboardOverviewTests(
+export async function runDashboardOverviewTests(
   assert: (c: boolean, n: string) => void,
   section: (t: string) => void,
-): void {
+): Promise<void> {
   // ==== A. Reading honestly ====
   section("dashboard: a failed read is never an empty result");
   {
@@ -629,13 +630,68 @@ export function runDashboardOverviewTests(
     assert(chart.includes("both series share one maximum") || chart.includes("share one maximum"),
       "dashboard: both lines share one scale, so a busier line cannot be faked by normalising it");
 
-    const ownerPage = readFileSync("src/app/owner/page.tsx", "utf8");
-    assert(ownerPage.includes('rpc("network_activity_daily"'),
-      "dashboard: the owner page reads the staff-gated series");
-    assert(ownerPage.includes('dailySeries(activityDaily, "signups"') &&
-      ownerPage.includes('dailySeries(activityDaily, "study_sessions"'),
-      "dashboard: sign-ups and study sessions are drawn from the same read");
-    assert(ownerPage.includes('unreadable={Boolean(dailyError)}'),
-      "dashboard: a failed growth read says so instead of drawing zeros");
+    const reader = readFileSync("src/lib/dashboard/activity.ts", "utf8");
+    assert(reader.includes('rpc("network_activity_daily"'),
+      "dashboard: the staff-gated series is read in exactly one place");
+    assert(reader.includes("PGRST202") && reader.includes("needsDatabaseUpdate"),
+      "dashboard: a function that is not installed yet is told apart from a failed read");
+    assert(reader.includes("Number.isFinite") && reader.includes("Math.round"),
+      "dashboard: a non-numeric count becomes zero instead of NaN reaching an SVG coordinate");
+
+    // The reader is driven directly, so the error shapes it will really see are pinned.
+    const fakeClient = (response: { data?: unknown; error?: unknown }) =>
+      ({ rpc: async () => response }) as never;
+    const missing = await readActivityDaily(
+      fakeClient({ data: null, error: { code: "PGRST202", message: "Could not find the function" } }),
+      14,
+    );
+    assert(missing.unreadable && missing.needsDatabaseUpdate && missing.rows.length === 0,
+      "dashboard: a missing function reads as 'needs the database update', not as a quiet network");
+    const broken = await readActivityDaily(
+      fakeClient({ data: null, error: { code: "42501", message: "owner/co-owner only" } }),
+      14,
+    );
+    assert(broken.unreadable && !broken.needsDatabaseUpdate,
+      "dashboard: a refusal is a failed read, never mistaken for a missing update");
+    const junk = await readActivityDaily(
+      fakeClient({
+        data: [
+          { day: "2026-11-12", signups: 2, study_sessions: "3", answers: null },
+          { day: "2026-11-11", signups: -4, study_sessions: 1.4, answers: 0 },
+          { day: 12, signups: 9 },
+          { signups: 40 },
+          null,
+        ],
+      }),
+      14,
+    );
+    assert(!junk.unreadable && junk.rows.length === 2,
+      "dashboard: a row without a real day is dropped, never charted under an invented date");
+    assert(junk.rows[0].signups === 2 && junk.rows[0].study_sessions === 3 && junk.rows[0].answers === 0,
+      "dashboard: counts are coerced to whole numbers, and a null is zero");
+    assert(junk.rows[1].signups === 0 && junk.rows[1].study_sessions === 1,
+      "dashboard: a negative count is dropped to zero and a fraction is rounded");
+
+    for (const [page, who] of [
+      ["src/app/owner/page.tsx", "owner"],
+      ["src/app/co-owner/page.tsx", "co-owner"],
+    ] as const) {
+      const source = readFileSync(page, "utf8");
+      assert(source.includes("readActivityDaily(") && source.includes("readActivityDaily(supabase, 14)"),
+        `dashboard: the ${who} page reads the staff-gated series through the one shared reader`);
+      assert(source.includes('dailySeries(activityRead.rows, "signups"') &&
+        source.includes('dailySeries(activityRead.rows, "study_sessions"'),
+        `dashboard: the ${who} charts sign-ups and study sessions from the same read`);
+      assert(source.includes('compare={{ label: "study sessions"'),
+        `dashboard: the ${who} panel draws the comparison line rather than a second chart`);
+      assert(source.includes("unreadable={activityRead.unreadable}"),
+        `dashboard: a failed growth read on the ${who} page says so instead of drawing zeros`);
+      assert(source.includes("activityRead.needsDatabaseUpdate"),
+        `dashboard: the ${who} page tells the reader to press Update database when that is the real cause`);
+    }
+
+    const chartHint = readFileSync("src/components/dashboard/TrendChart.tsx", "utf8");
+    assert(chartHint.includes("hint") && chartHint.includes("hint ??"),
+      "dashboard: the chart can carry the real, fixable reason instead of the generic sentence");
   }
 }

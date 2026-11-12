@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user";
 import { AppShell } from "@/components/app/AppShell";
 import { TrendChart } from "@/components/dashboard/TrendChart";
-import { weekActivity } from "@/lib/dashboard/overview";
+import { dailySeries, weekActivity } from "@/lib/dashboard/overview";
+import { readActivityDaily } from "@/lib/dashboard/activity";
 import { Badge, Card, CardContent } from "@/components/ui";
 import { Briefcase, CheckCircle2, ClipboardList, Users } from "lucide-react";
 import { canUseTesterFeatures, canAccessOwnerSecurity } from "@/lib/auth/permissions";
@@ -102,6 +103,15 @@ export default async function CoOwnerPage() {
     7,
   );
 
+  /*
+   * The Co-Owner runs the same network, so they get the same read: accounts created against
+   * study sessions, from the staff-gated network_activity_daily(). Counts only - no member's
+   * work is exposed to draw it, and a failed read says so instead of drawing zeros.
+   */
+  const activityRead = await readActivityDaily(supabase, 14);
+  const signupSeries = dailySeries(activityRead.rows, "signups", new Date(), 14);
+  const studySeries = dailySeries(activityRead.rows, "study_sessions", new Date(), 14);
+
 return (
     /*
    * 2026-11-12: this page is the Co-Owner's administrative HOME, so it renders inside the
@@ -127,6 +137,21 @@ return (
               unreadable={Boolean(weekError)}
               unit="membership events"
               sourceNote="Read from membership_audit. A day with no events is drawn as an empty bar."
+            />
+            <TrendChart
+              title="Growth and study"
+              subtitle="Accounts created and study sessions started, day by day, over the last 14 days."
+              variant="line"
+              series={signupSeries}
+              compare={{ label: "study sessions", series: studySeries }}
+              unreadable={activityRead.unreadable}
+              hint={
+                activityRead.needsDatabaseUpdate
+                  ? "This panel needs the latest database update. Nothing is wrong: the owner can press Update database on their dashboard and it will fill in."
+                  : undefined
+              }
+              unit="accounts created"
+              sourceNote="Counted by network_activity_daily() from profiles, work_sessions and responses - counts only, so no member's work is exposed to make the chart."
             />
 
       <div className="space-y-6">
