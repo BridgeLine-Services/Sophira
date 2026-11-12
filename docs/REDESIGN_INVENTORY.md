@@ -193,3 +193,22 @@ data layer, `auth-gated` = redirects or reads the session itself. A page with no
 - `/api/writing/plan`
 - `/api/writing/review`
 - `/auth/callback`
+
+## Membership notifications and global presence (2026-11-13)
+
+New modules:
+
+- `/src/lib/notifications/notify.ts` — the one server helper that records a member notice
+  (registry-validated, preference-aware, idempotent, never throws).
+- `/src/lib/notifications/membership-notes.ts` — plain-language wording for a role change, a
+  restoration and an accepted invitation.
+- `/src/lib/notifications/use-notification-bell.ts` — the signed-in member's own unread count,
+  live over the existing realtime connection with a paused-when-hidden fallback.
+- `/src/components/app/NotificationPreferences.tsx` — the missing control for the existing
+  notification-preferences API.
+
+Changed surfaces: `AppShell` (heartbeat + unread badge), `MembersPanel` (no longer reports its
+own presence), `/notifications` (grouped headings, read/unread in words, error state),
+`/dashboard` (own unread summary), `/settings` (notification preferences), and the
+invitation-request, invitation-accept, role and member APIs (notices plus the Co-Owner list
+fix).

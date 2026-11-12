@@ -6,7 +6,9 @@ import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import { BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone, AlertTriangle } from "lucide-react";
+import { Bell, BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone, AlertTriangle } from "lucide-react";
+import { safeLink } from "@/lib/notifications/store";
+import LocalDateTime from "@/components/app/LocalDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +73,26 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       .in("status", ["candidate", "active", "recurring", "temporary"]),
   ]);
 
+  /**
+   * MY NOTIFICATIONS AT A GLANCE (2026-11-13).
+   *
+   * Only this member's own rows are read, and RLS says the same thing, so nothing here can
+   * describe anyone else's invitation, role or account. Read separately because a deployment
+   * without migration 0042 must not break the dashboard: if the table is missing the page says
+   * it could not check, which is different from "nothing new".
+   */
+  const [{ count: unreadNotices, error: unreadError }, { data: latestNotice, error: latestError }] = await Promise.all([
+    supabase.from("member_notifications").select("id", { count: "exact", head: true }).is("read_at", null),
+    supabase
+      .from("member_notifications")
+      .select("id, title, created_at, link")
+      .order("created_at", { ascending: false })
+      .limit(1),
+  ]);
+  const notificationsReadable = !unreadError && !latestError;
+  const latest = latestNotice?.[0] ?? null;
+  const latestHref = latest ? safeLink(latest.link) : null;
+
   const teacherName = (id: string | null) =>
     id ? (teachers?.find((t) => t.id === id)?.name ?? null) : null;
   const wp = writingProfile?.[0] ?? null;
@@ -102,6 +124,55 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </span>
               <span className="text-sm text-ink-soft">Any subject, any level — explained the way you like.</span>
             </Link>
+          </div>
+        </section>
+
+        {/* Your own notifications: a summary, not an administrative feed. */}
+        <section aria-labelledby="dashboard-notifications-heading">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2
+              id="dashboard-notifications-heading"
+              className="flex items-center gap-2 text-base font-semibold text-ink"
+            >
+              <Bell className="h-4 w-4 text-accent" aria-hidden /> Notifications
+            </h2>
+            <Link href="/notifications" className="text-sm font-medium text-accent hover:underline">
+              See all notifications
+            </Link>
+          </div>
+          <div className="mt-3 rounded-card border border-line bg-card p-4">
+            {!notificationsReadable ? (
+              <p className="text-sm text-ink-soft">
+                Sophira couldn&apos;t check your notifications just now. Nothing has been lost — open
+                your notifications to try again.
+              </p>
+            ) : (unreadNotices ?? 0) === 0 && !latest ? (
+              <p className="text-sm text-ink-soft">
+                Nothing yet. Invitation news, role changes and Canvas updates will appear here.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-ink">
+                  {(unreadNotices ?? 0) > 0
+                    ? `${unreadNotices} unread notification${unreadNotices === 1 ? "" : "s"}`
+                    : "No unread notifications"}
+                </p>
+                {latest && (
+                  <p className="text-sm text-ink-soft">
+                    Most recent:{" "}
+                    {latestHref ? (
+                      <Link href={latestHref} className="font-medium text-accent hover:underline">
+                        {latest.title}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-ink">{latest.title}</span>
+                    )}
+                    {" · "}
+                    <LocalDateTime iso={latest.created_at} />
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </section>
 

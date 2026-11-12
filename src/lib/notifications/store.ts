@@ -19,7 +19,16 @@ export type NotificationCategory = "canvas" | "deadlines" | "research" | "docume
 
 export const CATEGORIES: NotificationCategory[] = ["canvas", "deadlines", "research", "documents", "account", "system"];
 
-/** Every event Sophira can raise, and the category it belongs to. */
+/**
+ * Every event Sophira can raise, and the category it belongs to.
+ *
+ * 2026-11-13: membership events were added. They use the EXISTING "account" category rather
+ * than a new one, because that is the row a member already controls in preferences, and
+ * because adding a category would mean changing the database's fixed category list for no
+ * benefit to the person reading the notice. The notification centre still shows them under
+ * their own heading (see presentationGroup), so "Invitations and membership" and "Account
+ * and security" stay tellable apart in the interface.
+ */
 export const KINDS = {
   canvas_assignment_new: "canvas",
   canvas_assignment_changed: "canvas",
@@ -30,6 +39,11 @@ export const KINDS = {
   document_save_failed: "documents",
   document_recovered: "documents",
   account_security: "account",
+  invitation_request_approved: "account",
+  invitation_request_rejected: "account",
+  invitation_accepted: "account",
+  membership_role_changed: "account",
+  account_restored: "account",
   system_maintenance: "system",
 } as const;
 
@@ -102,9 +116,66 @@ export const CATEGORY_LABELS: Record<NotificationCategory, string> = {
   deadlines: "Due dates and overdue work",
   research: "Finished research",
   documents: "Document saving and recovery",
-  account: "Account and security",
+  account: "Invitations, membership and account security",
   system: "Sophira maintenance",
 };
+
+/**
+ * PRESENTATION HEADINGS (2026-11-13).
+ *
+ * The six stored categories are what a member switches on and off. This is only how the
+ * list is grouped for reading, so invitation news is not buried among security notices.
+ * Nothing here is stored, and nothing here can change what a member receives.
+ */
+export type PresentationGroup = "membership" | "security" | "canvas" | "deadlines" | "research" | "documents" | "system";
+
+export const PRESENTATION_LABELS: Record<PresentationGroup, string> = {
+  membership: "Invitations and membership",
+  security: "Account and security",
+  canvas: "Canvas",
+  deadlines: "Due dates",
+  research: "Research",
+  documents: "Documents",
+  system: "System maintenance",
+};
+
+const MEMBERSHIP_KINDS = new Set<string>([
+  "invitation_request_approved",
+  "invitation_request_rejected",
+  "invitation_accepted",
+  "membership_role_changed",
+  "account_restored",
+]);
+
+/** Which heading a notice is shown under. Derived from the event, never from stored text. */
+export function presentationGroup(kind: string): PresentationGroup {
+  if (MEMBERSHIP_KINDS.has(kind)) return "membership";
+  switch (kind) {
+    case "account_security":
+      return "security";
+    case "canvas_assignment_new":
+    case "canvas_assignment_changed":
+    case "canvas_assignment_missing":
+      return "canvas";
+    case "due_soon":
+    case "overdue":
+      return "deadlines";
+    case "research_complete":
+      return "research";
+    case "document_save_failed":
+    case "document_recovered":
+      return "documents";
+    case "system_maintenance":
+      return "system";
+    default:
+      return "system";
+  }
+}
+
+/** The heading text for one notice. Always something a member can read. */
+export function presentationLabel(kind: string): string {
+  return PRESENTATION_LABELS[presentationGroup(kind)];
+}
 
 export interface NotificationRow {
   id: string;

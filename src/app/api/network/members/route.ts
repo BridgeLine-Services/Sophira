@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { selectRow, updateProfileColumns, callDbFunction, privilegedChannelReachable } from "@/lib/db-privileged";
 import { requireStaff } from "@/lib/supabase/guard";
 import { canManageAccount } from "@/lib/auth/permissions";
+import { notifyMember } from "@/lib/notifications/notify";
+import { ACCOUNT_RESTORED_NOTE } from "@/lib/notifications/membership-notes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,14 +98,33 @@ export async function POST(request: NextRequest) {
         // the user regardless. Report but do not silently swallow.
         console.error("revoke_all_sessions failed after status update");
       }
+      /**
+       * NO IN-APP NOTICE ON REVOCATION (2026-11-13, deliberate).
+       *
+       * A revoked member cannot read their notifications: they are no longer authorized to
+       * open Sophira at all. Writing one would be a message into a room they cannot enter, and
+       * claiming it was "delivered" would be false. Access is never delayed to send a notice.
+       * The restore path above is where they hear from Sophira, once they can sign in again.
+       */
       return NextResponse.json({ data: { ok: true } });
     }
     case "restore": {
+      const restoredAt = new Date().toISOString();
       const restored = direct
         ? await updateProfileColumns(user_id, { status: "active", access_revoked_at: null })
         : !(await admin!.from("profiles").update({ status: "active", access_revoked_at: null }).eq("id", user_id)).error;
       if (!restored) return NextResponse.json({ error: "The change could not be saved." }, { status: 500 });
-      return NextResponse.json({ data: { ok: true } });
+      // 2026-11-13: they can sign in again, so this is the one moment a notice can reach them.
+      // It is written AFTER the restore succeeded; a failed restore above returns early, and a
+      // failure to record the notice never reverses the restore.
+      const notice = await notifyMember(user_id, {
+        kind: "account_restored",
+        title: ACCOUNT_RESTORED_NOTE.title,
+        body: ACCOUNT_RESTORED_NOTE.body,
+        link: "/dashboard",
+        dedupeKey: `account-restored-${user_id}-${restoredAt}`,
+      });
+      return NextResponse.json({ data: { ok: true, notification: notice } });
     }
     case "remove": {
       // Deleting the auth user cascades to profiles, courses, teachers,

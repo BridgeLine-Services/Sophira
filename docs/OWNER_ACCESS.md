@@ -268,3 +268,31 @@ informational ones, and the section header counts them.
 
 When every check answers as expected the page says so, and it says what it did not check, rather
 than implying the whole system is healthy.
+
+## Invitation requests: who sees them (2026-11-13)
+
+The list and the decision now use the same authority. Previously the `GET` handler returned
+every request only for the Owner while the `PATCH` handler already let a Co-Owner decide one,
+so a Co-Owner could act on requests they were never shown.
+
+| Role | Sees the whole request list | Can approve or reject |
+| --- | --- | --- |
+| User | No — only their own requests | No |
+| Tester | No | No |
+| Co-Owner | Yes | Yes |
+| Owner | Yes | Yes |
+
+Server: `requireNetworkManagement` (the same guard as `PATCH`) opens the staff-wide branch;
+everyone else falls through to their own rows, and RLS enforces the same rule independently.
+Appointing an Owner or Co-Owner, ownership transfer, billing and security remain Owner-only.
+
+## What a member is told, and what they are not
+
+Members receive in-app notices about their own membership events: their invitation request was
+approved or rejected, the invitation they sent was accepted, their role changed, or their
+access was restored. Owners and Co-Owners do not gain any ability to read another member's
+notifications — there is no such policy and no such screen, and notices never contain
+invitation tokens, decision notes about other people, or academic content.
+
+Revoking access writes no notice, because a revoked member cannot sign in to read one. Access
+is never delayed for a message.

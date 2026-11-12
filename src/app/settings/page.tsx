@@ -9,6 +9,7 @@ import { fmtDate } from "@/lib/format";
 import type { InvitationRequest, Profile } from "@/lib/types";
 import { ShieldCheck, Smartphone, Download } from "lucide-react";
 import { AvailabilityControl } from "@/components/app/AvailabilityControl";
+import { NotificationPreferences } from "@/components/app/NotificationPreferences";
 import { useAutosave } from "@/lib/save/useAutosave";
 import SaveStatus from "@/components/ui/SaveStatus";
 
@@ -315,6 +316,9 @@ export default function SettingsPage() {
 
         {/* How you appear: the member's own availability choice (2026-11-12). */}
         <AvailabilityControl />
+
+        {/* What Sophira tells you about (2026-11-13). The API existed; the control did not. */}
+        <NotificationPreferences />
 
         {/* Privacy */}
         <Card>

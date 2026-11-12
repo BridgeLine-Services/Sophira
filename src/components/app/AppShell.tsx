@@ -13,6 +13,9 @@ import { Gauge, Keyboard } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
+import { usePresenceReporter } from "@/lib/presence/use-presence-reporter";
+import { DEFAULT_THRESHOLDS } from "@/lib/presence/thresholds";
+import { useNotificationBell } from "@/lib/notifications/use-notification-bell";
 
 // Active subject/course scope indicator (course-aware engines round):
 // shows the real subject or course this engine is working within.
@@ -289,6 +292,8 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  /** The owner's live presence cadence. Null until it has been read, so nothing is guessed. */
+  const [presenceWindow, setPresenceWindow] = useState<{ intervalMs: number; activeWindowMs: number } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -311,6 +316,54 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
     window.addEventListener("offline", down);
     return () => { window.removeEventListener("online", up); window.removeEventListener("offline", down); };
   }, []);
+
+  /**
+   * EVERY SIGNED-IN MEMBER REPORTS PRESENCE (2026-11-13).
+   *
+   * This used to live only on the Owner's members screen, so the member directory was fed
+   * by one page. The shell is the one component every authenticated screen shares, for all
+   * four roles and in both the workspace and owner environments, so it is the right home for
+   * the heartbeat. The cadence comes from the owner's own settings, never from a guess; until
+   * it has been read, reporting stays off rather than inventing an interval.
+   */
+  useEffect(() => {
+    if (!userId) return;
+    let alive = true;
+    fetch("/api/network/presence")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { settings?: Record<string, number> | null } | null) => {
+        if (!alive) return;
+        const settings = body?.settings ?? null;
+        setPresenceWindow({
+          intervalMs:
+            (Number(settings?.heartbeat_interval_seconds) || DEFAULT_THRESHOLDS.heartbeatIntervalSeconds) * 1000,
+          activeWindowMs:
+            (Number(settings?.active_threshold_seconds) || DEFAULT_THRESHOLDS.activeThresholdSeconds) * 1000,
+        });
+      })
+      .catch(() => {
+        // The settings could not be read: fall back to Sophira's own defaults, which the
+        // server clamps anyway. A missing setting must not stop people being seen.
+        if (alive) {
+          setPresenceWindow({
+            intervalMs: DEFAULT_THRESHOLDS.heartbeatIntervalSeconds * 1000,
+            activeWindowMs: DEFAULT_THRESHOLDS.activeThresholdSeconds * 1000,
+          });
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
+  usePresenceReporter({
+    intervalMs: presenceWindow?.intervalMs ?? DEFAULT_THRESHOLDS.heartbeatIntervalSeconds * 1000,
+    activeWindowMs: presenceWindow?.activeWindowMs ?? DEFAULT_THRESHOLDS.activeThresholdSeconds * 1000,
+    // Off until the member is confirmed, and off the moment they sign out.
+    enabled: Boolean(userId) && presenceWindow !== null && !signingOut,
+  });
+
+  const { unread, known: unreadKnown } = useNotificationBell(userId);
 
   // Blank-screen/redirect-loop fix (2026-10-08): if the session dies while
   // the user is inside the app (token revoked, cookie cleared, signed out
@@ -458,20 +511,30 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
   /** Where "home" is for whoever is signed in. A Co-Owner cannot open /owner. */
   const adminHomeHref = isOwner ? "/owner" : isCoOwner ? "/owner/members" : "/dashboard";
 
+  /** The unread badge is drawn only for a count that was actually read, never for zero. */
+  const unreadBadge = unreadKnown && unread > 0 ? unread : 0;
+
   const navLink = (href: string, label: string, Icon: typeof Home) => {
     const base = href.split("?")[0];
     const active = pathname === base || pathname.startsWith(base + "/");
+    const badge = href === "/notifications" ? unreadBadge : 0;
     return (
       <Link
         key={href}
         href={href}
         onClick={drawerOpen ? closeDrawer : undefined}
         aria-current={active ? "page" : undefined}
+        aria-label={badge ? `${label}, ${badge} unread` : undefined}
         className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
           active ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
       >
         <Icon className="h-4 w-4" aria-hidden />
         {label}
+        {badge > 0 && (
+          <span className="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[11px] font-semibold text-on-accent">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
       </Link>
     );
   };
@@ -619,8 +682,13 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
                   : "text-ink-soft hover:bg-ink/5"
               )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4" aria-hidden />
               {label}
+              {navHref === "/notifications" && unreadBadge > 0 && (
+                <span className="rounded-full bg-accent px-1.5 text-[11px] font-semibold text-on-accent">
+                  {unreadBadge > 99 ? "99+" : unreadBadge}
+                </span>
+              )}
             </Link>
           ))}
             </>
@@ -715,8 +783,13 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
                 pathname === href || pathname.startsWith(href + "/") ? "text-accent" : "text-ink-soft"
               )}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-5 w-5" aria-hidden />
               {label}
+              {href === "/notifications" && unreadBadge > 0 && (
+                <span className="rounded-full bg-accent px-1.5 text-[10px] font-semibold text-on-accent">
+                  {unreadBadge > 99 ? "99+" : unreadBadge}
+                </span>
+              )}
             </Link>
           ))}
         </div>

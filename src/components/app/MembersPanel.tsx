@@ -13,7 +13,6 @@ import { buildMemberRow, filterMembers, summarize, type MemberFilter, type Membe
 import { freshnessLabel } from "@/lib/format";
 import { DEFAULT_THRESHOLDS, type PresenceThresholds } from "@/lib/presence/thresholds";
 import { usePresenceFeed } from "@/lib/presence/use-presence-feed";
-import { usePresenceReporter } from "@/lib/presence/use-presence-reporter";
 import type { NetworkMemberStats, Role } from "@/lib/types";
 
 interface Props {
@@ -74,12 +73,10 @@ export function MembersPanel({
     if (next.statsError) setNotice(next.statsError);
   }, []);
 
-  // The administrator's own presence still has to be reported, otherwise the owner never
-  // appears as Active in their own directory.
-  usePresenceReporter({
-    intervalMs: activeThresholds.heartbeatIntervalSeconds * 1000,
-    activeWindowMs: activeThresholds.activeThresholdSeconds * 1000,
-  });
+  // 2026-11-13: this panel no longer reports presence itself. The shared application shell
+  // now does it for every signed-in role on every screen, so keeping a second loop here
+  // would double every administrator's heartbeats and release the session on navigation
+  // away from this page. The panel keeps its presence FEED (below), which is unrelated.
 
   // Re-render the "as of" line every half minute so it ages visibly instead of freezing.
   useEffect(() => {

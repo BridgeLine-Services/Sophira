@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireStaff } from "@/lib/supabase/guard";
 import { canManageMemberRole } from "@/lib/auth/permissions";
-import { isRole, roleLabel } from "@/lib/roles";
+import { isRole, roleLabel, type Role } from "@/lib/roles";
+import { notifyMember } from "@/lib/notifications/notify";
+import { roleChangedNote } from "@/lib/notifications/membership-notes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,9 +95,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error ?? "The role change was refused." }, { status: 403 });
   }
 
+  const finalRole = (result.role ?? nextRole) as Role;
+  const previousRole = result.previous_role ?? null;
+
+  /**
+   * THE MEMBER IS TOLD (2026-11-13) - only after the change was committed, so a refused or
+   * failed change can never produce a success notice. The dedupe key is derived from the
+   * change itself, not from when it happened, so a retry cannot produce a second notice.
+   */
+  const words = roleChangedNote(finalRole);
+  const notice = await notifyMember(userId, {
+    kind: "membership_role_changed",
+    title: words.title,
+    body: words.body,
+    link: "/settings",
+    dedupeKey: `role-${userId}-${previousRole ?? "unknown"}-${finalRole}`,
+  });
+
   return NextResponse.json({
-    role: result.role ?? nextRole,
-    previous_role: result.previous_role ?? null,
-    summary: `That member is now a ${roleLabel(result.role ?? nextRole)}.`,
+    role: finalRole,
+    previous_role: previousRole,
+    summary: `That member is now a ${roleLabel(finalRole)}.`,
+    notification: notice,
   });
 }

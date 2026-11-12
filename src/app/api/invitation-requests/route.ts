@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireNetworkManagement, requireUser } from "@/lib/supabase/guard";
 import { checkEmail, emailProblemMessage, EMAIL_MAX_INPUT } from "@/lib/validation/email";
+import { notifyMember } from "@/lib/notifications/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,14 @@ export async function GET() {
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 
-  if (guard.data.profile.role === "owner") {
+  /**
+   * 2026-11-13: the LIST was Owner-only while DECIDING was already staff-wide, so a Co-Owner
+   * could approve or reject requests they were never shown. Both now use exactly the same
+   * authority - the same guard the PATCH handler uses - and the database policies agree.
+   * Everyone else falls through to their own requests below, which RLS also enforces.
+   */
+  const staff = await requireNetworkManagement(supabase);
+  if (staff.ok) {
     const { data, error } = await supabase
       .from("invitation_requests")
       .select("*")
@@ -151,7 +159,16 @@ export async function PATCH(request: NextRequest) {
       })
       .eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ data: { ok: true, status: "rejected" } });
+    // The requester is told, and only the requester. The decision note stays administrative,
+    // so the reviewer's private reasoning is not copied into the member's list.
+    const notice = await notifyMember(req.requester_id, {
+      kind: "invitation_request_rejected",
+      title: "Your invitation request wasn't approved",
+      body: `Sophira did not create an invitation for ${req.email}. Nothing was shared with them, and you can ask again if something changes.`,
+      link: "/settings",
+      dedupeKey: `invitation-request-${req.id}-rejected`,
+    });
+    return NextResponse.json({ data: { ok: true, status: "rejected", notification: notice } });
   }
 
   // Approve → issue the actual invitation. The proposed person must still
@@ -180,7 +197,21 @@ export async function PATCH(request: NextRequest) {
   if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+
+  /**
+   * The requester is told their request was approved, AFTER the invitation genuinely exists.
+   * The notice never carries the token: the live link stays on the Invitations page and in the
+   * email or text delivery, which is the only place a working token belongs.
+   */
+  const notice = await notifyMember(req.requester_id, {
+    kind: "invitation_request_approved",
+    title: "Your invitation request was approved",
+    body: `An invitation for ${req.email} has been created. The invitation link is on the Invitations page and works only for that email address.`,
+    link: "/settings",
+    dedupeKey: `invitation-request-${req.id}-approved`,
+  });
+
   return NextResponse.json({
-    data: { ok: true, status: "approved", link: `${origin}/signup?invite=${token}` },
+    data: { ok: true, status: "approved", link: `${origin}/signup?invite=${token}`, notification: notice },
   });
 }

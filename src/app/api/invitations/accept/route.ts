@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { selectRow, acceptInvitationAtomic, privilegedChannelReachable } from "@/lib/db-privileged";
+import { notifyMember } from "@/lib/notifications/notify";
+import { invitationAcceptedNote } from "@/lib/notifications/membership-notes";
 
 export const runtime = "nodejs";
 
@@ -99,6 +101,28 @@ export async function POST(request: NextRequest) {
       );
   if (!accepted) {
     return NextResponse.json({ error: "That invitation was already used or revoked." }, { status: 410 });
+  }
+
+  /**
+   * THE INVITER IS TOLD (2026-11-13).
+   *
+   * Only AFTER the invitation was atomically claimed, so a person who never finished
+   * registering cannot produce a "they joined" notice. The retry path above (already
+   * accepted) deliberately says nothing: re-running a completed acceptance is not new news,
+   * and the dedupe key makes a second attempt harmless anyway.
+   *
+   * The notice carries no token, and it is addressed to the inviter's own inbox. A failure
+   * here is logged by the helper and never reported to the new member as a failed signup.
+   */
+  const invitedBy = typeof invitation.invited_by === "string" ? invitation.invited_by : null;
+  if (invitedBy && invitedBy !== user.id) {
+    const words = invitationAcceptedNote(String(invitation.email));
+    await notifyMember(invitedBy, {
+      kind: "invitation_accepted",
+      title: words.title,
+      body: words.body,
+      dedupeKey: `invitation-${invitation.id}-accepted`,
+    });
   }
 
   return NextResponse.json({ data: { ok: true } });

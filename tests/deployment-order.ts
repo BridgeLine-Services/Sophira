@@ -61,12 +61,13 @@ export function runDeploymentOrderTests(
   section("4. A refused heartbeat is not retried forever");
   {
     const reporter = readFileSync("src/lib/presence/use-presence-reporter.ts", "utf8");
-    assert(/unsupported = true/.test(reporter) && /presence === "unavailable"/.test(reporter),
-      "deploy order: the tab stops reporting when the server says presence cannot be recorded");
-    assert(/if \(timer\) clearInterval\(timer\)/.test(reporter),
+    assert(/stopped = true/.test(reporter) && /presence === "unavailable"/.test(reporter)
+        && /res\.status === 403/.test(reporter),
+      "deploy order: the tab stops reporting when the server says presence cannot be recorded, or refuses the account");
+    assert(/clearInterval\(state\.timer\)/.test(reporter),
       "deploy order: it clears its own interval, so an old database is not polled every 30s per tab");
-    assert(/lastSent\.current = Date\.now\(\)/.test(reporter) && /catch \{/.test(reporter),
-      "deploy order: a genuine network failure is still swallowed, never turned into a fake success");
+    assert(/\.catch\(\(\) => \{/.test(reporter) && /if \(body\?\.ok === true\) state\.lastSent = Date\.now\(\)/.test(reporter),
+      "deploy order: a genuine network failure is still swallowed, and a failed call is never recorded as a successful beat");
   }
 
   section("5. The owner is told what to press, in their own words");

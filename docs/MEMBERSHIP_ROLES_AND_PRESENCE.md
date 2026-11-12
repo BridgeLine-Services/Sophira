@@ -222,3 +222,105 @@ docs/WHAT_I_NEED_TO_DO_NEXT.md.
 - Invitation-only registration, revocation, session invalidation and permanent
   removal all behave exactly as before; they now additionally refuse to let the
   last Owner remove themselves.
+
+## Global presence reporting (2026-11-13)
+
+**Who reports, and from where.** Before this change the heartbeat was started by
+`MembersPanel` — the Owner's member directory. That meant presence was really only fed by
+whoever happened to be sitting on that page: a member working through assignments all evening
+looked absent, and the Owner's own row only updated while they watched the directory.
+
+The reporter now lives in `src/components/app/AppShell.tsx`, the one component every
+authenticated screen renders, in both the workspace and the owner environment. Because the
+shell is rendered per page, the hook is backed by ONE shared loop
+(`src/lib/presence/use-presence-reporter.ts`, `let shared` + a holder count):
+
+- acquiring it twice is a no-op, so a route change cannot start a second heartbeat;
+- the last shell out waits `HANDOVER_MS` (2s) before releasing, so navigating between pages
+  does not release and immediately re-claim the same session;
+- the cadence comes from the Owner's own settings, read once from `GET /api/network/presence`.
+  Until that read answers, reporting stays OFF rather than inventing an interval.
+
+**All four roles report:** User, Tester, Co-Owner and Owner. The identity is the session's
+own (`requireUser` on the API), so a role can never report as somebody else.
+
+**Session lifecycle**
+
+| Event | What happens |
+| --- | --- |
+| Signed-in screen opens | One heartbeat, immediately |
+| Normal navigation | The same loop continues; no new session |
+| Tab hidden | No beats are sent (a hidden tab is not present) |
+| Tab/app visible again | One heartbeat immediately |
+| Connection lost | Nothing is claimed; the call is not treated as success |
+| Connection returns | One heartbeat immediately (recovers without waiting an interval) |
+| Tab closed | `pagehide` releases the session (`DELETE`), the row would expire anyway |
+| Browser killed | No event fires; the session expires server-side. The server is authoritative |
+| Sign out | Reporting is switched off with `signingOut`, and the shell unmounts |
+| Account revoked / suspended | The server refuses (`403`); the loop stops for good |
+| Database without migration 0050 | The server answers `presence: "unavailable"`; the loop stops |
+
+**Privacy.** The only thing recorded is an opaque per-tab identifier (session storage, not a
+device id, never a fingerprint) and a single "something happened" timestamp. No message
+content, keystrokes, page history, reading history, assignment content or clipboard data is
+read or stored. Availability (Available/Away/Busy/Do Not Disturb) stays a separate
+member-controlled choice and is not derived from activity.
+
+**Degradation.** `unknown` is never shown as `Online`, never shown as `Offline`. A failed read
+keeps the last picture and the page says how old it is (`as of …`). The presence states and the
+owner-only visibility of presence are unchanged.
+
+## Membership notifications (2026-11-13)
+
+Sophira already had `public.member_notifications` (migration 0042) with a fixed event-kind
+registry, per-member RLS, dedupe keys and preferences. This cycle extends that system; it does
+not add a second one and needs no migration.
+
+### Events added
+
+| Event kind | Recipient | Stored category | What it says | Dedupe key |
+| --- | --- | --- | --- | --- |
+| `invitation_request_approved` | the requester | `account` | The invitation exists; the link is on the Invitations page and works only for that address | `invitation-request-<id>-approved` |
+| `invitation_request_rejected` | the requester | `account` | Not approved; nothing was shared; they may ask again | `invitation-request-<id>-rejected` |
+| `invitation_accepted` | the person who issued the invitation | `account` | That address joined Sophira | `invitation-<invitation id>-accepted` |
+| `membership_role_changed` | the affected member | `account` | The new role, and what they gained or lost | `role-<user>-<previous>-<next>` |
+| `account_restored` | the restored member | `account` | They can sign in again | `account-restored-<user>-<timestamp>` |
+
+No new category was introduced on purpose: `account` is the row members already control in
+preferences, and the database's category list is fixed. The notification centre still shows
+invitation and membership news under its own heading ("Invitations and membership") derived
+from the event kind — presentation only, nothing stored differently.
+
+### Recipients, wording and privacy rules
+
+- A notice is addressed to exactly one member and is written only after the operation it
+  describes actually succeeded. A refused role change, a failed invitation insert or an
+  unclaimed invitation produces no notice.
+- **No token is ever included.** A live invitation token stays in the email/text delivery and
+  on the Invitations page; a notice says where to find the link, never what it is.
+- The administrative decision note is not copied into the requester's notice, and the actor's
+  identity is not exposed beyond what the existing audit already shows to staff.
+- Every notice is worded by `src/lib/notifications/membership-notes.ts` or by the route, in
+  plain language, with a validated in-app link (`/settings`, `/dashboard`).
+- A notice never reveals academic content and never appears in another member's list. There is
+  no administrative read of anyone's notifications, by design.
+
+### Delivery behaviour (honest by construction)
+
+`src/lib/notifications/notify.ts` is the single server helper:
+
+1. the event kind must be in the registry (`validate()`), so nothing wordless can be stored;
+2. the member's own preference is checked first; a refusal is reported as "turned off", which
+   is not a failure and is not a delivery;
+3. the write goes over the verified privileged channel (`insertNotification`), with the
+   service-role client as the documented fallback for deployments that only have that;
+4. `(user_id, dedupe_key)` turns a retry into "already reported";
+5. **nothing throws.** A notice is a courtesy that follows a completed operation, so a failed
+   write is logged for diagnosis and the invitation, role change or restore still stands. The
+   route returns the outcome (`notification: {created, skipped, failed?}`) instead of claiming
+   success it did not verify.
+
+**Revocation deliberately writes no notice.** A revoked member cannot open Sophira, so an
+in-app notice would be a message into a room they cannot enter; access is never delayed to send
+one. They hear from Sophira on restoration, when they can actually read it. Nothing changed
+about revocation itself: status is set and sessions are invalidated immediately.

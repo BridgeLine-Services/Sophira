@@ -84,3 +84,23 @@ speed for paced output, not subject knowledge. Exposed from every subject
 workspace to the single real /writing/typing page; never a separate
 Settings feature. No data-model change was needed or made.
 
+
+## Member presence and membership notifications (2026-11-13) — implemented, partly live-verified
+
+**Presence reporting is now global.** The heartbeat moved from the Owner's members page into the
+shared app shell, so all four roles report while using Sophira normally, through one shared loop
+that survives navigation. Session lifecycle (hidden tab, reconnect, close, sign-out, revocation,
+missing migration) is documented in `docs/MEMBERSHIP_ROLES_AND_PRESENCE.md`.
+
+**Membership notifications** (`invitation_request_approved`, `invitation_request_rejected`,
+`invitation_accepted`, `membership_role_changed`, `account_restored`) are recorded through the
+existing table and preferences from migration 0042 — no new migration, no second system.
+
+**Co-Owner request visibility** now matches their decision authority.
+
+Verified: `npm test` 6906/6906, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings
+(the existing ceiling), production build OK.
+
+Not live-verified: actual signed-in presence beats and inbox writes against the production
+database (needs a member test account), and whether the deployment's notification write channel
+is reachable (`insertNotification` direct connection, or the service-role fallback).

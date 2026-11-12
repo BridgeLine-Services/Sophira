@@ -437,8 +437,11 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
   const panel = readFileSync("src/components/app/MembersPanel.tsx", "utf8");
   assert(panel.includes("fetchMembers") && panel.includes("could not refresh"),
     "client: a failed refresh keeps the rows AND says they may be old");
-  assert(panel.includes("usePresenceFeed") && panel.includes("usePresenceReporter"),
-    "client: the panel both reports its own presence and follows everyone else's");
+  assert(panel.includes("usePresenceFeed") && !panel.includes("usePresenceReporter"),
+    "client: the panel follows everyone else's presence, and no longer reports its own - the shared shell owns that now");
+  const shellReporter = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  assert(shellReporter.includes("usePresenceReporter(") && shellReporter.includes("/api/network/presence"),
+    "client: the one component every signed-in screen shares owns the heartbeat, for all four roles");
   assert(panel.includes("filterMembers") && panel.includes("summarize"),
     "client: filters and summary counts come from the tested helpers, not ad-hoc maths");
   const feed = readFileSync("src/lib/presence/use-presence-feed.ts", "utf8");

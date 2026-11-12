@@ -26,6 +26,8 @@ const TABLE_COLUMNS = {
   profiles: new Set(["id"] as const),
 } as const;
 const PROFILE_COLUMNS = new Set(["status", "access_revoked_at", "can_request_invites"] as const);
+/** The six categories the database itself allows (migration 0042). */
+const NOTIFICATION_CATEGORIES = new Set(["canvas", "deadlines", "research", "documents", "account", "system"] as const);
 
 type AllowedTable = keyof typeof TABLE_COLUMNS;
 
@@ -117,6 +119,63 @@ export async function updateProfileColumns(
     return r.rows.length > 0;
   });
   return res === true;
+}
+
+/**
+ * RECORD ONE MEMBER NOTICE (2026-11-13).
+ *
+ * Membership events (an invitation request decided, a role changed, an account restored) are
+ * raised by server code after the real operation has already succeeded. They go through this
+ * privileged channel because no browser may write to member_notifications: the table grants a
+ * member read and mark-read on their OWN rows and nothing else, and there is deliberately no
+ * insert policy for anyone.
+ *
+ * The SQL is fixed and parameterised, the category is checked against the database's own list,
+ * and the unique (user_id, dedupe_key) constraint turns a retry into "duplicate" rather than a
+ * second notice. Returns null when the privileged channel is not available, so the caller can
+ * say so honestly instead of claiming delivery.
+ */
+export async function insertNotification(row: {
+  userId: string;
+  category: string;
+  kind: string;
+  title: string;
+  body: string;
+  link: string | null;
+  dedupeKey: string;
+}): Promise<"inserted" | "duplicate" | null> {
+  requireAllowed("notification category", row.category, NOTIFICATION_CATEGORIES);
+  const res = await withClient(async (client) => {
+    const r = await client.query(
+      `insert into public.member_notifications (user_id, category, kind, title, body, link, dedupe_key)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       on conflict (user_id, dedupe_key) do nothing
+       returning id`,
+      [row.userId, row.category, row.kind, row.title, row.body, row.link, row.dedupeKey]
+    );
+    return r.rows.length > 0 ? ("inserted" as const) : ("duplicate" as const);
+  });
+  return res;
+}
+
+/**
+ * Does this member still want notices in this category? Absent means on, and a category the
+ * member has never touched is on. Null means it could not be read - the caller decides, and
+ * a notice about the member's own account is worth sending rather than swallowing.
+ */
+export async function notificationCategoryEnabled(userId: string, category: string): Promise<boolean | null> {
+  requireAllowed("notification category", category, NOTIFICATION_CATEGORIES);
+  const res = await withClient(async (client) => {
+    const r = await client.query(
+      `select categories from public.notification_preferences where user_id = $1`,
+      [userId]
+    );
+    if (r.rows.length === 0) return true;
+    const raw = (r.rows[0] as { categories?: unknown }).categories;
+    const map = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    return map[category] !== false;
+  });
+  return res;
 }
 
 /** Idempotent profile-row existence check (stale-signup cleanup). */

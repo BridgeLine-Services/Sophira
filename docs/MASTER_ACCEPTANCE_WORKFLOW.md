@@ -742,3 +742,22 @@ Every BLOCKED row is IMPLEMENTED and code-inspected; its verification
 becomes possible the moment the named blocker is removed. No test above is
 marked PASSED on the basis of code existing — each PASSED row cites the
 executed verification that observed the behavior.
+
+## 2026-11-13 — Membership communication and global presence
+
+| Area | What was verified | Result |
+| --- | --- | --- |
+| Presence scope | The reporter is started by `AppShell`, which every authenticated screen and both environments render; the members panel no longer starts its own | PASSED (source + suite) |
+| Presence lifecycle | One shared loop with a 2s hand-over, hidden-tab suppression, immediate beat on reconnect/visibility, explicit release on `pagehide`, stop on `403` and on `presence: "unavailable"` | PASSED (source pins in `tests/deployment-order.ts`, `tests/membership-notifications.ts`) |
+| Presence against a live database | A signed-in member actually appearing Online for another role | NOT VERIFIED — needs a member test account |
+| Membership events | Five new registered kinds, all in the existing `account` category; validation refuses anything else | PASSED (unit) |
+| Recipient privacy | Notices are written for one member, only after the operation succeeded; no token, no decision note, no actor detail | PASSED (source) |
+| Duplicate suppression | Dedupe keys derive from the event (request id, invitation id, change) | PASSED (source) |
+| Failure isolation | `notifyMember` never throws; routes return the notice outcome and never convert a missed notice into a failed invitation, role change or restore | PASSED (source) |
+| Revocation | Still immediate; deliberately no in-app notice (the member cannot read one) | PASSED (source) |
+| Co-Owner request list | `GET` uses `requireNetworkManagement`; own-request branch preserved | PASSED (source) |
+| Notification centre | Grouped headings, read/unread in words, empty state, error state, validated links | PASSED (source + build) |
+| Preferences | Existing API reached from Settings, confirmed save, stated failure, absent = on | PASSED (source) |
+| Member dashboard | Own unread count and latest notice; "could not check" is distinct from "empty" | PASSED (source) |
+| Schema | No new migration; the notification table is still created only by 0042 and RLS is unchanged | PASSED |
+| Full verification | `npm test` 6906/6906, `npx tsc --noEmit`, `npm run lint` (0 errors / 33 warnings), production build | PASSED |
