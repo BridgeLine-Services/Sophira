@@ -67,6 +67,9 @@ export const OWNER_NAV_GROUPS: Array<{
       // filing and following QA reports. Minimum role "tester" means members
       // and guests never see it, and the page re-checks server-side.
       { href: "/tester", label: "Testing workspace", icon: FlaskConical, minimum: "tester" },
+      // Co-Owner workspace (2026-11-12): the people-facing home for the co_owner role,
+      // rendered from the authority already defined in src/lib/auth/permissions.ts.
+      { href: "/co-owner", label: "Co-Owner workspace", icon: Briefcase, minimum: "co_owner" },
     ],
   },
   {
