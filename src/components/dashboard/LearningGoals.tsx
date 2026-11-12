@@ -194,7 +194,7 @@ export function LearningGoals() {
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="dash-panel-title">My learning goals</h2>
+          <h2 id="dashboard-goals-heading" className="dash-panel-title">My learning goals</h2>
           <p className="dash-panel-sub mt-1">Your own objectives, tracked against the work you actually do.</p>
         </div>
         <Button size="sm" variant="secondary" onClick={() => setFormOpen((open) => !open)}>

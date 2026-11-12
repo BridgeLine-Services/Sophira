@@ -75,14 +75,14 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
 
   return (
     <div className="mt-6 space-y-6">
-      <section aria-labelledby="owner-dashboard-numbers">
+      <section aria-labelledby="owner-dashboard-numbers" className="panel p-4 sm:p-5">
         <div className="section-head mb-3">
           <h2 id="owner-dashboard-numbers" className="section-title">Your network at a glance</h2>
           <p className="meta">Counts only. Another member&apos;s work is never shown here.</p>
         </div>
         <div className="stat-grid">
           {tiles.map((t) => (
-            <Link key={t.label} href={t.href} className="stat stat-hover block focus-visible:rounded-2xl">
+            <Link key={t.label} href={t.href} className="stat stat-hover block">
               <p className="stat-label">{t.label}</p>
               <p className="stat-value">{t.value}</p>
               <p className="stat-note">{t.note}</p>
@@ -91,7 +91,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
         </div>
       </section>
 
-      <p className="flex items-start gap-2 text-sm text-ink-soft">
+      <p className="mt-4 flex items-start gap-2 text-sm text-ink-soft">
         <span className={"dot mt-1.5 " + (healthy ? "dot-ok" : attention.length > 0 ? "dot-warn" : "dot-idle")} aria-hidden />
         <span>
           {healthy
@@ -103,7 +103,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
         </span>
       </p>
 
-      <section aria-labelledby="owner-dashboard-manage">
+      <section aria-labelledby="owner-dashboard-manage" className="panel p-4 sm:p-5">
         <div className="section-head mb-3">
           <h2 id="owner-dashboard-manage" className="section-title">Manage Sophira</h2>
           <p className="meta">Twelve destinations, each one page of its own</p>
@@ -115,7 +115,7 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
               <Link
                 key={p.href}
                 href={p.href}
-                className="group panel flex items-start gap-3 p-4 transition-colors hover:border-accent/40 focus-visible:rounded-2xl"
+                className="group rounded-xl border border-line bg-card flex items-start gap-3 p-4 transition-colors hover:border-accent/40"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent transition-colors group-hover:bg-accent group-hover:text-on-accent">
                   <Icon className="h-[18px] w-[18px]" aria-hidden />
