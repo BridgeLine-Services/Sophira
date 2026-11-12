@@ -10,6 +10,13 @@ import { isStaff, normalizeRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
+const MEMBER_ROLE_LABEL: Record<string, string> = {
+  user: "Member",
+  tester: "Tester",
+  co_owner: "Co-Owner",
+  owner: "Owner",
+};
+
 /**
  * CO-OWNER WORKSPACE (2026-11-12).
  *
@@ -27,13 +34,17 @@ export default async function CoOwnerPage() {
   if (!isStaff(role)) redirect("/dashboard");
 
   // Real reads only. A query that fails is reported as unavailable, never as zero.
-  const [members, invitations, requests, qa] = await Promise.all([
+  const [members, invitations, requests, qa, teamAudit, recentSignups] = await Promise.all([
     supabase.from("profiles").select("id, role, status"),
     canUseTesterFeatures(role)
       ? supabase.from("invitations").select("id, status").eq("status", "pending")
       : Promise.resolve({ data: null as Array<{ id: string; status: string }> | null }),
     supabase.from("invitation_requests").select("id, status").eq("status", "pending"),
     supabase.from("qa_reports").select("id, status").eq("status", "open"),
+    // Team Activity: the audited staff actions on membership (0048 grants staff read).
+    supabase.from("membership_audit").select("id, action, previous_role, new_role, success, created_at").order("created_at", { ascending: false }).limit(8),
+    // Member Activity: recent registrations, from the directory staff may read.
+    supabase.from("profiles").select("id, display_name, role, created_at").order("created_at", { ascending: false }).limit(5),
   ]);
 
   const memberRows = members.data ?? null;
@@ -85,6 +96,98 @@ export default async function CoOwnerPage() {
               );
             })}
           </div>
+        </section>
+
+        <section aria-labelledby="co-member-activity-h">
+          <h2 id="co-member-activity-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Member activity</h2>
+          <Card><CardContent className="p-4">
+            {recentSignups.data && recentSignups.data.length > 0 ? (
+              <ul className="divide-y divide-line">
+                {recentSignups.data.map((m) => (
+                  <li key={m.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="text-ink">{m.display_name || "A member"}</span>
+                    <span className="text-ink-soft">
+                      {MEMBER_ROLE_LABEL[String(m.role ?? "user")] ?? "Member"} · joined {new Date(m.created_at).toLocaleDateString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-ink-soft">
+                {recentSignups.data ? "No members have joined yet." : "Member activity could not be read just now."}
+              </p>
+            )}
+          </CardContent></Card>
+        </section>
+
+        <section aria-labelledby="co-qa-h">
+          <h2 id="co-qa-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">QA command center</h2>
+          <Card><CardContent className="p-4">
+            <p className="text-sm text-ink-soft">
+              {qa.data
+                ? `${qa.data.length} tester report${qa.data.length === 1 ? "" : "s"} waiting for triage. Bugs, feedback and ideas from testers land here.`
+                : "Tester reports could not be read just now."}
+            </p>
+            <Link href="/owner/qa" className="mt-2 inline-block text-sm text-accent hover:underline">Open QA triage &rarr;</Link>
+          </CardContent></Card>
+        </section>
+
+        <section aria-labelledby="co-team-h">
+          <h2 id="co-team-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Team activity</h2>
+          <Card><CardContent className="p-4">
+            {teamAudit.data && teamAudit.data.length > 0 ? (
+              <ul className="divide-y divide-line">
+                {teamAudit.data.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="text-ink">
+                      {String(a.action).replace(/_/g, " ")}
+                      {a.new_role ? ` → ${MEMBER_ROLE_LABEL[String(a.new_role)] ?? a.new_role}` : ""}
+                    </span>
+                    <span className={a.success ? "text-ink-soft" : "text-danger"}>
+                      {a.success ? "Recorded" : "Failed"} · {new Date(a.created_at).toLocaleDateString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-ink-soft">
+                {teamAudit.data ? "No staff actions recorded yet." : "Team activity could not be read just now."}
+              </p>
+            )}
+          </CardContent></Card>
+        </section>
+
+        <section aria-labelledby="co-courses-h">
+          <h2 id="co-courses-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Course oversight</h2>
+          <Card><CardContent className="p-4">
+            <p className="text-sm text-ink-soft">
+              Every member&apos;s courses belong to their own private workspace, so network-wide course lists cannot be shown here. Engagement and completion figures come from the analytics page, which reports aggregates only.
+            </p>
+            <Link href="/owner/analytics" className="mt-2 inline-block text-sm text-accent hover:underline">Open analytics &rarr;</Link>
+          </CardContent></Card>
+        </section>
+
+        <section aria-labelledby="co-announce-h">
+          <h2 id="co-announce-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Network announcements</h2>
+          <Card><CardContent className="p-4">
+            <p className="text-sm text-ink-soft">
+              Sophira has no announcement channel yet, so there is nothing to publish or read here. Notifications members
+              receive today come from their own account and deadline activity.
+            </p>
+          </CardContent></Card>
+        </section>
+
+        <section aria-labelledby="co-tasks-h">
+          <h2 id="co-tasks-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">My responsibilities</h2>
+          <Card><CardContent className="p-4">
+            <ul className="space-y-2 text-sm text-ink-soft">
+              <li><strong className="text-ink">Members.</strong> Keep the directory accurate, help with account problems, suspend when needed - within your limits.</li>
+              <li><strong className="text-ink">Invitations and requests.</strong> {invitations.data || requests.data ? `${(invitations.data?.length ?? 0) + (requests.data?.length ?? 0)} waiting for action.` : "Could not be read just now."}</li>
+              <li><strong className="text-ink">QA.</strong> Triage tester reports and confirm fixes before closing them.</li>
+              <li><strong className="text-ink">Analytics.</strong> Watch engagement and completion, and flag anything slipping.</li>
+              <li><strong className="text-ink">Operations.</strong> Coordinate with teachers and staff, and escalate owner-level problems (billing, security, providers) to the Owner.</li>
+            </ul>
+          </CardContent></Card>
         </section>
 
         <section aria-labelledby="co-areas-h">
