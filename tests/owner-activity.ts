@@ -77,7 +77,9 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
     "status: every row explains itself in plain language");
 
   // ---- The owner sidebar must reach every section that now exists --------------
-  const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  // 2026-11-12: the owner navigation registry is data in src/lib/navigation/owner-nav.ts
+  // (moved out of the "use client" shell so a Server Component can read it).
+  const shell = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
   for (const route of ["members", "invitations", "requests", "activity", "status", "security", "ai-providers"]) {
     assert(shell.includes(`"/owner/${route}"`),
       `nav: the owner sidebar links to the dedicated ${route} page`);

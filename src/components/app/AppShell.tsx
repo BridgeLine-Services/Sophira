@@ -4,12 +4,14 @@ import { SignOutButton } from "./SignOutButton";
 import { usePathname, useRouter } from "next/navigation";
 import { SyncStatus } from "@/components/app/SyncStatus";
 import { purgeOfflineOnLogout } from "@/lib/offline/client";
-import { Bell, CloudOff, Database } from "lucide-react";
+import { Bell, CloudOff } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { Activity, BookOpen, Brain, Briefcase, ChevronDown, ChartColumn, HardDriveDownload, Home, LogOut, MailQuestion, Menu, NotebookPen, Settings, ShieldCheck, Mic, Sparkles, UserPlus, Users, Wifi, X } from "lucide-react";
-import { FlaskConical, Gauge, Keyboard, Megaphone } from "lucide-react";
+// 2026-11-12: the owner-navigation icons moved to src/lib/navigation/owner-nav.ts with the
+// registry. Only the workspace/shell icons this component draws itself remain imported here.
+import { BookOpen, Brain, ChevronDown, Home, LogOut, Menu, NotebookPen, Settings, ShieldCheck, Mic, Wifi, X } from "lucide-react";
+import { Keyboard } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
@@ -17,6 +19,7 @@ import { usePresenceReporter } from "@/lib/presence/use-presence-reporter";
 import { DEFAULT_THRESHOLDS } from "@/lib/presence/thresholds";
 import { useNotificationBell } from "@/lib/notifications/use-notification-bell";
 import { usePendingRequests } from "@/lib/notifications/use-pending-requests";
+import { OWNER_NAV_GROUPS, ownerNavGroupsFor, type NavRole } from "@/lib/navigation/owner-nav";
 
 // Active subject/course scope indicator (course-aware engines round):
 // shows the real subject or course this engine is working within.
@@ -36,78 +39,16 @@ const NAV = [
 ];
 
 /**
- * OWNER NAV (workspace-separation round 2026-10-11): the Owner Dashboard is
- * its OWN environment with its own navigation layout. "My Workspace" is the
- * single intentional exit into the personal academic workspace; the owner
- * view never shows the workspace sections (Courses tree, Notebooks, etc.),
- * and the workspace only links back here through the explicit Owner
- * Dashboard entry and the brand logo.
+ * The owner navigation registry lives in src/lib/navigation/owner-nav.ts.
+ *
+ * It used to be defined here, in this "use client" module. The Owner Dashboard's
+ * server-rendered area grid imported it from here, and a Server Component cannot
+ * read a value out of a Client Component: it receives a client reference, so
+ * `.map` was not a function and /owner died inside the error boundary
+ * (2026-11-12 production incident, digest 3954906548). The shared module makes
+ * the registry a real array for the sidebar (client) and the grid (server) alike.
+ * One registry, two consumers, no second copy.
  */
-type NavRole = "user" | "tester" | "co_owner" | "owner";
-
-/**
- * 2026-11-12: every Owner-Dashboard entry declares the LOWEST role that may open it.
- * The list is filtered with the same authority the server enforces, so a Co-Owner never
- * sees a link whose page would bounce them back. Anything not marked "staff" is
- * Owner-only: security, billing, AI providers, integrations, database updates.
- */
-export const OWNER_NAV_GROUPS: Array<{
-  heading: string;
-  items: Array<{ href: string; label: string; icon: typeof Home; minimum?: NavRole }>;
-}> = [
-  {
-    heading: "Overview",
-    items: [
-      { href: "/owner", label: "Dashboard overview", icon: Gauge },
-      { href: "/owner/health", label: "System Health", icon: Gauge },
-      // 2026-11-11: production drifted nine tables behind with no way to update it
-      // from the app. This is that way, labelled in the owner's own words.
-      { href: "/owner/database", label: "Database updates", icon: Database },
-      // Tester workspace (2026-11-12): the tester role gets its own home for
-      // filing and following QA reports. Minimum role "tester" means members
-      // and guests never see it, and the page re-checks server-side.
-      { href: "/tester", label: "Testing workspace", icon: FlaskConical, minimum: "tester" },
-      // Co-Owner workspace (2026-11-12): the people-facing home for the co_owner role,
-      // rendered from the authority already defined in src/lib/auth/permissions.ts.
-      { href: "/co-owner", label: "Co-Owner workspace", icon: Briefcase, minimum: "co_owner" },
-      { href: "/owner/announcements", label: "Announcements", icon: Megaphone, minimum: "co_owner" },
-    ],
-  },
-  {
-    heading: "Network Management",
-    items: [
-      { href: "/owner/members", label: "Members", icon: Users, minimum: "co_owner" },
-      { href: "/owner/invitations", label: "Invite someone", icon: UserPlus, minimum: "co_owner" },
-      { href: "/owner/requests", label: "Invitation requests", icon: MailQuestion, minimum: "co_owner" },
-      // Counts only, never a member's coursework: see lib/owner/analytics.ts for what is refused.
-      { href: "/owner/analytics", label: "Network analytics", icon: ChartColumn, minimum: "co_owner" },
-    ],
-  },
-  {
-    heading: "Monitoring",
-    items: [
-      { href: "/owner/activity", label: "Recent activity", icon: Activity },
-      { href: "/owner/status", label: "System status", icon: ShieldCheck },
-      // 2026-11-13: the owner asked to be able to answer "which parts work?", "is the AI slow?"
-      // and "could we come back from a disaster?" without reading a log or a dashboard of jargon.
-      { href: "/owner/features", label: "Feature health", icon: Sparkles },
-      { href: "/owner/ai-operations", label: "AI operations", icon: Gauge },
-      { href: "/owner/backup", label: "Backup and recovery", icon: HardDriveDownload },
-      // 2026-11-11: "is the app ready to go out?" had no single answer. The page reuses the
-      // release gate's own results; it is not a second gate.
-      { href: "/owner/release-readiness", label: "Release readiness", icon: ShieldCheck },
-    ],
-  },
-  {
-    heading: "Configuration",
-    items: [
-      { href: "/owner/security", label: "Security and billing", icon: ShieldCheck },
-      { href: "/owner/ai-providers", label: "AI providers and models", icon: Gauge },
-      { href: "/owner/integrations", label: "Integrations", icon: Settings },
-    ],
-  },
-  { heading: "Personal", items: [{ href: "/dashboard?view=workspace", label: "My Workspace", icon: Briefcase }] },
-];
 
 /**
  * The shared application shell (nav spec 2026-10-09): desktop/laptop gets a
@@ -527,11 +468,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
    * Owner-only. The pages themselves authorise again on the server, so hiding a link is a
    * convenience, never the boundary.
    */
-  const rank: Record<NavRole, number> = { user: 0, tester: 1, co_owner: 2, owner: 3 };
-  const canSeeNavItem = (minimum?: NavRole) => rank[role] >= rank[minimum ?? "owner"];
-  const visibleOwnerGroups = OWNER_NAV_GROUPS
-    .map((g) => ({ ...g, items: g.items.filter((item) => canSeeNavItem(item.minimum)) }))
-    .filter((g) => g.items.length > 0);
+  const visibleOwnerGroups = ownerNavGroupsFor(role);
 
   /** Where "home" is for whoever is signed in. A Co-Owner cannot open /owner. */
   const adminHomeHref = isOwner ? "/owner" : isCoOwner ? "/owner/members" : "/dashboard";

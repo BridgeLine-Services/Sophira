@@ -1,3 +1,44 @@
+## 2026-11-12 — The Owner Dashboard renders again (production incident, digest 3954906548)
+
+`/owner` failed in production for one account with `TypeError: h.OWNER_NAV_GROUPS.map is not a
+function`, three times, on deployment `dpl_HjhFpPiS4GA62LAyK9YT7oMWyoTY`. The build was clean and
+every test passed: the defect only appears when a page is really rendered.
+
+Cause: the owner-navigation registry lived inside `src/components/app/AppShell.tsx`, which begins
+with `"use client"`. `src/components/owner/OwnerAreaGrid.tsx` is a Server Component and imported the
+array from it. A Server Component cannot read a value out of a Client Component: the bundler hands
+over a client reference, so `OWNER_NAV_GROUPS` was a proxy object, `.map` was not a function, and the
+page fell into the error boundary.
+
+The registry now lives in `src/lib/navigation/owner-nav.ts`, a module with no client directive, no
+hooks, no browser APIs and no Supabase client - just the data, the types, the icons and one shared
+`ownerNavGroupsFor(role)` filter. Both consumers import it from there: AppShell (client, unchanged
+desktop/tablet/mobile navigation, drawer, active states, presence, notifications, theme, logout) and
+OwnerAreaGrid (server, still a Server Component - no `"use client"` workaround). All 20
+destinations, 5 group headings, every label, icon and minimum role are preserved exactly; 12 icon
+imports left AppShell because only the registry used them.
+
+Guards added so this class of defect cannot come back silently:
+
+- A repository-wide rule, enforced in the test suite, that a module WITHOUT `"use client"` may not
+  import a named data value from a module WITH `"use client"` (component and `import type` imports
+  stay allowed). The checker is itself tested against a fixture tree in the exact shape of the
+  shipped defect, so the guard is proven to fire rather than assumed to.
+- The real `OwnerAreaGrid` is now rendered server-side in the test suite for Owner, Co-Owner and
+  member: 20 destinations for the Owner, no Owner-only area for a Co-Owner, nothing at all for a
+  member.
+- Behavioural role assertions replaced the old text searches for the array, so the nav is tested as
+  data (what each role receives) rather than as source text.
+
+Also in this pass: both error boundaries (`src/app/error.tsx`, `src/app/global-error.tsx`) now show
+the opaque reference code, offer to copy it, and let a signed-in person file the failure in
+Sophira's own `qa_reports` table. Nothing is transmitted automatically; no stack trace, cookie,
+token or coursework is shown or sent; reporting is wrapped so a failure inside it can never replace
+the recovery screen with a blank one.
+
+Verified: 7364/7364 tests, tsc clean, lint 0 errors (33 warnings, ceiling unchanged), production
+build OK, secret scan CLEAN, repository verify PASS, runtime smoke 100/100.
+
 ## 2026-11-11 — The Overview now says when the database is behind
 
 The dashboard learned that its database was out of date only when a member read failed as "column

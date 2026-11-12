@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { OWNER_NAV_GROUPS } from "@/components/app/AppShell";
-import { roleRank } from "@/lib/roles";
+import { ownerNavGroupsFor } from "@/lib/navigation/owner-nav";
 import type { Role } from "@/lib/roles";
 
 /**
@@ -10,10 +9,10 @@ import type { Role } from "@/lib/roles";
  * and adding an area never means editing a second hardcoded list.
  */
 export function OwnerAreaGrid({ role }: { role: Role }) {
-  const visible = OWNER_NAV_GROUPS.map((g) => ({
-    heading: g.heading,
-    items: g.items.filter((i) => roleRank(role) >= roleRank(i.minimum ?? "owner")),
-  })).filter((g) => g.items.length > 0);
+  // Same registry, same rule as the sidebar, imported from a module that carries no
+  // "use client" directive: a Server Component cannot read data out of a Client
+  // Component (that import produced the 2026-11-12 TypeError on /owner).
+  const visible = ownerNavGroupsFor(role);
 
   return (
     <section aria-labelledby="owner-areas-h" className="mt-8">

@@ -9,17 +9,20 @@ export function runProdFixTests(assert: (c: boolean, n: string) => void, section
   section("production fixes (owner nav, offline keys, deployment honesty)");
 
   const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  // 2026-11-12: the owner navigation registry moved out of this "use client" module into
+  // src/lib/navigation/owner-nav.ts. Destination assertions follow the data there.
+  const ownerNav = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
   assert(!shell.includes('href: "#'),
     "nav: no hash-only owner links remain (a hash-only href resolves against the CURRENT route, which is why they did nothing on /owner/health)");
   // 2026-11-03 (phase 1): the owner sections became real routes, so no owner nav link may
   // depend on a hash. A hash link only scrolls an existing anchor and silently does nothing
   // when that anchor is gone, which is the defect this file was written for.
-  assert(!/\/owner#/.test(shell),
+  assert(!/\/owner#/.test(shell + ownerNav),
     "nav: no owner nav link uses a hash any more - every destination is its own page");
   for (const route of ["/owner", "/owner/health", "/owner/members", "/owner/invitations",
     "/owner/requests", "/owner/activity", "/owner/status", "/owner/security",
     "/owner/ai-providers", "/owner/integrations"]) {
-    assert(shell.includes(`{ href: "${route}",`), `nav: ${route} is a sidebar destination`);
+    assert(ownerNav.includes(`{ href: "${route}",`), `nav: ${route} is a sidebar destination`);
     const file = route === "/owner" ? "src/app/owner/page.tsx" : `src/app${route}/page.tsx`;
     assert(existsSync(file), `nav: ${route} resolves to a real page module (${file})`);
   }
