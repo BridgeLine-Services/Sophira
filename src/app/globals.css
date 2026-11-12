@@ -253,3 +253,24 @@ input, textarea, select {
 .dash-path-basis { font-size: 12px; line-height: 1.55; color: rgba(255, 255, 255, 0.7); }
 .dash-note { font-size: 12px; color: rgba(255, 255, 255, 0.7); }
 .dash-range { accent-color: #6d4bd8; }
+
+/*
+ * ROLE DASHBOARDS (2026-11-12): the same purple language as the member home, applied as a
+ * shell. The role pages keep their existing markup; only their top-level blocks are lifted
+ * onto white panels, so every semantic token inside them still resolves as before.
+ */
+.dash-page > .dash-stack { display: flex; flex-direction: column; gap: 12px; }
+.dash-page > .dash-stack > * {
+  background: #ffffff;
+  color: #23263a;
+  border-radius: 18px;
+  padding: clamp(12px, 1.4vw, 18px);
+  box-shadow: 0 18px 38px rgba(12, 6, 30, 0.24);
+}
+.dash-page > .dash-stack > .dash-hero {
+  background: transparent;
+  box-shadow: none;
+  padding: 2px 4px 6px;
+  color: #fff;
+}
+.dash-page > .dash-stack > .dash-hero .dash-hero-sub { color: rgba(255, 255, 255, 0.72); }

@@ -94,6 +94,14 @@ export default async function CoOwnerPage() {
    * academic workspace.
    */
   <AppShell title="Co-Owner Dashboard" variant="owner" role={role}>
+        <div className="dash-page">
+          <div className="dash-stack">
+            <div className="dash-hero">
+              <p className="dash-eyebrow">Co-Owner Dashboard</p>
+              <h2 className="dash-hero-title mt-1">The network you help run</h2>
+              <p className="dash-hero-sub mt-2 max-w-2xl">Your areas, member activity and QA work, read live from the database. Anything unreadable says so.</p>
+            </div>
+
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Co-Owner</Badge>
@@ -269,6 +277,9 @@ export default async function CoOwnerPage() {
           </CardContent></Card>
         )}
       </div>
-    </AppShell>
+    
+          </div>
+        </div>
+</AppShell>
   );
 }
