@@ -41,6 +41,7 @@ export function PresenceSettings({ initial, available = true }: Props) {
   const [problems, setProblems] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [savedOnce, setSavedOnce] = useState(false);
 
   const dirty = (Object.keys(values) as Array<keyof PresenceThresholds>).some(
     (key) => values[key] !== saved[key],
@@ -76,6 +77,7 @@ export function PresenceSettings({ initial, available = true }: Props) {
       const next = json.thresholds ?? values;
       setSaved(next);
       setValues(next);
+      setSavedOnce(true);
       setNotice("Saved. Every member's presence now follows these numbers.");
     } catch {
       setProblems(["The settings could not be sent just now. Nothing was changed."]);
@@ -167,10 +169,12 @@ export function PresenceSettings({ initial, available = true }: Props) {
           disabled={busy || !dirty}
           className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-on-accent disabled:opacity-50"
         >
-          {busy ? "Saving…" : dirty ? "Save presence settings" : "Saved"}
+          {busy ? "Saving…" : dirty ? "Save presence settings" : "No changes to save"}
         </button>
         <span className="text-xs text-ink-soft">
-          Only an Owner can change these.
+          {savedOnce
+            ? "Saved values are the ones shown here."
+            : "Only an Owner can change these. Nothing has been changed on this visit yet."}
         </span>
       </div>
     </section>

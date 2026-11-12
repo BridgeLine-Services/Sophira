@@ -9,6 +9,12 @@
  *
  * This is best-effort by design. A tab that dies without warning leaves a row that simply
  * expires, so nothing here needs to be reliable for the directory to be correct.
+ *
+ * 2026-11-12: the hook STOPS once the server says it cannot record presence at all (a
+ * database that has not taken the presence migration). Previously it kept posting every
+ * interval forever against a schema that would never accept it — pointless traffic on every
+ * open tab. A permanent refusal is not retried; a dropped network call still is not treated
+ * as success either, and the row simply expires.
  */
 
 import { useEffect, useRef } from "react";
@@ -50,17 +56,28 @@ export function usePresenceReporter({ intervalMs, activeWindowMs, enabled = true
     if (!sessionId) return; // storage unavailable: report nothing rather than guess
 
     let disposed = false;
+    // Set when the server says presence cannot be recorded at all. Not a temporary failure:
+    // retrying it every interval would be noise, so the reporter stops until the page reloads.
+    let unsupported = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
 
     const send = async (interacted: boolean) => {
-      if (disposed) return;
+      if (disposed || unsupported) return;
       try {
-        await fetch("/api/network/presence", {
+        const res = await fetch("/api/network/presence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ session_id: sessionId, interacted }),
           keepalive: true,
         });
         lastSent.current = Date.now();
+        if (res.ok) {
+          const body = (await res.json().catch(() => null)) as { ok?: boolean; presence?: string } | null;
+          if (body?.presence === "unavailable") {
+            unsupported = true;
+            if (timer) clearInterval(timer);
+          }
+        }
       } catch {
         // A failed beat is not retried into a fake success; the session just expires.
       }
@@ -75,7 +92,7 @@ export function usePresenceReporter({ intervalMs, activeWindowMs, enabled = true
 
     void send(true); // arriving on a page is an interaction
 
-    const timer = setInterval(() => {
+    timer = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       const fresh = Date.now() - lastInteraction.current <= activeWindowMs;
       void send(fresh);
@@ -100,7 +117,7 @@ export function usePresenceReporter({ intervalMs, activeWindowMs, enabled = true
 
     return () => {
       disposed = true;
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
       for (const name of events) window.removeEventListener(name, markInteraction);
       window.removeEventListener("pagehide", release);
       release();

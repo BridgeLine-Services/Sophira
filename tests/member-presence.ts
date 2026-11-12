@@ -79,6 +79,10 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
       "thresholds: a refusal is shown as an alert listing every problem");
     assert(/profile\.role === "owner" && \(/.test(page) && /<PresenceSettings/.test(page),
       "thresholds: the panel is rendered for the Owner only (a Co-Owner does not retune the clock)");
+    assert(!/dirty \? "Save presence settings" : "Saved"/.test(ui) && /No changes to save/.test(ui),
+      "thresholds: the button never reads \"Saved\" before anything was saved in this visit");
+    assert(/savedOnce/.test(ui) && /Nothing has been changed on this visit yet/.test(ui),
+      "thresholds: the form states plainly that nothing was changed yet, instead of implying a save");
     assert(/available/.test(ui) && /unavailable until the database has the presence tables/.test(ui),
       "thresholds: on a database without the tables the panel says so and changes nothing");
   }

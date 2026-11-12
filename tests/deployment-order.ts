@@ -58,7 +58,18 @@ export function runDeploymentOrderTests(
   assert(/said|error: problems\[0\]/.test(route),
     "deploy order: a refused save is a sentence, so the Owner is never left guessing");
 
-  section("4. The owner is told what to press, in their own words");
+  section("4. A refused heartbeat is not retried forever");
+  {
+    const reporter = readFileSync("src/lib/presence/use-presence-reporter.ts", "utf8");
+    assert(/unsupported = true/.test(reporter) && /presence === "unavailable"/.test(reporter),
+      "deploy order: the tab stops reporting when the server says presence cannot be recorded");
+    assert(/if \(timer\) clearInterval\(timer\)/.test(reporter),
+      "deploy order: it clears its own interval, so an old database is not polled every 30s per tab");
+    assert(/lastSent\.current = Date\.now\(\)/.test(reporter) && /catch \{/.test(reporter),
+      "deploy order: a genuine network failure is still swallowed, never turned into a fake success");
+  }
+
+  section("5. The owner is told what to press, in their own words");
   const ownerDoc = readFileSync("docs/WHAT_I_NEED_TO_DO_NEXT.md", "utf8");
   assert(/Update database/.test(ownerDoc),
     "deploy order: the owner checklist names the exact button");
