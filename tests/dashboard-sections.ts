@@ -110,6 +110,38 @@ export function runDashboardSectionTests(assert: Assert, section: (name: string)
   assert(owner.includes('id="owner-dashboard-numbers"') && owner.includes('id="owner-dashboard-manage"'),
     "both owner dashboard sections keep their accessible names");
 
+  section("the purple frame around dashboard content is gone");
+
+  // The purple gradient filled the whole dashboard CONTAINER, so a 14-26px purple band sat on all
+  // four sides of every white panel: the "purple outline" around Overview and Your workspace.
+  const dashPage = css.split(".dash-page {")[1]?.split("}")[0] ?? "";
+  assert(!dashPage.includes("background: var(--hero-bg)"),
+    "the dashboard container no longer fills itself with the purple gradient");
+  assert(!dashPage.includes("box-shadow"),
+    "the dashboard container no longer paints a frame shadow around the content");
+  assert(!dashPage.includes("padding:"),
+    "the dashboard container adds no purple padding band around the panels");
+  const dashHero = css.split(".dash-hero {")[1]?.split("}")[0] ?? "";
+  assert(dashHero.includes("background: var(--hero-bg)"),
+    "the purple gradient belongs to the hero band only");
+  const roleHero = css.split(".dash-page > .dash-stack > .dash-hero {")[1]?.split("}")[0] ?? "";
+  assert(roleHero.includes("background: var(--hero-bg)"),
+    "the role dashboards keep the same purple hero band");
+
+  // White text must never sit on the page canvas: only the hero band carries white ink.
+  const eyebrow = css.split(".dash-eyebrow {")[1]?.split("}")[0] ?? "";
+  assert(eyebrow.includes("rgb(var(--c-ink-soft))"),
+    "the eyebrow uses readable theme ink outside the hero");
+  assert(css.includes(".dash-hero .dash-eyebrow { color: rgba(255, 255, 255, 0.62); }"),
+    "the eyebrow stays light on the purple hero");
+  const heroSub = css.split("\n.dash-hero-sub {")[1]?.split("}")[0] ?? "";
+  assert(heroSub.includes("rgb(var(--c-ink-soft))"),
+    "the workspace subtitle uses readable theme ink outside the hero");
+
+  // The member home keeps the purple band around exactly its opening block.
+  assert(page.includes('<header className="dash-hero">'),
+    "the member home draws its opening block as the purple hero band");
+
   section("no literal colours in the dashboard cards");
 
   assert(!page.includes("rgba(81,69,232"), "the purple glow literal is replaced by a theme shadow token");

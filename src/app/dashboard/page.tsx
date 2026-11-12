@@ -288,7 +288,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="dash-page">
         {/* HERO (2026-11-12): the owner's purple reference. Who you are, where your learning
             stands, and the two things you can start right now - before any navigation. */}
-        <header className="flex flex-wrap items-start justify-between gap-4">
+        <header className="dash-hero">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="dash-eyebrow">Your learning home</p>
             <h1 className="dash-hero-title mt-1">Welcome back{greetingName}!</h1>
@@ -302,7 +303,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <HelpCircle className="h-4 w-4" aria-hidden /> Ask a question
             </Link>
           </div>
-        </header>
+        </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
           {/* Your learning path: the documented calculation, drawn. */}
@@ -370,6 +371,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </div>
           ))}
         </div>
+
+        </header>
 
         {/* MILESTONES: counters over real rows, each showing how far along it is. */}
         <section className="dash-panel mt-3" aria-labelledby="dashboard-milestones-heading">

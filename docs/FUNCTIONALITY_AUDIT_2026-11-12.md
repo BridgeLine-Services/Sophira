@@ -363,3 +363,55 @@ One open item recorded in the blockers list is now characterised: GitHub's remai
 alert is **glib** in `src-tauri/Cargo.lock` (medium, first fixed in `0.20.0`). It is the Tauri desktop
 shell's GTK binding; the remedy is a locked `cargo update` plus a Rust/GTK build, and this sandbox
 has no Rust toolchain, so it was not attempted rather than half-applied to a lockfile.
+
+---
+
+## Addendum 2026-11-13: the purple outline around dashboard content
+
+### What it actually was
+
+The shipped stylesheet had no purple border, ring or outline rule anywhere: the only two `outline`
+declarations in the production CSS were the teal focus indicator on the element's own shape and its
+inset navigation variant. The purple around content was the dashboard's own background: `--hero-bg`,
+the purple reference gradient, was painted on `.dash-page`, the whole content container, together
+with 14-26px of padding.
+
+Measured on the rendered page (built CSS, 1280px): between the page canvas and the first white panel
+there were **26px of solid violet** on top, left and right, and the same band ran down both sides and
+under the last panel. Every white panel therefore sat inside a purple frame. On the Owner Dashboard
+that frame wrapped the whole stack, including `Administrative overview`; on Home it wrapped the
+content column, including the `Your workspace` group. That frame is the "purple outline".
+
+### What changed
+
+| File | Change |
+|---|---|
+| `src/app/globals.css` | The purple gradient moved off `.dash-page` and onto `.dash-hero`, the opening band. `.dash-page` now paints nothing (no gradient, no padding, no frame shadow). Panel surfaces, radii, inner padding, spacing rhythm and typography are untouched. The two violet panel shadows (`rgba(12, 6, 30, .42)` / `.24`) are replaced by the existing theme elevation token `var(--elev-3)`, so no purple-tinted halo is drawn on the light canvas. |
+| `src/app/globals.css` | `.dash-eyebrow` and `.dash-hero-sub` default to readable theme ink, because they are also used outside the hero (`Your workspace`). Inside the hero band they stay light: `.dash-hero .dash-eyebrow`, `.dash-hero .dash-hero-sub`, `.dash-hero .dash-hero-title`. |
+| `src/app/dashboard/page.tsx` | The member home's opening block (heading, two action buttons, learning-path and week cards, the four progress tiles) is now inside `<header className="dash-hero">`, so the purple band frames the introduction instead of the whole page. No data, logic, permission or component changed. |
+| `tests/dashboard-sections.ts` | New section "the purple frame around dashboard content is gone": the container carries no gradient, no padding band and no frame shadow; the hero band carries the gradient; white ink only inside the hero; the member home draws the band. |
+| `tests/dashboard-overview.ts` | The pinned purple-hero assertion now checks `.dash-hero` instead of `.dash-page`. The palette and the owner's reference are unchanged. |
+
+Role dashboards (Owner, Co-Owner, Tester) needed no markup change: their hero was already a
+`.dash-hero` element, and `.dash-page > .dash-stack > .dash-hero` now carries the band.
+
+### Verification
+
+- Compiled CSS from a production build: `.dash-page{color:rgb(var(--c-ink))}` with no background, no
+  padding, no box-shadow; `.dash-hero` carries `var(--hero-bg)`; zero occurrences of the violet
+  `12, 6, 30` shadow literals anywhere in the bundle.
+- Rendered the built CSS at 1280, 834 and 390px with the source structure: purple appears only
+  inside the hero band (desktop rows 24-362 of 1227, owner 24-154 of 1000); the page margin beside
+  every white panel is the ivory canvas, not violet, at all three widths.
+- `npx tsc --noEmit` clean, `npm test` 7814/7814, lint 0 errors / 33 warnings, `npm run build` OK,
+  design-drift 0, accessibility PASS 180 files, contrast PASS 32 pairs in both themes, conformance
+  80 routes, secret scan clean.
+
+### Limits
+
+- The signed-in pages were still not looked at in a real browser session: the stored test-member
+  credentials no longer authenticate (Supabase returns `invalid_credentials`) and the live network
+  has two accounts, both real. No account was created. The layout above was verified against the
+  production-compiled CSS at three widths, not against a logged-in browser window.
+- Dark mode is proven at the token level (contrast gate, both palettes) plus the gradient variables,
+  not on a rendered dark page.
