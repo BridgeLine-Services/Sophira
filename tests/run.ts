@@ -3371,20 +3371,21 @@ async function runThemeTokenTests(): Promise<void> {
   const light = grab(":root {");
   const dark = grab('[data-theme="dark"]');
 
-  // LIGHT IS UNCHANGED. These are the exact pre-migration values; if a token
-  // drifts, light mode has regressed even when the build is green.
-  assert(light.paper === "#f8f8fa" && light.ink === "#252b3a" && light.accent === "#5145e8",
-    "theme: light token values are identical to the previously shipped palette");
-  assert(light["ink-soft"] === "#697386" && light.success === "#0f766e" && light.danger === "#b91c1c",
-    "theme: light status and secondary colours are unchanged");
+  // LIGHT IS THE ENTERPRISE IVORY/SLATE/TEAL direction (2026-11-12). These are exact
+  // values; if a token drifts, light mode has regressed even when the build is green.
+  assert(light.paper === "#f7f6f2" && light.ink === "#1a212e" && light.accent === "#0d7076",
+    "theme: light tokens implement the enterprise ivory / charcoal-navy / muted-teal direction");
+  assert(light["ink-soft"] === "#5c6778" && light.success === "#157347" && light.danger === "#b02020",
+    "theme: light status and secondary colours are the measured enterprise set");
 
-  // DARK IS THE VIOLET DIRECTION, and the shipped CSS (not a constant) is measured.
-  assert(dark.paper === "#211735" && dark.card === "#382254",
-    "theme: dark tokens implement the violet design direction");
-  // 2026-11-03: the dark accent and danger were lightened after the contrast audit measured
-  // them at 3.35:1 and 4.16:1 on card surfaces. The violet hue is unchanged; the lightness is.
-  assert(dark.accent === "#9684ff" && dark.danger === "#f87171",
+  // DARK IS THE MIDNIGHT-NAVY DIRECTION (2026-11-12), and the shipped CSS (not a
+  // constant) is measured by scripts/contrast.mjs in this suite.
+  assert(dark.paper === "#0b101a" && dark.card === "#131a27",
+    "theme: dark tokens implement the midnight-navy / charcoal direction");
+  assert(dark.accent === "#5ed2ca" && dark.danger === "#f87171",
     "theme: dark accent and danger meet WCAG AA on card surfaces (measured, not eyeballed)");
+  assert(light.brand === "#4f46e5" && dark.brand === "#9684ff",
+    "theme: purple survives ONLY as the restrained brand token in both themes");
   assert(Object.keys(light).length >= 14 && Object.keys(dark).length >= 14,
     "theme: both themes define the full token set");
   assert(Object.keys(light).sort().join() === Object.keys(dark).sort().join(),

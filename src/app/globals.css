@@ -3,48 +3,55 @@
 @tailwind utilities;
 
 :root {
-  /* LIGHT (default) - values identical to the previously shipped palette,
-     expressed as RGB triplets so Tailwind opacity modifiers keep working. */
+  /* LIGHT (default) - enterprise palette (2026-11-12): soft ivory canvas,
+     cool slate text, muted teal accent, purple reserved as a subtle brand
+     accent only. Every text/surface pair is measured by scripts/contrast.mjs
+     (WCAG AA) in both themes and enforced by the suite. */
   color-scheme: light;
-  --c-paper: 248 248 250;
-  --c-card: 255 255 255;
-  --c-card-elevated: 241 240 247;
-  --c-sidebar: 255 255 255;
+  --c-paper: 247 246 242;      /* soft ivory page */
+  --c-card: 255 255 255;       /* white surface */
+  --c-card-elevated: 242 241 236;
+  --c-sidebar: 252 251 248;
   --c-topbar: 255 255 255;
-  --c-line: 227 226 236;
-  --c-ink: 37 43 58;
-  --c-ink-soft: 105 115 134;
-  --c-accent: 81 69 232;
-  --c-accent-soft: 240 238 255;
-  --c-accent-deep: 63 53 201;
-  /* Text placed ON a filled emphasis surface (accent buttons, danger buttons). Light mode is
-     white; dark mode needs dark ink, because the dark accent and danger are deliberately light
-     enough to read as coloured text on a card (AA 4.5:1). */
+  --c-line: 226 225 220;       /* warm neutral hairline */
+  --c-ink: 26 33 46;           /* charcoal-navy text */
+  --c-ink-soft: 92 103 120;    /* cool slate secondary text */
+  --c-accent: 13 112 118;      /* muted teal - the working accent */
+  --c-accent-soft: 224 240 238;
+  --c-accent-deep: 10 90 95;
+  --c-brand: 79 70 229;        /* subtle purple brand mark only */
+  --c-brand-soft: 236 234 253;
   --c-on-accent: 255 255 255;
-  --c-success: 15 118 110;
-  --c-warn: 180 83 9;
-  --c-danger: 185 28 28;
+  --c-success: 21 115 71;
+  --c-warn: 146 64 14;
+  --c-danger: 176 32 32;
 }
 
 /* DARK - the violet/plum direction. Every text/surface pair is measured by
    scripts/contrast.mjs in both themes (16 pairs each, WCAG AA) and the suite runs it.
    Applied by data-theme="dark" on <html>; this is the ONLY dark palette. */
+/* DARK - midnight navy and charcoal surfaces with the same muted teal
+   accent and a restrained violet brand mark. Applied by data-theme="dark"
+   on <html>; this is the ONLY dark palette, and every pair is measured by
+   scripts/contrast.mjs in the suite. */
 [data-theme="dark"] {
   color-scheme: dark;
-  --c-paper: 33 23 53;
-  --c-card: 56 34 84;
-  --c-card-elevated: 68 41 98;
-  --c-sidebar: 37 28 64;
-  --c-topbar: 48 32 77;
-  --c-line: 90 65 119;
-  --c-ink: 247 243 255;
-  --c-ink-soft: 192 181 214;
-  --c-accent: 150 132 255;
-  --c-accent-soft: 60 42 92;
-  --c-accent-deep: 143 127 255;
-  --c-on-accent: 33 23 53;
-  --c-success: 32 187 134;
-  --c-warn: 241 184 45;
+  --c-paper: 11 16 26;         /* midnight navy page */
+  --c-card: 19 26 39;          /* charcoal card */
+  --c-card-elevated: 27 36 52;
+  --c-sidebar: 14 20 31;
+  --c-topbar: 17 24 36;
+  --c-line: 45 57 75;          /* cool slate hairline */
+  --c-ink: 234 238 244;
+  --c-ink-soft: 156 168 184;
+  --c-accent: 94 210 202;      /* teal, lightened for dark surfaces */
+  --c-accent-soft: 30 52 58;
+  --c-accent-deep: 128 226 218;
+  --c-brand: 150 132 255;
+  --c-brand-soft: 42 38 74;
+  --c-on-accent: 11 16 26;
+  --c-success: 74 222 160;
+  --c-warn: 245 190 80;
   --c-danger: 248 113 113;
 }
 

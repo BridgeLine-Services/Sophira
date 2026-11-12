@@ -31,6 +31,9 @@ const config: Config = {
         ink: { DEFAULT: token("ink"), soft: token("ink-soft") },
         // accent + status
         accent: { DEFAULT: token("accent"), soft: token("accent-soft"), deep: token("accent-deep") },
+        // brand = the restrained purple mark (logo, brand moments ONLY) -
+        // it must never carry primary actions now that teal is the accent.
+        brand: { DEFAULT: token("brand"), soft: token("brand-soft") },
         "on-accent": token("on-accent"),
         success: token("success"),
         warn: token("warn"),
