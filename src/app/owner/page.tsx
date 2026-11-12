@@ -5,7 +5,7 @@ import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user"
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { TrendChart } from "@/components/dashboard/TrendChart";
-import { weekActivity } from "@/lib/dashboard/overview";
+import { dailySeries, weekActivity, type ActivityDayRow } from "@/lib/dashboard/overview";
 import { OwnerDashboard } from "@/components/app/OwnerDashboard";
 import { OwnerAreaGrid } from "@/components/owner/OwnerAreaGrid";
 import type { Role } from "@/lib/roles";
@@ -212,6 +212,26 @@ export default async function OwnerPage() {
     14,
   );
 
+  /*
+   * GROWTH AND STUDY (2026-11-12): the fuller series. Membership events say what happened to the
+   * roster; these say what the roster actually did. Sign-ups, study sessions and submitted
+   * answers live in tables whose RLS is own-rows-only, so this reads a staff-gated COUNT through
+   * network_activity_daily() rather than widening a policy. If that function is not in the
+   * database yet, the read fails and the panel says so - it never draws zeros it did not read.
+   */
+  const { data: dailyRows, error: dailyError } = await supabase.rpc("network_activity_daily", { p_days: 14 });
+  const activityDaily: ActivityDayRow[] = ((dailyRows ?? []) as unknown[])
+    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
+    .filter((row) => typeof row.day === "string")
+    .map((row) => ({
+      day: String(row.day),
+      signups: Number(row.signups) || 0,
+      study_sessions: Number(row.study_sessions) || 0,
+      answers: Number(row.answers) || 0,
+    }));
+  const signupSeries = dailySeries(activityDaily, "signups", new Date(), 14);
+  const studySeries = dailySeries(activityDaily, "study_sessions", new Date(), 14);
+
 return (
     <AppShell
       title="Owner Dashboard"
@@ -248,6 +268,16 @@ return (
               unreadable={Boolean(activityError)}
               unit="membership events"
               sourceNote="Read from membership_audit. A day with no events is drawn as zero, not skipped, and nothing is estimated."
+            />
+            <TrendChart
+              title="Growth and study"
+              subtitle="Accounts created and study sessions started, day by day, over the same 14 days."
+              variant="line"
+              series={signupSeries}
+              compare={{ label: "study sessions", series: studySeries }}
+              unreadable={Boolean(dailyError)}
+              unit="accounts created"
+              sourceNote="Counted by network_activity_daily() from profiles, work_sessions and responses. Counts only, so no member's work is exposed to make the chart."
             />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
