@@ -158,6 +158,33 @@ if (!(await rpcRefusesAnon("presence_set_availability", { p_availability: "avail
   // Not a failure: the page degrades honestly, and this check must not imply the app is broken.
 }
 
+// 2026-11-11: migration 0053 adds the writer behind the administrative history (invitations,
+// suspensions, restorations, removals, request decisions, integration connections). The probe
+// below CANNOT write: an action outside the closed list is refused before any insert, so this
+// only asks whether the writer exists.
+{
+  const { status, body } = await rest("rpc/record_admin_event", {
+    method: "POST",
+    body: JSON.stringify({
+      p_action: "__live_probe_not_an_action__",
+      p_target: null,
+      p_success: true,
+      p_reason: null,
+      p_metadata: {},
+      p_actor: null,
+    }),
+  });
+  const text = JSON.stringify(body ?? "");
+  const present = status !== 404 && !text.includes("PGRST202");
+  record(
+    present ? "PASS" : "INFO",
+    "administrative actions are recorded (migration 0053)",
+    present
+      ? "the audit writer exists and refused the probe before writing anything"
+      : "the writer is absent, so the Security page will show role changes only; press Update database on the Owner Dashboard",
+  );
+}
+
 // Nothing may have been created by the probes above.
 {
   const after = await rowCount("member_presence");
@@ -241,9 +268,26 @@ const SIGNED_IN_CHECKS = [
   ["a real invitation email arrives", "invitation-email"],
 ];
 
+/**
+ * A SUPPLIED ACCOUNT THAT IS NOT AN ACCOUNT (2026-11-11).
+ *
+ * A test address with no "@" in it cannot sign in, and reporting that as "sign-in was refused"
+ * would blame the application for a typo in a setting. The check says what is actually wrong, in
+ * the words someone can act on, and stays BLOCKED - never a pass, never a false failure.
+ */
+const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(MEMBER1.email);
+
 if (!MEMBER1.email || !MEMBER1.password) {
   for (const [label] of SIGNED_IN_CHECKS) {
     signedIn("BLOCKED", label, "no test member account was supplied, so this was not attempted");
+  }
+} else if (!LOOKS_LIKE_EMAIL) {
+  for (const [label] of SIGNED_IN_CHECKS) {
+    signedIn(
+      "BLOCKED",
+      label,
+      "the saved test member email is not an email address (it has no @), so no sign-in was attempted; replace it with a real test-only member address",
+    );
   }
 } else {
   const session = await signIn(MEMBER1);

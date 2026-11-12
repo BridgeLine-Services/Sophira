@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import {
   auditHref,
   describeAction,
+  describeAuditEntry,
   hasFilters,
   RECORDED_ACTIONS,
   type AuditEntry,
@@ -45,12 +46,7 @@ function Entry({ entry }: { entry: AuditEntry }) {
           {describeAction(entry.action)}
           <Badge>{entry.success ? "allowed" : "refused"}</Badge>
         </p>
-        <p className="mt-0.5 text-sm text-ink-soft">
-          {entry.actorName} changed {entry.targetName} from {entry.fromRole} to {entry.toRole}.
-        </p>
-        {!entry.success && entry.reason && (
-          <p className="mt-1 text-xs text-ink-soft">Sophira refused it: {entry.reason}</p>
-        )}
+        <p className="mt-0.5 text-sm text-ink-soft">{describeAuditEntry(entry)}</p>
       </div>
     </div>
   );
@@ -214,8 +210,8 @@ export function SecurityHistory({
         ) : (
           <EmptyState
             icon={<span aria-hidden className="text-lg">·</span>}
-            title="No role changes recorded yet"
-            description="When someone's role is changed, or Sophira refuses a change, it will appear here."
+            title="Nothing recorded yet"
+            description="When someone's access, role or an invitation changes - or Sophira refuses a change - it will appear here."
           />
         )
       ) : (

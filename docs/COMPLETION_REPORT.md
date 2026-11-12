@@ -2,6 +2,67 @@
 
 > Evidence-based status only. Historical rounds remain in git history.
 
+## This round: the complete administrative history (2026-11-11)
+
+**Baseline audited:** `945265af` (master had not advanced; 0 open pull requests; CI, CodeQL and
+Migrations green on it). **This round:** migration `0053_admin_audit_events.sql`, the recorder, the
+wiring into every real event source, the extended reader and 139 new assertions.
+
+### A. Implemented and tested
+
+- **One history, not two.** The existing `public.membership_audit` table and its staff-only read
+  policy are extended, not replaced. `0048`'s role-change function and every existing row are
+  untouched.
+- **`public.record_admin_event()`**: SECURITY DEFINER, pinned `search_path`, closed action list
+  (13 categories), ten filtered metadata keys with length caps, actor taken from the session (or
+  from the server channel that verified it), five-second retry guard, `EXECUTE` for `service_role`
+  only, INSERT/UPDATE/DELETE revoked from `anon` and `authenticated`.
+- **Recorded after the action succeeds**, at every real source: `/api/network/members` (suspend,
+  restore, remove, invitation permission, plus refusals), `/api/invitations` (created, cancelled,
+  deleted, plus a separate refused entry when mail was not accepted), `/api/invitations/accept`
+  (joined), `/api/invitation-requests` (approved, declined), and the provider connection store
+  (connected on first connection only, disconnected only when something was connected).
+- **One plain sentence per entry** for every category, including a removed member (name captured at
+  the time) and an unrecognised provider (named as unrecognised, never invented).
+- **Security page** filters and pages in the database across all categories; the filters are derived
+  from the one vocabulary, so the page cannot offer a category that is never written.
+- **Tests:** 7268/7268 (`tests/admin-audit.ts` is new). Type check clean, lint 0 errors
+  (32 warnings, ceiling unchanged at 33), production build OK, secret scan clean, 53-migration chain
+  applied to a throwaway PostgreSQL 15 with 86 policies and RLS on every table.
+
+### B. Implemented but not live-verified
+
+- The new categories have never been written by the deployed app. The live database has the table
+  but not `0053` (probed with a refused no-op, nothing written), so recording currently returns
+  "unavailable" and the page shows what it has. One database update closes this.
+
+### C. Blocked by owner configuration
+
+- `0052` (AI response times) and `0053` (this history) are not applied live: Owner Dashboard →
+  Database updates → **Update database**.
+- A real invitation email needs a configured mail provider.
+- The scheduled backup needs `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `DATABASE_URL` as
+  repository secrets; until then the workflow reports Blocked on purpose.
+
+### D. Blocked by test accounts
+
+- Ten signed-in checks are BLOCKED: the saved test member address is not an email address (no
+  "@"), so no sign-in was attempted. `npm run verify:live-membership` now says exactly that instead
+  of blaming the app. Everything else it checks passes (13).
+
+### E. Not implemented
+
+- Failed sign-in history. Supabase's authentication does not provide a reliable, safe event, and
+  Sophira will not infer one from an ordinary API error. The page states the gap.
+
+### F. Deliberately not implemented
+
+- Deploy and rollback controls (no tested rollback path).
+- Per-feature individual activity tracking for analytics (a data-collection decision, not a code
+  one).
+- A second audit table, a second reader, or a client-side writer of any kind.
+
+
 ## This session: dependency, Windows, and UI foundation work (2026-10-15)
 
 - Upgraded Next.js 14.2.35 to patched 15.5.28, moved `pdf-parse` to the

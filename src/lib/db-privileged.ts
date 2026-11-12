@@ -178,6 +178,37 @@ export async function notificationCategoryEnabled(userId: string, category: stri
   return res;
 }
 
+/**
+ * RECORD ONE ADMINISTRATIVE EVENT (2026-11-11).
+ *
+ * Goes through the database's own writer, public.record_admin_event(), rather than inserting into
+ * membership_audit directly: the function owns the closed action list, the metadata filter, the
+ * retry guard and the actor rule. Called only by server code that has already verified the
+ * administrator, over the privileged channel, so `auth.uid()` is absent here and the verified
+ * actor is passed explicitly.
+ *
+ * Returns "duplicate" when the same event was written moments ago (the function's own retry
+ * guard) and null when the privileged channel is not available at all - the caller says so
+ * honestly instead of claiming a record exists.
+ */
+export async function insertAdminAudit(row: {
+  action: string;
+  actorId: string | null;
+  targetId: string | null;
+  success: boolean;
+  reason: string | null;
+  metadata: Record<string, string>;
+}): Promise<"recorded" | "duplicate" | null> {
+  const res = await withClient(async (client) => {
+    const r = await client.query(
+      `select public.record_admin_event($1::text, $2::uuid, $3::boolean, $4::text, $5::jsonb, $6::uuid) as id`,
+      [row.action, row.targetId, row.success, row.reason, JSON.stringify(row.metadata), row.actorId]
+    );
+    return (r.rows[0] as { id?: string } | undefined)?.id ? ("recorded" as const) : ("duplicate" as const);
+  });
+  return res;
+}
+
 /** Idempotent profile-row existence check (stale-signup cleanup). */
 export async function listProfileIds(): Promise<string[] | null> {
   return withClient(async (client) => {

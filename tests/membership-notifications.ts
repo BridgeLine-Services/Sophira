@@ -283,10 +283,11 @@ export function runMembershipNotificationTests(
   );
   assert(createsTable.length === 1,
     "schema: exactly one migration creates the notification table, so nothing was recreated");
-  // 2026-11-13: 51 -> 52. The notification work still needs no migration of its own (the assertion
-  // above proves it); 0052 adds an AI response-time column for the owner's AI Operations view.
-  assert(migrations.length === 52,
-    "schema: the notification cycle added no migration; 0052 is the AI response-time column");
+  // 2026-11-13: 51 -> 52 (0052, the AI response-time column). 2026-11-11: 52 -> 53 (0053, the
+  // administrative audit function and its indexes). The notification work itself still needs no
+  // migration of its own - the assertion above proves it.
+  assert(migrations.length === 53,
+    "schema: notification changes ride the 0042 table; 0053 adds the administrative audit writer");
 
   section("approving a request actually sends the invitation");
 

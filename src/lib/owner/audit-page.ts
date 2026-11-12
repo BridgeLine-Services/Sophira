@@ -18,20 +18,36 @@
  *   - a REFUSED action is a record, not a gap;
  *   - a filter that matches nobody says so, rather than implying a quiet history.
  *
- * WHAT IS NOT HERE: Sophira records role changes (and the refusals of role changes). Sign-ins,
- * invitation emails, suspensions and integration changes are NOT written to this table yet, and
- * the page says so instead of pretending the absence means "nothing happened".
+ * WHAT IS HERE NOW (2026-11-11): the whole administrative history, not only role changes. Role
+ * changes and their refusals (migration 0048), plus invitations created, sent, cancelled, deleted
+ * and accepted, invitation-request decisions, access suspended and restored, members removed,
+ * invitation-permission changes and integration connections (migration 0053). Every one of them
+ * arrives through a SECURITY DEFINER function with a closed action list, so nothing here can be
+ * forged from a browser.
+ *
+ * WHAT IS STILL NOT HERE: failed sign-ins. Supabase's authentication does not hand the
+ * application a reliable, safe sign-in event, and inventing one from an ordinary API error would
+ * be a security feature that lies. The page names the gap in plain words.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { roleLabel } from "../roles";
+import {
+  ADMIN_ACTIONS,
+  describeAdminEvent,
+  sanitizeAuditMetadata,
+  type AuditMetadata,
+} from "./admin-audit";
 
 export const AUDIT_PAGE_SIZE = 25;
 
-/** The actions this table records today. Kept as a list so the filter cannot offer a false one. */
-export const RECORDED_ACTIONS: Array<{ value: string; label: string }> = [
-  { value: "set_role", label: "Role change" },
-];
+/**
+ * The actions this table records. Derived from the one closed vocabulary in admin-audit.ts, so the
+ * filter can neither offer a kind that is never written nor miss one that is.
+ */
+export const RECORDED_ACTIONS: Array<{ value: string; label: string }> = ADMIN_ACTIONS.map(
+  ({ value, label }) => ({ value, label }),
+);
 
 export interface AuditFilters {
   search: string;
@@ -58,6 +74,8 @@ export interface AuditEntry {
   toRole: string;
   success: boolean;
   reason: string | null;
+  /** Only the safe, recognised keys - see sanitizeAuditMetadata. */
+  metadata: AuditMetadata;
 }
 
 export interface AuditQueryResult {
@@ -134,7 +152,7 @@ export async function loadAuditPage(
 
   let query = supabase
     .from("membership_audit")
-    .select("id, actor_id, target_id, action, previous_role, new_role, success, failure_reason, created_at", {
+    .select("id, actor_id, target_id, action, previous_role, new_role, success, failure_reason, metadata, created_at", {
       count: "exact",
     });
 
@@ -195,6 +213,9 @@ export async function loadAuditPage(
       toRole: roleLabel(String(row.new_role ?? "")),
       success: row.success !== false,
       reason: typeof row.failure_reason === "string" && row.failure_reason ? row.failure_reason : null,
+      metadata: sanitizeAuditMetadata(
+        row.metadata && typeof row.metadata === "object" ? (row.metadata as Record<string, unknown>) : {},
+      ),
     };
   });
 
@@ -206,6 +227,30 @@ export async function loadAuditPage(
     available: true,
     error: null,
   };
+}
+
+/**
+ * ONE ENTRY, ONE PLAIN SENTENCE.
+ *
+ * The page used to print "actor changed target from X to Y" for every row, which is only true of
+ * a role change. Every category now goes through the same describer, and a name Sophira can no
+ * longer resolve is described as such rather than left blank.
+ */
+export function describeAuditEntry(entry: AuditEntry): string {
+  const targetName =
+    entry.targetId && entry.targetName === GONE
+      ? entry.metadata.member_label || GONE
+      : entry.targetName || entry.metadata.member_label || "a member";
+  return describeAdminEvent({
+    action: entry.action,
+    actorName: entry.actorName || "Someone",
+    targetName,
+    success: entry.success,
+    reason: entry.reason,
+    metadata: entry.metadata,
+    fromRole: entry.fromRole,
+    toRole: entry.toRole,
+  });
 }
 
 /** Build the page's own URL with one filter changed - used by the pagination links. */

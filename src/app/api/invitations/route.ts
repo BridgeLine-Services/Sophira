@@ -5,6 +5,7 @@ import { requireNetworkManagement } from "@/lib/supabase/guard";
 import { invitationEmailNote } from "@/lib/invitations/email";
 import { checkEmail, emailProblemMessage, EMAIL_MAX_INPUT } from "@/lib/validation/email";
 import { deliverInvitation, normalizePhone, type Channel } from "@/lib/invitations/delivery";
+import { recordAdminEvent } from "@/lib/owner/admin-events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -155,6 +156,35 @@ export async function POST(request: NextRequest) {
       .then(() => undefined);
   }
 
+  /**
+   * HISTORY (2026-11-11): one entry for the invitation, and a SECOND entry only when the email did
+   * not go out. Both are written after the row and the delivery attempt exist, so neither can
+   * describe something that did not happen. The entry carries no token: the working link stays in
+   * the email and on this page, which is the only place a live token belongs.
+   */
+  const inviteActorId = (await supabase.auth.getUser()).data.user?.id ?? null;
+  await recordAdminEvent({
+    action: "invitation_created",
+    actorId: inviteActorId,
+    targetId: null,
+    metadata: {
+      channels: channels.join("+"),
+      delivery: emailResult.status,
+      reused: Boolean(existing),
+      invitation_id: String(row.id),
+    },
+  });
+  if (emailResult.status !== "sent") {
+    await recordAdminEvent({
+      action: "invitation_delivery",
+      actorId: inviteActorId,
+      targetId: null,
+      success: false,
+      reason: emailResult.reason ?? "the mail provider did not accept the message",
+      metadata: { channel: "email", delivery: emailResult.status, invitation_id: String(row.id) },
+    });
+  }
+
   return NextResponse.json({
     data: {
       ...row,
@@ -187,12 +217,24 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
   if (!body.id) return NextResponse.json({ error: "Missing invitation id." }, { status: 400 });
-  const { error: uErr } = await supabase
+  // `.select("id")` is what makes the history honest: a cancel that matched no pending row
+  // changed nothing, so it must not produce a "cancelled" entry.
+  const { data: cancelled, error: uErr } = await supabase
     .from("invitations")
     .update({ status: "revoked" })
     .eq("id", body.id)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id");
   if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
+  if (Array.isArray(cancelled) && cancelled.length > 0) {
+    const cancelActorId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    await recordAdminEvent({
+      action: "invitation_revoked",
+      actorId: cancelActorId,
+      targetId: null,
+      metadata: { invitation_id: String(body.id) },
+    });
+  }
   return NextResponse.json({ data: { ok: true } });
 }
 
@@ -202,7 +244,16 @@ export async function DELETE(request: NextRequest) {
 
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing invitation id." }, { status: 400 });
-  const { error: dErr } = await supabase.from("invitations").delete().eq("id", id);
+  const { data: deleted, error: dErr } = await supabase.from("invitations").delete().eq("id", id).select("id");
   if (dErr) return NextResponse.json({ error: dErr.message }, { status: 500 });
+  if (Array.isArray(deleted) && deleted.length > 0) {
+    const deleteActorId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    await recordAdminEvent({
+      action: "invitation_deleted",
+      actorId: deleteActorId,
+      targetId: null,
+      metadata: { invitation_id: String(id) },
+    });
+  }
   return NextResponse.json({ data: { ok: true } });
 }

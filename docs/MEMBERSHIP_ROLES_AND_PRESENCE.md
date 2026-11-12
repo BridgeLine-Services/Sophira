@@ -88,6 +88,42 @@ Only staff can read it
 **excluded** from the member data export because it names the administrator who
 acted, which is another person's information.
 
+### The same history now covers every administrative action (2026-11-11)
+
+Role changes were the only recorded category, which made the Security page honest but thin:
+"nothing happened" and "nothing was recorded" looked the same for invitations, suspensions and
+connections. Migration `0053_admin_audit_events.sql` completes the SAME table and the SAME
+reader - there is no second audit system - with a second writer,
+`public.record_admin_event()`.
+
+Recorded now: invitations created, cancelled, deleted and accepted; the confirmed email outcome
+of each invitation (and a separate refused entry when the provider did not accept it);
+invitation-request approvals and declines; access suspended and restored; members removed;
+invitation-permission changes; integrations connected and disconnected. Every entry carries the
+administrator (where there is one), the member affected, the outcome, the moment, a short
+explanation and a small set of safe metadata keys.
+
+The protections are the same ones the role function already had, plus two:
+
+- **closed action list** - the database refuses any category it does not know, so a caller cannot
+  invent an event type;
+- **filtered metadata** - only ten named keys survive, each truncated, so a token, an address
+  body or academic content cannot be written here even by mistake;
+- **no member session can call it** - `EXECUTE` belongs to `service_role` alone, the table's
+  INSERT/UPDATE/DELETE grants are revoked from `anon` and `authenticated`, and the function
+  re-checks `is_staff()` if a session is ever presented;
+- **retry guard** - the identical event (same action, actor, target, metadata) inside five
+  seconds is treated as a retry and is not recorded twice;
+- **after the fact, never before** - every call site records once its own write has succeeded, and
+  a refused attempt is recorded as refused.
+
+Not recorded, deliberately: failed sign-ins. Supabase's authentication does not give the
+application a reliable, safe sign-in event, and deriving one from an ordinary API error would be a
+security feature that lies. The Security page names that gap in plain words.
+
+Until the database has taken `0053`, recording returns "unavailable" and the history shows what it
+has. Nothing else changes, and nothing is claimed that was not stored.
+
 ---
 
 ## 2. Presence

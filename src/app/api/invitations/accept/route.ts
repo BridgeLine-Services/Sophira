@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { selectRow, acceptInvitationAtomic, privilegedChannelReachable } from "@/lib/db-privileged";
 import { notifyMember } from "@/lib/notifications/notify";
 import { invitationAcceptedNote } from "@/lib/notifications/membership-notes";
+import { recordAdminEvent } from "@/lib/owner/admin-events";
 
 export const runtime = "nodejs";
 
@@ -102,6 +103,19 @@ export async function POST(request: NextRequest) {
   if (!accepted) {
     return NextResponse.json({ error: "That invitation was already used or revoked." }, { status: 410 });
   }
+
+  /**
+   * HISTORY (2026-11-11): recorded only for the acceptance that actually claimed the invitation.
+   * The idempotent retry path above returns earlier, so re-running this route never produces a
+   * second "joined" entry, and the new member is both the actor and the subject - they accepted
+   * their own invitation.
+   */
+  await recordAdminEvent({
+    action: "invitation_accepted",
+    actorId: user.id,
+    targetId: user.id,
+    metadata: { invitation_id: String(invitation.id) },
+  });
 
   /**
    * THE INVITER IS TOLD (2026-11-13).

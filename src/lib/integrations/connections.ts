@@ -7,6 +7,7 @@
  * every query is additionally scoped to the requesting user's id.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordAdminEvent } from "@/lib/owner/admin-events";
 
 // 'canvas' reuses this table (migration 0041 widened the check constraint)
 // because duplicating the token-storage model would mean two places that can
@@ -49,6 +50,10 @@ export async function upsertConnection(
     base_url?: string | null;
   },
 ): Promise<void> {
+  // Whether this is a FIRST connection or a refresh of an existing one decides whether the
+  // history gets an entry. A token refresh is not "someone connected Google Drive", and writing
+  // one every hour would bury the events that matter.
+  const existing = await getConnection(userId, provider);
   const admin = createAdminClient();
   const { error } = await admin
     .from("provider_connections")
@@ -66,6 +71,16 @@ export async function upsertConnection(
       { onConflict: "user_id,provider" },
     );
   if (error) throw new Error("Could not save the connection.");
+  if (!existing) {
+    // Recorded after the connection was saved. Provider name only: no token, no account label,
+    // no document. Members see their own connection state; staff see that it happened.
+    await recordAdminEvent({
+      action: "integration_connected",
+      actorId: userId,
+      targetId: userId,
+      metadata: { provider },
+    });
+  }
 }
 
 export async function updateTokens(userId: string, provider: Provider, accessToken: string, expiresAt: string | null): Promise<void> {
@@ -79,9 +94,20 @@ export async function updateTokens(userId: string, provider: Provider, accessTok
 }
 
 export async function deleteConnection(userId: string, provider: Provider): Promise<void> {
+  const existing = await getConnection(userId, provider);
   const admin = createAdminClient();
   const { error } = await admin.from("provider_connections").delete().eq("user_id", userId).eq("provider", provider);
   if (error) throw new Error("Could not remove the connection.");
+  // Only an actual removal is recorded: disconnecting something that was never connected would
+  // read as an event that never happened.
+  if (existing) {
+    await recordAdminEvent({
+      action: "integration_disconnected",
+      actorId: userId,
+      targetId: userId,
+      metadata: { provider },
+    });
+  }
 }
 
 /**

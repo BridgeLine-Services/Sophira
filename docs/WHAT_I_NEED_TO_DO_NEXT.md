@@ -4,38 +4,62 @@ You never need a terminal, SQL, or code. Each step below says exactly where to
 click. Full status details live in docs/COMPLETION_REPORT.md (the authoritative
 report, updated 2026-10-13). Details for steps 1-2: docs/WORD_GOOGLE_DOCS_SETUP.md.
 
-## First: add the new Members and presence pieces to your database (about 1 minute)
+## First: bring your database up to date (about 1 minute)
 
-**Why:** Sophira has three new pieces of database furniture for the member list:
-four member roles, verified phone numbers, and the live presence records that let
-the Members page show who is at their screen. They have been tested on a throwaway
-database, but your real one has not taken them yet. I checked your live database on
-2026-11-11 and confirmed the four new tables are not there yet, so the Members page
-currently says "Presence is not available" instead of guessing.
+**Why:** Sophira has two newer pieces of database furniture waiting.
 
-Nothing is broken while you wait. The Members page still lists everyone, roles still
-work the old way, and nobody's work is interrupted.
+1. The first records **how long each AI answer took**, so the AI Operations page can show response
+   times instead of "not measured yet".
+2. The second records the **whole administrative history**: invitations, suspensions, restorations,
+   removals, invitation-request decisions and integration connections, not only role changes. The
+   Security page already tells you when something is not recorded; after this, almost everything is.
+
+I checked your real database on 2026-11-11. Everything for members, roles, phone numbers and
+presence is already there. These two updates are not, so the AI page says response time is not
+measured yet, and the Security page still shows role changes only.
+
+Nothing is broken while you wait. Members can keep working, and no existing record is touched.
 
 **What to do:**
 
-1. Open **https://sophira.vercel.app/owner/database** and sign in as the Owner if it
-   asks.
-2. Look at the line under "Your database today". If it is green and says
-   **Up to date**, you are already done — skip to step 4.
-3. If it says something like **3 updates missing**, press the button marked
-   **Update database** and wait for the spinner to stop. Text on the page will
-   change to **Up to date** with **50 of 50 pieces are in place**. This only adds
-   what is missing; nothing existing is replaced or deleted, and members can keep
-   working while it runs.
-4. Open **https://sophira.vercel.app/owner/members** and check two things:
-   - Near the top there is a box called **How quickly members look active or offline**
-     with six numbers and a Save button.
-   - Each member row shows a presence word (Active, Idle, Offline, or Unknown) next
-     to a separate account condition word.
+1. Open **https://sophira.vercel.app/owner/database** and sign in as the Owner if it asks.
+2. Look at the line under "Your database today". If it is green and says **Up to date**, you are
+   already done — skip to step 4.
+3. If it says something like **2 updates missing**, press the button marked **Update database** and
+   wait for the spinner to stop. The page will change to **Up to date**, with a line like
+   **53 of 53 pieces are in place** (the number grows as Sophira gains database pieces; what matters
+   is that the two numbers match). This only adds what is missing; nothing existing is replaced or
+   deleted, and members can keep working while it runs.
+4. Open **https://sophira.vercel.app/owner/ai-operations** and check that the response-time line no
+   longer says "not measured yet".
+5. Open **https://sophira.vercel.app/owner/security** and check that the lower card says invitations,
+   suspensions and connections are recorded (it will still say failed sign-ins are not).
 
-**If something looks wrong, paste this back to me:** the exact wording of any red or
-amber message on that page, and the line that begins "N of N pieces are in place".
+**If something looks wrong, paste this back to me:** the exact wording of any red or amber message
+on that page, and the line that ends "pieces are in place".
+
 Do not paste your password or any key.
+
+## Second: replace the test member sign-in I was given (about 2 minutes)
+
+The address saved for the signed-in checks is not an email address (it has no "@" in it), so I did
+not attempt to sign in with it. Ten checks stay marked BLOCKED rather than being reported as passes
+or as an application fault. Everything else about those checks is ready.
+
+A test member is a separate account used only for checking, never your own account.
+
+**What to do:**
+
+1. Open **https://sophira.vercel.app/owner/members**.
+2. Find the member you want to use for testing (create one through Invitations first if there is
+   nobody suitable). It must be a normal **User** role, not an Owner or Co-Owner.
+3. Copy that member's email address exactly as it appears.
+4. Send me that email address and a test-only password for it in a private message. I will store
+   them as secrets, never in the code, and never in a report.
+
+As soon as I have them I can finish: a signed-in member reporting presence, two devices keeping one
+person Online, a member being refused another member's rows, and a User being refused a staff
+action.
 
 ## Fix the typing schema in production (2 minutes, no technical steps)
 

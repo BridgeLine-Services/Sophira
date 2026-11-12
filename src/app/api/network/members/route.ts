@@ -6,9 +6,24 @@ import { requireStaff } from "@/lib/supabase/guard";
 import { canManageAccount } from "@/lib/auth/permissions";
 import { notifyMember } from "@/lib/notifications/notify";
 import { ACCOUNT_RESTORED_NOTE } from "@/lib/notifications/membership-notes";
+import { recordAdminEvent } from "@/lib/owner/admin-events";
+import type { AdminActionValue } from "@/lib/owner/admin-audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * WHICH RECORDED EVENT EACH ACTION BECOMES (2026-11-11).
+ *
+ * One map, used for the success AND the refusal, so "Sophira refused to suspend Jordan" is
+ * described with the same words as "Alex suspended Jordan". A refusal is a record, not a gap.
+ */
+const EVENT_FOR_ACTION: Record<string, AdminActionValue> = {
+  revoke: "account_suspended",
+  restore: "account_restored",
+  remove: "member_removed",
+  set_invite_permission: "invite_permission_changed",
+};
 
 /**
  * Membership management (workflow §4; four roles 2026-11-12).
@@ -49,6 +64,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing action or user id." }, { status: 400 });
   }
   if (user_id === actorId) {
+    // Recorded as a refusal: an attempt to change your own standing is exactly the kind of thing
+    // the history exists to show, and there is no member detail to leak in it.
+    const refusedSelf = EVENT_FOR_ACTION[action];
+    if (refusedSelf) {
+      await recordAdminEvent({
+        action: refusedSelf,
+        actorId,
+        targetId: user_id,
+        success: false,
+        reason: "You cannot manage your own account here.",
+      });
+    }
     return NextResponse.json({ error: "You cannot manage your own account here." }, { status: 400 });
   }
 
@@ -60,11 +87,29 @@ export async function POST(request: NextRequest) {
   const admin = direct ? null : createAdminClient();
   const target = direct
     ? await selectRow("profiles", "id", user_id)
-    : (await admin!.from("profiles").select("id, role, status").eq("id", user_id).single()).data;
+    : (await admin!.from("profiles").select("id, role, status, display_name").eq("id", user_id).single()).data;
   if (!target) {
     return NextResponse.json({ error: "That member could not be found." }, { status: 404 });
   }
+  // The name is captured NOW, because the profile can disappear later (a removed member). An
+  // entry that can still name who it was about is worth more than one that never can.
+  const targetLabel =
+    typeof target.display_name === "string" && target.display_name.trim()
+      ? target.display_name.trim().slice(0, 120)
+      : "a member";
+
   if (target.role === "owner") {
+    const refusedOwner = EVENT_FOR_ACTION[action];
+    if (refusedOwner) {
+      await recordAdminEvent({
+        action: refusedOwner,
+        actorId,
+        targetId: user_id,
+        success: false,
+        reason: "Owners cannot be modified here.",
+        metadata: { member_label: targetLabel },
+      });
+    }
     return NextResponse.json({ error: "Owners cannot be modified here. Use Change role to hand ownership over." }, { status: 400 });
   }
 
@@ -74,6 +119,17 @@ export async function POST(request: NextRequest) {
     { id: user_id, role: (target.role as string) ?? "user" },
   );
   if (!decision.allowed) {
+    const refusedByRole = EVENT_FOR_ACTION[action];
+    if (refusedByRole) {
+      await recordAdminEvent({
+        action: refusedByRole,
+        actorId,
+        targetId: user_id,
+        success: false,
+        reason: decision.reason ?? "That action is not allowed.",
+        metadata: { member_label: targetLabel },
+      });
+    }
     return NextResponse.json({ error: decision.reason ?? "That action is not allowed." }, { status: 403 });
   }
 
@@ -98,6 +154,14 @@ export async function POST(request: NextRequest) {
         // the user regardless. Report but do not silently swallow.
         console.error("revoke_all_sessions failed after status update");
       }
+      // Recorded after the status change and the session revocation above, never before: the
+      // entry describes something that really happened.
+      await recordAdminEvent({
+        action: "account_suspended",
+        actorId,
+        targetId: user_id,
+        metadata: { member_label: targetLabel, status: "revoked" },
+      });
       /**
        * NO IN-APP NOTICE ON REVOCATION (2026-11-13, deliberate).
        *
@@ -124,6 +188,12 @@ export async function POST(request: NextRequest) {
         link: "/dashboard",
         dedupeKey: `account-restored-${user_id}-${restoredAt}`,
       });
+      await recordAdminEvent({
+        action: "account_restored",
+        actorId,
+        targetId: user_id,
+        metadata: { member_label: targetLabel, status: "active" },
+      });
       return NextResponse.json({ data: { ok: true, notification: notice } });
     }
     case "remove": {
@@ -133,6 +203,14 @@ export async function POST(request: NextRequest) {
       const authAdmin = direct ? createAdminClient() : admin!;
       const { error } = await authAdmin.auth.admin.deleteUser(user_id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      // After the delete, and carrying the name that was read a moment ago, because the profile
+      // (and its display name) no longer exists by the time this is read back.
+      await recordAdminEvent({
+        action: "member_removed",
+        actorId,
+        targetId: user_id,
+        metadata: { member_label: targetLabel },
+      });
       return NextResponse.json({ data: { ok: true } });
     }
     case "set_invite_permission": {
@@ -143,6 +221,12 @@ export async function POST(request: NextRequest) {
         ? await updateProfileColumns(user_id, { can_request_invites: value })
         : !(await admin!.from("profiles").update({ can_request_invites: value }).eq("id", user_id)).error;
       if (!setOk) return NextResponse.json({ error: "The change could not be saved." }, { status: 500 });
+      await recordAdminEvent({
+        action: "invite_permission_changed",
+        actorId,
+        targetId: user_id,
+        metadata: { member_label: targetLabel, value },
+      });
       return NextResponse.json({ data: { ok: true } });
     }
     default:

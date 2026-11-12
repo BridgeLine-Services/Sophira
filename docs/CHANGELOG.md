@@ -1,3 +1,36 @@
+## 2026-11-11 — The administrative history now records everything an owner needs to see
+
+The Security page could read role changes, and said plainly that invitations, suspensions,
+restorations, removals, request decisions and integration connections were not recorded. That was
+honest but incomplete: "nothing happened" and "nothing was recorded" looked identical.
+
+Migration `0053_admin_audit_events.sql` completes the EXISTING `membership_audit` table and its
+staff-only read policy - no second audit system - with `public.record_admin_event()`: a closed
+action list, ten filtered metadata keys, an actor taken from the verified session (or from the
+server channel that already verified it), a five-second retry guard, and `EXECUTE` for
+`service_role` only. The table's INSERT/UPDATE/DELETE grants are revoked from `anon` and
+`authenticated`, so append-only is enforced by grant as well as by the absence of write policies.
+
+Every call site records AFTER its own write succeeds: `/api/network/members` (suspend, restore,
+remove, invitation permission - including refusals such as "a Co-Owner may not act on another
+Co-Owner"), `/api/invitations` (created, cancelled, deleted, plus a separate refused entry when the
+mail provider did not accept the message), `/api/invitations/accept` (joined), the
+invitation-request decisions, and the provider connection store (connected the first time only, so
+token refreshes do not bury the history).
+
+The page reads one sentence per entry, including for a member who has since been removed (the name
+captured at the time is used, not a blank). Failed sign-ins remain deliberately uncollected and are
+named as such.
+
+Verified: 7268/7268 tests (139 new assertions in `tests/admin-audit.ts`), tsc clean, lint 0 errors
+(32 warnings), production build OK, secret scan clean, the 53-migration chain applied to a
+throwaway PostgreSQL 15. Behaviour proved directly on that database: an unknown category is
+refused, `password`/`token`/nested values are dropped from metadata, the same event twice inside
+five seconds yields one row, a refusal keeps its reason, `authenticated` and `anon` hold no write
+grant and cannot execute the writer, and re-applying 0053 keeps existing rows. The live database
+has NOT taken 0053 yet (probed with a no-op refusal, nothing written), so the owner needs to press
+Update database before the new categories start recording.
+
 ## 2026-11-11 — Database updates: the owner can finally apply migrations from the app
 
 The first-launch wizard deliberately refuses to touch a database that already has an owner, so a live

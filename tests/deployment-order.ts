@@ -76,7 +76,10 @@ export function runDeploymentOrderTests(
     "deploy order: the owner checklist names the exact button");
   assert(/\/owner\/database/.test(ownerDoc) && /\/owner\/members/.test(ownerDoc),
     "deploy order: it names both click-by-click addresses");
-  assert(/50 of 50 pieces are in place/.test(ownerDoc),
+  // 2026-11-11: this used to pin the literal "50 of 50 pieces are in place", which went stale the
+  // moment the chain grew - a stale pin says nothing about the owner's experience. What matters is
+  // that the checklist quotes the page's own success line and the words it uses.
+  assert(/Up to date/.test(ownerDoc) && /pieces are in place/.test(ownerDoc),
     "deploy order: it says what success looks like, in the page's own wording");
   assert(/Do not paste your password or any key/.test(ownerDoc),
     "deploy order: it repeats the secret-handling rule where it is needed");

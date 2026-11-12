@@ -5,6 +5,7 @@ import { checkEmail, emailProblemMessage, EMAIL_MAX_INPUT } from "@/lib/validati
 import { notifyMember } from "@/lib/notifications/notify";
 import { invitationRequestApprovedNote } from "@/lib/notifications/membership-notes";
 import { deliverInvitation } from "@/lib/invitations/delivery";
+import { recordAdminEvent } from "@/lib/owner/admin-events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -161,6 +162,11 @@ export async function PATCH(request: NextRequest) {
       })
       .eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await recordAdminEvent({
+      action: "invitation_request_rejected",
+      actorId: ownerId,
+      targetId: typeof req.requester_id === "string" ? req.requester_id : null,
+    });
     // The requester is told, and only the requester. The decision note stays administrative,
     // so the reviewer's private reasoning is not copied into the member's list.
     const notice = await notifyMember(req.requester_id, {
@@ -237,6 +243,30 @@ export async function PATCH(request: NextRequest) {
    * never carries the token: the live link stays on the Invitations page and in the email, which
    * is the only place a working token belongs.
    */
+  // HISTORY (2026-11-11): the invitation exists and the send was attempted, so this is the
+  // moment the entry can tell the truth about both. No address and no token are stored.
+  await recordAdminEvent({
+    action: "invitation_created",
+    actorId: ownerId,
+    targetId: null,
+    metadata: {
+      channels: "email",
+      delivery: emailStatus,
+      source: "request",
+      invitation_id: String(invitation.id),
+    },
+  });
+  if (emailStatus !== "sent") {
+    await recordAdminEvent({
+      action: "invitation_delivery",
+      actorId: ownerId,
+      targetId: null,
+      success: false,
+      reason: delivery.email.reason ?? "the mail provider did not accept the message",
+      metadata: { channel: "email", delivery: emailStatus, invitation_id: String(invitation.id) },
+    });
+  }
+
   const words = invitationRequestApprovedNote(req.email, emailStatus);
   const notice = await notifyMember(req.requester_id, {
     kind: "invitation_request_approved",

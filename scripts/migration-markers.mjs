@@ -127,4 +127,8 @@ export const MARKERS = {
   // 0052: the AI response-time column behind the owner's AI Operations view.
   "0052_ai_response_latency.sql":
     "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'provider_usage' and column_name = 'latency_ms')",
+  // 0053: the administrative history beyond role changes. The probe asks for the function
+  // that writes the other categories, which only exists once this migration really ran.
+  "0053_admin_audit_events.sql":
+    "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'record_admin_event' and n.nspname = 'public')",
 };

@@ -65,8 +65,9 @@ export default async function OwnerSecurityPage({
         <section aria-labelledby="security-history">
           <h3 id="security-history" className="mb-2 text-sm font-semibold text-ink">Changes to access</h3>
           <p className="mb-3 max-w-2xl text-sm text-ink-soft">
-            Every role change Sophira has recorded, newest first, including the ones it refused.
-            Search it whenever something about someone&apos;s access does not look right.
+            Everything Sophira has recorded about access and invitations, newest first, including
+            the actions it refused. Search it whenever something about someone&apos;s access does
+            not look right.
           </p>
           <SecurityHistory result={audit} filters={filters} people={people} />
         </section>
@@ -95,17 +96,28 @@ export default async function OwnerSecurityPage({
           <CardContent className="space-y-2 p-4 text-sm text-ink-soft">
             <p className="font-medium text-ink">What this history does and does not contain</p>
             <p>
-              Recorded here: every role change, and every change Sophira refused, with who asked,
-              who was affected, and the moment it happened.
+              Recorded here, with who did it, who it was about, whether it worked and the moment it
+              happened: role changes and the changes Sophira refused; invitations created, emailed,
+              cancelled, deleted and accepted; decisions about invitation requests; access suspended
+              and restored; members removed; whether a member may request invitations; and
+              integrations connected or disconnected.
             </p>
             <p>
-              Not recorded yet: sign-ins and failed sign-in attempts, invitation emails, suspensions
-              and restorations, and integration changes. Sophira will not display those as
-              &quot;nothing happened&quot; while it does not keep them; they are listed here so you
-              know the difference between a quiet week and an unrecorded one.
+              If your database has not taken the newest update yet, only role changes appear below.
+              The <Link href="/owner/database" className="text-accent hover:underline">Database updates</Link>
+              {" "}page says whether anything is missing, and pressing Update database adds it without
+              replacing anything.
             </p>
             <p>
-              This page is Owner-only. A Co-Owner can manage members, but not read this history.
+              Not recorded: failed sign-in attempts. Sophira&apos;s sign-in service does not give
+              the application a reliable, safe report of them, and inventing one from an ordinary
+              error would be a security feature that is not true. Everything else above is the
+              complete record, so an empty result really does mean nothing happened.
+            </p>
+            <p>
+              This page is Owner-only. A Co-Owner can manage members but cannot open this page.
+              Members cannot read it, and it never contains a password, a sign-in link, an
+              invitation link or anyone&apos;s academic work.
             </p>
           </CardContent>
         </Card>
