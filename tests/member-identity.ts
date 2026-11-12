@@ -38,7 +38,7 @@ export function runMemberIdentityTests(assert: (cond: boolean, msg: string) => v
   // The table calls onAction; MembersPanel wires that prop to the shared member action, so a
   // restore still reaches the unchanged server route.
   const membersPanel = readFileSync("src/components/app/MembersPanel.tsx", "utf8");
-  assert(dashSrc.includes('onAction(m, "restore")') && membersPanel.includes("onAction={") &&
+  assert(/onAction\((m|row), "restore"\)/.test(dashSrc) && membersPanel.includes("onAction={") &&
     membersPanel.includes("postMemberAction"),
     "dashboard: reinstatement still reaches the unchanged action handler");
 
@@ -51,7 +51,7 @@ export function runMemberIdentityTests(assert: (cond: boolean, msg: string) => v
     'owner: an accepted invitation says who joined, not just the invited address');
   assert(dashSrc.includes('no phone yet'),
     'owner: a missing phone number is stated plainly so the owner knows who to ask');
-  assert(dashSrc.includes('m.phone'), 'owner: the member row shows the phone number when one exists');
+  assert(/\b(m|row)\.phone\b/.test(dashSrc), 'owner: the member row shows the phone number when one exists');
 
   const signup = readFileSync('src/app/signup/page.tsx', 'utf8');
   assert(signup.includes('required') && signup.includes('Please enter the name'),

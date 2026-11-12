@@ -230,7 +230,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "nav: mobile gets a slide-out drawer with a menu button, close button, and modal semantics");
   assert(shell.includes("Escape") && shell.includes("menuBtnRef.current?.focus()"),
     "nav: the drawer closes on Escape and restores focus to the menu button");
-  assert(shell.includes("navigator.onLine") && shell.includes('href="/online"'),
+  assert(shell.includes("navigator.onLine") && shell.includes('"/online?env=owner" : "/online"'),
     "nav: a real connectivity status chip links to /online (never a fabricated state)");
 
   // Every subject workspace route exists as a real page (no dead links).
@@ -399,7 +399,9 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "owner: the owner layout has its own navigation with My Workspace as the single intentional exit into the personal workspace");
   assert(shell4.includes('variant === "owner" ? (') && shell4.includes('variant?: "workspace" | "owner"'),
     "owner: AppShell has separate owner and workspace navigation layouts (variant prop)");
-  assert(shell4.includes('variant === "owner" ? "/owner" : isOwner ? "/owner" : "/dashboard"'),
+  // 2026-11-12: the brand link is now adminHomeHref, which is /owner for an Owner,
+  // /owner/members for a Co-Owner (who cannot open /owner) and /dashboard for everyone else.
+  assert(shell4.includes('const adminHomeHref = isOwner ? "/owner" : isCoOwner ? "/owner/members" : "/dashboard"'),
     "owner: the Sophira logo opens the Owner Dashboard for the owner (workspace users keep /dashboard)");
   assert(shell4.includes('workspaceHomeHref = isOwner ? "/dashboard?view=workspace" : "/dashboard"') && shell4.includes('navLink(workspaceHomeHref, "Home", Home)'),
     "workspace: Home inside the workspace opens the WORKSPACE Home even for the owner (no silent reset to the owner view)");

@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner, useToast } from "@/components/ui";
 import { offlineStack } from "@/lib/offline/client";
@@ -9,6 +10,15 @@ interface Health { ok?: boolean; services?: Record<string, boolean> }
 
 export default function OnlinePage() {
   const { toast } = useToast();
+  // 2026-11-12: opening this page from the Owner Dashboard used to drop the owner into the
+  // member workspace shell, losing the admin navigation and looking like a sign-out. The
+  // owner shell now links here with ?env=owner and this page keeps that environment.
+  const [ownerEnvironment, setOwnerEnvironment] = useState(false);
+  useEffect(() => {
+    // Read from the address bar after mount: no prerender bailout, and the value is stable
+    // for the life of the page.
+    setOwnerEnvironment(new URLSearchParams(window.location.search).get("env") === "owner");
+  }, []);
   const [online, setOnline] = useState(true);
   const [health, setHealth] = useState<Health | null>(null);
   const [healthBusy, setHealthBusy] = useState(false);
@@ -68,8 +78,13 @@ export default function OnlinePage() {
   }
 
   return (
-    <AppShell title="Online">
+    <AppShell title="Online" variant={ownerEnvironment ? "owner" : "workspace"}>
       <div className="mx-auto max-w-2xl space-y-4">
+        {ownerEnvironment && (
+          <Link href="/owner" className="text-sm text-accent hover:underline">
+            &larr; Back to the Owner Dashboard
+          </Link>
+        )}
         <p className="text-sm text-ink-soft">
           Live connectivity and synchronization status. This page never shows a false online or
           offline state — it reports exactly what it can verify.

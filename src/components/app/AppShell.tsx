@@ -39,7 +39,18 @@ const NAV = [
  * and the workspace only links back here through the explicit Owner
  * Dashboard entry and the brand logo.
  */
-const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; label: string; icon: typeof Home }> }> = [
+type NavRole = "user" | "tester" | "co_owner" | "owner";
+
+/**
+ * 2026-11-12: every Owner-Dashboard entry declares the LOWEST role that may open it.
+ * The list is filtered with the same authority the server enforces, so a Co-Owner never
+ * sees a link whose page would bounce them back. Anything not marked "staff" is
+ * Owner-only: security, billing, AI providers, integrations, database updates.
+ */
+const OWNER_NAV_GROUPS: Array<{
+  heading: string;
+  items: Array<{ href: string; label: string; icon: typeof Home; minimum?: NavRole }>;
+}> = [
   {
     heading: "Overview",
     items: [
@@ -53,7 +64,7 @@ const OWNER_NAV_GROUPS: Array<{ heading: string; items: Array<{ href: string; la
   {
     heading: "Network Management",
     items: [
-      { href: "/owner/members", label: "Members", icon: Users },
+      { href: "/owner/members", label: "Members", icon: Users, minimum: "co_owner" },
       { href: "/owner/invitations", label: "Invite someone", icon: UserPlus },
       { href: "/owner/requests", label: "Invitation requests", icon: MailQuestion },
     ],
@@ -269,7 +280,10 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
   const router = useRouter();
   const supabase = createClient();
   const [signingOut, setSigningOut] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
+  const [role, setRole] = useState<NavRole>("user");
+  const isOwner = role === "owner";
+  /** A Co-Owner runs the member directory but not the settings. */
+  const isCoOwner = role === "co_owner";
   const [userId, setUserId] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -278,10 +292,11 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
 
   useEffect(() => {
     let alive = true;
-    supabase.from("profiles").select("id, role").limit(1).then(({ data }) => {
-      if (alive && data?.[0]) {
-        if (data[0].role === "owner") setIsOwner(true);
-        setUserId(data[0].id as string);
+    supabase.from("profiles").select("id, role").limit(1).maybeSingle().then(({ data }) => {
+      if (alive && data) {
+        const value = String(data.role ?? "user");
+        setRole(value === "owner" || value === "co_owner" || value === "tester" ? (value as NavRole) : "user");
+        setUserId(data.id as string);
       }
     });
     return () => { alive = false; };
@@ -384,7 +399,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
 
   const onlineChip = (inDrawer: boolean) => (
     <Link
-      href="/online"
+      href={variant === "owner" ? "/online?env=owner" : "/online"}
       onClick={inDrawer ? closeDrawer : undefined}
       className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
         pathname === "/online" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
@@ -428,6 +443,21 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
   // base path so the query never breaks highlighting.
   const workspaceHomeHref = isOwner ? "/dashboard?view=workspace" : "/dashboard";
 
+  /**
+   * 2026-11-12: one place that decides which Owner-Dashboard sections this person may see.
+   * A Co-Owner gets the member directory and nothing else; everything unmarked stays
+   * Owner-only. The pages themselves authorise again on the server, so hiding a link is a
+   * convenience, never the boundary.
+   */
+  const rank: Record<NavRole, number> = { user: 0, tester: 1, co_owner: 2, owner: 3 };
+  const canSeeNavItem = (minimum?: NavRole) => rank[role] >= rank[minimum ?? "owner"];
+  const visibleOwnerGroups = OWNER_NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((item) => canSeeNavItem(item.minimum)) }))
+    .filter((g) => g.items.length > 0);
+
+  /** Where "home" is for whoever is signed in. A Co-Owner cannot open /owner. */
+  const adminHomeHref = isOwner ? "/owner" : isCoOwner ? "/owner/members" : "/dashboard";
+
   const navLink = (href: string, label: string, Icon: typeof Home) => {
     const base = href.split("?")[0];
     const active = pathname === base || pathname.startsWith(base + "/");
@@ -460,13 +490,13 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-line bg-paper/95 backdrop-blur lg:flex"
         aria-label="Primary"
       >
-        <Link href={variant === "owner" ? "/owner" : isOwner ? "/owner" : "/dashboard"} className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
+        <Link href={variant === "owner" ? adminHomeHref : adminHomeHref === "/dashboard" ? "/dashboard" : adminHomeHref} className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
           Sophira
         </Link>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label={variant === "owner" ? "Owner sections" : "Sections"}>
           {variant === "owner" ? (
-            OWNER_NAV_GROUPS.map((g) => (
+            visibleOwnerGroups.map((g) => (
               <div key={g.heading} className="mb-3">
                 <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
                 {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
@@ -475,10 +505,10 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             ))
           ) : (
             <>
-              {isOwner && (
+              {(isOwner || isCoOwner) && (
                 <Link
-                  href="/owner"
-                  aria-current={pathname === "/owner" ? "page" : undefined}
+                  href={adminHomeHref}
+                  aria-current={pathname === adminHomeHref ? "page" : undefined}
                   className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
                     pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5")}
                 >
@@ -529,7 +559,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
               ←
             </Link>
           ) : (
-            <Link href={variant === "owner" ? "/owner" : isOwner ? "/owner" : "/dashboard"} className="flex items-center gap-2 font-semibold text-ink lg:hidden">
+            <Link href={variant === "owner" ? adminHomeHref : adminHomeHref === "/dashboard" ? "/dashboard" : adminHomeHref} className="flex items-center gap-2 font-semibold text-ink lg:hidden">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
               <span className="hidden sm:inline">Sophira</span>
             </Link>
@@ -564,10 +594,10 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             ))
           ) : (
             <>
-              {isOwner && (
+              {(isOwner || isCoOwner) && (
                 <Link
-                  href="/owner"
-                  aria-current={pathname === "/owner" ? "page" : undefined}
+                  href={adminHomeHref}
+                  aria-current={pathname === adminHomeHref ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
                     pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5"
@@ -634,7 +664,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             </div>
             <nav className="flex-1 space-y-0.5 px-3 pb-4" aria-label="Sections">
               {variant === "owner" ? (
-                OWNER_NAV_GROUPS.map((g) => (
+                visibleOwnerGroups.map((g) => (
               <div key={g.heading} className="mb-3">
                 <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
                 {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
@@ -642,9 +672,9 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             ))
               ) : (
                 <>
-                  {isOwner && (
-                    <Link href="/owner" onClick={closeDrawer} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/5">
-                      <ShieldCheck className="h-4 w-4" aria-hidden /> Owner Dashboard
+                  {(isOwner || isCoOwner) && (
+                    <Link href={adminHomeHref} onClick={closeDrawer} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/5">
+                      <ShieldCheck className="h-4 w-4" aria-hidden /> {isOwner ? "Owner Dashboard" : "Members"}
                     </Link>
                   )}
                   {navLink(workspaceHomeHref, "Home", Home)}

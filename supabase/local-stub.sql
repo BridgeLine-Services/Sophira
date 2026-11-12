@@ -32,6 +32,12 @@ create table if not exists auth.users (
   raw_app_meta_data jsonb default '{}'::jsonb,
   invited_at timestamptz,
   email_confirmed_at timestamptz,
+  -- 2026-11-12: the real Supabase auth.users carries the login phone number and the
+  -- provider's confirmation timestamp. Migration 0049 reads both to decide whether a
+  -- number is VERIFIED or merely supplied, so the local stub must have the same
+  -- columns or the migration cannot be verified honestly.
+  phone text,
+  phone_confirmed_at timestamptz,
   created_at timestamptz not null default now()
 );
 create or replace function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;

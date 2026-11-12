@@ -52,6 +52,12 @@ export const MARKERS = {
   // so it is false before the migration and true only once it really ran.
   "0047_memory_teacher_assignment_scope.sql":
     "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'student_memories' and column_name = 'assignment_id')",
+  "0048_membership_roles.sql":
+    "exists (select 1 from pg_constraint where conname = 'profiles_role_check' and pg_get_constraintdef(oid) like '%co_owner%')",
+  "0049_member_phone_verification.sql":
+    "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'network_member_phones' and n.nspname = 'public' and 'verified' = any(p.proargnames))",
+  "0050_member_presence.sql":
+    "to_regclass('public.member_presence') is not null",
   "0046_response_provenance.sql":
     "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'responses' and column_name = 'provider_used')",
   "0045_response_edits.sql":

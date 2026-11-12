@@ -20,3 +20,21 @@ export async function requireOwnerPage() {
   if (profile.role !== "owner") redirect("/dashboard");
   return { supabase, user, profile };
 }
+
+/**
+ * Member-management page gate (2026-11-12).
+ *
+ * The four-role model gives a Co-Owner the member directory and nothing else. This gate
+ * mirrors requireOwnerPage exactly — same session handling, same revocation redirect, same
+ * recovery behaviour — and only widens WHICH role may enter. The pages that use it are the
+ * ones a Co-Owner is authorised for; every Owner-only page keeps requireOwnerPage above.
+ */
+export async function requireStaffPage() {
+  const supabase = createClient();
+  const user = await requireUser(supabase);
+  const { profile } = await readProfileWithRepair(supabase, user.id);
+  if (!profile) redirect("/owner");
+  if (profile.status === "revoked") redirect("/access-denied");
+  if (profile.role !== "owner" && profile.role !== "co_owner") redirect("/dashboard");
+  return { supabase, user, profile };
+}

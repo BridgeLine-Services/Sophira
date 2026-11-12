@@ -84,8 +84,21 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
     assert(existsSync(`src/app/owner/${route}/page.tsx`),
       `nav: /owner/${route} exists, so the sidebar link cannot 404`);
     const page = readFileSync(`src/app/owner/${route}/page.tsx`, "utf8");
-    assert(page.includes("requireOwnerPage"),
+    // 2026-11-12: /owner/members is the one section a Co-Owner is authorised for, so it uses
+    // the staff gate. Every other owner page keeps the owner-only gate, asserted separately.
+    const expectedGate = route === "members"
+      ? /requireStaffPage|requireOwnerPage/
+      : /requireOwnerPage/;
+    assert(expectedGate.test(page),
       `nav: /owner/${route} authorises on the server, not by hiding a link`);
+    if (route === "members") {
+      const ctx = readFileSync("src/lib/owner/page-context.ts", "utf8");
+      assert(/profile\.role !== "owner" && profile\.role !== "co_owner"/.test(ctx),
+        "nav: the staff gate accepts an Owner or a Co-Owner and redirects everyone else");
+    } else {
+      assert(!/requireStaffPage/.test(page),
+        `nav: /owner/${route} stays Owner-only — a Co-Owner is not quietly let into ${route}`);
+    }
   }
   assert(shell.includes('heading: "Monitoring"'),
     "nav: the new sections sit in their own group rather than being appended anywhere");

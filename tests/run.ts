@@ -103,6 +103,8 @@ import { readInviteUi, readOwnerUi } from "./owner-surface";
 import { runOwnerTrendTests } from "./owner-trends";
 import { runActivationReadinessTests } from "./activation-readiness";
 import { runMemberIdentityTests } from "./member-identity";
+import { runMembershipRoleTests } from "./membership-roles";
+import { runMemberPresenceTests } from "./member-presence";
 import { runNotificationProducerTests } from "./notification-producer";
 import { runDeploymentCapabilityTests } from "./deployment-capabilities";
 import { runCanvasRubricTests } from "./canvas-rubric";
@@ -2709,9 +2711,29 @@ async function runSecurityRegressionTests(): Promise<void> {
     // get_invitation_by_token is a SECURITY DEFINER FUNCTION (not a policy)
     // and only exposes ONE pending invitation by unguessable token — the
     // documented signup exception; it is asserted below, not whitelisted blindly.
-    const unscoped = policies.filter((p) => !/auth\.uid\(\)/.test(p.body));
+    // 2026-11-12 (four roles): a policy may also be scoped by the two role helpers, because
+    // "staff" cannot be expressed as auth.uid() alone. That is allowed ONLY because the
+    // helpers are themselves auth.uid()-scoped, SECURITY DEFINER, a closed role list, and not
+    // executable by anon — all asserted immediately below. A policy scoped by NOTHING is still
+    // a failure: the check did not loosen, it learned one new legitimate shape.
+    const roleScoped = (body: string) => /public\.(is_staff|is_owner)\(\)/.test(body);
+    const unscoped = policies.filter((p) => !/auth\.uid\(\)/.test(p.body) && !roleScoped(p.body));
     assert(unscoped.length === 0,
-      `security: every policy is scoped to auth.uid() (unscoped: ${unscoped.map((p) => p.table).join(", ") || "none"}) — no permissive policy can slip in`);
+      `security: every policy is scoped to auth.uid() or a verified role helper (unscoped: ${unscoped.map((p) => p.table).join(", ") || "none"}) — no permissive policy can slip in`);
+    const helpers = sql.match(/create or replace function public\.(is_staff|is_owner)\(\)[\s\S]*?\$\$;/g) ?? [];
+    assert(helpers.length === 2,
+      "security: the role helpers used by policies are defined in the migrations");
+    for (const helper of helpers) {
+      assert(/security definer/.test(helper), "security: each role helper runs as definer so it can read profiles safely");
+      assert(/p\.id = auth\.uid\(\)/.test(helper), "security: each role helper is bound to the caller's own auth.uid() row");
+      assert(/set search_path = public, pg_temp/.test(helper), "security: each role helper pins its search_path");
+      assert(/stable/.test(helper), "security: each role helper is stable, so it is not re-evaluated per row");
+    }
+    assert(/revoke all on function public\.is_staff\(\) from public, anon;/.test(sql) &&
+      /revoke all on function public\.is_owner\(\) from public, anon;/.test(sql),
+      "security: an anonymous caller cannot use the role helpers to probe role membership");
+    assert(!/p\.role in \('owner', 'co_owner'\)[\s\S]*?or p\.role is null/.test(sql),
+      "security: neither helper treats a NULL role as staff");
     // No policy may be written as `using (true)` — that is world access.
     const permissive = policies.filter((p) => /using\s*\(\s*true\s*\)|with check\s*\(\s*true\s*\)/.test(p.body));
     assert(permissive.length === 0, "security: no `using (true)` / `with check (true)` policy exists anywhere");
@@ -4185,7 +4207,17 @@ async function runAccessControlTests(): Promise<void> {
       // account recovery), so it authenticates via supabase.auth.getUser()
       // and cannot require an active profile. The owner role itself is
       // granted only by the database's race-safe claim (0026), never here.
-      const guarded = src.includes("requireUser") || src.includes("requireOwner") || rel === "/api/complete-owner";
+      // 2026-11-12: the guard family grew with the four-role model (requireStaff,
+      // requireNetworkManagement, requireTester). The requirement is unchanged — the route
+      // must call a shared guard that resolves the caller's session AND profile status — so the
+      // pin recognises the family instead of only two of its names.
+      const guardFamily = /require(User|Owner|Staff|NetworkManagement|Tester|Admin)\b/;
+      const guarded = guardFamily.test(src) || rel === "/api/complete-owner";
+      if (guardFamily.test(src)) {
+        assert(src.includes("@/lib/supabase/guard") || src.includes("../lib/supabase/guard") ||
+          src.includes("require-user"),
+          `access: ${rel} calls its guard from the shared guard module, not a local copy`);
+      }
       const publicOk = intentionallyPublic.some((p) => rel === p);
       assert(guarded || publicOk,
         `access: ${rel} enforces the server guard (authenticated -> active) or is on the documented public allowlist`);
@@ -4228,7 +4260,13 @@ async function runAccessControlTests(): Promise<void> {
 
     // ---- revoke/restore/remove actions are owner-only and server-enforced -
     const members = fs.readFileSync(path.join(process.cwd(), "src", "app", "api", "network", "members", "route.ts"), "utf8");
-    assert(members.includes("requireOwner"), "access: membership actions go through requireOwner");
+    // 2026-11-12: four roles mean a Co-Owner may suspend a User or Tester, so the gate is the
+    // staff guard and the DECISION is the shared permission matrix. The protections tested are
+    // unchanged: server-enforced, never self-service, and never applied to an Owner.
+    assert(members.includes("requireStaff") && members.includes("@/lib/supabase/guard"),
+      "access: membership actions go through a shared server guard");
+    assert(members.includes("canManageAccount"),
+      "access: the acting role is checked against the shared permission matrix, not compared inline");
     assert(members.includes("access_revoked_at") && members.includes("status: \"revoked\""),
       "access: revoke records both status and audit timestamp");
     assert(members.includes('rpc("revoke_all_sessions"'),
@@ -4241,7 +4279,8 @@ async function runAccessControlTests(): Promise<void> {
     assert(members.includes("access_revoked_at: null") && members.includes('status: "active"'),
       "access: restore clears status and audit timestamp");
     assert(members.includes("deleteUser"), "access: permanent removal deletes the auth user");
-    assert(members.includes("user_id === ownerId"), "access: the owner cannot lock themselves out by self-revocation");
+    assert(/user_id === (ownerId|actorId)/.test(members),
+      "access: the person acting cannot lock themselves out by self-revocation");
     assert(members.includes('target.role === "owner"') || members.includes('"owner"'),
       "access: owner accounts cannot be modified by membership actions");
 
@@ -4255,8 +4294,11 @@ async function runAccessControlTests(): Promise<void> {
       "access: the Access Management area offers revoke/reinstate");
     assert(ui.includes("id.subtitle") && ui.includes("joined ") && ui.includes("revoked "),
       "access: member rows show name, email, and the dates access was granted/revoked");
-    assert(ui.includes("Only the owner can grant, revoke, or reinstate access"),
-      "access: the UI states clearly that only the owner can manage access");
+    // 2026-11-12: four roles mean a Co-Owner may manage Users and Testers, so the sentence
+    // had to say what is actually true. The guarantee tested is unchanged: the page states
+    // plainly who may manage access and where the limit is.
+    assert(ui.includes("Owners and") && /only an Owner\s*\n?\s*can manage another Owner/.test(ui.replace(/<[^>]+>/g, " ").replace(/&apos;/g, "'").replace(/\s+/g, " ").trim()),
+      "access: the UI states clearly who may manage access, and that Owners are out of bounds");
 
     // ---- fail-closed owner bootstrap, no hardcoded credentials --------------
     const m8 = fs.readFileSync(path.join(process.cwd(), "supabase", "migrations", "0008_invitation_only_signup.sql"), "utf8");
@@ -4997,9 +5039,11 @@ async function runOwnerRenderSafetyTests(): Promise<void> {
   // 2026-10-28 regression: a null optional field must never throw during
   // render (the owner saw the generic error screen on /owner, and
   // /dashboard redirects owners straight back to /owner).
-  assert(!/m\.subject_usage\.length/.test(dash) && dash.includes("m.subject_usage?.length"),
+  // 2026-11-12: the row is a MemberRow now, so the same guarantee is expressed against
+  // `row.subjectUsage`. The assertion is unchanged in substance: a missing field must not throw.
+  assert(!/\bsubjectUsage\.length/.test(dash) && dash.includes("row.subjectUsage?.length"),
     "owner: an optional subject_usage field cannot crash the member row");
-  assert(dash.includes("(m.subject_usage ?? []).map"),
+  assert(dash.includes("(row.subjectUsage ?? []).map"),
     "owner: the usage badges render from a guaranteed array");
   const setup = readFileSync("src/app/setup/page.tsx", "utf8");
   assert(setup.includes("Create owner account") && setup.includes('href="/login"'),
@@ -5325,7 +5369,7 @@ async function runOwnerSetupTests(): Promise<void> {
 }
 
 __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTests()).then(() => runMemoryTests()).then(() => runDeploymentTests()).then(() => runPatternEvidenceTests()).then(() => runExecutionTests()).then(() => runTypingProfileTests()).then(() => runNativeUrlTests()).then(() => runSecurityRegressionTests()).then(() => runInvitationRegressionTests()).then(() => runAcceptanceDocTests()).then(() => runResearchBenchPinTests()).then(() => runInferenceEndpointTests()).then(() => runRankingRegressionTests()).then(() => runIntegrationsDoctorTests()).then(() => runLintGateTests()).then(() => runWritingProfileLearningTests()).then(() => runStyleSuggestionTests()).then(() => runWritingReviewTests()).then(() => runRedesignAuditTests()).then(() => runThemeTokenTests()).then(() => runPrimitiveTokenTests()).then(() => runRepoWideThemeTests()).then(() => runInventorySignalTests()).then(() => runCanvasIntegrationTests()).then(() => runPdfExtractionTests()).then(() => runReleaseGateTests()).then(() => runPwaReadinessTests()).then(() => runAccessControlTests()).then(() => runOwnerSetupTests()).then(() => (process.env.LIVE_GEMINI === "1" ? runGeminiLiveTests() : Promise.resolve())).then(() => (process.env.RESEARCH_LIVE === "1" ? runResearchLiveTests() : Promise.resolve())).then(() => runLegalPageTests()).then(() => runOfflineTests(assert, section)).then(() => runNotebookTests(assert, section)).then(() => runExportTests(assert, section)).then(() => runResearchResumeTests(assert, section)).then(() => runOwnerSystemHealthTests(assert, section)).then(() => runScheduledHealthTests(assert, section)).then(() => runOwnerNextStepTests(assert, section)).then(() => runProdFixTests(assert, section)).then(() => runSystemHealthActionsTests(assert, section))
-  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section)).then(() => runAccessibilityTests(assert, section)).then(() => runBackupIntegrityTests(assert)).then(() => runNotificationProducerTests(assert)).then(() => runDeploymentCapabilityTests(assert, section)).then(() => runCanvasRubricTests(assert, section)).then(() => runDataPreservationTests(assert, section)).then(() => runNotificationTests(assert, section)).then(() => runBackupToolTests(assert)).then(() => runOwnerActivityTests(assert)).then(() => runOwnerTrendTests(assert)).then(() => runActivationReadinessTests(assert)).then(() => runMemberIdentityTests(assert))
+  .then(() => runPptxExportTests(assert, section)).then(() => runProviderIntegrationTests(assert, section)).then(() => runDocumentSelectionTests(assert, section)).then(() => runDocumentHistoryTests(assert, section)).then(() => runSupabaseUrlTests()).then(() => runSetupDependencyAndLearningTests()).then(() => runAuthRedirectTests()).then(() => runOwnerFlowSimplicityTests()).then(() => runAutoSetupTests()).then(() => runFirstRunUXTests()).then(() => runDeliveryCapabilityTests()).then(() => runInviteFormTests()).then(() => runPdfFragilityPins()).then(() => runOfflineEvalTests()).then(() => runDocBenchTests()).then(() => runInformationBoundaryTests()).then(() => runDiscoveryTests()).then(() => runChannelDiscoveryTests()).then(() => runDeliveryEnvTests()).then(() => runInvitationDeliveryTests()).then(() => runOwnerRenderSafetyTests()).then(() => runSupabaseUrlTests()).then(() => runConnectionCandidateTests()).then(() => runResearchModeTests()).then(() => runAdversarialCitationTests(assert, section)).then(() => runMathPipelineTests(assert, section)).then(() => runEssayPipelineTests(assert, section)).then(() => runHostileAuditTests(assert, section)).then(() => runPrivilegedIdentifierTests(assert, section)).then(() => runAccessibilityTests(assert, section)).then(() => runBackupIntegrityTests(assert)).then(() => runNotificationProducerTests(assert)).then(() => runDeploymentCapabilityTests(assert, section)).then(() => runCanvasRubricTests(assert, section)).then(() => runDataPreservationTests(assert, section)).then(() => runNotificationTests(assert, section)).then(() => runBackupToolTests(assert)).then(() => runOwnerActivityTests(assert)).then(() => runOwnerTrendTests(assert)).then(() => runActivationReadinessTests(assert)).then(() => runMemberIdentityTests(assert)).then(() => runMembershipRoleTests(assert, section)).then(() => runMemberPresenceTests(assert, section))
     .then(() => runProdEnvPolicyTests(assert, section)).then(() => runReadinessCompletionTests(assert, section)).then(() => runOwnerBootstrapTests(assert, section)).then(() => runLoginOwnerCtaTests(assert, section)).then(() => runVercelConfigTests(assert, section)).then(() => runDoctorTests(assert, section)).then(() => runCrashGuardTests(assert, section)).then(() => runEnvManifestTests(assert, section)).then(() => runGitHubInstallTests(assert, section)).then(() => runSelfHostedAiTests(assert, section)).then(() => runOwnerAuthFlowTests(assert, section)).then(() => runOwnerSetupAutomationTests(assert, section)).then(() => runOwnerPreservationCensusTests(assert, section)).then(() => runOutboundTimeoutTests(assert, section)).then(() => runApiDynamicTests(assert, section)).then(() => runLoadingStateTests(assert, section)).then(() => runPageStructureTests(assert, section)).then(() => runLocalFirstTests(assert, section)).then(() => runResetPasswordTests(assert, section)).then(() => runAccountExportTests(assert, section)).then(() => runCourseEngineTests(assert, section)).then(() => runAuthRedirectLoopTests(assert, section)).then(() => runSelfHealingProvisionTests(assert, section)).then(() => runMathIntegralTests(assert, section)).then(() => runMathRegistryTests(assert, section)).then(() => runProviderTests(assert, section)).then(() => runSecretScanTests(assert, section)).then(async () => {
     const r = await runExtractionProvenanceTests();
     passed += r.passed;
