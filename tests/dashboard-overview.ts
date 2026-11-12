@@ -546,8 +546,11 @@ export async function runDashboardOverviewTests(
   section("dashboard: the hero keeps the owner's purple reference");
   {
     const css = readFileSync("src/app/globals.css", "utf8");
-    assert(/\.dash-page\s*\{[^}]*background:\s*var\(--hero-bg\)/.test(css),
-      "dashboard: the dashboard page takes its hero from --hero-bg, not a second palette");
+    // The hero band carries the gradient. It moved off `.dash-page` on 2026-11-13: filling the
+    // whole container left a 14-26px purple band around every white panel, which read as a purple
+    // outline around the content. The palette and the reference are unchanged.
+    assert(/\.dash-hero\s*\{[^}]*background:\s*var\(--hero-bg\)/.test(css),
+      "dashboard: the hero band takes its colour from --hero-bg, not a second palette");
     assert(css.includes("#2b1a56") && css.includes("#7c5cea"),
       "dashboard: --hero-bg still carries the purple reference gradient");
     assert(!css.includes("#10302f") && !css.includes("#0d2a33"),

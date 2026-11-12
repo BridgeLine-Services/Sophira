@@ -279,10 +279,19 @@ input, textarea, select {
    changes a selector that already exists elsewhere: every class is new
    and prefixed .dash-, so the rest of Sophira is untouched.
    ===================================================================== */
+/* PURPLE FRAME REMOVED (2026-11-13). The purple gradient used to fill the whole dashboard
+   CONTAINER, so every white panel sat inside a 14-26px purple band on all four sides. Measured on
+   the rendered page: 26px of solid violet between the page canvas and the first white panel. That
+   band is what reads as a purple outline around the content. The gradient now belongs to the hero
+   band only (.dash-hero); content sits on the page canvas. Panel surface, radius, padding, spacing,
+   type, charts and buttons are all unchanged. */
 .dash-page {
+  color: rgb(var(--c-ink));
+}
+.dash-hero {
   color: rgb(var(--hero-ink));
   border-radius: 22px;
-  padding: clamp(14px, 2vw, 26px);
+  padding: clamp(16px, 2.2vw, 28px);
   background: var(--hero-bg);
   box-shadow: var(--elev-3);
 }
@@ -291,16 +300,19 @@ input, textarea, select {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.62);
+  color: rgb(var(--c-ink-soft));
 }
+.dash-hero .dash-eyebrow { color: rgba(255, 255, 255, 0.62); }
 .dash-hero-title {
   font-size: clamp(23px, 3vw, 32px);
   font-weight: 700;
   line-height: 1.16;
   letter-spacing: -0.01em;
-  color: #fff;
+  color: rgb(var(--c-ink));
 }
-.dash-hero-sub { color: rgba(255, 255, 255, 0.72); font-size: 14px; line-height: 1.5; }
+.dash-hero .dash-hero-title { color: #fff; }
+.dash-hero-sub { color: rgb(var(--c-ink-soft)); font-size: 14px; line-height: 1.5; }
+.dash-hero .dash-hero-sub { color: rgba(255, 255, 255, 0.78); }
 .dash-glass {
   background: rgba(255, 255, 255, 0.09);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -326,7 +338,7 @@ input, textarea, select {
   color: #23263a;
   border-radius: 18px;
   padding: clamp(14px, 1.6vw, 20px);
-  box-shadow: 0 18px 38px rgba(12, 6, 30, 0.26);
+  box-shadow: var(--elev-3);
 }
 /* SECTION SEPARATION (2026-11-12): every top-level block on a dashboard page owns the space above
    it, so two panels never touch at any width and the hero does not need a hand-set margin. */
@@ -409,15 +421,15 @@ input, textarea, select {
   color: #23263a;
   border-radius: 18px;
   padding: clamp(12px, 1.4vw, 18px);
-  box-shadow: 0 18px 38px rgba(12, 6, 30, 0.24);
+  box-shadow: var(--elev-3);
 }
 .dash-page > .dash-stack > .dash-hero {
-  background: transparent;
-  box-shadow: none;
-  padding: 2px 4px 6px;
-  color: #fff;
+  color: rgb(var(--hero-ink));
+  border-radius: 22px;
+  padding: clamp(16px, 2.2vw, 28px);
+  background: var(--hero-bg);
+  box-shadow: var(--elev-3);
 }
-.dash-page > .dash-stack > .dash-hero .dash-hero-sub { color: rgba(255, 255, 255, 0.72); }
 
 /* Trend chart (2026-11-12): purple on the white role panels, no literal colour in the tsx. */
 .trend-line { stroke: #6d4bd8; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
