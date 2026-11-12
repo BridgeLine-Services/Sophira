@@ -40,6 +40,8 @@
     "../src/lib/research/verify.ts",
     "../src/lib/invitations/delivery.ts",
     "../src/lib/owner/role-audit.ts",
-    "../src/lib/roles.ts"
+    "../src/lib/roles.ts",
+    "../src/lib/navigation/owner-nav.ts",
+    "../src/components/owner/OwnerAreaGrid.tsx"
   ]
 }

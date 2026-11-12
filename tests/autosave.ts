@@ -283,7 +283,9 @@ section("migrations: every file is accounted for, and the owner has a button (20
   assert(/Updates only add what is missing/.test(control),
     "the page states that nothing is replaced or removed");
 
-  const nav = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  // 2026-11-12: the registry lives in src/lib/navigation/owner-nav.ts (shared by the client
+  // sidebar and the server-rendered area grid).
+  const nav = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
   assert(nav.includes('href: "/owner/database"') && nav.includes("Database updates"),
     "the owner navigation offers Database updates by name");
 }

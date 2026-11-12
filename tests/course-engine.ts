@@ -395,7 +395,11 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // academic workspace — two environments, two navigation layouts.
   // ============================================================
   const shell4 = readFileSync("src/components/app/AppShell.tsx", "utf8");
-  assert(shell4.includes("OWNER_NAV") && shell4.includes("My Workspace") && shell4.includes("/dashboard?view=workspace"),
+  // 2026-11-12: the registry moved to src/lib/navigation/owner-nav.ts, a module with NO
+  // "use client" directive, because the Owner Dashboard's Server Component could not read
+  // it out of this Client Component (that import threw on /owner in production).
+  const ownerNavSrc = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
+  assert(shell4.includes("OWNER_NAV") && ownerNavSrc.includes("My Workspace") && ownerNavSrc.includes("/dashboard?view=workspace"),
     "owner: the owner layout has its own navigation with My Workspace as the single intentional exit into the personal workspace");
   assert(shell4.includes('variant === "owner" ? (') && shell4.includes('variant?: "workspace" | "owner"'),
     "owner: AppShell has separate owner and workspace navigation layouts (variant prop)");
@@ -814,21 +818,24 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   section("owner nav grouping and anchor integrity");
   {
     const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+    // 2026-11-12: the registry is data in src/lib/navigation/owner-nav.ts now. These
+    // assertions follow the DATA; AppShell is only checked for consuming it.
+    const navRegistry = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
     assert(shell.includes("OWNER_NAV_GROUPS"),
       "owner-nav: the owner sidebar is grouped, not a flat list");
     for (const h of ["Overview", "Network Management", "Configuration", "Personal"]) {
-      assert(shell.includes(`heading: "${h}"`),
+      assert(navRegistry.includes(`heading: "${h}"`),
         "owner-nav: functional group present — " + h);
     }
-    const overviewPos = shell.indexOf('heading: "Overview"');
-    const membersPos = shell.indexOf('heading: "Network Management"');
-    const provPos = shell.indexOf('heading: "Configuration"');
-    const wsPos = shell.indexOf('heading: "Personal"');
+    const overviewPos = navRegistry.indexOf('heading: "Overview"');
+    const membersPos = navRegistry.indexOf('heading: "Network Management"');
+    const provPos = navRegistry.indexOf('heading: "Configuration"');
+    const wsPos = navRegistry.indexOf('heading: "Personal"');
     assert(overviewPos < membersPos && membersPos < provPos && provPos < wsPos,
       "owner-nav: groups are ordered Overview -> Network -> Configuration -> Personal");
     assert(shell.includes("OWNER_NAV_GROUPS.flatMap"),
       "owner-nav: the tablet row flattens the same groups — one source of truth, no duplicate nav definitions");
-    const flat = shell.slice(shell.indexOf("OWNER_NAV_GROUPS:"), shell.indexOf("];", shell.indexOf("OWNER_NAV_GROUPS:")));
+    const flat = navRegistry.slice(navRegistry.indexOf("OWNER_NAV_GROUPS:"), navRegistry.indexOf("];", navRegistry.indexOf("OWNER_NAV_GROUPS:")));
     const wsCount = (flat.match(/view=workspace/g) || []).length;
     assert(wsCount === 1,
       "owner-nav: exactly ONE My Workspace entry — no duplicated destinations");
@@ -1171,7 +1178,8 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     assert(ownerInt.includes('variant="owner"') && ownerInt.includes('profile.role !== "owner"') && ownerInt.includes("redirect"),
       "bugfix-3: /owner/integrations is owner-guarded and renders in the OWNER shell");
     const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
-    assert(shell.includes('href: "/owner/integrations"') && !shell.includes('href: "/settings/integrations"'),
+    const ownerNav = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
+    assert(ownerNav.includes('href: "/owner/integrations"') && !ownerNav.includes('href: "/settings/integrations"'),
       "bugfix-3: the owner nav no longer links into the user Settings integrations page");
     const userInt = readFileSync("src/app/settings/integrations/page.tsx", "utf8");
     assert(userInt.includes("IntegrationsPanel"),

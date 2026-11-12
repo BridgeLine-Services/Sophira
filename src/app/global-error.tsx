@@ -15,7 +15,10 @@
  * a genuine layout crash, so "renders correctly when triggered" is browser-verifiable work, not
  * something this repository has proven.
  */
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  // 2026-11-12: the same safe reference the route boundary shows. No stack trace,
+  // no user content, nothing transmitted — just the opaque code the platform logs.
+  const reference = typeof error?.digest === "string" && error.digest.trim() ? error.digest.trim() : "";
   return (
     <html lang="en">
       <body style={{ margin: 0, fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif", background: "rgb(var(--c-paper))", color: "rgb(var(--c-ink))" }}>
@@ -42,6 +45,12 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
               Go to your dashboard
             </a>
           </div>
+          {reference && (
+            <p style={{ fontSize: 13, margin: "20px 0 0", color: "rgb(var(--c-ink-soft))" }}>
+              Reference{" "}
+              <code style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", userSelect: "all" }}>{reference}</code>
+            </p>
+          )}
         </main>
       </body>
     </html>

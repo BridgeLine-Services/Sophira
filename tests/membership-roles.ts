@@ -64,7 +64,8 @@ export function runMembershipRoleTests(assert: (cond: boolean, msg: string) => v
     const pageSrc = readFileSync("src/app/owner/invitations/page.tsx", "utf8");
     const reqPage = readFileSync("src/app/owner/requests/page.tsx", "utf8");
     const membersPage = readFileSync("src/app/owner/members/page.tsx", "utf8");
-    const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+    // 2026-11-12: the owner navigation registry moved to src/lib/navigation/owner-nav.ts.
+    const shell = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
     const doc = readFileSync("docs/MEMBERSHIP_ROLES_AND_PRESENCE.md", "utf8");
     const sql = readFileSync("supabase/migrations/0051_directory_privacy_and_staff_invitations.sql", "utf8");
 
@@ -237,8 +238,10 @@ export function runMembershipRoleTests(assert: (cond: boolean, msg: string) => v
     "guards: the staff guards ask the permission matrix instead of comparing strings");
 
   section("12. The navigation shows only what the person may open");
-  const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
-  assert(shell.includes("minimum?: NavRole") && shell.includes("canSeeNavItem"),
+  // 2026-11-12: the registry and its role rule live in the shared navigation module now.
+  const shell = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
+  const shellClient = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  assert(shell.includes("minimum?: NavRole") && shellClient.includes("ownerNavGroupsFor(role)"),
     "nav: every Owner-Dashboard entry declares the lowest role that may open it");
   assert(/\{ href: "\/owner\/members", label: "Members", icon: Users, minimum: "co_owner" \}/.test(shell),
     "nav: Members is the entry a Co-Owner may open");
