@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MemberDirectory } from "./MemberDirectory";
 import {
   changeMemberRole,
@@ -9,6 +9,7 @@ import {
   type MemberAction,
 } from "@/lib/owner/member-actions";
 import { buildMemberRow, filterMembers, summarize, type MemberFilter, type MemberRow } from "@/lib/owner/member-view";
+import { freshnessLabel } from "@/lib/format";
 import { DEFAULT_THRESHOLDS, type PresenceThresholds } from "@/lib/presence/thresholds";
 import { usePresenceFeed } from "@/lib/presence/use-presence-feed";
 import { usePresenceReporter } from "@/lib/presence/use-presence-reporter";
@@ -52,6 +53,10 @@ export function MembersPanel({
   const [removeTarget, setRemoveTarget] = useState<MemberRow | null>(null);
   const [filter, setFilter] = useState<MemberFilter>({ presence: "all", condition: "all", role: "all", query: "" });
   const [usingPresence, setUsingPresence] = useState(presenceAvailable);
+  // How fresh the presence picture is. Without this the page says "Online" for a row that may
+  // have been read minutes ago, which is a claim about right now that nobody can check.
+  const [updatedAt, setUpdatedAt] = useState<number>(() => Date.now());
+  const [, setClock] = useState(0);
 
   const activeThresholds = thresholds ?? DEFAULT_THRESHOLDS;
 
@@ -64,6 +69,7 @@ export function MembersPanel({
     }
     setMembers(next.members);
     setUsingPresence(next.presenceAvailable);
+    setUpdatedAt(Date.now());
     if (next.statsError) setNotice(next.statsError);
   }, []);
 
@@ -73,6 +79,12 @@ export function MembersPanel({
     intervalMs: activeThresholds.heartbeatIntervalSeconds * 1000,
     activeWindowMs: activeThresholds.activeThresholdSeconds * 1000,
   });
+
+  // Re-render the "as of" line every half minute so it ages visibly instead of freezing.
+  useEffect(() => {
+    const id = setInterval(() => setClock((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   usePresenceFeed({
     intervalMs: activeThresholds.presenceUpdateIntervalSeconds * 1000,
@@ -175,6 +187,11 @@ export function MembersPanel({
         </span>
         {counts.conditions.suspended > 0 && (
           <span className="text-ink-soft">Suspended {counts.conditions.suspended}</span>
+        )}
+        {usingPresence && (
+          <span className="text-xs text-ink-soft">
+            as of {freshnessLabel(updatedAt)}
+          </span>
         )}
       </div>
 

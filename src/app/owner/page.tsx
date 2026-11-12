@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Briefcase, CheckCircle2, ClipboardList, Gauge, XCircle } from "lucide-react";
 import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
 import { capabilityRegistry, noUnexpectedCharges } from "@/lib/ai/capabilities";
+import { tallyPresenceStates } from "@/lib/owner/member-view";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +83,13 @@ export default async function OwnerPage() {
     phone: phoneById.get(m.user_id) ?? m.phone ?? null,
   }));
 
+  // WHO IS AT THEIR SCREEN RIGHT NOW (2026-11-12). Read from the same directory function the
+  // Members page uses. If it cannot be read, no number is shown at all - "0 online" and
+  // "we could not look" are different facts and must never be confused.
+  const { data: directoryRows, error: directoryError } = await supabase.rpc("network_directory");
+  const presenceLive = !directoryError && Array.isArray(directoryRows);
+  const tally = presenceLive ? tallyPresenceStates(directoryRows as Array<{ presence?: { state?: string | null } }>) : null;
+
   const setup = providerSetupStatus();
   const pageDiag = providerDiagnostics(readAiEnv());
   const hdrs = await headers();
@@ -120,6 +128,22 @@ export default async function OwnerPage() {
         requests={requests ?? null}
         statsError={statsError}
       />
+      {tally && (
+        <div className="mb-4">
+          <Card><CardContent className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 text-sm">
+            <span className="font-medium text-ink">
+              {tally.active + tally.online} {(tally.active + tally.online) === 1 ? "member is" : "members are"} active or online right now
+            </span>
+            <span className="text-ink-soft">
+              Active {tally.active} · Online {tally.online} · Idle {tally.idle}
+              {tally.away + tally.busy + tally.dnd > 0 && ` · Away or busy ${tally.away + tally.busy + tally.dnd}`}
+              {` · Offline ${tally.offline}`}
+              {tally.unknown > 0 && ` · Not reported ${tally.unknown}`}
+            </span>
+            <Link href="/owner/members" className="text-accent hover:underline">See who &rarr;</Link>
+          </CardContent></Card>
+        </div>
+      )}
       <section id="needs-attention" className="scroll-mt-4">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Needs attention</h2>
         <div className="grid gap-2">

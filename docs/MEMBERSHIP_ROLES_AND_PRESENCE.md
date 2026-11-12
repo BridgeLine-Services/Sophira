@@ -127,12 +127,23 @@ on failure — a dropped heartbeat must never interrupt a member's work.
 
 ## 3. What the Owner Dashboard now shows
 
+The overview page opens with one line stating how many people are **active or online
+right now**, built from the same directory function. If the directory cannot be read, no
+number appears at all: "0 online" and "we could not look" are different facts. Members
+with no reported state are counted as "Not reported", never folded into Offline.
+
 The Members page lists one row per member with: display name (the member's chosen
 nickname, then their email, then an honest "Name not set"), email, verified phone,
 role, presence with its reason, account condition, joined date, and last activity.
 Summary counts sit above the table, and both presence and condition have their own
 filter, so "who is online right now" and "whose account is suspended" are separate
 questions with separate answers.
+
+Presence is a claim about right now, so the counts line ends with "as of 2 minutes ago".
+The page refreshes on a realtime signal when available, on the owner's configured interval
+when not, and once when the tab becomes visible again; it stops refreshing entirely while
+the tab is hidden, because a background tab reporting in would make an absent member look
+present.
 
 Dates never print "Invalid Date": a missing timestamp reads "Never active",
 "Unavailable", "yesterday" or "12 days ago" as the facts allow

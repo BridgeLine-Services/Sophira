@@ -1,3 +1,4 @@
+import { freshnessLabel } from "../src/lib/format";
 import { readFileSync } from "fs";
 import {
   PRESENCE_STATES, MANUAL_AVAILABILITIES, computePresence, unknownPresence, presenceLabel, presenceColor,
@@ -8,7 +9,7 @@ import {
   DEFAULT_THRESHOLDS, THRESHOLD_BOUNDS, clampThreshold, clampThresholds, repairThresholdOrder,
   validateThresholds,
 } from "../src/lib/presence/thresholds";
-import { buildMemberRow, phoneView, filterMembers, summarize, PRESENCE_FILTERS, CONDITION_FILTERS } from "../src/lib/owner/member-view";
+import { buildMemberRow, phoneView, filterMembers, summarize, tallyPresenceStates, PRESENCE_FILTERS, CONDITION_FILTERS } from "../src/lib/owner/member-view";
 import { relativeTime, activityPhrase, fmtDate, fmtDateTime, isValidDate } from "../src/lib/format";
 
 /**
@@ -29,6 +30,54 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
     ...over,
   });
   const base = { accountStatus: "active", thresholds: DEFAULT_THRESHOLDS, now };
+
+  section("-1. Presence is only claimed as current when the page says how old it is");
+  {
+    const panel = readFileSync("src/components/app/MembersPanel.tsx", "utf8");
+    assert(/updatedAt/.test(panel) && /setUpdatedAt\(Date\.now\(\)\)/.test(panel),
+      "freshness: every successful refresh records when the picture was read");
+    assert(/as of \{freshnessLabel\(updatedAt\)\}/.test(panel),
+      "freshness: the counts line states how old the picture is beside the Online number");
+    assert(/usingPresence && \(/.test(panel),
+      "freshness: the claim is not made at all when presence is unavailable");
+    const f = freshnessLabel;
+    const base = Date.UTC(2026, 10, 12, 12, 0, 0);
+    assert(f(base, base + 5_000) === "just now", "freshness: seconds read as 'just now'");
+    assert(f(base, base + 65_000) === "a minute ago", "freshness: about a minute reads as a minute");
+    assert(f(base, base + 5 * 60_000) === "5 minutes ago", "freshness: minutes are counted");
+    assert(f(base, base + 2 * 3600_000) === "2 hours ago", "freshness: hours are counted");
+    assert(f(null) === "an unknown time", "freshness: a missing timestamp is stated, not guessed");
+    assert(f(Number.NaN) === "an unknown time", "freshness: an impossible timestamp is stated, not shown as NaN");
+  }
+
+  section("-0. The Owner Dashboard states who is at their screen, or says nothing");
+  {
+    const page = readFileSync("src/app/owner/page.tsx", "utf8");
+    assert(/rpc\("network_directory"\)/.test(page),
+      "overview: the count comes from the same directory function the Members page uses");
+    assert(/presenceLive = !directoryError && Array\.isArray\(directoryRows\)/.test(page),
+      "overview: a failed read produces no count at all, never a fake zero");
+    assert(/\{tally && \(/.test(page),
+      "overview: the strip is rendered only when the tally exists");
+    assert(/active or online right now/.test(page),
+      "overview: the sentence names what the number means, in words");
+    assert(/Not reported/.test(page),
+      "overview: members with no reported state are counted separately from Offline");
+    assert(/See who/.test(page) && /\/owner\/members/.test(page),
+      "overview: the strip links to the page that shows who");
+
+    const t = tallyPresenceStates([
+      { presence: { state: "active" } }, { presence: { state: "online" } },
+      { presence: { state: "idle" } }, { presence: { state: "offline" } },
+      { presence: null }, {},
+    ]);
+    assert(t.active === 1 && t.online === 1 && t.idle === 1 && t.offline === 1,
+      "overview: each state is counted once");
+    assert(t.unknown === 2,
+      "overview: two unreported rows count as Not reported, and are never counted as Offline");
+    assert(Object.values(t).reduce((a, b) => a + b, 0) === 6,
+      "overview: every member lands in exactly one bucket, so the strip never under-counts");
+  }
 
   section("0. The six thresholds the Owner can actually reach, and the bounds nobody can break");
   {

@@ -26,6 +26,7 @@ import {
   presenceColor,
   presenceLabel,
   unknownPresence,
+  normalizePresence,
   type AccountCondition,
   type PresenceResult,
   type PresenceSession,
@@ -271,4 +272,22 @@ export function summarize(rows: MemberRow[]) {
     conditions[row.condition] += 1;
   }
   return { total: rows.length, presence, conditions };
+}
+
+/**
+ * A presence tally straight from network_directory rows (2026-11-12).
+ *
+ * The Owner Dashboard states how many people are at their screen right now. That number is
+ * only shown when the directory actually answered; an unreadable directory produces no tally
+ * at all, because "0 online" and "we could not look" are very different facts.
+ * A member with no reported state counts as Unknown, never as Offline.
+ */
+export function tallyPresenceStates(
+  rows: Array<{ presence?: { state?: string | null } | null }>,
+): Record<PresenceState, number> {
+  const tally = { active: 0, online: 0, idle: 0, away: 0, busy: 0, dnd: 0, offline: 0, unknown: 0 } as Record<PresenceState, number>;
+  for (const row of rows) {
+    tally[normalizePresence(row?.presence?.state ?? null)] += 1;
+  }
+  return tally;
 }

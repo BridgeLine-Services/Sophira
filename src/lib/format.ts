@@ -78,3 +78,22 @@ export function activityPhrase(iso: string | null | undefined, opts: { now?: num
   if (rel === "just now") return "Active just now";
   return `Last active ${rel}`;
 }
+
+/**
+ * How old the presence picture is (2026-11-12).
+ *
+ * The Members page says "Online" about a person, which is a claim about RIGHT NOW. That is
+ * only honest if the page also says when it last looked. Seconds are named in plain words
+ * rather than a raw timestamp, and anything older than a couple of minutes says so instead
+ * of pretending to be live.
+ */
+export function freshnessLabel(at: number | null | undefined, now = Date.now()): string {
+  if (!at || !Number.isFinite(at)) return "an unknown time";
+  const seconds = Math.max(0, Math.round((now - at) / 1000));
+  if (seconds < 45) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes <= 1) return "a minute ago";
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours === 1 ? "an hour ago" : `${hours} hours ago`;
+}
