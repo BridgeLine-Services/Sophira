@@ -241,3 +241,30 @@ To enable automatic migration repair later, reconnect the Supabase
 integration in Vercel or provide a pooled connection string (port 6543).
 Regression pins live in tests/run.ts (REST-checked + no owner -> /create-owner;
 both channels down -> honest null; direct-failure never short-circuits).
+
+## 2026-11-12: one honest list of what needs the Owner
+
+The dashboard's "Needs attention" area could only speak about the two things the page happened to
+have loaded: invitation requests and provider keys. Three situations that genuinely need the
+Owner were invisible, because nothing on that page could see them:
+
+- a database that has not received its newest update, so presence and the role history are simply
+  missing;
+- members whose account is suspended, and therefore cannot sign in;
+- a member list Sophira could not read at all.
+
+All of them now come from one pure function, `buildActionItems()` in
+`src/lib/owner/action-items.ts`, which the page renders and the tests exercise directly. Two rules
+shape it. First, unknown is never zero: a count that could not be read produces a plain statement
+that it could not be read, never a cheerful "nothing to do" and never a fabricated number.
+Second, "your database is behind" and "your database could not be reached" are different facts
+(`isMissingDatabasePiece`), because telling the Owner to press an update button when the connection
+is down is a dead end that wastes their time.
+
+Every item is written for someone who has never opened a terminal: what happened, what it means
+for the people using Sophira, and one link to the page where they can act. A test asserts that no
+item contains migration, SQL, or database-error vocabulary. Urgent items are grouped above
+informational ones, and the section header counts them.
+
+When every check answers as expected the page says so, and it says what it did not check, rather
+than implying the whole system is healthy.

@@ -84,3 +84,42 @@ export async function runRoleAuditTests(
   assert(missing.available === false && missing.changes.length === 0,
     "audit: an unreadable table is reported as unavailable rather than as 'no changes ever'");
 }
+
+/**
+ * 2026-11-12: the audit list must not describe the situation from before a change.
+ *
+ * Both halves matter: after the Owner changes a role, the list has to reflect it; and because a
+ * Co-Owner can also change a role while the Owner is reading, there has to be a way to read the
+ * list again without reloading the whole page. Neither can be satisfied by client state, because
+ * the list is rendered on the server.
+ */
+export function runRoleAuditFreshnessTests(
+  assert: (cond: boolean, msg: string) => void,
+  section: (t: string) => void,
+): void {
+  section("4. The role-change list is never one change out of date");
+  const { readFileSync } = require("fs") as typeof import("fs");
+  const panel = readFileSync("src/components/app/MembersPanel.tsx", "utf8");
+  const log = readFileSync("src/components/app/RoleChangeLog.tsx", "utf8");
+
+  assert(/useRouter/.test(panel),
+    "audit: the Members panel can ask the server for a fresh render");
+  // The refresh must follow a SUCCESSFUL change only: refreshing after a refusal would imply
+  // something was written when the database refused it.
+  const handler = panel.slice(panel.indexOf("const result = await changeMemberRole"), panel.indexOf("const result = await changeMemberRole") + 700);
+  assert(/if \(result\.ok\) router\.refresh\(\)/.test(handler),
+    "audit: the list is re-rendered only after a change the server accepted");
+  assert(!/router\.refresh\(\)[\s\S]{0,80}else/.test(handler),
+    "audit: a refused change does not trigger a refresh that would imply it was recorded");
+
+  assert(/router\.refresh\(\)/.test(log),
+    "audit: the list has its own way to be read again");
+  assert(/Refresh this list/.test(log),
+    "audit: that control is a visible, labelled button rather than a hidden gesture");
+  assert(/useTransition/.test(log) && /Reading again/.test(log),
+    "audit: while it re-reads, the button says so instead of looking stuck");
+  assert(/This is what Sophira has recorded as of now/.test(log),
+    "audit: after re-reading, the list says what moment it describes");
+  assert(/disabled=\{pending\}/.test(log),
+    "audit: the button cannot be pressed repeatedly while a read is in flight");
+}

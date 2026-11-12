@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { MemberDirectory } from "./MemberDirectory";
 import {
   changeMemberRole,
@@ -116,6 +117,10 @@ export function MembersPanel({
     [members, activeThresholds, viewerId],
   );
 
+  // The role-change log below the table is rendered by the server, so a client-side refetch
+  // would leave it describing the situation from before the change. router.refresh() re-renders
+  // it from the database, so the list the Owner reads is never one change out of date.
+  const router = useRouter();
   const visible = useMemo(() => filterMembers(rows, filter), [rows, filter]);
   const counts = useMemo(() => summarize(rows), [rows]);
 
@@ -153,6 +158,9 @@ export function MembersPanel({
       }
       // Re-read the server's own view: the table shows what was stored, not what was clicked.
       await refresh();
+      // And the server-rendered audit list, which would otherwise describe the state before
+      // this change and quietly contradict the confirmation shown above it.
+      if (result.ok) router.refresh();
     } finally {
       setRoleBusyId(null);
     }

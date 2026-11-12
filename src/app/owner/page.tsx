@@ -13,6 +13,7 @@ import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
 import { capabilityRegistry, noUnexpectedCharges } from "@/lib/ai/capabilities";
 import { tallyPresenceStates } from "@/lib/owner/member-view";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
+import { buildActionItems, describeUnreadableMembers, isMissingDatabasePiece } from "@/lib/owner/action-items";
 
 export const dynamic = "force-dynamic";
 
@@ -68,8 +69,10 @@ export default async function OwnerPage() {
   // honest banner (never fabricated zeros); invitations, requests, and
   // every management action keep working; the banner names the actual
   // database reason and offers reload as the retry.
+  // 2026-11-12: the wording now comes from the shared action-item vocabulary, so the banner and
+  // the "Needs attention" card cannot drift into saying different things about the same failure.
   const statsError = mErr || !members
-    ? `Membership statistics could not be loaded (${(mErr?.message || "no data returned").replace(/[\n\r]/g, " ").slice(0, 160)}). The member list below may be incomplete — invitations and access management still work. Reload to retry.`
+    ? describeUnreadableMembers(mErr?.message ?? "no data returned")
     : null;
 
   // Owner-only phone directory (0043). A failure here must never hide the
@@ -90,10 +93,28 @@ export default async function OwnerPage() {
   const presenceLive = !directoryError && Array.isArray(directoryRows);
   const tally = presenceLive ? tallyPresenceStates(directoryRows as Array<{ presence?: { state?: string | null } }>) : null;
 
+  // 2026-11-12: what the Owner actually needs to do, in one honest list. Every input is a real
+  // read - a count that could not be read stays null and is reported as unreadable rather than
+  // as zero, and a missing database piece is distinguished from a database that is unreachable.
+  const directoryMissing = isMissingDatabasePiece(directoryError);
+  const suspendedMembers = presenceLive
+    ? (directoryRows as Array<{ o_status?: string | null }>).filter((r) => r.o_status === "suspended").length
+    : null;
   const setup = providerSetupStatus();
   const pageDiag = providerDiagnostics(readAiEnv());
   const hdrs = await headers();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${hdrs.get("x-forwarded-proto") || "http"}://${hdrs.get("host")}`;
+
+  const actionItems = buildActionItems({
+    requestsWaiting: requests ? requests.length : null,
+    suspendedMembers,
+    databaseOutdated: directoryMissing,
+    membersUnreadable: Boolean(statsError),
+    aiReady: Boolean(pageDiag.activeProvider),
+    microsoftReady: setup.microsoft,
+    googleReady: setup.google,
+    searchReady: setup.search,
+  });
 
   return (
     <AppShell
@@ -145,42 +166,39 @@ export default async function OwnerPage() {
         </div>
       )}
       <section id="needs-attention" className="scroll-mt-4">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Needs attention</h2>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">
+          Needs attention
+          {actionItems.length > 0 && <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium normal-case tracking-normal text-accent">{actionItems.length}</span>}
+        </h2>
         <div className="grid gap-2">
-          {(requests?.length ?? 0) > 0 && (
-            <Card><CardContent className="p-4">
-              <p className="font-medium text-ink">{requests?.length} access request{(requests?.length ?? 0) === 1 ? "" : "s"} waiting for your review</p>
-              <p className="mt-1 text-sm text-ink-soft">People asked to join your private network. Until you approve or decline, they cannot sign up.</p>
-              <Link href="#requests" className="mt-2 inline-block text-sm text-accent hover:underline">Review the requests &rarr;</Link>
+          {actionItems.map((item) => (
+            <Card key={item.key}><CardContent className="p-4">
+              <p className={"font-medium " + (item.tone === "urgent" ? "text-danger" : "text-ink")}>{item.title}</p>
+              <p className="mt-1 text-sm text-ink-soft">{item.body}</p>
+              {item.href && (
+                <Link href={item.href} className="mt-2 inline-block text-sm text-accent hover:underline">
+                  {item.linkLabel ?? "Open"} &rarr;
+                </Link>
+              )}
             </CardContent></Card>
-          )}
-          {(!setup.microsoft || !setup.google) && (
-            <Card><CardContent className="p-4">
-              <p className="font-medium text-ink">Word &amp; Google document saving is not set up yet</p>
-              <p className="mt-1 text-sm text-ink-soft">Members cannot connect their own Microsoft or Google accounts until the two provider apps are registered. This does not affect any other feature.</p>
-              {/* 2026-11-12: this pointed at the member Settings page, which renders in the
-                  personal-workspace shell and drops the owner out of their dashboard. */}
-              <Link href="/owner/integrations" className="mt-2 inline-block text-sm text-accent hover:underline">Open Integrations settings &rarr;</Link>
-              <p className="mt-1 text-xs text-ink-soft">Step-by-step: docs/WORD_GOOGLE_DOCS_SETUP.md</p>
-            </CardContent></Card>
-          )}
-          {!setup.search && (
-            <Card><CardContent className="p-4">
-              <p className="font-medium text-ink">Live web research is not configured</p>
-              <p className="mt-1 text-sm text-ink-soft">Research tools fall back to your uploaded library sources and the AI model&rsquo;s own knowledge. Add a search key whenever you want live web results.</p>
-              <p className="mt-1 text-xs text-ink-soft">How: docs/ENVIRONMENT_VARIABLES.md</p>
-            </CardContent></Card>
-          )}
-          {statsError && (
-            <Card><CardContent className="p-4">
-              <p className="font-medium text-danger">Membership statistics could not be loaded</p>
-              <p className="mt-1 text-sm text-ink-soft">The member table may be incomplete. Invitations and access management still work. Reload the page to retry.</p>
-            </CardContent></Card>
-          )}
-          {(requests?.length ?? 0) === 0 && setup.microsoft && setup.google && setup.search && !statsError && (
+          ))}
+          {/*
+            2026-11-12: the five hand-written notices that used to live here (requests, document
+            providers, search, membership failure, and the "nothing to do" card) are now produced
+            by buildActionItems() in src/lib/owner/action-items.ts. They were the visible part of
+            the dashboard's blind spots: a database that had not been updated and suspended members
+            had no notice at all, because nothing here could see them. One list, one place to fix,
+            and every item carries the same plain-language promise.
+          */}
+          {actionItems.length === 0 && (
             <Card><CardContent className="p-4">
               <p className="font-medium text-ink">Nothing needs your attention right now.</p>
-              <p className="mt-1 text-sm text-ink-soft">All configured services responded as expected. The release gate still lists the standing legal-review and device-test items until you complete them.</p>
+              <p className="mt-1 text-sm text-ink-soft">
+                Everything Sophira can check at the moment answered as expected: no one is waiting
+                to join, no account is suspended, and the configured services responded. This is not
+                a promise about anything Sophira cannot see - the release gate still lists the
+                standing legal-review and device-test items until you complete them.
+              </p>
             </CardContent></Card>
           )}
         </div>

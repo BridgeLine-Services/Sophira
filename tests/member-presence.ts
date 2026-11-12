@@ -486,7 +486,8 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
   const ownerPage = readFileSync("src/app/owner/page.tsx", "utf8");
   assert(!/href="\/settings\/integrations"/.test(ownerPage),
     "nav: the dashboard no longer sends the owner into the member Settings page");
-  assert(/href="\/owner\/integrations"/.test(ownerPage),
+  assert(/href="\/owner\/integrations"/.test(ownerPage)
+      || /href: "\/owner\/integrations"/.test(readFileSync("src/lib/owner/action-items.ts", "utf8")),
     "nav: the dashboard links to the owner Integrations page, which keeps the owner navigation");
   assert(readFileSync("src/app/owner/integrations/page.tsx", "utf8").includes('variant="owner"'),
     "nav: the Integrations page renders inside the owner shell");

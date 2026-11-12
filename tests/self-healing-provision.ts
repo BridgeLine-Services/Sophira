@@ -109,7 +109,14 @@ export function runSelfHealingProvisionTests(assert: (c: boolean, n: string) => 
     "stats: every returned column is explicitly cast and execute is re-granted");
   assert(generated.includes("0028_network_stats_repair.sql"),
     "stats: 0028 is embedded in the runtime chain (existing databases get it on repair)");
-  assert(ownerPage.includes("statsError") && ownerPage.includes("Membership statistics could not be loaded") && !ownerPage.includes("Run migration 0005 in Supabase"),
+  // 2026-11-12: the sentence moved into src/lib/owner/action-items.ts so the banner and the
+  // "Needs attention" card cannot say different things about the same failure. The guarantee is
+  // unchanged and is now checked in both places: a failed read is stated, and the Owner is never
+  // sent to run a migration by hand.
+  const vocabulary = readFileSync("src/lib/owner/action-items.ts", "utf8");
+  assert(ownerPage.includes("statsError") && ownerPage.includes("describeUnreadableMembers")
+      && vocabulary.includes("could not read your member list")
+      && !ownerPage.includes("Run migration 0005 in Supabase"),
     "stats: the owner page renders an honest banner and KEEPS the dashboard functional — no misleading 'run migration' dead end");
 
   // 2c. AUTH REDIRECT FIX — reset links point at the live domain

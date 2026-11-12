@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { describeRoleChange, type RoleChange } from "@/lib/owner/role-audit";
 import { fmtDateTime } from "@/lib/format";
 
@@ -17,6 +19,13 @@ interface Props {
  * not something to bury.
  */
 export function RoleChangeLog({ changes, available }: Props) {
+  // A Co-Owner can change a role too, so the Owner may be reading this list while someone else
+  // acts. The list is rendered by the server, so the honest control is "read it again", not a
+  // client-side guess at what changed.
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [asked, setAsked] = useState(false);
+
   if (!available) {
     return (
       <section className="rounded-card border border-line bg-surface p-4 text-sm text-ink-soft">
@@ -28,7 +37,25 @@ export function RoleChangeLog({ changes, available }: Props) {
 
   return (
     <section className="rounded-card border border-line bg-surface p-4">
-      <h3 className="text-sm font-semibold text-ink">Recent role changes</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-ink">Recent role changes</h3>
+        <button
+          type="button"
+          className="rounded-md border border-line px-2 py-1 text-xs text-ink-soft hover:border-accent hover:text-ink disabled:opacity-60"
+          disabled={pending}
+          onClick={() => {
+            setAsked(true);
+            startTransition(() => router.refresh());
+          }}
+        >
+          {pending ? "Reading again…" : "Refresh this list"}
+        </button>
+      </div>
+      {asked && !pending && (
+        <p className="mt-1 text-xs text-ink-soft" role="status">
+          This is what Sophira has recorded as of now.
+        </p>
+      )}
       <p className="mt-1 text-xs text-ink-soft">
         Who changed whose role, and every attempt Sophira refused. Refusals are listed too, so
         nothing is hidden. A member never sees this list, and it never appears in a member&apos;s data
