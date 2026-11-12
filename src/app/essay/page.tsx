@@ -172,7 +172,8 @@ function EssayPageInner() {
   }
 
   return (
-    <AppShell title="Essay workflow" backHref={courseId ? `/courses/${courseId}` : undefined}>
+    <AppShell
+      subtitle="Draft an essay section by section, with help exactly where you ask for it." title="Essay workflow" backHref={courseId ? `/courses/${courseId}` : undefined}>
       <div className="mx-auto max-w-3xl space-y-4">
         {courseId && (
           <p className="text-sm text-ink-soft">
@@ -213,7 +214,7 @@ function EssayPageInner() {
         {session && (
           <>
             {session.schedule_verdict && (
-              <p className={`rounded-lg p-3 text-sm ${session.schedule_verdict.startsWith("IMPOSSIBLE") ? "bg-danger/10 text-ink" : "bg-muted/50 text-ink/70"}`}>
+              <p className={`rounded-lg p-3 text-sm ${session.schedule_verdict.startsWith("IMPOSSIBLE") ? "bg-danger/10 text-ink" : "bg-ink/[0.05] text-ink/70"}`}>
                 <CalendarClock className="mr-1.5 inline h-4 w-4" /> {session.schedule_verdict}
               </p>
             )}
@@ -227,7 +228,7 @@ function EssayPageInner() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <pre className="whitespace-pre-wrap rounded-lg border border-line bg-muted/40 p-3 text-xs leading-5">{formatAssignmentPlan(session.plan)}</pre>
+                <pre className="whitespace-pre-wrap rounded-lg border border-line bg-ink/[0.04] p-3 text-xs leading-5">{formatAssignmentPlan(session.plan)}</pre>
               </CardContent>
             </Card>
 
@@ -243,7 +244,7 @@ function EssayPageInner() {
                     onUseTheirs={() => outlineAutosave.resolveConflict("theirs")}
                   />
                   {outlineDraft.map((s, i) => (
-                    <div key={s.id} className="rounded-lg border border-line p-3">
+                    <div key={s.id} className="panel-flat p-3">
                       <div className="flex items-center gap-2">
                         <Input value={s.title} onChange={(e) => {
                           const next = outlineDraft.map((o, j) => (j === i ? { ...o, title: e.target.value } : o));
@@ -285,7 +286,7 @@ function EssayPageInner() {
                     return <PacedSection key={s.id} onSectionSaved={() => void refreshSession(session.id)} sessionId={session.id} sessionUpdatedDate={session.updated_date ?? null} sectionId={s.id} title={meta?.title ?? s.id} draft={s.draft!} audits={s.audits} editedAt={s.edited_at ?? null} mode={session.output_mode} customWpm={session.custom_wpm} profile={profile} />;
                   })}
                   {session.final_verification && (
-                    <div className="rounded-lg border border-line p-3 text-sm">
+                    <div className="panel-flat p-3 text-sm">
                       <Badge tone={session.final_verification.status === "VERIFIED" ? "success" : "warn"}>Final verification: {session.final_verification.status}</Badge>
                       <p className="mt-1 text-ink/70">{session.final_verification.note}</p>
                     </div>
@@ -370,7 +371,7 @@ function PacedSection({ sessionId, sessionUpdatedDate, sectionId, title, draft, 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
   return (
-    <div className="rounded-lg border border-line p-3">
+    <div className="panel-flat p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="neutral">{title}</Badge>
         <Badge tone="accent">{OUTPUT_MODE_LABELS[wpm == null ? "instant" : mode].split(" —")[0]}</Badge>
@@ -381,7 +382,7 @@ function PacedSection({ sessionId, sessionUpdatedDate, sectionId, title, draft, 
           </Button>
         )}
       </div>
-      <div className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap rounded bg-muted/30 p-3 text-sm leading-6">
+      <div className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap rounded bg-ink/[0.03] p-3 text-sm leading-6">
         {visible}
         {!complete && <span className="animate-pulse text-ink/30">▌</span>}
       </div>

@@ -20,7 +20,8 @@ export default async function OwnerInvitationsPage() {
     || `${hdrs.get("x-forwarded-proto") || "http"}://${hdrs.get("host")}`;
 
   return (
-    <AppShell title="Invitations" variant="owner">
+    <AppShell
+      subtitle="Invitations sent, accepted and still waiting." title="Invitations" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

@@ -144,7 +144,7 @@ function SignUpForm() {
           </Link>
         </div>
       ) : (
-        <form onSubmit={onSubmit} className="rounded-card border border-line bg-card p-5 shadow-sm" noValidate>
+        <form onSubmit={onSubmit} className="panel p-5" noValidate>
           <p className="mb-4 rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent">
             You were invited as <strong>{invitation.email}</strong>
           </p>

@@ -56,7 +56,8 @@ function GrammarInner() {
   }
 
   return (
-    <AppShell title="Grammar & Spelling" backHref={courseId ? `/courses/${courseId}` : "/writing"}>
+    <AppShell
+      subtitle="Grammar and clarity suggestions for your draft, one change at a time." title="Grammar & Spelling" backHref={courseId ? `/courses/${courseId}` : "/writing"}>
       <div className="mx-auto max-w-3xl space-y-4">
         <p className="text-sm text-ink-soft">
           Grammar, spelling, punctuation, and clarity help. Each correction is explained and you
@@ -67,7 +68,7 @@ function GrammarInner() {
             <label htmlFor="gtext" className="text-sm font-medium text-ink">Your text</label>
             <textarea
               id="gtext"
-              className="min-h-52 w-full rounded-card border border-line p-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+              className="min-h-52 w-full panel-flat p-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Paste or type the text you want checked…"
@@ -87,10 +88,10 @@ function GrammarInner() {
               )}
               <ul className="space-y-2">
                 {corrections.map((c) => (
-                  <li key={c.id} className="rounded-card border border-line p-3">
+                  <li key={c.id} className="panel-flat p-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {c.kind && <Badge tone="neutral">{c.kind}</Badge>}
-                      <span className="text-sm text-ink-soft line-through decoration-red-400/60">{c.original}</span>
+                      <span className="text-sm text-ink-soft line-through decoration-danger/60">{c.original}</span>
                       <span className="text-sm text-ink">→ {c.suggestion}</span>
                     </div>
                     {c.explanation && <p className="mt-1 text-xs text-ink-soft">{c.explanation}</p>}

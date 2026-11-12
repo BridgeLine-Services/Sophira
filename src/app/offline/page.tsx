@@ -147,7 +147,8 @@ export default function OfflinePage() {
   }
 
   return (
-    <AppShell title="Offline">
+    <AppShell
+      subtitle="Work saved on this device that will sync when you are back online." title="Offline">
       <div className="space-y-6">
         {!ready && <Spinner />}
 
@@ -157,7 +158,7 @@ export default function OfflinePage() {
         <Card>
           <CardHeader className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              {online ? <Wifi className="h-4 w-4 text-emerald-600" /> : <WifiOff className="h-4 w-4 text-ink-soft" />}
+              {online ? <Wifi className="h-4 w-4 text-success" /> : <WifiOff className="h-4 w-4 text-ink-soft" />}
               {online ? "Connected — everything is available" : "Offline — local data only"}
             </CardTitle>
             <Badge tone={online ? "success" : "neutral"}>{online ? "online" : "offline"}</Badge>
@@ -226,7 +227,7 @@ export default function OfflinePage() {
                       <p className="font-medium">{m.label}</p>
                       <p className="text-xs text-ink/40">{m.tierLabel}</p>
                       <p className="text-xs text-ink/60">{m.params} · {m.quantization} · {m.license} · {m.capabilities.join(", ")}</p>
-                      <p className="text-xs text-amber-700/80">Limitations: {m.limitations}</p>
+                      <p className="text-xs text-warn/80">Limitations: {m.limitations}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge tone={state === "ready" ? "success" : state === "downloading" ? "accent" : "neutral"}>
@@ -248,7 +249,7 @@ export default function OfflinePage() {
                     </div>
                   </div>
                   {state === "ready" && (
-                    <p className="mt-1 text-xs text-emerald-700">Loaded on this device — works with no internet.</p>
+                    <p className="mt-1 text-xs text-success">Loaded on this device — works with no internet.</p>
                   )}
                 </div>
               );
@@ -307,7 +308,7 @@ export default function OfflinePage() {
             <CardHeader><CardTitle>Conflicts ({conflicts.length})</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {conflicts.map((c) => (
-                <div key={c.conflict_id} className="rounded border border-amber-300 bg-amber-50 p-3 text-xs">
+                <div key={c.conflict_id} className="rounded border border-warn/30 bg-warn/[0.07] p-3 text-xs">
                   <p className="font-medium">{c.table}/{c.id} — {c.kind} (both versions preserved; nothing was discarded)</p>
                   <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap">local: {JSON.stringify(c.local)?.slice(0, 200)}</pre>
                   <pre className="max-h-32 overflow-auto whitespace-pre-wrap">remote: {JSON.stringify(c.remote)?.slice(0, 200)}</pre>
@@ -348,10 +349,10 @@ function DeviceRecommendation() {
   const m = findModel(analysis.recommendation.modelId);
   const tone =
     analysis.recommendation.resourceClass === "HIGH RESOURCE"
-      ? "border-emerald-600/40 bg-emerald-500/5"
+      ? "border-success/30 bg-success/5"
       : analysis.recommendation.resourceClass === "MEDIUM RESOURCE"
-        ? "border-sky-600/30 bg-sky-500/5"
-        : "border-amber-600/30 bg-amber-500/5";
+        ? "border-accent/30 bg-accent-soft0/5"
+        : "border-warn/30 bg-warn/5";
   return (
     <div className={`rounded-md border p-3 text-sm ${tone}`}>
       <div className="flex items-center justify-between">
@@ -392,7 +393,7 @@ function DeviceRecommendation() {
  */
 function QualityHonesty() {
   return (
-    <div className="rounded-md border border-amber-400/50 bg-amber-50/60 p-3 text-xs dark:bg-amber-950/20">
+    <div className="rounded-md border border-warn/40 bg-warn/[0.07] p-3 text-xs bg-warn/[0.07]">
       <p className="font-medium">Local model quality vs remote model quality (honest)</p>
       <p className="mt-1">
         <strong>LOCAL:</strong> small open-weight models (135M–4B, quantized). Real, private, works offline — but

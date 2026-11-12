@@ -121,7 +121,12 @@ return (
    * trip, and the shell's "My Workspace" entry is the one deliberate way back to their own
    * academic workspace.
    */
-  <AppShell title="Co-Owner Dashboard" variant="owner" role={role}>
+  <AppShell
+    title="Co-Owner Dashboard"
+    subtitle="The shared administrative view: members, activity and network health."
+    variant="owner"
+    role={role}
+  >
         <div className="dash-page">
           <div className="dash-stack">
             <div className="dash-hero">

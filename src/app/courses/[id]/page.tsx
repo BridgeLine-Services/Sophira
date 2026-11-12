@@ -36,7 +36,8 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const tools = ENGINE_TOOLS[engineId];
 
   return (
-    <AppShell title={course.name} backHref="/courses">
+    <AppShell
+      subtitle="This course, its teacher, and the work that belongs to it." title={course.name} backHref="/courses">
       <div className="space-y-6">
         {/* Course workspace header: name, subject, selected teacher, engine */}
         <div className="flex flex-wrap items-center gap-2">

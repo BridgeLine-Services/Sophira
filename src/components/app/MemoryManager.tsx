@@ -188,7 +188,7 @@ export function MemoryManager({
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="h-9 rounded-md border border-input bg-card px-2 text-sm"
+            className="h-9 rounded-md border border-line bg-card px-2 text-sm"
             aria-label="Filter by category"
           >
             <option value="">All categories</option>
@@ -199,7 +199,7 @@ export function MemoryManager({
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="h-9 rounded-md border border-input bg-card px-2 text-sm"
+            className="h-9 rounded-md border border-line bg-card px-2 text-sm"
             aria-label="Filter by status"
           >
             <option value="">All statuses</option>
@@ -231,7 +231,7 @@ export function MemoryManager({
                 <select aria-label="Category"
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value as MemoryCategory)}
-                  className="mt-1 h-9 w-full rounded-md border border-input bg-card px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-line bg-card px-2 text-sm"
                 >
                   {MEMORY_CATEGORIES.map((mc) => (
                     <option key={mc} value={mc}>{MEMORY_CATEGORY_LABELS[mc]}</option>
@@ -284,12 +284,12 @@ export function MemoryManager({
                   <span>evidence: {m.evidence_count ?? 0} item{(m.evidence_count ?? 0) === 1 ? "" : "s"}</span>
                   <span>first observed {fmtDate(m.first_observed)}</span>
                   <span>last observed {fmtDate(m.last_observed)}</span>
-                  {m.improvement_trend === "improving" && <span className="font-medium text-green-700">trend: improving</span>}
-                  {m.improvement_trend === "regressing" && <span className="font-medium text-red-700">trend: regressing</span>}
+                  {m.improvement_trend === "improving" && <span className="font-medium text-success">trend: improving</span>}
+                  {m.improvement_trend === "regressing" && <span className="font-medium text-danger">trend: regressing</span>}
                   {m.improvement_trend === "plateaued" && <span>trend: plateaued</span>}
                 </div>
                 {/* Confidence bar */}
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-card-elevated">
                   <div className="h-full rounded-full bg-accent" style={{ width: `${Math.round(m.confidence * 100)}%` }} />
                 </div>
                 {/* Evidence inspector */}
@@ -311,11 +311,11 @@ export function MemoryManager({
                       <Eye className="h-4 w-4" /> {openEvidence === m.id ? "Hide evidence" : `Inspect evidence (${m.evidence_count})`}
                     </Button>
                     {openEvidence === m.id && (
-                      <ul className="mt-2 space-y-1 rounded-md border border-input bg-card p-3">
+                      <ul className="mt-2 space-y-1 rounded-md border border-line bg-card p-3">
                         {(evidence[m.id] || []).length === 0 && <li className="text-xs text-ink-soft"><Spinner className="mr-2 inline h-3 w-3" /> loading…</li>}
                         {(evidence[m.id] || []).map((ev) => (
                           <li key={ev.id} className="text-xs">
-                            <span className={ev.polarity === "positive" ? "text-green-700" : "text-red-700"}>
+                            <span className={ev.polarity === "positive" ? "text-success" : "text-danger"}>
                               {ev.polarity === "positive" ? "supports" : "contradicts"}
                             </span>{" "}
                             · {ev.evidence_type.replace(/_/g, " ")} · {ev.summary} · {fmtDate(ev.observed_at)}
@@ -355,7 +355,7 @@ export function MemoryManager({
                   </Button>
                 </div>
                 {editing?.id === m.id && (
-                  <div className="space-y-2 rounded-md border border-input p-3">
+                  <div className="space-y-2 rounded-md border border-line p-3">
                     <Input
                       value={editStatement}
                       onChange={(e) => {

@@ -97,6 +97,7 @@ export default function WritingPage() {
       <Link href="/writing/review" className="underline">Open the writing review workspace</Link>.
     </div>
     <AppShell
+      subtitle="The writing workspace: plan, draft, review and check your work."
       title="Writing Profile"
       actions={
         <Link href="/writing/new">

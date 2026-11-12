@@ -38,7 +38,8 @@ export default async function OwnerQaPage() {
    */
   if (needsDatabaseUpdate(error)) {
     return (
-      <AppShell title="QA reports" variant={environmentFor(profile.role)} role={profile.role} backHref={staffBackHrefFor(profile.role)}>
+      <AppShell
+      subtitle="Quality reports submitted from around the app." title="QA reports" variant={environmentFor(profile.role)} role={profile.role} backHref={staffBackHrefFor(profile.role)}>
         <DatabaseUpdateNotice feature="tester reports" error={error} canUpdate={profile.role === "owner"} />
       </AppShell>
     );

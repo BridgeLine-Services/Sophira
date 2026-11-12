@@ -64,7 +64,8 @@ export default async function OwnerFeaturesPage() {
   const needingOwner = featuresNeedingOwner(entries);
 
   return (
-    <AppShell title="Feature health" variant="owner">
+    <AppShell
+      subtitle="Which features are switched on, and what each one does." title="Feature health" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -146,11 +147,11 @@ export default async function OwnerFeaturesPage() {
 
 function StateDot({ state }: { state: FeatureState }) {
   const colour: Record<FeatureState, string> = {
-    working: "bg-emerald-500",
-    available: "bg-sky-500",
+    working: "bg-success",
+    available: "bg-accent-soft0",
     "not-configured": "bg-line",
-    problems: "bg-red-500",
-    unavailable: "bg-amber-500",
+    problems: "bg-danger",
+    unavailable: "bg-warn",
     "not-implemented": "bg-ink-soft/40",
   };
   return <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${colour[state]}`} />;

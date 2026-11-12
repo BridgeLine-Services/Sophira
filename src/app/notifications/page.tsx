@@ -60,7 +60,8 @@ export default async function NotificationsPage() {
   }
 
   return (
-    <AppShell title="Notifications" backHref="/dashboard">
+    <AppShell
+      subtitle="Everything that happened while you were away." title="Notifications" backHref="/dashboard">
       {/* Refreshes this list in place when a notice arrives; renders nothing itself. */}
       <NotificationsLive userId={user.id} />
       {announcements.length > 0 && (

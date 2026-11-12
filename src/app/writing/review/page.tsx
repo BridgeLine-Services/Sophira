@@ -25,7 +25,8 @@ export default async function WritingReviewPage() {
   }
 
   return (
-    <AppShell title="Review my writing" backHref="/writing">
+    <AppShell
+      subtitle="Review a draft against the brief and its rubric." title="Review my writing" backHref="/writing">
       <div className="mx-auto max-w-3xl space-y-4">
         <div>
           <h1 className="text-lg font-semibold text-ink">Review my writing</h1>

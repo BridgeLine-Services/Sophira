@@ -34,7 +34,8 @@ function TutorInner() {
   }
 
   return (
-    <AppShell title="Subject engine" backHref={courseId ? `/courses/${courseId}` : "/courses"}>
+    <AppShell
+      subtitle="Ask a question and work through it with guidance rather than just an answer." title="Subject engine" backHref={courseId ? `/courses/${courseId}` : "/courses"}>
       <div className="mx-auto max-w-3xl space-y-4">
         <p className="text-sm text-ink-soft">
           Ask this subject&apos;s engine anything from your course material — concepts, terminology,

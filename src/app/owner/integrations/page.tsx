@@ -21,7 +21,8 @@ export default async function OwnerIntegrationsPage() {
   const { profile } = await readProfileWithRepair(supabase, user.id);
   if (!profile || profile.role !== "owner") redirect("/owner");
   return (
-    <AppShell title="Integrations" variant="owner">
+    <AppShell
+      subtitle="Outside services connected to Sophira." title="Integrations" variant="owner">
       <div className="mx-auto max-w-3xl space-y-4">
         <p className="text-sm text-ink-soft">
           Connect a Microsoft or Google account to save documents directly into it.

@@ -43,7 +43,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     // NEVER sent back to /login: the user gets an explicit, visible error
     // and a way out instead of a redirect war.
     return (
-      <AppShell title="Account problem">
+      <AppShell
+      subtitle="Your day at a glance: what is due, what is next, and how your study is going." title="Account problem">
         <div className="mx-auto max-w-md space-y-3 py-10 text-center">
           <h1 className="text-xl font-semibold text-ink">Your account could not be loaded</h1>
           <p className="text-sm text-ink-soft">

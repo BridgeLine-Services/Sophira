@@ -105,7 +105,8 @@ function MathTypePageInner() {
   };
 
   return (
-    <AppShell title="Math • Type to Solve">
+    <AppShell
+      subtitle="Solve a problem step by step, with the working shown." title="Math • Type to Solve">
       <div className="mx-auto max-w-5xl space-y-4">
         <h1 className="text-2xl font-semibold">Type a math problem</h1>
         <p className="text-sm text-ink/60">Enter an expression, equation, or word problem. Choose the input style that works for you.</p>

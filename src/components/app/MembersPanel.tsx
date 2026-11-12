@@ -166,7 +166,7 @@ export function MembersPanel({
   return (
     <div className="space-y-4">
       {notice && (
-        <div role="alert" className="rounded-card border border-amber-300 bg-amber-50 p-3 text-sm text-ink">{notice}</div>
+        <div role="alert" className="rounded-card border border-warn/30 bg-warn/[0.07] p-3 text-sm text-ink">{notice}</div>
       )}
       {confirmation && (
         <div role="status" className="rounded-card border border-line bg-surface p-3 text-sm text-ink">{confirmation}</div>
@@ -271,7 +271,7 @@ export function MembersPanel({
       />
 
       {removeTarget && (
-        <div role="dialog" aria-modal="true" aria-labelledby="remove-title" className="rounded-card border border-rose-300 bg-rose-50 p-4">
+        <div role="dialog" aria-modal="true" aria-labelledby="remove-title" className="rounded-card border border-danger/30 bg-danger/[0.06] p-4">
           <h2 id="remove-title" className="text-sm font-semibold text-ink">
             Remove {removeTarget.identity.title} permanently?
           </h2>

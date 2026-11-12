@@ -66,9 +66,9 @@ interface CandidateRow {
 }
 
 const LABEL_TONE: Record<AnswerLabel, string> = {
-  "SOURCE-SUPPORTED": "border-emerald-600/40 bg-emerald-50 text-emerald-800",
-  INFERENCE: "border-sky-600/30 bg-sky-50 text-sky-800",
-  "NOT VERIFIED": "border-amber-500/50 bg-amber-50 text-amber-800",
+  "SOURCE-SUPPORTED": "border-success/30 bg-success/[0.07] text-success",
+  INFERENCE: "border-accent/30 bg-accent-soft text-accent",
+  "NOT VERIFIED": "border-warn/40 bg-warn/[0.07] text-warn",
 };
 
 export default function NotebookWorkspace() {
@@ -376,7 +376,8 @@ export default function NotebookWorkspace() {
   const sourceById = (sid: string) => sources.find((s) => s.id === sid);
 
   return (
-    <AppShell title={notebook?.title ?? "Notebook"} actions={
+    <AppShell
+      subtitle="Write and edit this notebook. Everything saves as you go." title={notebook?.title ?? "Notebook"} actions={
       <>
         <Button size="sm" variant="secondary" onClick={() => setConfirmDel({ kind: "notebook", label: notebook?.title ?? "this notebook" })}>
           <Archive className="h-4 w-4" /> Archive notebook
@@ -429,7 +430,7 @@ export default function NotebookWorkspace() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`rounded-md px-3 py-1.5 text-sm ${tab === t.id ? "bg-primary text-primary-foreground" : "border border-line text-ink/70 hover:bg-muted"}`}
+              className={`rounded-md px-3 py-1.5 text-sm ${tab === t.id ? "bg-accent text-accent-foreground" : "border border-line text-ink/70 hover:bg-card-elevated"}`}
             >
               {t.label}
             </button>
@@ -601,7 +602,7 @@ export default function NotebookWorkspace() {
                     <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. effects of the 1929 stock market crash on European economies" />
                     <Button onClick={runResearch} disabled={researchBusy}>{researchBusy ? <Spinner /> : "Research this topic"}</Button>
                     {analysis && (
-                      <div className="rounded border border-line bg-muted/40 p-3 text-xs text-ink/70">
+                      <div className="rounded border border-line bg-ink/[0.04] p-3 text-xs text-ink/70">
                         <p>{analysis.rationale}</p>
                         {analysis.requiredSourceTypes && <p className="mt-1">Required source types: {analysis.requiredSourceTypes.join("; ")}</p>}
                         {researchNotes.map((n, i) => <p key={i} className="text-ink/50">• {n}</p>)}
@@ -748,7 +749,7 @@ function AnswerPanel({ answer, onOpen, sourceById, compact }: {
 }) {
   if (!answer?.statements) return null;
   return (
-    <div className={`space-y-2 ${compact ? "" : "rounded-md border border-line bg-muted/30 p-3"}`}>
+    <div className={`space-y-2 ${compact ? "" : "rounded-md border border-line bg-ink/[0.03] p-3"}`}>
       {answer.statements.map((st, i) => (
         <div key={i} className="text-sm">
           <span className={`mr-2 inline-block rounded border px-1.5 py-0.5 text-xs ${LABEL_TONE[st.label] ?? ""}`}>{st.label}</span>
@@ -756,7 +757,7 @@ function AnswerPanel({ answer, onOpen, sourceById, compact }: {
           {st.citations.map((c, j) => (
             <button
               key={j}
-              className="mx-0.5 rounded border border-sky-500/40 bg-sky-50 px-1 text-xs text-sky-800 hover:bg-sky-100"
+              className="mx-0.5 rounded border border-accent/40 bg-accent-soft px-1 text-xs text-accent hover:bg-accent-soft"
               title={`Open the exact location — ${st.reason}`}
               onClick={() => onOpen(c, sourceById(c.sourceId))}
             >

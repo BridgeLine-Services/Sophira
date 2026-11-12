@@ -48,7 +48,7 @@ export function RequestsPanel({ initialRequests, members }: {
 
   return (
     <div className="space-y-3">
-      {error && <p role="alert" className="rounded-card border border-amber-300 bg-amber-50 p-3 text-sm text-ink">{error}</p>}
+      {error && <p role="alert" className="rounded-card border border-warn/30 bg-warn/[0.07] p-3 text-sm text-ink">{error}</p>}
       {link && (
         <p className="rounded-card border border-accent/30 bg-accent-soft/40 p-3 text-sm text-ink">
           Invitation created. Share this link if the email does not arrive:{" "}

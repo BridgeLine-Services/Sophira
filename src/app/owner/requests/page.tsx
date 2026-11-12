@@ -15,7 +15,8 @@ export default async function OwnerRequestsPage() {
   const { requests, members } = await loadOwnerRoster(supabase);
 
   return (
-    <AppShell title="Invitation Requests" variant="owner">
+    <AppShell
+      subtitle="Requests to join the network, waiting for a decision." title="Invitation Requests" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

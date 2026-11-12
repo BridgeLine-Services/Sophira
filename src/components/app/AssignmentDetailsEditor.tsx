@@ -98,7 +98,7 @@ export default function AssignmentDetailsEditor({
   }, [snapshot.phase, clearDraft, onSaved, title, brief]);
 
   return (
-    <section aria-labelledby="assignment-details-heading" className="rounded-lg border border-line p-3">
+    <section aria-labelledby="assignment-details-heading" className="panel-flat p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 id="assignment-details-heading" className="text-sm font-semibold text-ink">
           Assignment details

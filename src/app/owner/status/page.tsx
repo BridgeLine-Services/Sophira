@@ -30,7 +30,8 @@ export default async function OwnerStatusPage() {
   });
 
   return (
-    <AppShell title="System Status" variant="owner">
+    <AppShell
+      subtitle="The current state of each part of the system." title="System Status" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -49,7 +50,7 @@ export default async function OwnerStatusPage() {
               <div key={row.key} className="flex items-start gap-3 p-4">
                 <span
                   aria-hidden
-                  className={"mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " + (row.state === "ready" ? "bg-emerald-500" : row.state === "attention" ? "bg-amber-400" : "bg-line")}
+                  className={"mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " + (row.state === "ready" ? "bg-success" : row.state === "attention" ? "bg-warn" : "bg-line")}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium text-ink">

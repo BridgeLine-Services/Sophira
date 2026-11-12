@@ -68,7 +68,8 @@ export default async function OwnerAnalyticsPage({
   const slowPeak = Math.max(1, ...ai.days.map((d) => d.averageMs ?? 0));
 
   return (
-    <AppShell title="Network analytics" variant="owner">
+    <AppShell
+      subtitle="How the network is being used over time." title="Network analytics" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -135,7 +136,7 @@ export default async function OwnerAnalyticsPage({
               </form>
             </div>
             {periodError && (
-              <p role="status" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm text-ink">
+              <p role="status" className="mt-2 rounded-lg border border-warn/30 bg-warn/[0.07] p-2 text-sm text-ink">
                 {periodError} The figures below use the last 30 days.
               </p>
             )}
@@ -144,7 +145,7 @@ export default async function OwnerAnalyticsPage({
         </Card>
 
         {report.reading === "unavailable" && (
-          <div role="status" className="rounded-card border border-amber-300 bg-amber-50 p-3 text-sm text-ink">
+          <div role="status" className="rounded-card border border-warn/30 bg-warn/[0.07] p-3 text-sm text-ink">
             {report.unavailableReason}
           </div>
         )}
@@ -272,7 +273,7 @@ export default async function OwnerAnalyticsPage({
             </p>
 
             {ai.reading === "unavailable" ? (
-              <p role="status" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm text-ink">
+              <p role="status" className="mt-3 rounded-lg border border-warn/30 bg-warn/[0.07] p-2 text-sm text-ink">
                 {ai.reason}
               </p>
             ) : (
@@ -301,7 +302,7 @@ export default async function OwnerAnalyticsPage({
                           <div key={day.day} className="flex min-w-[18px] flex-1 flex-col items-center gap-1">
                             <div className="flex h-24 w-full items-end justify-center">
                               <span
-                                className={"w-2.5 rounded-t " + (day.failed > 0 ? "bg-rose-400/80" : "bg-accent/80")}
+                                className={"w-2.5 rounded-t " + (day.failed > 0 ? "bg-danger/80" : "bg-accent/80")}
                                 style={{ height: `${Math.max(2, (day.requests / aiPeak) * 100)}%` }}
                                 title={`${day.day}: ${day.requests} requests, ${day.failed} failed`}
                               />
@@ -430,7 +431,7 @@ export default async function OwnerAnalyticsPage({
               studies.
             </p>
             {footprint.reason && (
-              <p role="status" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm text-ink">
+              <p role="status" className="mt-3 rounded-lg border border-warn/30 bg-warn/[0.07] p-2 text-sm text-ink">
                 {footprint.reason}
               </p>
             )}

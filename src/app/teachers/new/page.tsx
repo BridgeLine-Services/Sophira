@@ -39,7 +39,8 @@ export default function NewTeacherPage() {
   }
 
   return (
-    <AppShell title="New teacher" backHref="/teachers">
+    <AppShell
+      subtitle="Add a teacher profile so their marking preferences are followed." title="New teacher" backHref="/teachers">
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
           <Label htmlFor="name">Teacher&apos;s name *</Label>

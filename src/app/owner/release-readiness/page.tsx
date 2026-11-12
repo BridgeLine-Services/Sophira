@@ -39,9 +39,9 @@ const STATE_LABEL: Record<FactState, string> = {
 };
 
 const STATE_DOT: Record<FactState, string> = {
-  ready: "bg-emerald-500",
-  "not-ready": "bg-rose-500",
-  blocked: "bg-amber-400",
+  ready: "bg-success",
+  "not-ready": "bg-danger",
+  blocked: "bg-warn",
   unknown: "bg-line",
 };
 
@@ -129,13 +129,14 @@ export default async function OwnerReleaseReadinessPage() {
 
   const verdictTone =
     report.verdict === "READY"
-      ? "border-emerald-300 bg-emerald-50"
+      ? "border-success/30 bg-success/[0.07]"
       : report.verdict === "NOT READY"
-        ? "border-rose-300 bg-rose-50"
-        : "border-amber-300 bg-amber-50";
+        ? "border border-danger/30 bg-danger/[0.06]"
+        : "border border-warn/30 bg-warn/[0.07]";
 
   return (
-    <AppShell title="Release readiness" variant="owner">
+    <AppShell
+      subtitle="Checks that must pass before a release goes out." title="Release readiness" variant="owner">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

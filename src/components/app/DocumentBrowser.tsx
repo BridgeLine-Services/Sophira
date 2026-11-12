@@ -222,14 +222,14 @@ export default function DocumentBrowser() {
         </button>
       )}
       {note && <p className="mt-2 text-xs text-ink-soft">{note}</p>}
-      {message && <p className="mt-2 text-xs text-amber-600">{message}</p>}
+      {message && <p className="mt-2 text-xs text-warn">{message}</p>}
       {files.length > 0 && (
         <ul className="mt-3 max-h-72 space-y-1.5 overflow-y-auto pr-1">
           {files.map((f) => (
             <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
               <span className="text-sm">
                 {f.title}
-                {f.shared && <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase">shared{f.owner ? ` · ${f.owner}` : ""}</span>}
+                {f.shared && <span className="ml-2 rounded bg-card-elevated px-1.5 py-0.5 text-[10px] uppercase">shared{f.owner ? ` · ${f.owner}` : ""}</span>}
               </span>
               <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setChosen(f)}>Use this document</button>
             </li>
@@ -243,7 +243,7 @@ export default function DocumentBrowser() {
           <textarea aria-label="State the scope of your assigned workload" className="mt-2 w-full rounded-md border p-2 text-sm" rows={2} value={scope} onChange={(e) => { setScope(e.target.value); keepScope({ text: e.target.value }); }} placeholder="Your assigned section, questions, or deliverables" />
           {scopeMessage ? <p role="status" className="mt-1 text-xs text-ink/60">{scopeMessage}</p> : null}
           <div className="mt-2 flex gap-2">
-            <button type="button" className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50" disabled={busy} onClick={() => void confirmSelection()}>Confirm scope</button>
+            <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground disabled:opacity-50" disabled={busy} onClick={() => void confirmSelection()}>Confirm scope</button>
             <button type="button" className="rounded-md border px-3 py-1.5 text-sm" onClick={() => { setChosen(null); setScope(""); }}>Cancel</button>
           </div>
           <p className="mt-1 text-[10px] text-ink-soft">Reading a shared document never makes its other sections your work. Non-Sophira collaborators keep using Word or Google normally; Sophira creates no profile for them.</p>
@@ -256,7 +256,7 @@ export default function DocumentBrowser() {
             {selections.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
                 <span className="text-sm">
-                  <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase">{s.provider}</span>
+                  <span className="mr-1.5 rounded bg-card-elevated px-1.5 py-0.5 text-[10px] uppercase">{s.provider}</span>
                   {s.document_title ?? "Untitled"}
                   {s.scope_description && <span className="mt-0.5 block text-xs text-ink-soft">Scope: {s.scope_description}</span>}
                 </span>
@@ -290,16 +290,16 @@ export default function DocumentBrowser() {
               {compare.removed.length > 0 && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase text-ink-soft">Removed</p>
-                  <ul className="mt-1 space-y-0.5">{compare.removed.slice(0, 40).map((l, i) => <li key={i} className="rounded bg-red-500/10 px-1 font-mono text-[10px]">{l.slice(0, 160)}</li>)}</ul>
+                  <ul className="mt-1 space-y-0.5">{compare.removed.slice(0, 40).map((l, i) => <li key={i} className="rounded bg-danger/10 px-1 font-mono text-[10px]">{l.slice(0, 160)}</li>)}</ul>
                 </div>
               )}
               {compare.added.length > 0 && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase text-ink-soft">Added</p>
-                  <ul className="mt-1 space-y-0.5">{compare.added.slice(0, 40).map((l, i) => <li key={i} className="rounded bg-emerald-500/10 px-1 font-mono text-[10px]">{l.slice(0, 160)}</li>)}</ul>
+                  <ul className="mt-1 space-y-0.5">{compare.added.slice(0, 40).map((l, i) => <li key={i} className="rounded bg-success/10 px-1 font-mono text-[10px]">{l.slice(0, 160)}</li>)}</ul>
                 </div>
               )}
-              {compare.truncated && <p className="mt-1 text-[10px] text-amber-600">The comparison was truncated for size; open the versions individually for full detail.</p>}
+              {compare.truncated && <p className="mt-1 text-[10px] text-warn">The comparison was truncated for size; open the versions individually for full detail.</p>}
             </div>
           )}
           {msVersions && (
