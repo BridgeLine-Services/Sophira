@@ -163,7 +163,7 @@ export default function WritingPage() {
 
         {/* Samples */}
         <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">My writing samples</h2>
+          <h2 className="mb-3 meta-strong">My writing samples</h2>
           {samples.length === 0 ? (
             <EmptyState
               title="No samples yet"

@@ -163,7 +163,7 @@ export function SystemHealthPanel() {
             {Object.entries(data.runtime_environment).map(([k, v]) => (
               <li key={k} className="text-sm">
                 <span className="font-medium text-ink">{k.replace(/_/g, " ")}</span>
-                <span className={"ml-2 text-xs font-semibold " + (v.status === "CONFIGURED" ? "text-emerald-600" : v.status === "OPTIONAL" ? "text-ink-soft" : "text-destructive")}>{v.status}</span>
+                <span className={"ml-2 text-xs font-semibold " + (v.status === "CONFIGURED" ? "text-emerald-600" : v.status === "OPTIONAL" ? "text-ink-soft" : "text-danger")}>{v.status}</span>
                 <span className="block text-xs text-ink-soft">{v.detail}</span>
               </li>
             ))}

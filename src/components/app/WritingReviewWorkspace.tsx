@@ -29,7 +29,7 @@ interface PastedSource {
   content: string;
 }
 
-const card = "rounded-lg border border-line bg-card p-4";
+const card = "panel p-4";
 const btn = "rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink-soft hover:bg-ink/5 disabled:opacity-50";
 const primary = "rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-50";
 

@@ -209,7 +209,7 @@ export default function DocumentBrowser() {
   return (
     <div className="mt-6 rounded-lg border p-4">
       <p className="text-sm font-semibold">Documents &amp; workload scope</p>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 text-xs text-ink-soft">
         Browse documents your connected account can see, pick one, and state the section or questions Sophira should work on. Sophira only ever works for you, within the scope you set.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -221,7 +221,7 @@ export default function DocumentBrowser() {
           Enable Drive browsing (optional — adds read-only consent so shared files appear)
         </button>
       )}
-      {note && <p className="mt-2 text-xs text-muted-foreground">{note}</p>}
+      {note && <p className="mt-2 text-xs text-ink-soft">{note}</p>}
       {message && <p className="mt-2 text-xs text-amber-600">{message}</p>}
       {files.length > 0 && (
         <ul className="mt-3 max-h-72 space-y-1.5 overflow-y-auto pr-1">
@@ -239,26 +239,26 @@ export default function DocumentBrowser() {
       {chosen && (
         <div className="mt-3 rounded-md border p-3">
           <p className="text-sm font-medium">{chosen.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground">State the workload scope — e.g. &quot;Section A: introduction (first 3 paragraphs)&quot; or &quot;questions 4-6 only&quot;.</p>
+          <p className="mt-1 text-xs text-ink-soft">State the workload scope — e.g. &quot;Section A: introduction (first 3 paragraphs)&quot; or &quot;questions 4-6 only&quot;.</p>
           <textarea aria-label="State the scope of your assigned workload" className="mt-2 w-full rounded-md border p-2 text-sm" rows={2} value={scope} onChange={(e) => { setScope(e.target.value); keepScope({ text: e.target.value }); }} placeholder="Your assigned section, questions, or deliverables" />
           {scopeMessage ? <p role="status" className="mt-1 text-xs text-ink/60">{scopeMessage}</p> : null}
           <div className="mt-2 flex gap-2">
             <button type="button" className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50" disabled={busy} onClick={() => void confirmSelection()}>Confirm scope</button>
             <button type="button" className="rounded-md border px-3 py-1.5 text-sm" onClick={() => { setChosen(null); setScope(""); }}>Cancel</button>
           </div>
-          <p className="mt-1 text-[10px] text-muted-foreground">Reading a shared document never makes its other sections your work. Non-Sophira collaborators keep using Word or Google normally; Sophira creates no profile for them.</p>
+          <p className="mt-1 text-[10px] text-ink-soft">Reading a shared document never makes its other sections your work. Non-Sophira collaborators keep using Word or Google normally; Sophira creates no profile for them.</p>
         </div>
       )}
       {selections.length > 0 && (
         <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your active workload selections</p>
+          <p className="meta-strong">Your active workload selections</p>
           <ul className="mt-2 space-y-1.5">
             {selections.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
                 <span className="text-sm">
                   <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase">{s.provider}</span>
                   {s.document_title ?? "Untitled"}
-                  {s.scope_description && <span className="mt-0.5 block text-xs text-muted-foreground">Scope: {s.scope_description}</span>}
+                  {s.scope_description && <span className="mt-0.5 block text-xs text-ink-soft">Scope: {s.scope_description}</span>}
                 </span>
                 <span className="flex gap-2">
                   <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => void openHistory(s)}>History</button>
@@ -275,7 +275,7 @@ export default function DocumentBrowser() {
             <p className="text-sm font-semibold">Document history — {historyFor.document_title ?? "Untitled"}</p>
             <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setHistoryFor(null)}>Close</button>
           </div>
-          <p className="mt-1 text-[10px] text-muted-foreground">{historyNote ?? "Loading history…"}</p>
+          <p className="mt-1 text-[10px] text-ink-soft">{historyNote ?? "Loading history…"}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className="rounded-md border px-2 py-1 text-xs disabled:opacity-50" disabled={historyBusy} onClick={() => void observeChanges()}>Check for changes outside Sophira</button>
             <button type="button" className="rounded-md border px-2 py-1 text-xs disabled:opacity-50" disabled={historyBusy} onClick={() => void compareVersions()}>Compare last two versions</button>
@@ -286,16 +286,16 @@ export default function DocumentBrowser() {
           {compare && (
             <div className="mt-3 rounded-md border p-2 text-xs">
               <p className="font-medium">{compare.ok ? `Added ${compare.added.length} line(s), removed ${compare.removed.length} line(s).` : "Comparison unavailable."}</p>
-              <p className="mt-1 text-[10px] text-muted-foreground">{compare.note}</p>
+              <p className="mt-1 text-[10px] text-ink-soft">{compare.note}</p>
               {compare.removed.length > 0 && (
                 <div className="mt-2">
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">Removed</p>
+                  <p className="text-[10px] font-semibold uppercase text-ink-soft">Removed</p>
                   <ul className="mt-1 space-y-0.5">{compare.removed.slice(0, 40).map((l, i) => <li key={i} className="rounded bg-red-500/10 px-1 font-mono text-[10px]">{l.slice(0, 160)}</li>)}</ul>
                 </div>
               )}
               {compare.added.length > 0 && (
                 <div className="mt-2">
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">Added</p>
+                  <p className="text-[10px] font-semibold uppercase text-ink-soft">Added</p>
                   <ul className="mt-1 space-y-0.5">{compare.added.slice(0, 40).map((l, i) => <li key={i} className="rounded bg-emerald-500/10 px-1 font-mono text-[10px]">{l.slice(0, 160)}</li>)}</ul>
                 </div>
               )}
@@ -305,7 +305,7 @@ export default function DocumentBrowser() {
           {msVersions && (
             <div className="mt-3 rounded-md border p-2 text-xs">
               <p className="font-medium">OneDrive versions {msEtag ? "" : "(version check unavailable — restore disabled)"}</p>
-              {msVersions.length === 0 && <p className="mt-1 text-[10px] text-muted-foreground">No version history is available for this file.</p>}
+              {msVersions.length === 0 && <p className="mt-1 text-[10px] text-ink-soft">No version history is available for this file.</p>}
               <ul className="mt-1 space-y-1">
                 {msVersions.slice(0, 10).map((v) => (
                   <li key={v.id} className="flex items-center justify-between gap-2">
@@ -314,7 +314,7 @@ export default function DocumentBrowser() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-1 text-[10px] text-muted-foreground">Restoring replaces the current file content; it is refused if the file changed since this check.</p>
+              <p className="mt-1 text-[10px] text-ink-soft">Restoring replaces the current file content; it is refused if the file changed since this check.</p>
             </div>
           )}
           {historyFor?.provider === "google" && historyFor.provider_document_id && (
@@ -323,7 +323,7 @@ export default function DocumentBrowser() {
             </div>
           )}
           <ul className="mt-3 max-h-64 space-y-1.5 overflow-y-auto pr-1">
-            {historyEvents.length === 0 && <li className="text-[10px] text-muted-foreground">No recorded events yet. Sophira records writes it performs and versions it observes — it cannot see every keystroke in Word or Google Docs.</li>}
+            {historyEvents.length === 0 && <li className="text-[10px] text-ink-soft">No recorded events yet. Sophira records writes it performs and versions it observes — it cannot see every keystroke in Word or Google Docs.</li>}
             {historyEvents.map((e) => (
               <li key={e.id} className="rounded-md border p-2">
                 {(() => {
@@ -338,15 +338,15 @@ export default function DocumentBrowser() {
                   return (
                     <>
                       <p className="text-xs font-medium text-ink">{d.what}</p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                      <p className="mt-0.5 text-[10px] text-ink-soft">
                         {new Date(e.recorded_at).toLocaleString()} · {d.origin} {d.confirmation}
                       </p>
                       <p className="mt-0.5 text-[10px] text-ink-soft">{describeProvenance(e.provenance as HistoryProvenance)}</p>
                     </>
                   );
                 })()}
-                <p className="mt-1 text-[10px] text-muted-foreground">{e.summary}</p>
-                {e.target_section && <p className="text-[10px] text-muted-foreground">Section: {e.target_section}</p>}
+                <p className="mt-1 text-[10px] text-ink-soft">{e.summary}</p>
+                {e.target_section && <p className="text-[10px] text-ink-soft">Section: {e.target_section}</p>}
                 {e.has_snapshot && historyFor.provider === "google" && (
                   <button type="button" className="mt-1 rounded-md border px-2 py-0.5 text-[10px] disabled:opacity-50" disabled={historyBusy} onClick={() => void createRecoveryCopy(e.id)}>
                     Create recovery copy from this version{e.snapshot_truncated ? " (truncated)" : ""}

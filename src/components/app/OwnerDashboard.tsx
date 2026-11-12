@@ -9,6 +9,11 @@
  *
  * The numbers below are the same real records as before - counts and timestamps only, never
  * another member's academic content. Nothing is estimated, and a tile with no data says so.
+ *
+ * 2026-11-12 (reskin): presentation only. Same five inputs, same counts, same links, same
+ * sentences. The tiles moved onto the shared .stat vocabulary and the twelve management
+ * destinations became a grouped list of .panel rows, which reads as an administration
+ * console rather than a grid of twelve identical boxes.
  */
 import Link from "next/link";
 import {
@@ -23,7 +28,6 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui";
 import { buildTrends } from "@/lib/owner-trends";
 import { buildStatusRows, statusIsHealthy, type StatusInput } from "@/lib/owner-status";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
@@ -70,51 +74,63 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
   ];
 
   return (
-    <div className="space-y-6">
-      <div id="overview" className="grid grid-cols-2 gap-3 scroll-mt-4 sm:grid-cols-4">
-        {tiles.map((t) => (
-          <Link key={t.label} href={t.href} className="block rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <Card className="h-full transition-colors hover:border-accent/60">
-              <CardContent className="p-4">
-                <p className="text-xs text-ink-soft">{t.label}</p>
-                <p className="mt-1 text-2xl font-semibold text-ink">{t.value}</p>
-                <p className="mt-1 text-xs text-ink-soft">{t.note}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
+    <div className="mt-6 space-y-6">
+      <section aria-labelledby="owner-dashboard-numbers">
+        <div className="section-head mb-3">
+          <h2 id="owner-dashboard-numbers" className="section-title">Your network at a glance</h2>
+          <p className="meta">Counts only. Another member&apos;s work is never shown here.</p>
+        </div>
+        <div className="stat-grid">
+          {tiles.map((t) => (
+            <Link key={t.label} href={t.href} className="stat stat-hover block focus-visible:rounded-2xl">
+              <p className="stat-label">{t.label}</p>
+              <p className="stat-value">{t.value}</p>
+              <p className="stat-note">{t.note}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
 
-      <p className="text-sm text-ink-soft">
-        {healthy
-          ? "Everything essential is working."
-          : attention.length > 0
-            ? `${attention.length} ${attention.length === 1 ? "item needs" : "items need"} your attention. The other features still work.`
-            : "Some checks have not run yet."}{" "}
-        <Link href="/owner/status" className="font-medium text-accent hover:underline">See system status</Link>
+      <p className="flex items-start gap-2 text-sm text-ink-soft">
+        <span className={"dot mt-1.5 " + (healthy ? "dot-ok" : attention.length > 0 ? "dot-warn" : "dot-idle")} aria-hidden />
+        <span>
+          {healthy
+            ? "Everything essential is working."
+            : attention.length > 0
+              ? `${attention.length} ${attention.length === 1 ? "item needs" : "items need"} your attention. The other features still work.`
+              : "Some checks have not run yet."}{" "}
+          <Link href="/owner/status" className="font-medium text-accent underline-offset-4 hover:underline">See system status</Link>
+        </span>
       </p>
 
-      <nav aria-label="Manage Sophira" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {pages.map((p) => {
-          const Icon = p.icon;
-          return (
-            <Link key={p.href} href={p.href}
-              className="rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Card className="h-full transition-colors hover:border-accent/60">
-                <CardContent className="flex h-full items-start gap-3 p-4">
-                  <Icon className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
-                  <span className="min-w-0">
-                    <span className="block font-medium text-ink">{p.title}</span>
-                    <span className="mt-0.5 block text-sm text-ink-soft">{p.body}</span>
-                  </span>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </nav>
+      <section aria-labelledby="owner-dashboard-manage">
+        <div className="section-head mb-3">
+          <h2 id="owner-dashboard-manage" className="section-title">Manage Sophira</h2>
+          <p className="meta">Twelve destinations, each one page of its own</p>
+        </div>
+        <nav aria-label="Manage Sophira" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {pages.map((p) => {
+            const Icon = p.icon;
+            return (
+              <Link
+                key={p.href}
+                href={p.href}
+                className="group panel flex items-start gap-3 p-4 transition-colors hover:border-accent/40 focus-visible:rounded-2xl"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent transition-colors group-hover:bg-accent group-hover:text-on-accent">
+                  <Icon className="h-[18px] w-[18px]" aria-hidden />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[14.5px] font-semibold text-ink">{p.title}</span>
+                  <span className="mt-0.5 block text-sm leading-relaxed text-ink-soft">{p.body}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+      </section>
 
-      <p className="text-xs text-ink-soft">
+      <p className="callout">
         You can manage membership without ever opening a member&apos;s assignments, writing or
         documents. Sophira keeps each person&apos;s work private, including from you.
       </p>

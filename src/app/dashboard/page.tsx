@@ -664,7 +664,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <div className="dash-panel">
         {/* What I remember — real counts from your data (workflow §6) */}
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">What I remember</h2>
+        <h2 className="mb-3 meta-strong">What I remember</h2>
         <p className="text-sm text-ink-soft">
           Working from <strong className="text-ink">{courses?.length ?? 0} course{(courses?.length ?? 0) === 1 ? "" : "s"}</strong>,{" "}
           <strong className="text-ink">{teachers?.length ?? 0} teacher{(teachers?.length ?? 0) === 1 ? "" : "s"}</strong> with their profiles,{" "}
@@ -804,7 +804,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="dash-panel">
         {/* Writing profile */}
         <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">My Writing Profile</h2>
+          <h2 className="mb-3 meta-strong">My Writing Profile</h2>
           <Card>
             <CardContent className="flex items-start gap-3 p-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
@@ -837,7 +837,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="dash-panel">
         {/* Recent assignments */}
         <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Recent assignments</h2>
+          <h2 className="mb-3 meta-strong">Recent assignments</h2>
           {assignments?.length ? (
             <div className="divide-y divide-ink/5 rounded-card border border-line bg-card">
               {assignments.map((a) => (
@@ -865,7 +865,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {/* Recent feedback */}
         {recentFeedback && recentFeedback.length > 0 && (
           <section>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Recent feedback</h2>
+            <h2 className="mb-3 meta-strong">Recent feedback</h2>
             <div className="divide-y divide-ink/5 rounded-card border border-line bg-card">
               {recentFeedback.map((f) => (
                 <div key={f.id} className="p-4">

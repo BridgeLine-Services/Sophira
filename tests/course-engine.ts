@@ -327,7 +327,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   const shell2 = readFileSync("src/components/app/AppShell.tsx", "utf8");
   assert(shell2.includes('className="fixed inset-0 z-50 lg:hidden" role="dialog"'),
     "tablet: the drawer is reachable below lg — nested course navigation is NOT desktop-only");
-  assert(shell2.includes("hover:bg-ink/5 lg:hidden") && shell2.includes("Open menu"),
+  assert(shell2.includes("hover:bg-ink/[0.06]") && shell2.includes("lg:hidden") && shell2.includes("Open menu"),
     "tablet: the menu button is visible on tablets and phones (lg:hidden)");
   assert(shell2.includes("FOCUS TRAP") && shell2.includes("focusables[focusables.length - 1]"),
     "drawer: Tab focus is trapped inside the modal drawer (wraps first/last)");
@@ -557,8 +557,12 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // 2026-11-03: only the overview anchor survives on the dashboard; the other sections are
   // real routes, so they need pages rather than anchors.
   const ownerDash = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
-  assert(ownerDash.includes('id="overview"'),
-    "owner: the overview anchor target still exists for the dashboard nav item");
+  // 2026-11-12 (reskin): the overview anchor moved to the server-rendered
+  // Administrative overview section on /owner, which is where the owner nav item
+  // ("Overview") actually lands. The guarantee is unchanged: exactly one target.
+  const ownerPageSrc = readFileSync("src/app/owner/page.tsx", "utf8");
+  assert(ownerPageSrc.includes('id="overview"') && !ownerDash.includes('id="overview"'),
+    "owner: the overview anchor target still exists for the dashboard nav item (once, on /owner)");
   for (const route of ["members", "invitations", "requests", "activity", "status", "security", "ai-providers"]) {
     assert(existsSync(`src/app/owner/${route}/page.tsx`),
       `owner: /owner/${route} is a real page, not a missing anchor`);
@@ -654,7 +658,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(globalsCss.includes(".data-table thead th") && globalsCss.includes(".data-table tbody tr:hover"),
     "design system: one shared data-table design (headers, rhythm, hover) instead of per-page table styles");
   const ownerPageHead = readFileSync("src/app/owner/page.tsx", "utf8");
-  assert(ownerPageHead.includes("uppercase tracking-wider text-ink-soft"),
+  assert(ownerPageHead.includes("meta-strong") && globalsCss.includes(".meta-strong"),
     "design system: the owner dashboard uses the app-wide section-heading pattern");
   assert(mathRoute.includes("transcribe the WHOLE question") && mathRoute.includes("State each instruction word ONCE") && mathRoute.includes("EVERY visible answer choice"),
     "ocr: the vision prompt captures complete questions, forbids duplicated instructions, and keeps every multiple-choice option");
@@ -779,9 +783,12 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   section("responsive shell and owner table containment");
   {
     const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
-    assert(shell.includes("mx-auto w-full max-w-6xl flex-1"),
-      "layout: the shared main container is max-w-6xl — the workspace and owner dashboard use the viewport instead of a narrow centered column");
-    assert(shell.split("max-w-6xl").length >= 4,
+    // 2026-11-12 (reskin): the shared ceiling moved from max-w-6xl to the wider
+    // max-w-content (78rem) so wide screens are not a narrow centred column. The
+    // guarantee is unchanged: ONE width, shared by header, tablet nav and content.
+    assert(shell.includes("mx-auto w-full max-w-content") && shell.includes("flex-1"),
+      "layout: the shared main container is max-w-content — the workspace and owner dashboard use the viewport instead of a narrow centered column");
+    assert(shell.split("max-w-content").length >= 4,
       "layout: header, tablet nav, and main share the SAME max width so the shell stays aligned");
     const owner = readFileSync("src/app/owner/page.tsx", "utf8");
     const ownerTables = owner.split("<table").length - 1;

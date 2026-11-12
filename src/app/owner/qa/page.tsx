@@ -47,7 +47,7 @@ export default async function OwnerQaPage() {
   return (
     <AppShell title="QA reports" variant={environmentFor(profile.role)} role={profile.role} backHref={staffBackHrefFor(profile.role)}>
       <div className="space-y-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-soft">Tester reports</h2>
+        <h2 className="meta-strong">Tester reports</h2>
         <QaTriage rows={(data as QaRow[] | null) ?? []} />
       </div>
     </AppShell>

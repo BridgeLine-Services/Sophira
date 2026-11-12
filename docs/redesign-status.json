@@ -1,34 +1,94 @@
 {
-  "/owner/members": {
+  "/access-denied": {
     "status": "partial",
-    "reason": "Dedicated route; actions reuse the shared member-actions module. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
   },
-  "/owner/invitations": {
+  "/co-owner": {
     "status": "partial",
-    "reason": "Dedicated route; mutations reuse the shared invitation-actions module and delivery wording is unchanged. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
   },
-  "/owner/requests": {
+  "/courses/[id]": {
     "status": "partial",
-    "reason": "Dedicated route; approving still requires the owner's click. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/dashboard": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/downloads": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/lectures": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/notifications": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/offline": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/owner": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
   },
   "/owner/activity": {
     "status": "partial",
     "reason": "Dedicated route reading stored timestamps through the existing buildActivity. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
   },
-  "/owner/status": {
+  "/owner/ai-operations": {
     "status": "partial",
-    "reason": "Dedicated route using the existing buildStatusRows. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
-  },
-  "/owner/security": {
-    "status": "partial",
-    "reason": "Dedicated route reporting the server-side charge policy; it cannot change it. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
   },
   "/owner/ai-providers": {
     "status": "partial",
     "reason": "Dedicated route reporting existing provider diagnostics; no key or token rendered. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
   },
-  "/owner": {
+  "/owner/analytics": {
     "status": "partial",
-    "reason": "Now a real overview: four aggregate tiles that link to their pages, a status line, and cards to each management page. Automated tests pass; light/dark and mobile visual review not yet done, so it is not marked complete."
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/owner/backup": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/owner/features": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/owner/invitations": {
+    "status": "partial",
+    "reason": "Dedicated route; mutations reuse the shared invitation-actions module and delivery wording is unchanged. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/members": {
+    "status": "partial",
+    "reason": "Dedicated route; actions reuse the shared member-actions module. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/qa": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/owner/requests": {
+    "status": "partial",
+    "reason": "Dedicated route; approving still requires the owner's click. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/security": {
+    "status": "partial",
+    "reason": "Dedicated route reporting the server-side charge policy; it cannot change it. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/owner/status": {
+    "status": "partial",
+    "reason": "Dedicated route using the existing buildStatusRows. Automated tests pass and the route authorises on the server. Light/dark and mobile visual review not yet done, so it is not marked complete."
+  },
+  "/tester": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
+  },
+  "/writing": {
+    "status": "partial",
+    "reason": "Re-skinned onto the shared 2026-11-12 design system (page frame, panel, stat and table vocabulary; per-theme elevation; repaired utility names that resolved to no colour). Suite, type check and production build pass. Not marked complete: it has not been inspected in a browser in either theme, at any width, while signed in."
   }
 }

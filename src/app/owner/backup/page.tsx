@@ -55,15 +55,15 @@ export default async function OwnerBackupPage() {
             <p className="mt-1 text-sm text-ink-soft">{report.headline}</p>
             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
               <div>
-                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Last backup</dt>
+                <dt className="text-xs uppercase tracking-wide text-ink-soft">Last backup</dt>
                 <dd className="text-ink">{formatDay(report.lastRunAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Last checked</dt>
+                <dt className="text-xs uppercase tracking-wide text-ink-soft">Last checked</dt>
                 <dd className="text-ink">{formatDay(report.lastVerifiedAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Last restore rehearsal</dt>
+                <dt className="text-xs uppercase tracking-wide text-ink-soft">Last restore rehearsal</dt>
                 <dd className="text-ink">{formatDay(report.lastRestoreTestAt)}</dd>
               </div>
             </dl>

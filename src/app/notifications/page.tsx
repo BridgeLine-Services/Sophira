@@ -65,7 +65,7 @@ export default async function NotificationsPage() {
       <NotificationsLive userId={user.id} />
       {announcements.length > 0 && (
         <section aria-labelledby="ann-h" className="mb-6">
-          <h2 id="ann-h" className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-soft">Announcements</h2>
+          <h2 id="ann-h" className="mb-2 meta-strong">Announcements</h2>
           <div className="space-y-2">
             {announcements.map((a) => (
               <div key={a.id} className="rounded-card border border-line bg-card p-4">
@@ -105,7 +105,7 @@ export default async function NotificationsPage() {
             <section key={group} aria-labelledby={`notifications-${group}`}>
               <h2
                 id={`notifications-${group}`}
-                className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft"
+                className="mb-3 meta-strong"
               >
                 {presentationLabel(grouped.get(group)![0].kind)}
               </h2>

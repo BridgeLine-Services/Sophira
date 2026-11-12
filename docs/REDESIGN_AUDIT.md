@@ -494,3 +494,96 @@ No page, component, token, or palette was changed. Claiming otherwise would be
 the exact failure the directive warns about. What exists now is a measured
 baseline, a reproducible inventory, and a contrast gate that any future palette
 must pass.
+
+---
+
+# Phase F — professional reskin (2026-11-12)
+
+Baseline commit: `e1c0de4` (the commit production served at the start of this phase).
+Branch: `feat/professional-reskin`. Nothing was deployed to production.
+
+## F.1 Baseline, measured before any edit
+
+| Check | Result |
+|---|---|
+| `npm test` | **PASS** 7705/7705 |
+| `npx tsc --noEmit` | **PASS** |
+| `npm run lint` | **PASS** 0 errors, 33 warnings (the pinned ceiling) |
+| `npm run build` | **PASS** |
+| `node scripts/design-drift.mjs` | **PASS** 0 literal colour utilities |
+| `node scripts/inventory.mjs` | 80 page routes, 101 API routes |
+
+The audit's own conclusion still holds: the palette had already been moved to the
+enterprise ivory/slate/teal direction and was pinned by `tests/run.ts`, so this
+phase did **not** re-pick colours. It built the missing layer above them.
+
+## F.2 What was actually missing (found by reading the tree, not the docs)
+
+1. **No elevation language.** Every card used one fixed light shadow
+   (`0 1px 3px rgb(ink/0.05)`), which is invisible on ivory and looks like a smudge
+   on midnight navy. There was no per-theme shadow at all.
+2. **No shared component vocabulary.** Panels, stat tiles, section headings, nav
+   rows, callouts and status dots were re-invented per page; 15 files carried their
+   own uppercase heading string, and the owner console used three different ones.
+3. **Utility names that resolved to no colour.** `text-muted-foreground`,
+   `border-destructive`, `bg-destructive` and `border bg-card` are not tokens in
+   `tailwind.config.ts`. They rendered as inherited text and `currentColor` borders
+   in 11 files. That is why parts of the owner console looked unbordered.
+4. **Raw palette squares for status.** `bg-emerald-500` / `bg-amber-400` bypassed
+   the theme entirely (allowed by the drift ratchet, which deliberately ignores
+   semantic emerald/amber, but wrong for a status dot).
+5. **The member dashboard was a light-on-dark island.** `.dash-panel` pinned
+   `#ffffff` and `#241a44`, so in dark mode the six learning panels stayed white.
+   That is the exact "permanently white component" defect the directive forbids.
+6. **The shell was 240px of unstyled list.** No group hierarchy in the rail, one
+   radius for everything, a `bg-paper/95` rail indistinguishable from the page, and
+   a 1152px content ceiling.
+
+## F.3 What this phase changed
+
+- `src/app/globals.css`: added `--elev-1/2/3`, `--elev-accent` and `--hero-bg` to
+  **both** themes (shadows are the one visual idea with no colour token, so they are
+  declared per theme rather than shared); added one component layer
+  (`.page-*`, `.panel*`, `.stat*`, `.nav-*`, `.callout*`, `.dot*`, `.seg*`,
+  `.data-table` refinement) using only semantic tokens; re-skinned `.dash-*` from
+  purple-on-always-white to the product's teal/charcoal hero with **theme-aware**
+  panels. Token values are untouched, so the contrast and palette pins still hold.
+- `tailwind.config.ts`: radius (`panel`, `tile`), elevation (`e1/e2/e3/accent`),
+  a readable type ramp (smallest text 11px, body 15px), `max-w-content` (78rem)
+  and one easing curve.
+- Shared primitives: Button (4 variants, 3 sizes, same props), Card, Badge, Input /
+  Textarea / Select / Label, EmptyState, Toast, ConfirmDialog. Public interfaces
+  unchanged; no behavioural change.
+- `AppShell.tsx`: 256px `bg-sidebar` rail with a brand lockup, labelled groups,
+  `.nav-item` / `.nav-item-active` rows with an accent indicator, a rank card, a
+  `bg-topbar` header, an aligned tablet row, a `bg-sidebar` drawer and a bottom bar
+  with an active pill. Same four renderers, same registries, same permissions.
+- `/owner`: stat-grid administrative overview, a real "Needs attention" panel with
+  per-item status dots, token-based callouts, and the provider tables.
+- `OwnerDashboard.tsx`: stat grid + twelve management destinations as one grouped
+  list of panel rows.
+- 25 further page/component files: repair of the utility names above, one section
+  heading style, panel surfaces, `data-table` on static tables.
+
+## F.4 Verified after the change
+
+| Check | Result |
+|---|---|
+| `npm test` | **PASS** 7705/7705 |
+| `npx tsc --noEmit` | **PASS** |
+| `npm run lint` | **PASS** 0 errors, 33 warnings |
+| `npm run build` | **PASS** |
+| `node scripts/design-drift.mjs` | **PASS** 0 literal colour utilities |
+
+Three test pins were updated, not deleted, because the shell they pin legitimately
+moved: the rail width (`w-60` -> `w-64`, `lg:pl-60` -> `lg:pl-64`), the content
+ceiling (`max-w-6xl` -> `max-w-content`) and the location of the single
+`#overview` anchor (now on the Administrative overview section of `/owner`, which is
+where the "Overview" nav item lands). Each keeps its original guarantee and says so.
+
+## F.5 NOT verified — stated plainly
+
+**No page has been inspected in a browser.** There are no test accounts, so no
+signed-in screen could be opened; the public `/login` was not captured either. Every
+claim above is a code, type, test and build claim. Light/dark appearance, the eight
+specified widths, and the fourth role's dashboard remain unproven by eye.

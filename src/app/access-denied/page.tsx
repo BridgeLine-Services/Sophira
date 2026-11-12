@@ -20,7 +20,7 @@ export default function AccessDeniedPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center px-4 py-10 text-center">
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-danger/10 text-danger">
         <ShieldOff className="h-7 w-7" />
       </span>
       <h1 className="mt-5 text-xl font-semibold text-ink">Access denied</h1>

@@ -206,7 +206,7 @@ export default async function OwnerAnalyticsPage({
                   <table className="data-table w-full min-w-[420px] text-sm">
                     <caption className="sr-only">The same weekly figures as a table</caption>
                     <thead>
-                      <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-soft">
                         <th scope="col" className="px-3 py-2">Week starting</th>
                         <th scope="col" className="px-3 py-2">Joined</th>
                         <th scope="col" className="px-3 py-2">Invitations accepted</th>
@@ -295,7 +295,7 @@ export default async function OwnerAnalyticsPage({
                 ) : (
                   <div className="mt-4 space-y-4">
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Requests per day</p>
+                      <p className="text-xs uppercase tracking-wide text-ink-soft">Requests per day</p>
                       <div className="mt-2 flex items-end gap-1 overflow-x-auto" role="img" aria-label="AI requests per day in the chosen period">
                         {ai.days.map((day) => (
                           <div key={day.day} className="flex min-w-[18px] flex-1 flex-col items-center gap-1">
@@ -314,7 +314,7 @@ export default async function OwnerAnalyticsPage({
                     </div>
 
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Response time</p>
+                      <p className="text-xs uppercase tracking-wide text-ink-soft">Response time</p>
                       {ai.timed ? (
                         <>
                           <div className="mt-2 flex items-end gap-1 overflow-x-auto" role="img" aria-label="Average AI response time per day">
@@ -347,7 +347,7 @@ export default async function OwnerAnalyticsPage({
                       <table className="data-table w-full min-w-[420px] text-sm">
                         <caption className="sr-only">AI activity per day, as a table</caption>
                         <thead>
-                          <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                          <tr className="border-b text-left text-xs uppercase tracking-wide text-ink-soft">
                             <th scope="col" className="px-3 py-2">Day</th>
                             <th scope="col" className="px-3 py-2">Requests</th>
                             <th scope="col" className="px-3 py-2">Failed</th>
@@ -368,7 +368,7 @@ export default async function OwnerAnalyticsPage({
                     </div>
 
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">By provider</p>
+                      <p className="text-xs uppercase tracking-wide text-ink-soft">By provider</p>
                       {ai.byProvider.length === 0 ? (
                         <p className="mt-1 text-sm text-ink-soft">No provider is recorded for this period.</p>
                       ) : (
@@ -514,7 +514,7 @@ function Metric({ label, value, note }: { label: string; value: string; note: st
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-xs uppercase tracking-wide text-ink-soft">{label}</dt>
       <dd className="text-ink">{value}</dd>
     </div>
   );
@@ -523,7 +523,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 function CountTable({ title, rows }: { title: string; rows: Array<{ label: string; count: number }> }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{title}</p>
+      <p className="text-xs uppercase tracking-wide text-ink-soft">{title}</p>
       {rows.length === 0 ? (
         <p className="mt-1 text-sm text-ink-soft">Nothing to show.</p>
       ) : (

@@ -378,7 +378,7 @@ export default function LecturesPage() {
         <Card>
           <CardContent className="space-y-3">
             <h2 className="text-[15px] font-semibold text-ink">Add a lecture recording</h2>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-ink-soft">
               A class recording, a voice memo, or a video of the board. Sophira transcribes it on your own machine
               where it can, then writes study notes that point at the moment they came from.
             </p>
@@ -398,11 +398,11 @@ export default function LecturesPage() {
                 <Upload className="mr-2 h-4 w-4" aria-hidden />
                 Choose a file
               </Button>
-              <span className="text-xs text-muted">MP4, WebM, MOV, MP3, M4A or WAV. Up to 500 MB.</span>
+              <span className="text-xs text-ink-soft">MP4, WebM, MOV, MP3, M4A or WAV. Up to 500 MB.</span>
             </div>
             <input ref={fileInput} type="file" accept="video/*,audio/*" className="hidden" aria-hidden tabIndex={-1} />
             {uploading ? (
-              <p className="flex items-center gap-2 text-sm text-muted" role="status">
+              <p className="flex items-center gap-2 text-sm text-ink-soft" role="status">
                 <Spinner /> {uploading.name}: {uploading.step}
               </p>
             ) : null}
@@ -415,7 +415,7 @@ export default function LecturesPage() {
         </Card>
 
         {assets === null ? (
-          <p className="flex items-center gap-2 text-sm text-muted" role="status">
+          <p className="flex items-center gap-2 text-sm text-ink-soft" role="status">
             <Spinner /> Loading your recordings
           </p>
         ) : assets.length === 0 ? (
@@ -439,9 +439,9 @@ export default function LecturesPage() {
                   <CardContent className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {asset.kind === "video" ? (
-                        <FileVideo className="h-4 w-4 text-muted" aria-hidden />
+                        <FileVideo className="h-4 w-4 text-ink-soft" aria-hidden />
                       ) : (
-                        <Mic className="h-4 w-4 text-muted" aria-hidden />
+                        <Mic className="h-4 w-4 text-ink-soft" aria-hidden />
                       )}
                       <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
                         {asset.original_filename || "Recording"}
@@ -449,15 +449,15 @@ export default function LecturesPage() {
                       <Badge tone={STATUS_TONE[asset.status]}>{STATUS_LABEL[asset.status]}</Badge>
                     </div>
 
-                    <p className="text-xs text-muted">
+                    <p className="text-xs text-ink-soft">
                       {mb(asset.byte_size)}
                       {asset.duration_sec ? ` · ${clock(Number(asset.duration_sec))}` : ""} · added{" "}
                       {fmtDate(asset.created_at)}
                       {asset.frames_sampled > 0 ? ` · ${asset.frames_sampled} stills read` : ""}
                     </p>
 
-                    {asset.member_note ? <p className="text-sm text-muted">{plainText(asset.member_note, 600)}</p> : null}
-                    {notes[asset.id] ? <p className="text-sm text-muted">{plainText(notes[asset.id], 600)}</p> : null}
+                    {asset.member_note ? <p className="text-sm text-ink-soft">{plainText(asset.member_note, 600)}</p> : null}
+                    {notes[asset.id] ? <p className="text-sm text-ink-soft">{plainText(notes[asset.id], 600)}</p> : null}
 
                     <div className="flex flex-wrap gap-2">
                       <Button variant="secondary" onClick={() => void transcribe(asset.id)} disabled={busy}>
@@ -476,13 +476,13 @@ export default function LecturesPage() {
                     </div>
 
                     {!canStudy ? (
-                      <p className="text-xs text-muted">Study notes need a transcript first. Transcribe this recording above.</p>
+                      <p className="text-xs text-ink-soft">Study notes need a transcript first. Transcribe this recording above.</p>
                     ) : null}
 
                     {answer ? (
                       <div className="space-y-2 rounded-lg border border-line bg-surface-2 p-3">
                         <p className="whitespace-pre-wrap text-sm text-ink">{plainText(answer.answer, 20000)}</p>
-                        <p className="text-xs text-muted">
+                        <p className="text-xs text-ink-soft">
                           {answer.notice ? `${answer.notice} ` : ""}
                           {answer.transcriptConfidence ? `Transcript confidence: ${answer.transcriptConfidence}. ` : ""}
                           {answer.removedCitations > 0
@@ -513,9 +513,9 @@ export default function LecturesPage() {
 
                     {frameSet && frameSet.length > 0 ? (
                       <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted">What was on screen</p>
+                        <p className="text-xs font-medium text-ink-soft">What was on screen</p>
                         {frameSet.map((f, i) => (
-                          <p key={`${asset.id}-${i}`} className="text-xs text-muted">
+                          <p key={`${asset.id}-${i}`} className="text-xs text-ink-soft">
                             <span className="font-medium text-ink">{clock(f.atSec)}</span>
                             {f.text ? `: ${plainText(f.text, 180)}` : f.note ? `: ${plainText(f.note, 180)}` : ": nothing readable"}
                           </p>

@@ -118,8 +118,8 @@ function CourseTree({ userId, pathname, onNavigate }: {
   const linkActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
   const subjectActive = (slug: string) => linkActive(`/courses/${slug}`);
   const rowCls = (active: boolean) =>
-    cn("flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium",
-      active ? "bg-accent-soft text-accent font-medium shadow-[inset_3px_0_0_rgb(var(--c-accent))]" : "text-ink-soft hover:bg-ink/5 hover:text-ink");
+    cn("flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium",
+      active ? "bg-accent-soft text-accent font-semibold shadow-[inset_3px_0_0_rgb(var(--c-accent))]" : "text-ink-soft hover:bg-ink/[0.06] hover:text-ink");
 
   const chevron = (expanded: boolean, label: string) => (
     <button
@@ -483,12 +483,12 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
     <Link
       href={variant === "owner" ? "/online?env=owner" : "/online"}
       onClick={inDrawer ? closeDrawer : undefined}
-      className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
-        pathname === "/online" ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
+      className={cn("nav-item", pathname === "/online" && "nav-item-active")}
       aria-label={online ? "Online — view live status" : "Offline — view live status"}
       aria-current={pathname === "/online" ? "page" : undefined}
     >
-      <Wifi className="h-4 w-4" aria-hidden />
+      <span className={cn("dot", online ? "dot-ok" : "dot-idle")} aria-hidden />
+      <Wifi className={cn("h-[17px] w-[17px] shrink-0", online ? "block" : "hidden")} aria-hidden />
       {online ? "Online" : "Offline"}
     </Link>
   );
@@ -508,11 +508,9 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
         href={href}
         onClick={drawerOpen ? closeDrawer : undefined}
         aria-current={active ? "page" : undefined}
-        className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
-          active ? "bg-ink/10 text-ink" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
-        }`}
+        className={cn("nav-item", active && "nav-item-active")}
       >
-        <Icon className="h-4 w-4" aria-hidden />
+        <Icon className="h-[17px] w-[17px] shrink-0" aria-hidden />
         {label}
       </Link>
     );
@@ -572,10 +570,9 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
               ? `${label}, ${badge} waiting for a decision`
               : undefined
         }
-        className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
-          active ? "bg-accent-soft text-accent" : "text-ink-soft hover:bg-ink/5 hover:text-ink")}
+        className={cn("nav-item", active && "nav-item-active")}
       >
-        <Icon className="h-4 w-4" aria-hidden />
+        <Icon className="h-[17px] w-[17px] shrink-0" aria-hidden />
         {label}
         {badge > 0 && (
           <span className="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[11px] font-semibold text-on-accent">
@@ -597,14 +594,19 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
       {/* PERSISTENT SIDEBAR RAIL (lg+): brand, expandable Courses hierarchy,
           the section list, the online status chip, and sign out. */}
       <aside
-        className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-line bg-paper/95 backdrop-blur lg:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-line bg-sidebar lg:flex"
         aria-label="Primary"
       >
-        <Link href={adminHomeHref} className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
-          Sophira
+        <Link href={adminHomeHref} className="flex items-center gap-3 px-5 pb-3 pt-5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-[15px] font-bold text-on-accent shadow-e1">
+            S
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[15px] font-semibold leading-none tracking-[-0.015em] text-ink">Sophira</span>
+            <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-soft">Academic AI</span>
+          </span>
         </Link>
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label={variant === "owner" ? "Owner sections" : "Sections"}>
+        <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label={variant === "owner" ? "Owner sections" : "Sections"}>
           {variant === "owner" ? (
             role === null ? (
               // The rank is not known yet: say so plainly instead of drawing a menu that
@@ -612,23 +614,25 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
               <p className="px-3 py-2 text-sm text-ink-soft" role="status">Loading your menu…</p>
             ) : (
               visibleOwnerGroups.map((g) => (
-                <div key={g.heading} className="mb-3">
-                  <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
-                  {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
-                  {g.heading === "Personal" && (<SignOutButton nav />)}
+                <div key={g.heading}>
+                  <p className="nav-group-label">{g.heading}</p>
+                  <div className="space-y-0.5">
+                    {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
+                    {g.heading === "Personal" && (<SignOutButton nav />)}
+                  </div>
                 </div>
               ))
             )
           ) : (
             <>
+              <p className="nav-group-label">Your workspace</p>
               {dashboardLink && (
                 <Link
                   href={dashboardLink.href}
                   aria-current={pathname === dashboardLink.href ? "page" : undefined}
-                  className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
-                    pathname === dashboardLink.href ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5")}
+                  className={cn("nav-item", pathname === dashboardLink.href ? "nav-item-active" : "text-accent hover:bg-accent-soft/60 hover:text-accent")}
                 >
-                  <ShieldCheck className="h-4 w-4" aria-hidden />
+                  <ShieldCheck className="h-[17px] w-[17px] shrink-0" aria-hidden />
                   {dashboardLink.label}
                 </Link>
               )}
@@ -639,36 +643,41 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
           )}
           {onlineChip(false)}
         </nav>
-        <div className="border-t border-line p-3">
+        <div className="border-t border-line px-3 py-3">
           {rankLabel && (
-            <p className="mb-2 flex items-center gap-2 px-2 text-xs text-ink-soft" data-rank={role}>
-              <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Signed in as <span className="font-semibold text-ink">{rankLabel}</span>
+            <p
+              className="mb-2 flex items-center gap-2 rounded-xl bg-card/80 px-3 py-2 text-xs text-ink-soft ring-1 ring-inset ring-line"
+              data-rank={role}
+            >
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
+              <span className="min-w-0">
+                Signed in as <span className="font-semibold text-ink">{rankLabel}</span>
+              </span>
             </p>
           )}
-          <div className="mb-2 px-2"><SyncStatus /></div>
+          <div className="mb-1 px-1"><SyncStatus /></div>
           <button
             onClick={signOut}
             disabled={signingOut}
             aria-label="Sign out"
             title="Sign out"
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
+            className="nav-item w-full disabled:opacity-50"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-[17px] w-[17px] shrink-0" />
             Sign out
           </button>
         </div>
       </aside>
 
-      <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur lg:pl-60">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
+      <header className="sticky top-0 z-30 border-b border-line bg-topbar/90 backdrop-blur-md lg:pl-64">
+        <div className="mx-auto flex h-14 max-w-content items-center gap-2 px-4 sm:px-6">
           <button
             ref={menuBtnRef}
             type="button"
             onClick={() => setDrawerOpen(true)}
             aria-label="Open menu"
             aria-expanded={drawerOpen}
-            className="-ml-2 flex h-11 w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5 lg:hidden"
+            className="-ml-2 flex h-11 w-11 items-center justify-center rounded-xl text-ink-soft hover:bg-ink/[0.06] hover:text-ink lg:hidden"
           >
             <Menu className="h-5 w-5" aria-hidden />
           </button>
@@ -676,17 +685,17 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
             <Link
               href={backHref === "/dashboard" && isOwner ? "/dashboard?view=workspace" : backHref}
               aria-label="Back"
-              className="-ml-1 flex h-11 items-center rounded-lg px-2 text-ink-soft hover:bg-ink/5"
+              className="-ml-1 flex h-11 items-center rounded-xl px-2 text-ink-soft hover:bg-ink/[0.06] hover:text-ink"
             >
               ←
             </Link>
           ) : (
             <Link href={adminHomeHref} className="flex items-center gap-2 font-semibold text-ink lg:hidden">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-[13px] font-bold text-on-accent">S</span>
               <span className="hidden sm:inline">Sophira</span>
             </Link>
           )}
-          <h1 className="flex-1 truncate text-[17px] font-semibold text-ink">{title}</h1>
+          <h1 className="flex-1 truncate text-[16px] font-semibold tracking-[-0.01em] text-ink sm:text-[17px]">{title}</h1>
           <ScopeChip />
           <ThemeToggle />
           <span className="mr-1 hidden sm:inline-flex"><SyncStatus /></span>
@@ -696,12 +705,12 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
             disabled={signingOut}
             aria-label="Sign out"
             title="Sign out"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5 lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-ink-soft hover:bg-ink/[0.06] hover:text-ink lg:hidden"
           >
             <LogOut className="h-5 w-5" />
           </button>
         </div>
-        <nav className="mx-auto hidden max-w-6xl gap-1 overflow-x-auto px-4 pb-2 md:flex lg:hidden" aria-label="Main">
+        <nav className="mx-auto hidden max-w-content gap-1 overflow-x-auto px-4 pb-2 sm:px-6 md:flex lg:hidden" aria-label="Main">
           {variant === "owner" ? (
             // 2026-11-12: this branch rendered the UNFILTERED registry (every group's items,
             // with no role filter), so the tablet row showed a Co-Owner every Owner-only page.
@@ -711,7 +720,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
                 key={href}
                 href={href}
                 aria-current={!href.includes("#") && pathname === href.split("#")[0].split("?")[0] ? "page" : undefined}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
+                className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[13.5px] font-medium text-ink-soft hover:bg-ink/[0.06] hover:text-ink aria-[current=page]:bg-accent-soft aria-[current=page]:text-accent"
               >
                 <Icon className="h-4 w-4" aria-hidden />
                 {label}
@@ -724,8 +733,8 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
                   href={dashboardLink.href}
                   aria-current={pathname === dashboardLink.href ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
-                    pathname === dashboardLink.href ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5"
+                    "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[13.5px] font-medium",
+                    pathname === dashboardLink.href ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent-soft/60"
                   )}
                 >
                   <ShieldCheck className="h-4 w-4" aria-hidden />
@@ -738,10 +747,10 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
               href={navHref === "/dashboard" ? workspaceHomeHref : navHref}
               aria-current={pathname === navHref || pathname.startsWith(navHref + "/") ? "page" : undefined}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
+                "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[13.5px] font-medium",
                 pathname === navHref || pathname.startsWith(navHref + "/")
                   ? "bg-accent-soft text-accent"
-                  : "text-ink-soft hover:bg-ink/5"
+                  : "text-ink-soft hover:bg-ink/[0.06] hover:text-ink"
               )}
             >
               <Icon className="h-4 w-4" aria-hidden />
@@ -758,7 +767,9 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
         </nav>
       </header>
 
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 md:pb-12 lg:pl-60">{children}</main>
+      <main id="main-content" tabIndex={-1} className="w-full flex-1 pb-28 md:pb-12 lg:pl-64">
+        <div className="mx-auto w-full max-w-content px-4 pt-6 sm:px-6 sm:pt-7">{children}</div>
+      </main>
 
       {/* MOBILE SLIDE-OUT DRAWER: the full navigation hierarchy on phones.
           Escape, backdrop tap, and navigation close it; focus is managed. */}
@@ -776,31 +787,36 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
             tabIndex={-1}
             onTouchStart={onDrawerTouchStart}
             onTouchEnd={onDrawerTouchEnd}
-            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-line bg-paper pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-xl outline-none"
+            className="absolute inset-y-0 left-0 flex w-80 max-w-[86vw] flex-col overflow-y-auto border-r border-line bg-sidebar pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-e3 outline-none"
           >
-            <div className="flex items-center justify-between px-5 py-4">
-              <span className="flex items-center gap-2 font-semibold text-ink">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
-                Sophira
+            <div className="flex items-center justify-between px-5 pb-3 pt-5">
+              <span className="flex items-center gap-3 font-semibold text-ink">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-[15px] font-bold text-on-accent">S</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[15px] leading-none tracking-[-0.015em]">Sophira</span>
+                  <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-soft">Academic AI</span>
+                </span>
               </span>
               <button
                 type="button"
                 onClick={closeDrawer}
                 aria-label="Close menu"
-                className="flex h-11 w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5"
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-ink-soft hover:bg-ink/[0.06] hover:text-ink"
               >
                 <X className="h-5 w-5" aria-hidden />
               </button>
             </div>
-            <nav className="flex-1 space-y-0.5 px-3 pb-4" aria-label="Sections">
+            <nav className="flex-1 px-3 pb-4" aria-label="Sections">
               {variant === "owner" ? (
                 role === null ? (
                   <p className="px-3 py-2 text-sm text-ink-soft" role="status">Loading your menu…</p>
                 ) : (
                   visibleOwnerGroups.map((g) => (
-                    <div key={g.heading} className="mb-3">
-                      <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
-                      {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
+                    <div key={g.heading}>
+                      <p className="nav-group-label">{g.heading}</p>
+                      <div className="space-y-0.5">
+                        {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
+                      </div>
                     </div>
                   ))
                 )
@@ -811,9 +827,9 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
                       href={dashboardLink.href}
                       onClick={closeDrawer}
                       aria-current={pathname === dashboardLink.href ? "page" : undefined}
-                      className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/5"
+                      className="nav-item text-accent hover:bg-accent-soft/60 hover:text-accent"
                     >
-                      <ShieldCheck className="h-4 w-4" aria-hidden /> {dashboardLink.label}
+                      <ShieldCheck className="h-[17px] w-[17px] shrink-0" aria-hidden /> {dashboardLink.label}
                     </Link>
                   )}
                   {navLink(workspaceHomeHref, "Home", Home)}
@@ -823,21 +839,26 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
               )}
               {onlineChip(true)}
             </nav>
-            <div className="border-t border-line p-3">
+            <div className="border-t border-line px-3 py-3">
               {rankLabel && (
-                <p className="mb-2 flex items-center gap-2 px-2 text-xs text-ink-soft" data-rank={role}>
-                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Signed in as <span className="font-semibold text-ink">{rankLabel}</span>
+                <p
+                  className="mb-2 flex items-center gap-2 rounded-xl bg-card/80 px-3 py-2 text-xs text-ink-soft ring-1 ring-inset ring-line"
+                  data-rank={role}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
+                  <span className="min-w-0">
+                    Signed in as <span className="font-semibold text-ink">{rankLabel}</span>
+                  </span>
                 </p>
               )}
-              <div className="mb-2 px-2"><SyncStatus /></div>
+              <div className="mb-1 px-1"><SyncStatus /></div>
               <button
                 onClick={signOut}
                 disabled={signingOut}
                 aria-label="Sign out"
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
+                className="nav-item w-full disabled:opacity-50"
               >
-                <LogOut className="h-4 w-4" /> Sign out
+                <LogOut className="h-[17px] w-[17px] shrink-0" /> Sign out
               </button>
             </div>
           </div>
@@ -846,18 +867,20 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
 
       {/* MOBILE BOTTOM BAR: quick top-level destinations (drawer has the full hierarchy). */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-topbar/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
         aria-label="Main"
       >
-        <div className="flex h-16 items-stretch gap-1 overflow-x-auto px-2" style={{ scrollbarWidth: "none" }}>
+        <div className="flex h-16 items-stretch gap-0.5 overflow-x-auto px-1.5" style={{ scrollbarWidth: "none" }}>
           {workspaceLinks.filter((n) => n.href !== "/settings").map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href === "/dashboard" ? workspaceHomeHref : href}
               aria-current={pathname === href || pathname.startsWith(href + "/") ? "page" : undefined}
               className={cn(
-                "flex min-w-[64px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-medium",
-                pathname === href || pathname.startsWith(href + "/") ? "text-accent" : "text-ink-soft"
+                "flex min-w-[62px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-2 text-[11px] font-medium transition-colors",
+                pathname === href || pathname.startsWith(href + "/")
+                  ? "bg-accent-soft font-semibold text-accent"
+                  : "text-ink-soft active:bg-ink/[0.06]"
               )}
             >
               <Icon className="h-5 w-5" aria-hidden />

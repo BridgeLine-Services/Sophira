@@ -96,7 +96,7 @@ export default function DownloadsPage() {
     <div role="main" className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Download Sophira</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-ink-soft">
           One app, every platform. The web/PWA is always available; native packages appear here the moment a release
           actually contains them.
         </p>
@@ -121,7 +121,7 @@ export default function DownloadsPage() {
             <li><Link href="/install" className="underline">Install on Android</Link></li>
             <li><Link href="/install" className="underline">Install on desktop</Link></li>
           </ul>
-          <p className="text-muted-foreground">Or simply keep using Sophira in your browser — nothing is held back.</p>
+          <p className="text-ink-soft">Or simply keep using Sophira in your browser — nothing is held back.</p>
         </CardContent>
       </Card>
 
@@ -133,14 +133,14 @@ export default function DownloadsPage() {
             {version && date && <Badge tone="accent">v{version} · {date}</Badge>}
             <Badge tone="warn">TEST BUILD</Badge>
           </CardTitle>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-ink-soft">
             Test Build: these artifacts come from the test/private channel and may not be production-signed.
             Unsigned artifacts are labeled honestly and their install requirements are stated.
           </p>
         </CardHeader>
         <CardContent>
           {state === "loading" && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-ink-soft">
               <Spinner className="h-4 w-4" /> Checking the current release…
             </div>
           )}
@@ -148,7 +148,7 @@ export default function DownloadsPage() {
           {state === "none" && (
             <div className="rounded-lg bg-muted/40 p-4 text-sm">
               <p className="font-medium">No native release has been published yet.</p>
-              <p className="mt-1 text-muted-foreground">
+              <p className="mt-1 text-ink-soft">
                 Native packages (.apk, .ipa, Windows/macOS/Linux installers) appear here automatically once the release
                 pipeline publishes a GitHub release. Until then, the PWA above is the fully supported way to use
                 Sophira on every device — nothing is missing from it.
@@ -159,7 +159,7 @@ export default function DownloadsPage() {
           {state === "ready" && appAssets.length === 0 && (
             <div className="rounded-lg bg-muted/40 p-4 text-sm">
               <p className="font-medium">Release v{version} has no native packages attached.</p>
-              <p className="mt-1 text-muted-foreground">
+              <p className="mt-1 text-ink-soft">
                 The release exists, but no native artifact was attached to it. The PWA above is the supported install.
               </p>
             </div>
@@ -176,11 +176,11 @@ export default function DownloadsPage() {
                   return (
                     <div key={pl.key} className="rounded-lg bg-muted/40 p-3 text-sm">
                       <p className="font-medium">iPhone / iPad — no installable .ipa in this release</p>
-                      <p className="mt-1 text-muted-foreground">
+                      <p className="mt-1 text-ink-soft">
                         Apple devices cannot install an unsigned app, and iOS has no &quot;install unknown apps&quot;
                         switch — that is Apple&apos;s rule, not a missing download. The supported paths are:
                       </p>
-                      <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                      <ul className="mt-1 list-disc pl-5 text-ink-soft">
                         <li>PWA now: open Sophira in Safari, Share → Add to Home Screen (no Apple signing needed).</li>
                         <li>Development/ad-hoc: configure the Apple signing secrets in the repository, then the
                           release pipeline exports a real signed .ipa installable on registered devices via Xcode
@@ -216,7 +216,7 @@ export default function DownloadsPage() {
                                     <Badge tone="warn" className="ml-2">unsigned</Badge>
                                   )}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-ink-soft">
                                   v{version} · {date} · {fmtSize(a.size)}
                                 </p>
                               </div>
@@ -228,11 +228,11 @@ export default function DownloadsPage() {
                               </a>
                             </div>
                             {hash ? (
-                              <p className="break-all font-mono text-[11px] text-muted-foreground">
+                              <p className="break-all font-mono text-[11px] text-ink-soft">
                                 SHA-256: {hash}
                               </p>
                             ) : (
-                              <p className="text-[11px] text-muted-foreground">
+                              <p className="text-[11px] text-ink-soft">
                                 SHA-256:{" "}
                                 {checksumAsset ? (
                                   <a href={checksumAsset.browser_download_url} className="underline">
@@ -243,7 +243,7 @@ export default function DownloadsPage() {
                                 )}
                               </p>
                             )}
-                            <p className="text-xs text-muted-foreground">{pl.note}</p>
+                            <p className="text-xs text-ink-soft">{pl.note}</p>
                             {unsigned && /\.apk$/i.test(a.name) && (
                               <p className="text-xs text-amber-700">
                                 Installation requirements: this APK has no release signature. Install it with{" "}
@@ -261,7 +261,7 @@ export default function DownloadsPage() {
                 );
               })}
 
-              <p className="border-t pt-4 text-xs text-muted-foreground">
+              <p className="border-t pt-4 text-xs text-ink-soft">
                 Verify a download: <code className="rounded bg-muted px-1 py-0.5">sha256sum Sophira-release.apk</code>{" "}
                 and compare with the hash above or in the release&apos;s checksum files. Full release notes:{" "}
                 <a href={release!.html_url} className="underline" target="_blank" rel="noreferrer">{release!.html_url}</a>

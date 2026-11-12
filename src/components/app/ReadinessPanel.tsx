@@ -96,7 +96,7 @@ export function ReadinessPanel({ assignmentId }: { assignmentId: string }) {
             </p>
 
             <div className="rounded-lg border p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Submission readiness</p>
+              <p className="meta-strong">Submission readiness</p>
               <p className={`mt-1 text-lg font-semibold ${data.submission_ready ? "text-success" : "text-danger"}`}>
                 {data.submission_ready ? "PASS" : "FAIL"}
               </p>
