@@ -30,17 +30,25 @@ const SHARED = "src/lib/navigation/owner-nav.ts";
 const GRID = "src/components/owner/OwnerAreaGrid.tsx";
 const SHELL = "src/components/app/AppShell.tsx";
 
-/** Every destination the owner navigation shipped with, in registry order. */
+/**
+ * Every destination the OWNER's administrative navigation offers, in registry order.
+ *
+ * 2026-11-12: /tester and /co-owner left this list on purpose. Each rank now has its OWN
+ * dashboard entry (resolved in src/lib/navigation/role-home.ts and asserted in
+ * tests/role-navigation.ts), so the Owner is no longer offered two other ranks' workspaces
+ * inside their own Overview group. /owner/qa joined, because a Co-Owner is authorised to
+ * triage tester reports and had no way in; network analytics left, because that page is
+ * Owner-only and a link that bounces a Co-Owner back is worse than no link.
+ */
 const EXPECTED_HREFS = [
   "/owner",
   "/owner/health",
   "/owner/database",
-  "/tester",
-  "/co-owner",
   "/owner/announcements",
   "/owner/members",
   "/owner/invitations",
   "/owner/requests",
+  "/owner/qa",
   "/owner/analytics",
   "/owner/activity",
   "/owner/status",
@@ -155,8 +163,10 @@ export function runOwnerNavBoundaryTests(
     });
     assert(iconMarkup.every((m) => m.includes("<svg")),
       "owner-nav: every icon is a real renderable component — the server grid can draw all of them");
-    assert(allItems.map((i) => i.href).join("|") === EXPECTED_HREFS.join("|"),
-      "owner-nav: all 20 destinations survive extraction, in the original order");
+    assert(hrefsFor("owner").join("|") === EXPECTED_HREFS.join("|"),
+      "owner-nav: all 19 Owner destinations survive, in registry order");
+    assert(allItems.length === EXPECTED_HREFS.length + 1 && allItems.some((i) => i.href === "/co-owner"),
+      "owner-nav: the registry holds exactly ONE entry the Owner does not see — the Co-Owner's own dashboard");
     assert(allItems.filter((i) => i.href.includes("view=workspace")).length === 1,
       "owner-nav: My Workspace appears exactly once");
     assert(new Set(allItems.map((i) => i.href)).size === allItems.length,
@@ -185,8 +195,8 @@ export function runOwnerNavBoundaryTests(
       "owner-nav: the shared module holds no client-only dependency (hooks, browser globals, Supabase client)");
     assert(!/export\s+const\s+OWNER_NAV_GROUPS/.test(shell) && !/heading:\s*"/.test(shell),
       "owner-nav: AppShell no longer defines the registry — one copy, not two");
-    assert(/from "@\/lib\/navigation\/owner-nav"/.test(shell) && shell.includes("OWNER_NAV_GROUPS"),
-      "owner-nav: AppShell imports the registry from the shared module");
+    assert(/from "@\/lib\/navigation\/owner-nav"/.test(shell) && shell.includes("ownerNavGroupsFor("),
+      "owner-nav: AppShell imports the role filter from the shared module (it no longer holds the data)");
     assert(/from "@\/lib\/navigation\/owner-nav"/.test(grid),
       "owner-nav: OwnerAreaGrid imports from the shared module");
     assert(!/from "@\/components\/app\/AppShell"/.test(grid) && !grid.includes("OWNER_NAV_GROUPS"),
@@ -213,22 +223,27 @@ export function runOwnerNavBoundaryTests(
     const coOwner = hrefsFor("co_owner");
     assert(coOwner.length > 0 && coOwner.every((h) => !["/owner/security", "/owner/ai-providers", "/owner/integrations",
       "/owner/activity", "/owner/status", "/owner/backup", "/owner/features", "/owner/ai-operations",
-      "/owner/release-readiness"].includes(h)),
-      "owner-nav: a Co-Owner never sees an Owner-only area (security, billing, providers, integrations, monitoring)");
+      "/owner/release-readiness", "/owner/analytics", "/owner", "/tester"].includes(h)),
+      "owner-nav: a Co-Owner never sees an Owner-only area (security, billing, providers, integrations, monitoring, analytics) nor the Owner's own dashboard");
     assert(coOwner.includes("/owner/members") && coOwner.includes("/owner/invitations") &&
       coOwner.includes("/owner/requests") && coOwner.includes("/owner/announcements") &&
-      coOwner.includes("/co-owner"),
-      "owner-nav: a Co-Owner keeps the member-facing destinations");
+      coOwner.includes("/owner/qa") && coOwner.includes("/co-owner"),
+      "owner-nav: a Co-Owner keeps the member-facing destinations, QA triage and their own dashboard");
     const tester = hrefsFor("tester");
-    assert(tester.join("|") === "/tester",
-      "owner-nav: a Tester gets the testing workspace and nothing else in the owner navigation");
+    assert(!tester.some((h) => h.startsWith("/owner")),
+      "owner-nav: a Tester is offered no /owner destination at all");
     const user = hrefsFor("user");
     assert(user.length === 0,
       "owner-nav: an ordinary member gains no entry in the owner navigation at all");
     // The Owner-only default must stay the default: an unmarked item is Owner-only.
-    const unmarked = allItems.filter((i) => !i.minimum).map((i) => i.href);
+    // An entry with neither a minimum nor an exact audience is Owner-only. Entries that
+    // name an exact audience (the Co-Owner's own dashboard, My Workspace) are not "inherited"
+    // by rank at all - that is the distinction this pins.
+    const unmarked = allItems.filter((i) => !i.minimum && !i.roles).map((i) => i.href);
     assert(unmarked.length > 0 && unmarked.every((h) => !coOwner.includes(h)),
-      "owner-nav: an item with no minimum role is Owner-only, never inherited");
+      "owner-nav: an item with no minimum role and no exact audience is Owner-only, never inherited");
+    assert(allItems.filter((i) => i.roles).every((i) => !i.minimum),
+      "owner-nav: an exact audience and a minimum are never mixed on one entry");
     assert(ownerNavGroupsFor("user").every((g) => g.items.length > 0),
       "owner-nav: no empty group is ever handed to a renderer");
     assert(ownerNavGroupsFor("nonsense").flatMap((g) => g.items.map((i) => i.href)).length === 0,
@@ -325,13 +340,16 @@ export function runOwnerNavBoundaryTests(
         const ownerHtml = draw("owner");
         const missing = EXPECTED_HREFS.filter((href) => !ownerHtml.includes(`href="${href}"`));
         assert(missing.length === 0,
-          "owner-nav: the Owner's grid renders all 20 destinations on the server" +
+          "owner-nav: the Owner's grid renders all 19 destinations on the server" +
             (missing.length ? " — missing " + missing.slice(0, 3).join(", ") : ""));
         assert(EXPECTED_HEADINGS.every((h) => ownerHtml.includes(h)),
           "owner-nav: every group heading renders, in the grid, from the shared registry");
         const coHtml = draw("co_owner");
-        assert(coHtml.includes('href="/owner/members"') && coHtml.includes('href="/co-owner"'),
-          "owner-nav: a Co-Owner's grid renders the member-facing areas");
+        assert(coHtml.includes('href="/owner/members"') && coHtml.includes('href="/co-owner"') &&
+          coHtml.includes('href="/owner/qa"'),
+          "owner-nav: a Co-Owner's grid renders the member-facing areas and QA triage");
+        assert(!coHtml.includes('href="/owner"') && !coHtml.includes('href="/tester"'),
+          "owner-nav: a Co-Owner's grid never renders the Owner's or a Tester's dashboard");
         assert(!coHtml.includes('href="/owner/security"') && !coHtml.includes('href="/owner/integrations"'),
           "owner-nav: a Co-Owner's grid never renders an Owner-only area");
         const userHtml = draw("user");

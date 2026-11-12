@@ -91,9 +91,18 @@ export function runSelfHealingProvisionTests(assert: (c: boolean, n: string) => 
     "nav: header and content offset for the rail — no overlap or hidden actions");
   assert(appShell.includes("md:hidden") && appShell.includes("pb-[env(safe-area-inset-bottom)]"),
     "nav: the mobile bottom bar with safe-area insets is preserved");
-  const navRenders = (appShell.split("NAV.map").length - 1) + (appShell.split("NAV.filter").length - 1);
-  assert(navRenders >= 3,
+  // 2026-11-12: one builder (workspaceNavFor) feeds four renderers, and the filtered
+  // section list feeds the rail and the drawer, so no pattern has its own copy of the menu.
+  const navRenders =
+    (appShell.split("workspaceLinks.map").length - 1) +
+    (appShell.split("workspaceLinks.filter").length - 1) +
+    (appShell.split("sectionLinks.map").length - 1);
+  assert(navRenders >= 4,
     "nav: the single NAV source renders in every navigation pattern (sidebar, tablet top row, mobile drawer/bar) — no section is unreachable on any device");
+  assert(appShell.split("workspaceNavFor(role)").length - 1 === 1,
+    "nav: the menu is built ONCE from the shared builder and reused by every renderer");
+  assert(!/const NAV = \[/.test(appShell),
+    "nav: the shell holds no second copy of the menu");
   assert(appShell.includes("CourseTree") && appShell.includes("subjectToolUrl"),
     "nav: the subject tool hierarchy (math, essay, writing, and all subject tools) renders from the shared engine registry — reachable on every device");
 

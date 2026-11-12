@@ -4,14 +4,12 @@ import { SignOutButton } from "./SignOutButton";
 import { usePathname, useRouter } from "next/navigation";
 import { SyncStatus } from "@/components/app/SyncStatus";
 import { purgeOfflineOnLogout } from "@/lib/offline/client";
-import { Bell, CloudOff } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 // 2026-11-12: the owner-navigation icons moved to src/lib/navigation/owner-nav.ts with the
 // registry. Only the workspace/shell icons this component draws itself remain imported here.
-import { BookOpen, Brain, ChevronDown, Home, LogOut, Menu, NotebookPen, Settings, ShieldCheck, Mic, Wifi, X } from "lucide-react";
-import { Keyboard } from "lucide-react";
+import { BookOpen, ChevronDown, Home, LogOut, Menu, ShieldCheck, Wifi, X } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
@@ -19,24 +17,22 @@ import { usePresenceReporter } from "@/lib/presence/use-presence-reporter";
 import { DEFAULT_THRESHOLDS } from "@/lib/presence/thresholds";
 import { useNotificationBell } from "@/lib/notifications/use-notification-bell";
 import { usePendingRequests } from "@/lib/notifications/use-pending-requests";
-import { OWNER_NAV_GROUPS, ownerNavGroupsFor, type NavRole } from "@/lib/navigation/owner-nav";
+import { ownerNavGroupsFor, type NavRole } from "@/lib/navigation/owner-nav";
+// 2026-11-12: the rank -> dashboard answer and the workspace menu now live in shared,
+// server-safe modules. The shell no longer decides either one for itself, and every
+// navigation variant reads the same list.
+import { adminHomeFor, dashboardForRole, roleLabelFor } from "@/lib/navigation/role-home";
+import { workspaceNavFor } from "@/lib/navigation/workspace-nav";
+import { normalizeRole, type Role } from "@/lib/roles";
 
-// Active subject/course scope indicator (course-aware engines round):
-// shows the real subject or course this engine is working within.
-const NAV = [
-  { href: "/writing/typing", label: "Typing Calibration", icon: Keyboard },
-  { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/courses", label: "Courses", icon: BookOpen },
-  { href: "/notebooks", label: "Notebooks", icon: NotebookPen },
-  // Lecture studio: the only screen that drives the media pipeline
-  // (upload -> transcribe -> study notes -> slides). It was headless until
-  // Phase 5, so it is reachable from the main workspace navigation.
-  { href: "/lectures", label: "Lectures", icon: Mic },
-  { href: "/learning", label: "Learning / Memory", icon: Brain },
-  { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/offline", label: "Offline", icon: CloudOff },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
+/**
+ * The academic workspace navigation lives in src/lib/navigation/workspace-nav.ts (2026-11-12).
+ *
+ * It used to be a `const NAV` here, and each of the four render paths (desktop rail,
+ * tablet row, phone drawer, phone bottom bar) was hand-written beside it. That is how the
+ * tablet row ended up ignoring the role filter, why Home was second in the list, and why
+ * a Tester had no dashboard entry anywhere. One list, one role rule, four renderers.
+ */
 
 /**
  * The owner navigation registry lives in src/lib/navigation/owner-nav.ts.
@@ -232,21 +228,43 @@ function CourseTree({ userId, pathname, onNavigate }: {
   );
 }
 
-export function AppShell({ title, backHref, actions, variant = "workspace", children }: {
+export function AppShell({ title, backHref, actions, variant = "workspace", role: initialRole, children }: {
   title: string;
   backHref?: string;
   actions?: ReactNode;
   variant?: "workspace" | "owner";
+  /**
+   * The SERVER-VERIFIED rank of the signed-in member, when the page already read it.
+   * Passing it means the correct menu is drawn on the first paint, with no round trip and
+   * no moment where the wrong dashboard could appear. When a page cannot supply it, the
+   * shell reads its OWN profile row and nothing else. Never pass a browser-supplied value.
+   */
+  role?: Role | string | null;
   children: ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const [signingOut, setSigningOut] = useState(false);
-  const [role, setRole] = useState<NavRole>("user");
+  /**
+   * 2026-11-12: `null` means "not known yet". Nothing rank-specific is drawn until the real
+   * role arrives, so the sidebar can never show an Owner Dashboard to a member - or another
+   * rank's dashboard to a Co-Owner - while the profile is still loading. Unknown or
+   * unreadable fails closed: no administrative entry at all.
+   */
+  const [role, setRole] = useState<NavRole | null>(
+    initialRole === undefined ? null : normalizeRole(initialRole),
+  );
+  /** True once the rank is settled, so a later failed re-read keeps the known role. */
+  const roleSettled = useRef(initialRole !== undefined);
+  const [roleCheck, setRoleCheck] = useState(0);
   const isOwner = role === "owner";
-  /** A Co-Owner runs the member directory but not the settings. */
-  const isCoOwner = role === "co_owner";
+  /**
+   * 2026-11-12: the side panel now NAMES the rank. It used to identify an account only by
+   * which pages happened to appear, so a Tester and a Co-Owner looked identical. Null while
+   * the rank is unknown - the panel claims nothing rather than guessing one.
+   */
+  const rankLabel = roleLabelFor(role);
   const [userId, setUserId] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -255,17 +273,62 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
   /** The owner's live presence cadence. Null until it has been read, so nothing is guessed. */
   const [presenceWindow, setPresenceWindow] = useState<{ intervalMs: number; activeWindowMs: number } | null>(null);
 
+  /**
+   * WHO AM I (rewritten 2026-11-12).
+   *
+   * Two things were wrong here. `select(...).limit(1)` asked for "one profile row" without
+   * asking WHICH row: under a directory policy that lets staff read other people it could
+   * return a colleague, so the sidebar could draw someone else's rank. And a failed read
+   * left the role at its initial guess, which is exactly the value a role check must never
+   * invent.
+   *
+   * It now reads the signed-in identity first and asks for that one row by id. The first
+   * failed read leaves the rank UNKNOWN (no administrative navigation); a later failed
+   * re-read keeps the last known rank instead of collapsing the menu. Re-reading on focus
+   * means a rank change made by another staff member appears without a hard refresh.
+   */
   useEffect(() => {
     let alive = true;
-    supabase.from("profiles").select("id, role").limit(1).maybeSingle().then(({ data }) => {
-      if (alive && data) {
-        const value = String(data.role ?? "user");
-        setRole(value === "owner" || value === "co_owner" || value === "tester" ? (value as NavRole) : "user");
-        setUserId(data.id as string);
+    (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!alive) return;
+      const uid = auth.user?.id ?? null;
+      setUserId(uid);
+
+      // The page already told us, from the server. That is authoritative: no guess, no flash.
+      if (initialRole !== undefined) {
+        setRole(normalizeRole(initialRole));
+        roleSettled.current = true;
+        return;
       }
-    });
+      if (!uid) {
+        if (!roleSettled.current) setRole(null);
+        roleSettled.current = true;
+        return;
+      }
+      const { data, error } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+      if (!alive) return;
+      if (error || !data) {
+        if (!roleSettled.current) setRole(null); // fail closed, never "owner by default"
+      } else {
+        setRole(normalizeRole(data.role));
+      }
+      roleSettled.current = true;
+    })();
     return () => { alive = false; };
-  }, [supabase]);
+  }, [supabase, initialRole, roleCheck]);
+
+  // A rank change made elsewhere (promotion, demotion, suspension) shows up as soon as the
+  // member comes back to this tab, without a sign-out.
+  useEffect(() => {
+    const bump = () => setRoleCheck((n) => n + 1);
+    window.addEventListener("focus", bump);
+    window.addEventListener("online", bump);
+    return () => {
+      window.removeEventListener("focus", bump);
+      window.removeEventListener("online", bump);
+    };
+  }, []);
 
   // Real connectivity indicator (links to /online for live service status).
   useEffect(() => {
@@ -463,15 +526,29 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
   const workspaceHomeHref = isOwner ? "/dashboard?view=workspace" : "/dashboard";
 
   /**
-   * 2026-11-12: one place that decides which Owner-Dashboard sections this person may see.
-   * A Co-Owner gets the member directory and nothing else; everything unmarked stays
-   * Owner-only. The pages themselves authorise again on the server, so hiding a link is a
-   * convenience, never the boundary.
+   * 2026-11-12: one place that decides which administrative sections this person may see.
+   * A Co-Owner gets their own dashboard, the member-facing areas and QA triage; everything
+   * unmarked stays Owner-only. The pages themselves authorise again on the server, so
+   * hiding a link is a convenience, never the boundary.
    */
   const visibleOwnerGroups = ownerNavGroupsFor(role);
 
-  /** Where "home" is for whoever is signed in. A Co-Owner cannot open /owner. */
-  const adminHomeHref = isOwner ? "/owner" : isCoOwner ? "/owner/members" : "/dashboard";
+  /**
+   * The workspace menu for this rank: its OWN dashboard first (if it has one), then Home,
+   * then the academic sections in their existing order.
+   */
+  const workspaceLinks = workspaceNavFor(role);
+  const dashboardLink = dashboardForRole(role);
+  const sectionLinks = workspaceLinks.filter(
+    (n) => n.kind === "section" && n.href !== "/courses" && n.href !== "/dashboard",
+  );
+
+  /**
+   * Where "home" is for whoever is signed in: the rank's own dashboard, or the personal
+   * workspace for a member. Resolved in src/lib/navigation/role-home.ts, so the logo, the
+   * back button and every staff page agree about it.
+   */
+  const adminHomeHref = adminHomeFor(role);
 
   /** The unread badge is drawn only for a count that was actually read, never for zero. */
   const unreadBadge = unreadKnown && unread > 0 ? unread : 0;
@@ -523,40 +600,52 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-line bg-paper/95 backdrop-blur lg:flex"
         aria-label="Primary"
       >
-        <Link href={variant === "owner" ? adminHomeHref : adminHomeHref === "/dashboard" ? "/dashboard" : adminHomeHref} className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
+        <Link href={adminHomeHref} className="flex items-center gap-2 px-5 py-5 font-semibold text-ink">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
           Sophira
         </Link>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label={variant === "owner" ? "Owner sections" : "Sections"}>
           {variant === "owner" ? (
-            visibleOwnerGroups.map((g) => (
-              <div key={g.heading} className="mb-3">
-                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
-                {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
-                {g.heading === "Personal" && (<SignOutButton nav />)}
-              </div>
-            ))
+            role === null ? (
+              // The rank is not known yet: say so plainly instead of drawing a menu that
+              // might belong to someone else.
+              <p className="px-3 py-2 text-sm text-ink-soft" role="status">Loading your menu…</p>
+            ) : (
+              visibleOwnerGroups.map((g) => (
+                <div key={g.heading} className="mb-3">
+                  <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
+                  {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
+                  {g.heading === "Personal" && (<SignOutButton nav />)}
+                </div>
+              ))
+            )
           ) : (
             <>
-              {(isOwner || isCoOwner) && (
+              {dashboardLink && (
                 <Link
-                  href={adminHomeHref}
-                  aria-current={pathname === adminHomeHref ? "page" : undefined}
+                  href={dashboardLink.href}
+                  aria-current={pathname === dashboardLink.href ? "page" : undefined}
                   className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium",
-                    pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5")}
+                    pathname === dashboardLink.href ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5")}
                 >
                   <ShieldCheck className="h-4 w-4" aria-hidden />
-                  Owner Dashboard
+                  {dashboardLink.label}
                 </Link>
               )}
               {navLink(workspaceHomeHref, "Home", Home)}
               <CourseTree userId={userId} pathname={pathname} />
-              {NAV.filter((n) => n.href !== "/courses" && n.href !== "/dashboard").map((n) => navLink(n.href, n.label, n.icon))}
+              {sectionLinks.map((n) => navLink(n.href, n.label, n.icon))}
             </>
           )}
           {onlineChip(false)}
         </nav>
         <div className="border-t border-line p-3">
+          {rankLabel && (
+            <p className="mb-2 flex items-center gap-2 px-2 text-xs text-ink-soft" data-rank={role}>
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Signed in as <span className="font-semibold text-ink">{rankLabel}</span>
+            </p>
+          )}
           <div className="mb-2 px-2"><SyncStatus /></div>
           <button
             onClick={signOut}
@@ -592,7 +681,7 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
               ←
             </Link>
           ) : (
-            <Link href={variant === "owner" ? adminHomeHref : adminHomeHref === "/dashboard" ? "/dashboard" : adminHomeHref} className="flex items-center gap-2 font-semibold text-ink lg:hidden">
+            <Link href={adminHomeHref} className="flex items-center gap-2 font-semibold text-ink lg:hidden">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent">S</span>
               <span className="hidden sm:inline">Sophira</span>
             </Link>
@@ -614,7 +703,10 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         </div>
         <nav className="mx-auto hidden max-w-6xl gap-1 overflow-x-auto px-4 pb-2 md:flex lg:hidden" aria-label="Main">
           {variant === "owner" ? (
-            OWNER_NAV_GROUPS.flatMap((g) => g.items).map(({ href, label, icon: Icon }) => (
+            // 2026-11-12: this branch rendered the UNFILTERED registry (every group's items,
+            // with no role filter), so the tablet row showed a Co-Owner every Owner-only page.
+            // It now uses the same role-filtered groups as the rail and the drawer.
+            role === null ? null : visibleOwnerGroups.flatMap((g) => g.items).map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -627,20 +719,20 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             ))
           ) : (
             <>
-              {(isOwner || isCoOwner) && (
+              {dashboardLink && (
                 <Link
-                  href={adminHomeHref}
-                  aria-current={pathname === adminHomeHref ? "page" : undefined}
+                  href={dashboardLink.href}
+                  aria-current={pathname === dashboardLink.href ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
-                    pathname === "/owner" ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5"
+                    pathname === dashboardLink.href ? "bg-accent-soft text-accent" : "text-accent hover:bg-accent/5"
                   )}
                 >
-                  <ShieldCheck className="h-4 w-4" />
-                  Owner
+                  <ShieldCheck className="h-4 w-4" aria-hidden />
+                  {dashboardLink.label}
                 </Link>
               )}
-              {NAV.map(({ href: navHref, label, icon: Icon }) => (
+              {workspaceLinks.map(({ href: navHref, label, icon: Icon }) => (
             <Link
               key={navHref}
               href={navHref === "/dashboard" ? workspaceHomeHref : navHref}
@@ -702,27 +794,42 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
             </div>
             <nav className="flex-1 space-y-0.5 px-3 pb-4" aria-label="Sections">
               {variant === "owner" ? (
-                visibleOwnerGroups.map((g) => (
-              <div key={g.heading} className="mb-3">
-                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
-                {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
-              </div>
-            ))
+                role === null ? (
+                  <p className="px-3 py-2 text-sm text-ink-soft" role="status">Loading your menu…</p>
+                ) : (
+                  visibleOwnerGroups.map((g) => (
+                    <div key={g.heading} className="mb-3">
+                      <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{g.heading}</p>
+                      {g.items.map(({ href, label, icon: Icon }) => ownerNavLink(href, label, Icon))}
+                    </div>
+                  ))
+                )
               ) : (
                 <>
-                  {(isOwner || isCoOwner) && (
-                    <Link href={adminHomeHref} onClick={closeDrawer} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/5">
-                      <ShieldCheck className="h-4 w-4" aria-hidden /> {isOwner ? "Owner Dashboard" : "Members"}
+                  {dashboardLink && (
+                    <Link
+                      href={dashboardLink.href}
+                      onClick={closeDrawer}
+                      aria-current={pathname === dashboardLink.href ? "page" : undefined}
+                      className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/5"
+                    >
+                      <ShieldCheck className="h-4 w-4" aria-hidden /> {dashboardLink.label}
                     </Link>
                   )}
                   {navLink(workspaceHomeHref, "Home", Home)}
                   <CourseTree userId={userId} pathname={pathname} onNavigate={closeDrawer} />
-                  {NAV.filter((n) => n.href !== "/courses" && n.href !== "/dashboard").map((n) => navLink(n.href, n.label, n.icon))}
+                  {sectionLinks.map((n) => navLink(n.href, n.label, n.icon))}
                 </>
               )}
               {onlineChip(true)}
             </nav>
             <div className="border-t border-line p-3">
+              {rankLabel && (
+                <p className="mb-2 flex items-center gap-2 px-2 text-xs text-ink-soft" data-rank={role}>
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Signed in as <span className="font-semibold text-ink">{rankLabel}</span>
+                </p>
+              )}
               <div className="mb-2 px-2"><SyncStatus /></div>
               <button
                 onClick={signOut}
@@ -743,10 +850,10 @@ export function AppShell({ title, backHref, actions, variant = "workspace", chil
         aria-label="Main"
       >
         <div className="flex h-16 items-stretch gap-1 overflow-x-auto px-2" style={{ scrollbarWidth: "none" }}>
-          {NAV.filter((n) => n.href !== "/settings").map(({ href, label, icon: Icon }) => (
+          {workspaceLinks.filter((n) => n.href !== "/settings").map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
-              href={href}
+              href={href === "/dashboard" ? workspaceHomeHref : href}
               aria-current={pathname === href || pathname.startsWith(href + "/") ? "page" : undefined}
               className={cn(
                 "flex min-w-[64px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-medium",

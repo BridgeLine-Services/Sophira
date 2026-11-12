@@ -6,6 +6,7 @@
  * events, in-app links only, duplicate suppression, and preferences that default to on.
  */
 import { readFileSync } from "node:fs";
+import { readNavSurface } from "./helpers/navigation";
 import {
   CATEGORIES,
   CATEGORY_LABELS,
@@ -89,6 +90,7 @@ export function runNotificationTests(
   assert(/safeLink/.test(page), "notifications: the page validates the link before offering it");
   assert(/listNotifications\(supabase, user\.id\)/.test(page), "notifications: the page reads only this member's notices");
 
-  const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
-  assert(shell.includes('href: "/notifications"'), "notifications: the page is reachable from the app navigation");
+  // 2026-11-12: the menu list is src/lib/navigation/workspace-nav.ts now.
+  assert(readNavSurface().includes('href: "/notifications"'),
+    "notifications: the page is reachable from the app navigation");
 }

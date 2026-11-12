@@ -9,7 +9,16 @@ import { fmtDate } from "@/lib/format";
 import { LearningGoals } from "@/components/dashboard/LearningGoals";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { buildActivityEvents } from "@/lib/activity/feed";
-import { Bell, BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone, AlertTriangle } from "lucide-react";
+import {
+  buildProgress,
+  buildRecommendations,
+  buildResumeItems,
+  buildUpcoming,
+  countRows,
+  readCount,
+  readList,
+} from "@/lib/dashboard/overview";
+import { Bell, BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone, Sparkles, AlertTriangle } from "lucide-react";
 import { safeLink } from "@/lib/notifications/store";
 import LocalDateTime from "@/components/app/LocalDateTime";
 
@@ -61,17 +70,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // RECENT ACTIVITY (owner-approved definition): derived from real rows only -
   // no click log, no surveillance - read through the RLS-scoped client.
-  const [{ data: actAssignments }, { data: actResponses }, { data: actNotebooks }, { data: actNotes }, { data: actGoals }, { data: actCourses }, { data: actWriting }, { data: actNotifications }, { data: actFeedback }] = await Promise.all([
+  const [{ data: actAssignments }, { data: actResponses }, { data: actNotebooks }, { data: actNotes }, actGoalsResult, { data: actCourses }, { data: actWriting }, { data: actNotifications }, { data: actFeedback }] = await Promise.all([
     supabase.from("assignments").select("id, title, status, mode, updated_at").order("updated_at", { ascending: false }).limit(12),
     supabase.from("responses").select("id, assignment_id, created_at").order("created_at", { ascending: false }).limit(40),
     supabase.from("notebooks").select("id, title, created_at").order("created_at", { ascending: false }).limit(6),
     supabase.from("notebook_notes").select("id, notebook_id, created_at").order("created_at", { ascending: false }).limit(40),
-    supabase.from("learning_goals").select("id, title, status, progress, updated_at").order("updated_at", { ascending: false }).limit(6),
+    supabase.from("learning_goals").select("id, title, status, progress, target_date, updated_at").order("updated_at", { ascending: false }).limit(6),
     supabase.from("courses").select("id, name, created_at").order("created_at", { ascending: false }).limit(4),
     supabase.from("writing_profiles").select("updated_at, created_at").order("created_at", { ascending: false }).limit(1),
     supabase.from("member_notifications").select("id, title, body, link, created_at").eq("category", "account").order("created_at", { ascending: false }).limit(6),
     supabase.from("feedback").select("id, kind, created_at").order("created_at", { ascending: false }).limit(6),
   ]);
+  // 2026-11-12: the goals rows serve the activity feed AND the progress/recommendation
+  // logic, and a failed read must be visible rather than silently zero.
+  const actGoals = actGoalsResult.data;
   const activityEvents = buildActivityEvents({
     assignments: actAssignments ?? [],
     responses: actResponses ?? [],
@@ -86,12 +98,33 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     feedback: actFeedback ?? [],
   });
 
-  const nowIso = new Date().toISOString();
-  const [{ data: courses }, { data: teachers }, { data: writingProfile }, { data: assignments }, { count: pendingProposals }, { data: recentFeedback }, { count: activePatterns }, { data: notebooks }, { data: dueSoon }, { count: activeAssignmentCount }, { count: completedAssignmentCount }] = await Promise.all([
+  const now = new Date();
+  /*
+   * HONESTY (2026-11-12): these results are kept whole, not destructured down to `data`.
+   * The dashboard used to write `courses?.length ?? 0`, so a query that FAILED rendered as a
+   * confident zero - "you have no courses", "nothing in progress" - on the one screen whose
+   * job is to tell someone where they stand. Each read is now turned into a `ready` or
+   * `unavailable` value below (see src/lib/dashboard/overview.ts), and the two are never
+   * shown the same way.
+   */
+  const [
+    coursesResult,
+    teachersResult,
+    writingProfileResult,
+    assignmentsResult,
+    proposalsResult,
+    recentFeedbackResult,
+    patternsResult,
+    notebooksResult,
+    datedAssignmentsResult,
+    activeCountResult,
+    completedCountResult,
+    lecturesResult,
+  ] = await Promise.all([
     supabase.from("courses").select("*").order("created_at", { ascending: false }),
     supabase.from("teachers").select("id, name, notes").is("archived_at", null).order("created_at", { ascending: false }),
     supabase.from("writing_profiles").select("*").order("created_at", { ascending: false }).limit(1),
-    supabase.from("assignments").select("id, title, mode, status, updated_at").order("updated_at", { ascending: false }).limit(5),
+    supabase.from("assignments").select("id, title, mode, status, due_at, updated_at").order("updated_at", { ascending: false }).limit(6),
     supabase.from("profile_update_proposals").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase
       .from("feedback")
@@ -105,10 +138,58 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     // Command center (2026-11-12): notebooks + deadlines, straight from the
     // user's own rows - never invented, and honest empty states below.
     supabase.from("notebooks").select("id, title, updated_at").is("archived_at", null).order("updated_at", { ascending: false }).limit(3),
-    supabase.from("assignments").select("id, title, due_at, urgency, status").not("due_at", "is", null).gte("due_at", nowIso).order("due_at", { ascending: true }).limit(4),
+    // Every dated assignment that is not finished, overdue included: "upcoming work" that
+    // quietly drops what you already missed is not honest about your week.
+    supabase.from("assignments").select("id, title, due_at, urgency, status").not("due_at", "is", null).neq("status", "completed").order("due_at", { ascending: true }).limit(10),
     supabase.from("assignments").select("id", { count: "exact", head: true }).eq("status", "active"),
     supabase.from("assignments").select("id", { count: "exact", head: true }).eq("status", "completed"),
+    // Lecture studio recordings: a "continue" link is only offered for one that can be
+    // reopened there, so the row is read from the member's own media assets.
+    supabase.from("media_assets").select("id, original_filename, status, updated_at").order("updated_at", { ascending: false }).limit(4),
   ]);
+
+  const courses = coursesResult.data;
+  const teachers = teachersResult.data;
+  const writingProfile = writingProfileResult.data;
+  const assignments = assignmentsResult.data;
+  const pendingProposals = proposalsResult.count;
+  const recentFeedback = recentFeedbackResult.data;
+  const activePatterns = patternsResult.count;
+
+  /**
+   * The four decisions this page makes, taken in ONE place so they can be tested:
+   * how the progress tiles read, what can be resumed, what is due, and what to do next.
+   * Every one of them distinguishes "you have none" from "we could not read it".
+   */
+  const notebooksRead = { ...readList(notebooksResult), capped: true };
+  const goalsRead = readList(actGoalsResult);
+  const progress = buildProgress({
+    completed: readCount(completedCountResult),
+    active: readCount(activeCountResult),
+    courses: countRows(coursesResult),
+    teachers: countRows(teachersResult),
+    notebooks: notebooksRead,
+    goals: goalsRead,
+  });
+  const resume = buildResumeItems(
+    {
+      assignments: readList(assignmentsResult),
+      notebooks: notebooksRead,
+      lectures: readList(lecturesResult),
+      goals: goalsRead,
+    },
+    4,
+  );
+  const upcoming = buildUpcoming(readList(datedAssignmentsResult), now, 4);
+  const recommendations = buildRecommendations({
+    now,
+    assignments: readList(assignmentsResult),
+    notebooks: readList(notebooksResult),
+    lectures: readList(lecturesResult),
+    goals: goalsRead,
+    courses: readList(coursesResult),
+    writingProfileApproved: writingProfile?.[0]?.status === "approved",
+  });
 
   /**
    * MY NOTIFICATIONS AT A GLANCE (2026-11-13).
@@ -136,7 +217,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const greetingName = profile.display_name ? `, ${profile.display_name.split(" ")[0]}` : "";
 
   return (
-    <AppShell title={`Welcome${greetingName}`}>
+    <AppShell title={`Welcome${greetingName}`} role={profile.role}>
       <div className="space-y-8">
         {/* Primary actions */}
         <section aria-labelledby="dashboard-start-heading">
@@ -213,89 +294,160 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
         </section>
 
-        {/* MY PROGRESS — real counts only */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[
-            { label: "Active work", value: activeAssignmentCount ?? 0, note: "assignments in progress" },
-            { label: "Completed", value: completedAssignmentCount ?? 0, note: "finished assignments" },
-            { label: "Courses", value: courses?.length ?? 0, note: `with ${teachers?.length ?? 0} teacher${(teachers?.length ?? 0) === 1 ? "" : "s"} on file` },
-            { label: "Notebooks", value: notebooks?.length ? `${notebooks.length}${notebooks.length === 3 ? "+" : ""}` : 0, note: "research notebooks" },
-          ].map((stat) => (
-            <Card key={stat.label}>
-              <CardContent className="p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-ink-soft">{stat.label}</p>
-                <p className="mt-1 text-2xl font-semibold text-ink">{stat.value}</p>
-                <p className="text-xs text-ink-soft">{stat.note}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {/* MY PROGRESS (2026-11-12): real counts, and a read that failed says so instead of
+            claiming zero. Each tile carries its own state, so "you have none yet" and "we
+            could not ask" can never look the same. */}
+        <section aria-labelledby="dashboard-progress-heading">
+          <h2 id="dashboard-progress-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">My progress</h2>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {progress.map((stat) => (
+              <Card key={stat.key}>
+                <CardContent className="p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-soft">{stat.label}</p>
+                  <p
+                    className={stat.state === "unavailable" ? "mt-1 text-2xl font-semibold text-ink-soft" : "mt-1 text-2xl font-semibold text-ink"}
+                    aria-label={stat.state === "unavailable" ? `${stat.label}: not available right now` : `${stat.label}: ${stat.value}`}
+                  >
+                    {stat.value}
+                  </p>
+                  <p className="text-xs text-ink-soft">{stat.note}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
 
-        {/* CONTINUE WHERE YOU LEFT OFF — the real most-recent items, or an honest empty state */}
-        <div>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Continue where you left off</h2>
-          {(assignments?.length ?? 0) > 0 || (notebooks?.length ?? 0) > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              {(assignments ?? []).slice(0, 2).map((a) => (
-                <Link key={a.id} href={`/assignments/${a.id}`} className="block">
+        {/* SOPHIRA'S RECOMMENDATIONS (2026-11-12): worked out from this member's own rows,
+            never from an AI guess, and each one says WHY it is being suggested. */}
+        <section aria-labelledby="dashboard-recommendations-heading">
+          <h2 id="dashboard-recommendations-heading" className="flex items-center gap-2 text-base font-semibold text-ink">
+            <Sparkles className="h-4 w-4 text-accent" aria-hidden /> Sophira&apos;s Recommendations
+          </h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            What to work on next, based on what is actually in your workspace.
+          </p>
+          {recommendations.items.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {recommendations.items.map((rec) => (
+                <li key={rec.id}>
                   <Card className="transition hover:border-accent/40">
-                    <CardContent className="flex items-center gap-3 p-4">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><FileText className="h-4 w-4" /></span>
+                    <CardContent className="flex flex-wrap items-center gap-3 p-4">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-ink">{a.title}</p>
-                        <p className="text-xs text-ink-soft">Assignment · {a.status} · updated {fmtDate(a.updated_at)}</p>
+                        <p className="font-medium text-ink">{rec.title}</p>
+                        <p className="text-sm text-ink-soft">{rec.reason}</p>
                       </div>
-                      <span className="text-sm text-accent">Resume →</span>
+                      <Link
+                        href={rec.href}
+                        className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-accent hover:border-accent/60 hover:bg-accent-soft/40"
+                      >
+                        {rec.action}
+                      </Link>
                     </CardContent>
                   </Card>
-                </Link>
+                </li>
               ))}
-              {(notebooks ?? []).slice(0, 2).map((n) => (
-                <Link key={n.id} href={`/notebooks/${n.id}`} className="block">
+            </ul>
+          ) : (
+            <Card className="mt-3">
+              <CardContent className="p-4 text-sm text-ink-soft">{recommendations.note}</CardContent>
+            </Card>
+          )}
+          <p className="mt-2 text-xs text-ink-soft">
+            These come from your own assignments, notebooks and goals. Sophira does not guess at
+            what you find difficult, and nothing here needs the AI to be available.
+          </p>
+        </section>
+
+        {/* CONTINUE WHERE YOU LEFT OFF (2026-11-12): only destinations that genuinely
+            reopen, newest first, with an honest note when a source could not be read. */}
+        <section aria-labelledby="dashboard-resume-heading">
+          <h2 id="dashboard-resume-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Continue where you left off</h2>
+          {resume.items.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {resume.items.map((item) => (
+                <Link key={item.id} href={item.href} className="block">
                   <Card className="transition hover:border-accent/40">
                     <CardContent className="flex items-center gap-3 p-4">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink/5 text-accent"><BookOpen className="h-4 w-4" /></span>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+                        {item.kind === "assignment" ? <FileText className="h-4 w-4" />
+                          : item.kind === "notebook" ? <BookOpen className="h-4 w-4" />
+                            : item.kind === "lecture" ? <Library className="h-4 w-4" />
+                              : <ClipboardCheck className="h-4 w-4" />}
+                      </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-ink">{n.title}</p>
-                        <p className="text-xs text-ink-soft">Notebook · updated {fmtDate(n.updated_at)}</p>
+                        <p className="truncate font-medium text-ink">{item.title}</p>
+                        <p className="text-xs text-ink-soft">{item.detail} · updated {fmtDate(item.at)}</p>
                       </div>
-                      <span className="text-sm text-accent">Open →</span>
+                      <span className="shrink-0 text-sm text-accent">{item.action} →</span>
                     </CardContent>
                   </Card>
                 </Link>
               ))}
             </div>
           ) : (
-            <Card><CardContent className="p-4 text-sm text-ink-soft">Nothing to resume yet. Start an assignment above and it will appear here, ready to pick up where you stopped.</CardContent></Card>
+            <Card>
+              <CardContent className="p-4 text-sm text-ink-soft">
+                Nothing to resume yet. Start an assignment above and it will appear here, ready to
+                pick up where you stopped.
+              </CardContent>
+            </Card>
           )}
-        </div>
+          {resume.unreadable.length > 0 && (
+            <p className="mt-2 text-xs text-ink-soft">
+              Sophira couldn&apos;t read your {resume.unreadable.join(" or ")} just now, so something
+              recent may be missing from this list. Nothing has been lost.
+            </p>
+          )}
+        </section>
 
-        <LearningGoals />
+        <div id="learning-goals">
+          <LearningGoals />
+        </div>
 
         <RecentActivity events={activityEvents} />
 
-        {/* UPCOMING WORK — real deadlines only */}
-        <div>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Upcoming work</h2>
-          {(dueSoon?.length ?? 0) > 0 ? (
+        {/* UPCOMING WORK (2026-11-12): real deadlines only, overdue first, in plain words. */}
+        <section aria-labelledby="dashboard-upcoming-heading">
+          <h2 id="dashboard-upcoming-heading" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Upcoming work</h2>
+          {upcoming.unreadable ? (
+            <Card>
+              <CardContent className="p-4 text-sm text-ink-soft">
+                Sophira couldn&apos;t read your deadlines just now, so this list may be incomplete.
+                Nothing has been lost — try again in a moment.
+              </CardContent>
+            </Card>
+          ) : upcoming.items.length > 0 ? (
             <Card>
               <CardContent className="divide-y divide-line p-0">
-                {(dueSoon ?? []).map((a) => (
-                  <Link key={a.id} href={`/assignments/${a.id}`} className="flex items-center gap-3 p-4 transition hover:bg-accent-soft/40">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><AlertTriangle className="h-4 w-4" /></span>
+                {upcoming.items.map((a) => (
+                  <Link key={a.id} href={a.href} className="flex items-center gap-3 p-4 transition hover:bg-accent-soft/40">
+                    <span
+                      className={
+                        a.tone === "overdue"
+                          ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger"
+                          : "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"
+                      }
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-ink">{a.title}</p>
-                      <p className="text-xs text-ink-soft">Due {fmtDate(a.due_at)}</p>
+                      <p className="text-xs text-ink-soft">{a.when}</p>
                     </div>
-                    {a.urgency && <Badge tone="neutral">{a.urgency}</Badge>}
+                    <span className="shrink-0 text-xs text-ink-soft">{fmtDate(a.due_at)}</span>
                   </Link>
                 ))}
               </CardContent>
             </Card>
           ) : (
-            <Card><CardContent className="p-4 text-sm text-ink-soft">No deadlines on file. Set a due date when you start an assignment and it will show up here.</CardContent></Card>
+            <Card>
+              <CardContent className="p-4 text-sm text-ink-soft">
+                No deadlines on file. Set a due date when you start an assignment and it will show
+                up here.
+              </CardContent>
+            </Card>
           )}
-        </div>
+        </section>
 
         {/* More ways to work — quick launch (all modes are real, from MODES) */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">

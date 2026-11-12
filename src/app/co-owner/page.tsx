@@ -58,25 +58,42 @@ export default async function CoOwnerPage() {
     { label: "Open tester reports", value: qa.data ? qa.data.length : null, note: "Bugs and feedback awaiting triage", href: "/owner/qa", icon: ClipboardList },
   ];
 
+  /*
+   * 2026-11-12: only destinations this rank can actually open. The list used to include
+   * network analytics, activity and AI operations, all three of which are Owner-only pages
+   * that send a Co-Owner straight back to /dashboard - a link that refuses you is worse than
+   * no link. Each entry here is gated by requireStaffPage or canUseTesterFeatures, so it
+   * opens. Nothing was widened to make this true.
+   */
   const areas = [
     { href: "/owner/members", title: "Members", body: "Directory, roles within your limits, suspend or remove members and testers." },
     { href: "/owner/invitations", title: "Invitations", body: "Issue invitations and review the ones already sent." },
     { href: "/owner/requests", title: "Access requests", body: "Decide who may join the network." },
     { href: "/owner/qa", title: "QA triage", body: "Work through tester bug reports and feedback." },
-    { href: "/owner/analytics", title: "Network analytics", body: "Usage and learning activity across the network." },
-    { href: "/owner/activity", title: "Activity", body: "What has happened recently in the network." },
-    { href: "/owner/ai-operations", title: "AI operations", body: "Whether AI requests are succeeding and how quickly." },
+    { href: "/owner/announcements", title: "Announcements", body: "Write and publish updates for everyone in the network." },
   ];
 
-  const { data: announcementRows } = await supabase
+  // 2026-11-12: `?? []` here meant an announcements table that could not be read (or has not
+  // been created yet) was rendered as "write the first announcement" - a confident empty
+  // state on a table that may already hold posts. The error is now carried and shown.
+  const { data: announcementRows, error: announcementError } = await supabase
     .from("announcements")
     .select("id, title, body, status, published_at")
     .order("created_at", { ascending: false })
     .limit(4);
   const announcements = announcementRows ?? [];
+  const announcementsUnreadable = Boolean(announcementError) || !announcementRows;
 
   return (
-    <AppShell title="Co-Owner workspace">
+    /*
+   * 2026-11-12: this page is the Co-Owner's administrative HOME, so it renders inside the
+   * administrative environment (variant="owner") with the role-filtered staff sidebar - the
+   * same environment as the Owner's, minus everything the Co-Owner may not open. The rank
+   * is passed to the shell so the menu is right on the first paint instead of after a round
+   * trip, and the shell's "My Workspace" entry is the one deliberate way back to their own
+   * academic workspace.
+   */
+  <AppShell title="Co-Owner Dashboard" variant="owner" role={role}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Co-Owner</Badge>
@@ -168,15 +185,27 @@ export default async function CoOwnerPage() {
           <h2 id="co-courses-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Course oversight</h2>
           <Card><CardContent className="p-4">
             <p className="text-sm text-ink-soft">
-              Every member&apos;s courses belong to their own private workspace, so network-wide course lists cannot be shown here. Engagement and completion figures come from the analytics page, which reports aggregates only.
+              Every member&apos;s courses belong to their own private workspace, so network-wide course lists are never shown here. Counts about the network (members, invitations, requests, tester reports) are in the tiles above, and they are counts only.
             </p>
-            <Link href="/owner/analytics" className="mt-2 inline-block text-sm text-accent hover:underline">Open analytics &rarr;</Link>
+            <p className="mt-2 text-sm text-ink-soft">
+              The deeper network analytics page belongs to the Owner. Ask them if you need a figure it reports.
+            </p>
           </CardContent></Card>
         </section>
 
         <section aria-labelledby="co-announce-h">
           <h2 id="co-announce-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Network announcements</h2>
-          {announcements.length === 0 ? (
+          {announcementsUnreadable ? (
+            <Card><CardContent className="p-4">
+              <p className="text-sm text-ink-soft">
+                Announcements couldn&apos;t be read just now, so this list may be incomplete. Nothing has
+                been lost.
+              </p>
+              <Link href="/owner/announcements" className="mt-2 inline-block text-sm text-accent hover:underline">
+                Open announcements &rarr;
+              </Link>
+            </CardContent></Card>
+          ) : announcements.length === 0 ? (
             <Card><CardContent className="p-4">
               <p className="text-sm text-ink-soft">
                 Nothing announced yet. Published announcements appear here and in every member&apos;s notifications.
@@ -208,7 +237,7 @@ export default async function CoOwnerPage() {
               <li><strong className="text-ink">Members.</strong> Keep the directory accurate, help with account problems, suspend when needed - within your limits.</li>
               <li><strong className="text-ink">Invitations and requests.</strong> {invitations.data || requests.data ? `${(invitations.data?.length ?? 0) + (requests.data?.length ?? 0)} waiting for action.` : "Could not be read just now."}</li>
               <li><strong className="text-ink">QA.</strong> Triage tester reports and confirm fixes before closing them.</li>
-              <li><strong className="text-ink">Analytics.</strong> Watch engagement and completion, and flag anything slipping.</li>
+              <li><strong className="text-ink">Analytics.</strong> The figures at the top of this page are yours to watch - how many members are active, suspended, invited or waiting. The network-wide analytics page is Owner-only, so anything that needs it goes to the Owner.</li>
               <li><strong className="text-ink">Operations.</strong> Coordinate with teachers and staff, and escalate owner-level problems (billing, security, providers) to the Owner.</li>
             </ul>
           </CardContent></Card>

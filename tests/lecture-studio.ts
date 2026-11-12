@@ -1,4 +1,5 @@
 import { readFileSync, existsSync } from "fs";
+import { readNavSurface } from "./helpers/navigation";
 import { planFrames } from "../src/lib/media/pipeline";
 
 /**
@@ -28,13 +29,13 @@ export async function runLectureStudioTests(): Promise<{ passed: number; failed:
   const pagePath = "src/app/lectures/page.tsx";
   assert(existsSync(pagePath), "lecture studio page exists");
   const page = read(pagePath);
-  const shell = read("src/components/app/AppShell.tsx");
 
   section("lecture studio: reachable");
 
   assert(/^\s*"use client";/.test(page), "the studio is a client component (it drives the browser upload)");
   assert(page.includes("AppShell"), "the page renders inside the standard app shell");
-  assert(shell.includes('href: "/lectures"'), "Lectures appears in the workspace navigation");
+  // 2026-11-12: the destination lives in src/lib/navigation/workspace-nav.ts.
+  assert(readNavSurface().includes('href: "/lectures"'), "Lectures appears in the workspace navigation");
   assert(existsSync("src/app/lectures/loading.tsx"), "the route has a plain-words loading state");
   assert(!page.includes("dangerouslySetInnerHTML"), "no raw HTML injection");
 
