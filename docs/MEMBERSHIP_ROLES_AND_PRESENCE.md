@@ -82,9 +82,16 @@ and an optional label.
 
 ### Thresholds and why the order matters
 
-`presence_settings` holds six numbers, editable from the Owner Dashboard:
-heartbeat interval, connection timeout, active threshold, idle threshold, session
-expiration, and the presence update interval. `repairThresholdOrder` in
+`presence_settings` holds six numbers, editable by the Owner on the Members page
+(the box headed "How quickly members look active or offline"), served by
+`GET`/`PUT /api/network/presence-settings`. That route is Owner-only — a Co-Owner
+manages people but does not retune the clock everyone is measured against — and the
+database refuses a non-Owner write as well. The form shows each allowed range next to
+its field and then displays only what the server stored, so it can never show a
+setting that was not actually saved. The six numbers are the heartbeat interval,
+connection timeout, active threshold, idle threshold, session expiration, and the
+presence update interval, all in seconds, each with a floor and a ceiling that the
+database CHECKs as well. `repairThresholdOrder` in
 `src/lib/presence/thresholds.ts` enforces the only ordering that produces a stable
 picture, and `validateThresholds` refuses the values that would make members
 flicker: a connection timeout shorter than the report interval, an idle threshold
@@ -97,6 +104,8 @@ Owner is told the reason in a sentence, not handed a constraint name.
 |---|---|
 | `POST /api/network/presence` | Heartbeat. `action: "heartbeat"` records a tab; `action: "availability"` sets the member's own choice; `action: "close"` ends the tab. Only ever touches the caller's own rows. |
 | `GET /api/network/presence` | The caller's own presence and availability, so Settings can show what was recorded. |
+| `PUT /api/network/presence-settings` | The Owner retunes the six thresholds. Owner-only at the route, in the matrix, and in RLS. |
+| `GET /api/network/presence-settings` | The current thresholds with their bounds, so the form states each range instead of letting the Owner discover it by failing. |
 | `GET /api/network/stats` | The Owner Dashboard counts, computed from the same rules. |
 
 Two browser hooks drive this: `use-presence-reporter.ts` sends the heartbeat (fast
@@ -126,7 +135,21 @@ reported it backwards; `describeRoleChange` is the only place that logic lives n
 
 ---
 
-## 4. What this work did not change
+## 4. Applying this to the live database
+
+The three migrations are additive, but they still have to reach the real database.
+Until they do, `network_directory()` does not exist, so `loadOwnerRoster` falls back
+to `network_stats()` and the Members page states that presence is unavailable rather
+than showing every member as Offline. The thresholds box likewise says the tables are
+missing and changes nothing. This was written deliberately: the code ships before the
+database, so a deployment can never display an invented presence state.
+
+To apply it: sign in as Owner, open **/owner/database**, and press **Update database**.
+It only adds what is missing, reports "N of N pieces are in place", and members can
+keep working while it runs. The owner-facing wording is in
+docs/WHAT_I_NEED_TO_DO_NEXT.md.
+
+## 5. What this work did not change
 
 - No member account was deleted or recreated, and no existing role, profile field
   or academic record was modified by any migration. All three migrations are

@@ -4,6 +4,39 @@ You never need a terminal, SQL, or code. Each step below says exactly where to
 click. Full status details live in docs/COMPLETION_REPORT.md (the authoritative
 report, updated 2026-10-13). Details for steps 1-2: docs/WORD_GOOGLE_DOCS_SETUP.md.
 
+## First: add the new Members and presence pieces to your database (about 1 minute)
+
+**Why:** Sophira has three new pieces of database furniture for the member list:
+four member roles, verified phone numbers, and the live presence records that let
+the Members page show who is at their screen. They have been tested on a throwaway
+database, but your real one has not taken them yet. I checked your live database on
+2026-11-11 and confirmed the four new tables are not there yet, so the Members page
+currently says "Presence is not available" instead of guessing.
+
+Nothing is broken while you wait. The Members page still lists everyone, roles still
+work the old way, and nobody's work is interrupted.
+
+**What to do:**
+
+1. Open **https://sophira.vercel.app/owner/database** and sign in as the Owner if it
+   asks.
+2. Look at the line under "Your database today". If it is green and says
+   **Up to date**, you are already done — skip to step 4.
+3. If it says something like **3 updates missing**, press the button marked
+   **Update database** and wait for the spinner to stop. Text on the page will
+   change to **Up to date** with **50 of 50 pieces are in place**. This only adds
+   what is missing; nothing existing is replaced or deleted, and members can keep
+   working while it runs.
+4. Open **https://sophira.vercel.app/owner/members** and check two things:
+   - Near the top there is a box called **How quickly members look active or offline**
+     with six numbers and a Save button.
+   - Each member row shows a presence word (Active, Idle, Offline, or Unknown) next
+     to a separate account condition word.
+
+**If something looks wrong, paste this back to me:** the exact wording of any red or
+amber message on that page, and the line that begins "N of N pieces are in place".
+Do not paste your password or any key.
+
 ## Fix the typing schema in production (2 minutes, no technical steps)
 
 **Why:** The Migrations CI job shows "success" even when it cannot reach your
