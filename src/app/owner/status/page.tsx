@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { requireOwnerPage } from "@/lib/owner/page-context";
-import { loadOwnerRoster } from "@/lib/owner/roster";
+import { canReadDirectory } from "@/lib/owner/roster";
 import { buildStatusRows, statusIsHealthy } from "@/lib/owner-status";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
 import { providerDiagnostics, readAiEnv } from "@/lib/ai/provider";
@@ -16,7 +16,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function OwnerStatusPage() {
   const { supabase } = await requireOwnerPage();
-  const { statsError } = await loadOwnerRoster(supabase);
+  // 2026-11-12 (consolidation): this page needs ONE fact - whether the directory is
+  // readable - so it asks for that, instead of loading the whole roster (three reads).
+  const membersLoaded = await canReadDirectory(supabase);
   const setup = providerSetupStatus();
   const diag = providerDiagnostics(readAiEnv());
   const rows = buildStatusRows({
@@ -24,7 +26,7 @@ export default async function OwnerStatusPage() {
     microsoft: setup.microsoft,
     google: setup.google,
     search: setup.search,
-    membersLoaded: !statsError,
+    membersLoaded,
   });
 
   return (

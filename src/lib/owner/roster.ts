@@ -139,3 +139,31 @@ async function loadThresholds(supabase: SupabaseClient): Promise<PresenceThresho
     return DEFAULT_THRESHOLDS;
   }
 }
+
+/**
+ * NAMES FOR AUDIT ENTRIES (2026-11-12, consolidation).
+ *
+ * The audit pages need one thing from the roster: a display name per id. Loading the whole
+ * roster for that meant running network_directory, the invitations list and the requests list
+ * on every visit - three reads to answer one question. This reads only the people asked about.
+ * RLS still decides what may be read; a name that cannot be read falls back to "A member".
+ */
+export async function loadAuditNames(
+  supabase: SupabaseClient,
+  ids: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const wanted = Array.from(new Set(ids.filter((v): v is string => typeof v === "string" && v.length > 0)));
+  const names = new Map<string, string>();
+  if (wanted.length === 0) return names;
+  const { data } = await supabase.from("profiles").select("id, display_name, email").in("id", wanted);
+  for (const row of (data ?? []) as Array<{ id: string; display_name?: string | null; email?: string | null }>) {
+    names.set(row.id, row.display_name || row.email || "A member");
+  }
+  return names;
+}
+
+/** Whether the member directory can be read at all - one cheap row, not the whole roster. */
+export async function canReadDirectory(supabase: SupabaseClient): Promise<boolean> {
+  const { error } = await supabase.from("profiles").select("id", { head: true, count: "exact" }).limit(1);
+  return !error;
+}
