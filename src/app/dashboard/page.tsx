@@ -7,6 +7,8 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { LearningGoals } from "@/components/dashboard/LearningGoals";
+import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { buildActivityEvents } from "@/lib/activity/feed";
 import { Bell, BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone, AlertTriangle } from "lucide-react";
 import { safeLink } from "@/lib/notifications/store";
 import LocalDateTime from "@/components/app/LocalDateTime";
@@ -56,6 +58,33 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // Activity tracking for privacy-safe aggregate owner analytics.
   await supabase.from("profiles").update({ last_active_at: new Date().toISOString() }).eq("id", user.id).then(() => undefined);
+
+  // RECENT ACTIVITY (owner-approved definition): derived from real rows only -
+  // no click log, no surveillance - read through the RLS-scoped client.
+  const [{ data: actAssignments }, { data: actResponses }, { data: actNotebooks }, { data: actNotes }, { data: actGoals }, { data: actCourses }, { data: actWriting }, { data: actNotifications }, { data: actFeedback }] = await Promise.all([
+    supabase.from("assignments").select("id, title, status, mode, updated_at").order("updated_at", { ascending: false }).limit(12),
+    supabase.from("responses").select("id, assignment_id, created_at").order("created_at", { ascending: false }).limit(40),
+    supabase.from("notebooks").select("id, title, created_at").order("created_at", { ascending: false }).limit(6),
+    supabase.from("notebook_notes").select("id, notebook_id, created_at").order("created_at", { ascending: false }).limit(40),
+    supabase.from("learning_goals").select("id, title, status, progress, updated_at").order("updated_at", { ascending: false }).limit(6),
+    supabase.from("courses").select("id, name, created_at").order("created_at", { ascending: false }).limit(4),
+    supabase.from("writing_profiles").select("updated_at, created_at").order("created_at", { ascending: false }).limit(1),
+    supabase.from("member_notifications").select("id, title, body, link, created_at").eq("category", "account").order("created_at", { ascending: false }).limit(6),
+    supabase.from("feedback").select("id, kind, created_at").order("created_at", { ascending: false }).limit(6),
+  ]);
+  const activityEvents = buildActivityEvents({
+    assignments: actAssignments ?? [],
+    responses: actResponses ?? [],
+    assignmentTitles: Object.fromEntries((actAssignments ?? []).map((a) => [a.id, a.title ?? ""])),
+    notebooks: actNotebooks ?? [],
+    notebookNotes: actNotes ?? [],
+    notebookTitles: Object.fromEntries((actNotebooks ?? []).map((n) => [n.id, n.title ?? ""])),
+    goals: actGoals ?? [],
+    courses: actCourses ?? [],
+    writingProfileAt: actWriting?.[0]?.updated_at ?? null,
+    notifications: actNotifications ?? [],
+    feedback: actFeedback ?? [],
+  });
 
   const nowIso = new Date().toISOString();
   const [{ data: courses }, { data: teachers }, { data: writingProfile }, { data: assignments }, { count: pendingProposals }, { data: recentFeedback }, { count: activePatterns }, { data: notebooks }, { data: dueSoon }, { count: activeAssignmentCount }, { count: completedAssignmentCount }] = await Promise.all([
@@ -242,6 +271,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
 
         <LearningGoals />
+
+        <RecentActivity events={activityEvents} />
 
         {/* UPCOMING WORK — real deadlines only */}
         <div>
