@@ -64,6 +64,9 @@ export async function aiChatMeta(
           ok: r.ok,
           tokens_in: r.tokensIn ?? null,
           tokens_out: r.tokensOut ?? null,
+          // Duration only (0052). Null when it was not measured; the owner's AI Operations
+          // view reads NULL as "not measured", never as an instant answer.
+          latency_ms: typeof r.latencyMs === "number" && r.latencyMs >= 0 ? Math.round(r.latencyMs) : null,
         });
       } catch {
         /* best-effort diagnostics only */

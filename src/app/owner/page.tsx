@@ -12,8 +12,12 @@ import { Briefcase, CheckCircle2, ClipboardList, Gauge, XCircle } from "lucide-r
 import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
 import { capabilityRegistry, noUnexpectedCharges } from "@/lib/ai/capabilities";
 import { tallyPresenceStates } from "@/lib/owner/member-view";
+import { loadOwnerRoster } from "@/lib/owner/roster";
+import { buildBackupReport, readBackupReport } from "@/lib/owner/backup-status";
+import { countAiFailures, loadAiUsage } from "@/lib/owner/ai-usage";
+import { legalPlaceholdersRemain, loadLegalDoc } from "@/lib/legal";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
-import { buildActionItems, describeUnreadableMembers, isMissingDatabasePiece } from "@/lib/owner/action-items";
+import { buildActionItems, describeUnreadableMembers } from "@/lib/owner/action-items";
 
 export const dynamic = "force-dynamic";
 
@@ -59,11 +63,15 @@ export default async function OwnerPage() {
   if (profile.status === "revoked") redirect("/access-denied");
   if (profile.role !== "owner") redirect("/dashboard");
 
-  const [{ data: members, error: mErr }, { data: invitations }, { data: requests }] = await Promise.all([
-    supabase.rpc("network_stats"),
-    supabase.from("invitations").select("*").order("created_at", { ascending: false }),
-    supabase.from("invitation_requests").select("*").order("created_at", { ascending: false }),
-  ]);
+  // ONE READ, ONE TRUTH (2026-11-13). The overview used to perform its own membership,
+  // phone and directory reads, so the Members page and this page could disagree about the same
+  // person. It now uses the shared roster loader the Members page uses - same function, same
+  // fallbacks, same honest failure wording - and performs no duplicate query.
+  const roster = await loadOwnerRoster(supabase);
+  const members = roster.members;
+  const invitations = roster.invitations;
+  const requests = roster.requests;
+
   // 2026-10-08: a statistics failure must NOT take down the whole owner
   // dashboard. The membership table renders empty WITH an explicit,
   // honest banner (never fabricated zeros); invitations, requests, and
@@ -71,49 +79,57 @@ export default async function OwnerPage() {
   // database reason and offers reload as the retry.
   // 2026-11-12: the wording now comes from the shared action-item vocabulary, so the banner and
   // the "Needs attention" card cannot drift into saying different things about the same failure.
-  const statsError = mErr || !members
-    ? describeUnreadableMembers(mErr?.message ?? "no data returned")
+  const statsError = roster.statsError
+    ? describeUnreadableMembers(roster.directoryError ?? roster.statsError)
     : null;
-
-  // Owner-only phone directory (0043). A failure here must never hide the
-  // member list: phones are a convenience, membership is the record.
-  const { data: phones } = await supabase.rpc("network_member_phones");
-  const phoneById = new Map<string, string>(
-    ((phones ?? []) as Array<{ user_id: string; phone: string }>).map((r) => [r.user_id, r.phone])
-  );
-  const membersWithPhone: NetworkMemberStats[] = ((members ?? []) as NetworkMemberStats[]).map((m) => ({
-    ...m,
-    phone: phoneById.get(m.user_id) ?? m.phone ?? null,
-  }));
+  const membersLoaded = !roster.statsError;
 
   // WHO IS AT THEIR SCREEN RIGHT NOW (2026-11-12). Read from the same directory function the
   // Members page uses. If it cannot be read, no number is shown at all - "0 online" and
   // "we could not look" are different facts and must never be confused.
-  const { data: directoryRows, error: directoryError } = await supabase.rpc("network_directory");
-  const presenceLive = !directoryError && Array.isArray(directoryRows);
-  const tally = presenceLive ? tallyPresenceStates(directoryRows as Array<{ presence?: { state?: string | null } }>) : null;
+  const tally = roster.presenceAvailable ? tallyPresenceStates(members) : null;
 
   // 2026-11-12: what the Owner actually needs to do, in one honest list. Every input is a real
   // read - a count that could not be read stays null and is reported as unreadable rather than
   // as zero, and a missing database piece is distinguished from a database that is unreachable.
-  const directoryMissing = isMissingDatabasePiece(directoryError);
-  const suspendedMembers = presenceLive
-    ? (directoryRows as Array<{ o_status?: string | null }>).filter((r) => r.o_status === "suspended").length
+  const suspendedMembers = membersLoaded
+    ? members.filter((m) => String(m.status ?? "") === "suspended").length
     : null;
   const setup = providerSetupStatus();
   const pageDiag = providerDiagnostics(readAiEnv());
   const hdrs = await headers();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${hdrs.get("x-forwarded-proto") || "http"}://${hdrs.get("host")}`;
 
+  // Backups and legal paperwork are reported from real sources only: the backup report the
+  // backup tool leaves behind, and the actual legal documents on disk. If either cannot be read,
+  // nothing is claimed about it (null), rather than an invented "needs attention".
+  const backupReport = buildBackupReport(readBackupReport());
+
+  // AI FAILURES (2026-11-13). Read through the same loader the AI Operations page uses, over the
+  // last week, so "the AI is failing requests" reaches this list instead of hiding on a page the
+  // owner has to think to open. Null means the record could not be read, and then nothing is
+  // claimed about it - a failed read is never reported as zero failures.
+  const aiUsage = await loadAiUsage({ windowDays: 7, maxRows: 2000 });
+  const aiFailures = countAiFailures(aiUsage.rows);
+  const terms = loadLegalDoc("TERMS_OF_SERVICE");
+  const privacy = loadLegalDoc("PRIVACY_POLICY");
+  const legalIncomplete =
+    terms === null && privacy === null
+      ? null
+      : Boolean((terms && legalPlaceholdersRemain(terms)) || (privacy && legalPlaceholdersRemain(privacy)));
+
   const actionItems = buildActionItems({
-    requestsWaiting: requests ? requests.length : null,
+    requestsWaiting: roster.requestsAvailable ? requests.length : null,
     suspendedMembers,
-    databaseOutdated: directoryMissing,
-    membersUnreadable: Boolean(statsError),
+    databaseOutdated: roster.directoryMissing,
+    membersUnreadable: Boolean(roster.statsError),
     aiReady: Boolean(pageDiag.activeProvider),
     microsoftReady: setup.microsoft,
     googleReady: setup.google,
     searchReady: setup.search,
+    backup: { recoverable: backupReport.recoverable, reported: backupReport.reported },
+    legalIncomplete,
+    aiFailures,
   });
 
   return (
@@ -210,7 +226,7 @@ export default async function OwnerPage() {
         </div>
       )}
       <OwnerDashboard
-        initialMembers={membersWithPhone}
+        initialMembers={members}
         initialInvitations={(invitations || []) as Invitation[]}
         initialRequests={(requests || []) as InvitationRequest[]}
         siteUrl={siteUrl}
@@ -221,7 +237,7 @@ export default async function OwnerPage() {
           microsoft: setup.microsoft,
           google: setup.google,
           search: setup.search,
-          membersLoaded: !statsError,
+          membersLoaded,
         }}
       />
       <section className="mt-8" aria-labelledby="owner-providers-h">

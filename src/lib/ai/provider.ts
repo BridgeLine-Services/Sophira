@@ -512,6 +512,12 @@ export interface UseRecord {
   tokensIn?: number | null;
   tokensOut?: number | null;
   userId?: string;
+  /**
+   * How long THIS attempt took, in whole milliseconds (2026-11-13). A duration only: it says
+   * nothing about what was asked or answered, and it is what lets the owner see whether the AI
+   * is actually slow instead of guessing. Omitted when the clock could not be read.
+   */
+  latencyMs?: number | null;
 }
 
 /**
@@ -535,22 +541,25 @@ export async function serverAiChat(
   const { aiBreakers, breakerKey, withBreaker } = await import("./reliability");
   for (const p of plan.candidates) {
     const key = breakerKey(p, p === "selfhost" ? env.LOCAL_LLM_BASE_URL : null);
+    // Measured per ATTEMPT, so a provider that timed out is not averaged in with a fast one.
+    const startedAt = Date.now();
+    const elapsed = () => Date.now() - startedAt;
     try {
       if (p === "selfhost") {
         const r = await withBreaker(aiBreakers, key, () => selfhostChat(env, messages, opts, hooks.fetchFn));
         if (!r.text) throw new Error("The local inference server returned an empty response.");
-        hooks.onUse?.({ provider: "selfhost", model: env.LOCAL_LLM_MODEL, classification: "local", ok: true, tokensIn: r.tokensIn, tokensOut: r.tokensOut });
+        hooks.onUse?.({ provider: "selfhost", model: env.LOCAL_LLM_MODEL, classification: "local", ok: true, tokensIn: r.tokensIn, tokensOut: r.tokensOut, latencyMs: elapsed() });
         return { text: r.text, provider: "selfhost", model: env.LOCAL_LLM_MODEL };
       }
       if (p === "gemini") {
         const r = await withBreaker(aiBreakers, key, () => geminiChat(env, messages, opts, hooks.fetchFn));
         if (!r.text) throw new Error("Gemini returned an empty response.");
-        hooks.onUse?.({ provider: "gemini", model: env.GEMINI_MODEL, classification: "free-tier", ok: true, tokensIn: r.tokensIn, tokensOut: r.tokensOut });
+        hooks.onUse?.({ provider: "gemini", model: env.GEMINI_MODEL, classification: "free-tier", ok: true, tokensIn: r.tokensIn, tokensOut: r.tokensOut, latencyMs: elapsed() });
         return { text: r.text, provider: "gemini", model: env.GEMINI_MODEL };
       }
       if (p === "openai") {
         const text = await withBreaker(aiBreakers, key, () => openaiChat(env, messages, opts, hooks.fetchFn));
-        hooks.onUse?.({ provider: "openai", model: env.SOPHIRA_MODEL, classification: "paid", ok: true });
+        hooks.onUse?.({ provider: "openai", model: env.SOPHIRA_MODEL, classification: "paid", ok: true, latencyMs: elapsed() });
         return { text, provider: "openai", model: env.SOPHIRA_MODEL };
       }
     } catch (e) {
@@ -560,6 +569,7 @@ export async function serverAiChat(
         model: p === "gemini" ? env.GEMINI_MODEL : p === "selfhost" ? env.LOCAL_LLM_MODEL : env.SOPHIRA_MODEL,
         classification: costClassOf(p),
         ok: false,
+        latencyMs: elapsed(),
       });
     }
   }

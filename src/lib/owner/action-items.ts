@@ -26,6 +26,12 @@ export interface ActionItem {
   href?: string;
   linkLabel?: string;
   tone: ActionTone;
+  /**
+   * Whether members feel this right now: true / false, or null when Sophira cannot say.
+   * The Owner asked for this explicitly - "is anyone affected?" is usually the question that
+   * decides whether a job is for tonight or for next week.
+   */
+  membersAffected: boolean | null;
 }
 
 export interface ActionInputs {
@@ -42,6 +48,16 @@ export interface ActionInputs {
   microsoftReady: boolean;
   googleReady: boolean;
   searchReady: boolean;
+  /**
+   * Backup picture, or null when it could not be read (then nothing is claimed about it).
+   * `reported` false means no backup report has ever reached Sophira, which is unknown - not
+   * "no backup exists" and certainly not "backups are fine".
+   */
+  backup?: { recoverable: boolean; reported: boolean } | null;
+  /** True while the legal documents still contain owner-supplied placeholders. */
+  legalIncomplete?: boolean | null;
+  /** AI requests that failed in the recent window, or null when that was not read. */
+  aiFailures?: number | null;
 }
 
 const BODY_LIMIT = 400;
@@ -77,6 +93,7 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
         "and press the update button.",
       href: "/owner/database",
       linkLabel: "Open the database page",
+      membersAffected: true,
     });
   }
 
@@ -91,6 +108,7 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
         "database page will say whether your database is reachable.",
       href: "/owner/database",
       linkLabel: "Check the database",
+      membersAffected: null,
     });
   }
 
@@ -104,6 +122,7 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
         "sign up.",
       href: "/owner/requests",
       linkLabel: "Review the requests",
+      membersAffected: true,
     });
   }
 
@@ -117,6 +136,7 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
         "if someone is waiting to be let back in, restore them from the Members page.",
       href: "/owner/members",
       linkLabel: "Open Members",
+      membersAffected: true,
     });
   }
 
@@ -131,6 +151,7 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
         "configured and what is missing.",
       href: "/owner/health",
       linkLabel: "Open System Health",
+      membersAffected: true,
     });
   }
 
@@ -144,6 +165,7 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
         "apps are registered. No other feature is affected.",
       href: "/owner/integrations",
       linkLabel: "Open Integrations",
+      membersAffected: false,
     });
   }
 
@@ -157,6 +179,76 @@ export function buildActionItems(input: ActionInputs): ActionItem[] {
         "already knows. Add a search key whenever you want live web results.",
       href: "/owner/integrations",
       linkLabel: "Open Integrations",
+      membersAffected: false,
+    });
+  }
+
+  // A RECORDED AI FAILURE WITH A WORKING PROVIDER (2026-11-13). Distinct from "the AI service is
+  // not running": here a provider IS active and requests are still failing, which members notice
+  // as an error message. Only reported when the usage record was actually read.
+  if (input.aiFailures !== null && input.aiFailures !== undefined && input.aiFailures > 0 && input.aiReady) {
+    urgent.push({
+      key: "ai-failures",
+      tone: "urgent",
+      title: `${input.aiFailures} AI ${input.aiFailures === 1 ? "request has" : "requests have"} failed recently`,
+      body:
+        "The AI service is connected, but some requests did not produce an answer. A member sees a " +
+        "plain message when that happens and none of their work is lost. The AI Operations page " +
+        "shows which provider failed and how often, so you can decide whether to switch provider.",
+      href: "/owner/ai-operations",
+      linkLabel: "Open AI Operations",
+      membersAffected: true,
+    });
+  }
+
+  // BACKUPS (2026-11-13). Two very different situations, worded differently: a report Sophira has
+  // seen that is incomplete, and no report at all. Neither one is ever "backups are fine".
+  if (input.backup) {
+    if (input.backup.reported && !input.backup.recoverable) {
+      urgent.push({
+        key: "backup",
+        tone: "urgent",
+        title: "Your backups are not proven yet",
+        body:
+          "Sophira has a backup report, but not every step is done: the backup may be older than a " +
+          "week, unchecked, or never restored in a test. If the database were lost tonight, " +
+          "recovery is not guaranteed. No member sees a problem today - this is about the day " +
+          "something goes wrong.",
+        href: "/owner/backup",
+        linkLabel: "Open Backup and recovery",
+        membersAffected: false,
+      });
+    } else if (!input.backup.reported) {
+      info.push({
+        key: "backup-unreported",
+        tone: "info",
+        title: "No backup has been reported to Sophira",
+        body:
+          "Nobody has told Sophira about a backup, so it cannot say whether your network is " +
+          "protected tonight. This is not a failure: it is simply unknown. The Backup page " +
+          "explains the one command that takes a backup and the file that lets Sophira read its " +
+          "result.",
+        href: "/owner/backup",
+        linkLabel: "Open Backup and recovery",
+        membersAffected: false,
+      });
+    }
+  }
+
+  // LEGAL PAPERWORK (2026-11-13). Only shown when the documents were actually read and still
+  // contain placeholders, so the Owner is never nagged about a file Sophira could not open.
+  if (input.legalIncomplete === true) {
+    info.push({
+      key: "legal",
+      tone: "info",
+      title: "Your Terms and Privacy pages are still templates",
+      body:
+        "They contain placeholders where your legal name, address and contact details belong. " +
+        "Members can read the pages, and nothing is broken, but the wording is not yet yours. " +
+        "This matters before you invite people outside your own household.",
+      href: "/owner/status",
+      linkLabel: "See what is outstanding",
+      membersAffected: false,
     });
   }
 

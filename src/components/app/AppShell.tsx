@@ -8,7 +8,7 @@ import { Bell, CloudOff, Database } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { Activity, BookOpen, Brain, Briefcase, ChevronDown, Home, LogOut, MailQuestion, Menu, NotebookPen, Settings, ShieldCheck, Mic, UserPlus, Users, Wifi, X } from "lucide-react";
+import { Activity, BookOpen, Brain, Briefcase, ChevronDown, ChartColumn, HardDriveDownload, Home, LogOut, MailQuestion, Menu, NotebookPen, Settings, ShieldCheck, Mic, Sparkles, UserPlus, Users, Wifi, X } from "lucide-react";
 import { Gauge, Keyboard } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
@@ -71,6 +71,8 @@ const OWNER_NAV_GROUPS: Array<{
       { href: "/owner/members", label: "Members", icon: Users, minimum: "co_owner" },
       { href: "/owner/invitations", label: "Invite someone", icon: UserPlus, minimum: "co_owner" },
       { href: "/owner/requests", label: "Invitation requests", icon: MailQuestion, minimum: "co_owner" },
+      // Counts only, never a member's coursework: see lib/owner/analytics.ts for what is refused.
+      { href: "/owner/analytics", label: "Network analytics", icon: ChartColumn, minimum: "co_owner" },
     ],
   },
   {
@@ -78,6 +80,11 @@ const OWNER_NAV_GROUPS: Array<{
     items: [
       { href: "/owner/activity", label: "Recent activity", icon: Activity },
       { href: "/owner/status", label: "System status", icon: ShieldCheck },
+      // 2026-11-13: the owner asked to be able to answer "which parts work?", "is the AI slow?"
+      // and "could we come back from a disaster?" without reading a log or a dashboard of jargon.
+      { href: "/owner/features", label: "Feature health", icon: Sparkles },
+      { href: "/owner/ai-operations", label: "AI operations", icon: Gauge },
+      { href: "/owner/backup", label: "Backup and recovery", icon: HardDriveDownload },
     ],
   },
   {

@@ -772,4 +772,4 @@ executed verification that observed the behavior.
 | Staff see waiting requests | Pending count in the sidebar for Owner and Co-Owner only; unknown never shown as zero | PASSED (source) |
 | Centre refreshes in place | Realtime watcher filtered to the member's own rows, removed on unmount, renders nothing | PASSED (source + build) |
 | Live email actually arriving | Needs a verified sending configuration and a real inbox | NOT VERIFIED |
-| Full verification | `npm test` 6930/6930, `npx tsc --noEmit`, `npm run lint` (0 errors / 33 warnings), production build, secret scan | PASSED |
+| Full verification | `npm test` 7025/7025, `npx tsc --noEmit`, `npm run lint` (0 errors / 33 warnings), production build, secret scan | PASSED |

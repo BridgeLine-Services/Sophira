@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireNetworkManagement } from "@/lib/supabase/guard";
 import { clampThresholds, DEFAULT_THRESHOLDS, type PresenceThresholds } from "@/lib/presence/thresholds";
 import type { Invitation, NetworkMemberStats } from "@/lib/types";
+import { normalizeDirectoryRows } from "@/lib/owner/directory-rows";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +37,8 @@ export async function GET() {
   let statsError: string | null = null;
 
   if (!error && Array.isArray(directory)) {
-    members = directory as unknown as NetworkMemberStats[];
+    // Normalised rather than cast: the function returns o_* column names (see directory-rows.ts).
+    members = normalizeDirectoryRows(directory as Array<Record<string, unknown>>).members;
   } else {
     // Presence is new. On a database that has not taken migration 0050 yet, the owner must
     // still see their members rather than an empty page, so fall back to the older
@@ -46,7 +48,7 @@ export async function GET() {
     if (fallback.error) {
       return NextResponse.json({ error: fallback.error.message }, { status: 500 });
     }
-    members = (fallback.data || []) as NetworkMemberStats[];
+    members = normalizeDirectoryRows((fallback.data || []) as Array<Record<string, unknown>>).members;
     statsError = "Presence could not be read from the database yet, so it is shown as Unknown. Member details are complete.";
   }
 

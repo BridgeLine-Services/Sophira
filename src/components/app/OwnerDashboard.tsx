@@ -13,7 +13,9 @@
 import Link from "next/link";
 import {
   Activity,
+  ChartColumn,
   Gauge,
+  HardDriveDownload,
   MailQuestion,
   Settings2,
   ShieldCheck,
@@ -60,6 +62,11 @@ export function OwnerDashboard({ initialMembers, initialInvitations, initialRequ
     { href: "/owner/security", title: "Security and billing", body: "Confirm that Sophira cannot run up charges.", icon: ShieldCheck },
     { href: "/owner/ai-providers", title: "AI providers", body: "Which writing assistant is in use and what it can do.", icon: Sparkles },
     { href: "/owner/health", title: "System health", body: "Deeper checks on storage, sign-in and the database.", icon: Settings2 },
+    // 2026-11-13: the four operational views, each answering a question in the owner's words.
+    { href: "/owner/features", title: "Feature health", body: "Sixteen capabilities, and which ones are waiting on you.", icon: Sparkles },
+    { href: "/owner/ai-operations", title: "AI operations", body: "How fast the AI answers, what fails, and what it costs.", icon: Gauge },
+    { href: "/owner/analytics", title: "Network analytics", body: "How your network is growing, week by week.", icon: ChartColumn },
+    { href: "/owner/backup", title: "Backup and recovery", body: "Whether your network could be brought back, proven step by step.", icon: HardDriveDownload },
   ];
 
   return (

@@ -113,3 +113,44 @@ signed-in sessions. So the database update has been applied for these features.
 Not live-verified: actual signed-in presence beats and inbox writes against the production
 database (needs a member test account), and whether the deployment's notification write channel
 is reachable (`insertNotification` direct connection, or the service-role fallback).
+
+
+## The owner's command centre (2026-11-13) — implemented and verified offline
+
+Four pages, each answering one question the owner asked in their own words, plus one searchable
+audit view. Every figure comes from a record Sophira already wrote; nothing is inferred from a
+route existing, and nothing is reported as zero when it could not be read.
+
+| Question the owner asks | Where it is answered | What it is built on |
+|---|---|---|
+| "Which parts actually work?" | `/owner/features` | `src/lib/owner/feature-catalog.ts` (17 capabilities) |
+| "Is the AI working, how fast, how often does it fail?" | `/owner/ai-operations` | `src/lib/owner/ai-operations.ts` + `src/lib/owner/ai-usage.ts` |
+| "How is my network growing?" | `/owner/analytics` | `src/lib/owner/analytics.ts` |
+| "Could we be brought back from a disaster?" | `/owner/backup` | `src/lib/owner/backup-status.ts` |
+| "Did anyone's access change unexpectedly?" | `/owner/security` (searchable) | existing role audit via `SecurityHistory.tsx` |
+
+**Migration `0052_ai_response_latency.sql`** adds one nullable column, `provider_usage.latency_ms`.
+Additive only: no row, policy or grant is altered, and a database that has not taken it still shows
+complete request counts while saying plainly that response time is not measured yet.
+
+**Three defects found and fixed while building this:**
+
+1. `provider_usage` rows were being written without a duration, so "the AI feels slow" could never
+   be answered with evidence. The request that produces an answer now records how long it took.
+2. The backup report could record a failure and still be presented as a completed backup, because
+   a recent timestamp overwrote the failure state. A recorded failure now outranks any date.
+3. The member directory rendered the email twice, and for a member without one it made two
+   different statements about the same fact. It is now rendered exactly once, by the identity
+   subtitle that already knows how to say it is missing.
+
+**Also changed:** the Owner overview reads members through the one shared roster loader instead of
+its own three queries, so the overview and the Members page cannot disagree about the same person,
+and its *Needs attention* list now reports recent AI failures, unproven backups and template legal
+pages - each only when the underlying record says so.
+
+**Privacy:** none of these reads touch a member's assignments, notebooks, uploaded files,
+conversations or learning memory. The analytics page lists what Sophira deliberately does not
+measure rather than drawing an invented line, and no per-member figure is exposed.
+
+Verified: `npm test` 7025/7025, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings,
+production build OK, secret scan clean.

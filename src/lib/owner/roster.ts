@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import { clampThresholds, DEFAULT_THRESHOLDS, type PresenceThresholds } from "@/lib/presence/thresholds";
 import { loadRoleAudit, type RoleChange } from "@/lib/owner/role-audit";
+import { normalizeDirectoryRows } from "@/lib/owner/directory-rows";
 
 /**
  * Owner roster loader (2026-11-03, phase 1; extended 2026-11-12).
@@ -22,6 +23,20 @@ export interface OwnerRoster {
   requests: InvitationRequest[];
   statsError: string | null;
   presenceAvailable: boolean;
+  /**
+   * True when the directory function is MISSING (the database has not taken the newest update),
+   * as opposed to a database that simply could not be reached. The two need different words and
+   * a different owner action, so the distinction is made once, here, from the error's signature.
+   */
+  directoryMissing: boolean;
+  /** The directory's own error message, trimmed for display, or null. */
+  directoryError: string | null;
+  /**
+   * False when the invitation list or the request list could not be read. The overview uses these
+   * instead of treating an empty array as "nothing waiting" - an unread list is not an empty list.
+   */
+  invitationsAvailable: boolean;
+  requestsAvailable: boolean;
   thresholds: PresenceThresholds;
   /** The last few role changes, refusals included. Empty when the table is not there yet. */
   roleChanges: RoleChange[];
@@ -29,19 +44,29 @@ export interface OwnerRoster {
 }
 
 export async function loadOwnerRoster(supabase: SupabaseClient): Promise<OwnerRoster> {
-  const [{ data: directory, error: directoryError }, { data: invitations }, { data: requests }] =
-    await Promise.all([
-      supabase.rpc("network_directory"),
-      supabase.from("invitations").select("*").order("created_at", { ascending: false }),
-      supabase.from("invitation_requests").select("*").order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: directory, error: directoryError },
+    { data: invitations, error: invitationsError },
+    { data: requests, error: requestsError },
+  ] = await Promise.all([
+    supabase.rpc("network_directory"),
+    supabase.from("invitations").select("*").order("created_at", { ascending: false }),
+    supabase.from("invitation_requests").select("*").order("created_at", { ascending: false }),
+  ]);
 
   let members: NetworkMemberStats[] = [];
   let presenceAvailable = true;
   let statsError: string | null = null;
+  const { isMissingDatabasePiece } = await import("@/lib/owner/action-items");
+  const directoryMissing = Boolean(directoryError) && isMissingDatabasePiece(directoryError);
+  const directoryErrorText = directoryError?.message
+    ? directoryError.message.replace(/[\n\r]+/g, " ").slice(0, 160)
+    : null;
 
   if (!directoryError && Array.isArray(directory)) {
-    members = directory as unknown as NetworkMemberStats[];
+    // Normalised, not cast: the function's columns are prefixed (o_user_id ...) and a cast would
+    // hide the day that prefix reaches the browser, turning every member into "Unnamed member".
+    members = normalizeDirectoryRows(directory as Array<Record<string, unknown>>).members;
   } else {
     presenceAvailable = false;
     const { data: stats, error: statsReadError } = await supabase.rpc("network_stats");
@@ -51,7 +76,7 @@ export async function loadOwnerRoster(supabase: SupabaseClient): Promise<OwnerRo
         `Membership statistics could not be loaded (${reason}). The member list may be incomplete ` +
         `— invitations and access management still work. Reload to retry.`;
     } else {
-      members = stats as unknown as NetworkMemberStats[];
+      members = normalizeDirectoryRows(stats as Array<Record<string, unknown>>).members;
       statsError =
         "Presence is not available from this database yet, so it is shown as Unknown. Everything else is complete.";
     }
@@ -83,6 +108,10 @@ export async function loadOwnerRoster(supabase: SupabaseClient): Promise<OwnerRo
     requests: (requests ?? []) as InvitationRequest[],
     statsError,
     presenceAvailable,
+    directoryMissing,
+    directoryError: directoryErrorText,
+    invitationsAvailable: !invitationsError,
+    requestsAvailable: !requestsError,
     thresholds,
     roleChanges: audit.changes,
     roleAuditAvailable: audit.available,

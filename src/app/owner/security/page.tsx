@@ -5,17 +5,32 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { requireOwnerPage } from "@/lib/owner/page-context";
 import { noUnexpectedCharges } from "@/lib/ai/capabilities";
 import { readAiEnv, paidAllowed } from "@/lib/ai/provider";
+import { loadOwnerRoster } from "@/lib/owner/roster";
+import { loadRoleAudit } from "@/lib/owner/role-audit";
+import { SecurityHistory } from "@/components/app/SecurityHistory";
 
 export const dynamic = "force-dynamic";
 
+/** How many audit entries the history page asks for. More than the Members panel's handful,
+ *  because this page exists to be searched. */
+const HISTORY_LIMIT = 200;
+
 /**
- * Security and Billing (2026-11-03, phase 1). Reads the same server-side policy the providers
- * enforce. This page reports the policy; it cannot change it, so no browser interaction can
- * switch protection off.
+ * Security and Billing (2026-11-03, phase 1; history added 2026-11-13). Reads the same
+ * server-side policy the providers enforce. This page reports the policy; it cannot change it,
+ * so no browser interaction can switch protection off.
+ *
+ * The change history below is read with the signed-in staff member's own session, so the
+ * database's own policy - not this page - decides who may see it.
  */
 export default async function OwnerSecurityPage() {
-  await requireOwnerPage();
+  const { supabase } = await requireOwnerPage();
   const charges = noUnexpectedCharges(paidAllowed(readAiEnv()));
+  const roster = await loadOwnerRoster(supabase);
+  const names = new Map<string, string>(
+    roster.members.map((m) => [m.user_id, m.display_name || m.email || "A member"]),
+  );
+  const audit = await loadRoleAudit(supabase, names, HISTORY_LIMIT);
 
   return (
     <AppShell title="Security and Billing" variant="owner">
@@ -25,7 +40,7 @@ export default async function OwnerSecurityPage() {
             <h2 className="text-lg font-semibold text-ink">Protection against surprise charges</h2>
             <p className="mt-1 max-w-2xl text-sm text-ink-soft">
               Sophira is built so an unattended setting cannot start costing money. This page shows
-              the rule currently in force.
+              the rule currently in force, and the changes made to people&apos;s access.
             </p>
           </div>
           <Link href="/owner" className="text-sm font-medium text-accent hover:underline">Back to overview</Link>
@@ -40,6 +55,15 @@ export default async function OwnerSecurityPage() {
             <p className="mt-1 text-sm text-ink-soft">{charges.detail}</p>
           </CardContent>
         </Card>
+
+        <section aria-labelledby="security-history">
+          <h3 id="security-history" className="mb-2 text-sm font-semibold text-ink">Changes to access</h3>
+          <p className="mb-3 max-w-2xl text-sm text-ink-soft">
+            Every role change Sophira has recorded, newest first, including the ones it refused.
+            Search it whenever something about someone&apos;s access does not look right.
+          </p>
+          <SecurityHistory entries={audit.changes} available={audit.available} />
+        </section>
 
         <Card>
           <CardContent className="space-y-2 p-4 text-sm text-ink-soft">

@@ -66,9 +66,18 @@ export function MemberDirectory({
           {id.initials}
         </span>
         <div className="min-w-0">
+          {/*
+            EMAIL ONCE (2026-11-13). These three lines used to be: the name, the identity subtitle
+            (which is the email when the member has a name), and then a separate email line built
+            from the same address. A member with a name therefore read their address twice, and a member
+            without one read "No email on file" over "Email unavailable", two different statements
+            about one fact. The email is no longer rendered separately: memberIdentity() already
+            guarantees it appears exactly once, either as the title (when there is no name to show)
+            or as the subtitle (when there is), and says so plainly when it is missing. Nothing here re-reads identity;
+            the display bug was fixed where it was made.
+          */}
           <p className="truncate font-medium text-ink">{id.title}</p>
           <p className="truncate text-xs text-ink-soft">{id.subtitle}</p>
-          <p className="truncate text-xs text-ink-soft">{row.emailDisplay}</p>
           <p className="mt-1 text-xs text-ink-soft">
             joined {row.joinedDate} · {row.lastActivityDisplay}
             {row.revokedDate ? ` · revoked ${row.revokedDate}` : ""}

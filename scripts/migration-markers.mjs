@@ -124,4 +124,7 @@ export const MARKERS = {
   // backfilled 2026-11-11: there was no probe, so CI could not tell whether it ran.
   "0031_student_memory_course_scope.sql":
     "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'student_memories' and column_name = 'course_id')",
+  // 0052: the AI response-time column behind the owner's AI Operations view.
+  "0052_ai_response_latency.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'provider_usage' and column_name = 'latency_ms')",
 };

@@ -55,9 +55,15 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
   section("-0. The Owner Dashboard states who is at their screen, or says nothing");
   {
     const page = readFileSync("src/app/owner/page.tsx", "utf8");
-    assert(/rpc\("network_directory"\)/.test(page),
-      "overview: the count comes from the same directory function the Members page uses");
-    assert(/presenceLive = !directoryError && Array\.isArray\(directoryRows\)/.test(page),
+    // 2026-11-13: the overview no longer performs its own directory read. It uses the shared
+    // roster loader the Members page uses, which is a stronger version of the same rule: one
+    // read, one source, so the two pages cannot disagree about the same person.
+    assert(/loadOwnerRoster/.test(page) && !/rpc\("network_directory"\)/.test(page),
+      "overview: member data comes from the ONE shared loader, so it cannot disagree with Members");
+    const roster = readFileSync("src/lib/owner/roster.ts", "utf8");
+    assert(/rpc\("network_directory"\)/.test(roster),
+      "overview: that shared loader reads the same directory function the Members page uses");
+    assert(/roster\.presenceAvailable \? tallyPresenceStates\(members\) : null/.test(page),
       "overview: a failed read produces no count at all, never a fake zero");
     assert(/\{tally && \(/.test(page),
       "overview: the strip is rendered only when the tally exists");
@@ -463,7 +469,11 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
     "directory: presence is rendered as a colour AND a word");
   assert(dir.includes("row.conditionLabel"), "directory: account condition has its own column");
   assert(dir.includes("row.roleLabel"), "directory: the member's role is visible in the row");
-  assert(dir.includes("row.emailDisplay"), "directory: the email is visible, or states it is unavailable");
+  // 2026-11-13: the email used to be rendered twice (identity subtitle + a separate line, which
+  // for a member without one produced two different statements about the same fact). It is now
+  // rendered exactly once, by the subtitle, which says so plainly when there is no email.
+  assert(dir.includes("{id.subtitle}") && !dir.includes("row.emailDisplay"),
+    "directory: the email is visible exactly once, and states it is unavailable when there is none");
   assert(dir.includes("Supplied, not verified") && dir.includes("Verified by sign-in"),
     "directory: a phone number says whether it was ever verified");
   assert(dir.includes("md:hidden") && dir.includes("hidden overflow-x-auto") ,

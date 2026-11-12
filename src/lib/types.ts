@@ -20,7 +20,13 @@ export interface Profile {
   preferred_language: string | null;
   onboarded: boolean;
   /** pending | accepted | active are all usable accounts; revoked is not (mirrors the API guard). */
-  status: "active" | "pending" | "accepted" | "revoked";
+  /**
+   * The stored account status. "suspended", "locked" and "deactivated" were added here
+   * (2026-11-13) because the directory function can return them and the Owner overview needs to
+   * count them: the old union narrowed them away, so a suspended member could not be counted
+   * without a cast. Presence is a separate fact and is never derived from this field alone.
+   */
+  status: "active" | "pending" | "accepted" | "revoked" | "suspended" | "locked" | "deactivated";
   last_active_at: string | null;
   can_request_invites: boolean;
   created_at: string;
