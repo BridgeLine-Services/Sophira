@@ -51,7 +51,7 @@ type NavRole = "user" | "tester" | "co_owner" | "owner";
  * sees a link whose page would bounce them back. Anything not marked "staff" is
  * Owner-only: security, billing, AI providers, integrations, database updates.
  */
-const OWNER_NAV_GROUPS: Array<{
+export const OWNER_NAV_GROUPS: Array<{
   heading: string;
   items: Array<{ href: string; label: string; icon: typeof Home; minimum?: NavRole }>;
 }> = [

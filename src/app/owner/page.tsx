@@ -5,6 +5,8 @@ import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user"
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { OwnerDashboard } from "@/components/app/OwnerDashboard";
+import { OwnerAreaGrid } from "@/components/owner/OwnerAreaGrid";
+import type { Role } from "@/lib/roles";
 import { Badge, Button, Card, CardContent } from "@/components/ui";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import Link from "next/link";
@@ -244,6 +246,8 @@ export default async function OwnerPage() {
           )}
         </div>
       </section>
+
+      <OwnerAreaGrid role={(profile.role ?? "user") as Role} />
       <div id="security" className="scroll-mt-4"><NoUnexpectedChargesCard /></div>
       {statsError && (
         <div className="mb-4 rounded-card border border-danger/30 bg-danger/5 p-3" role="alert">
