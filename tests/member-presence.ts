@@ -3,7 +3,9 @@ import { readFileSync } from "fs";
 import {
   PRESENCE_STATES, MANUAL_AVAILABILITIES, computePresence, unknownPresence, presenceLabel, presenceColor,
   normalizePresence, normalizeManualAvailability, accountCondition, accountConditionLabel, countPresence,
-  countConditions, PRESENCE_ALLOWED_STATUSES, type PresenceSession,
+  countConditions,
+  applyInactivity,
+  INACTIVITY_PERIOD_DAYS, PRESENCE_ALLOWED_STATUSES, type PresenceSession,
 } from "../src/lib/presence/state";
 import {
   DEFAULT_THRESHOLDS, THRESHOLD_BOUNDS, clampThreshold, clampThresholds, repairThresholdOrder,
@@ -225,8 +227,35 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
   assert(accountCondition("accepted") === "active", "account: a legacy accepted profile reads Active");
   assert(accountCondition("pending") === "pending_invitation", "account: an unaccepted invitation reads Pending invitation");
   assert(accountCondition("revoked") === "suspended", "account: a revoked profile reads Suspended");
-  assert(accountCondition("something-else") === "inactive",
-    "account: an unrecognised status is Inactive, never dressed up as Active");
+  // 2026-11-12: an unrecognised status used to be folded into Inactive. That was a definite,
+  // false claim about somebody's account - "this person went quiet" - when the truth is that
+  // the record could not be understood. Unknown is the honest answer.
+  assert(accountCondition("something-else") === "unknown",
+    "account: an unrecognised status is Unknown, never dressed up as Active or as Inactive");
+  assert(accountCondition("") === "unknown" && accountCondition(null) === "unknown" && accountCondition(undefined) === "unknown",
+    "account: a missing status is Unknown too, rather than silently Inactive");
+  assert(accountConditionLabel("unknown") === "Unknown", "account: Unknown is written out, not left blank");
+  assert(accountCondition("locked") === "locked" && accountCondition("deactivated") === "deactivated",
+    "account: Locked and Deactivated appear only for statuses the lifecycle actually stores");
+
+  // Inactivity is derived from verified last activity, and it is not a punishment.
+  const nowMs = Date.UTC(2026, 10, 12, 12, 0, 0);
+  const daysAgo = (d: number) => new Date(nowMs - d * 86_400_000).toISOString();
+  assert(applyInactivity("active", daysAgo(3), { inactivityDays: 30, now: nowMs }) === "active",
+    "account: recent activity keeps the account Active");
+  assert(applyInactivity("active", daysAgo(45), { inactivityDays: 30, now: nowMs }) === "inactive",
+    "account: an Active account quiet for longer than the period is Inactive");
+  assert(applyInactivity("active", null, { inactivityDays: 30, now: nowMs }) === "active",
+    "account: with no trustworthy last activity nobody is accused of being Inactive");
+  assert(applyInactivity("active", "not a date", { inactivityDays: 30, now: nowMs }) === "active",
+    "account: unreadable last activity cannot make someone Inactive");
+  assert(applyInactivity("suspended", daysAgo(45), { inactivityDays: 30, now: nowMs }) === "suspended",
+    "account: inactivity never turns a Suspended account into something else");
+  assert(applyInactivity("unknown", daysAgo(45), { inactivityDays: 30, now: nowMs }) === "unknown",
+    "account: Unknown plus a long silence stays Unknown, because the underlying state is still unreadable");
+  assert(applyInactivity("active", daysAgo(45), { inactivityDays: 0, now: nowMs }) === "active",
+    "account: a disabled inactivity period does not make anyone Inactive");
+  assert(INACTIVITY_PERIOD_DAYS === 30, "account: the inactivity period is one stated constant, not a scattered number");
   const suspendedPresence = computePresence({ ...base, accountStatus: "revoked", sessions: [session()] });
   assert(suspendedPresence.state === "offline" && accountCondition("revoked") === "suspended",
     "account: presence and account condition are computed separately and can never be confused");
@@ -238,7 +267,8 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
   const conditions = countConditions(["active", "revoked", "pending", null]);
   assert(conditions.active === 1 && conditions.suspended === 1 && conditions.pending_invitation === 1,
     "counts: account conditions are counted separately");
-  assert(conditions.inactive === 1, "counts: a profile with no status counts as inactive, not as active");
+  assert(conditions.unknown === 1 && conditions.inactive === 0,
+    "counts: a profile with no status counts as Unknown, never as Inactive");
 
   section("8. Thresholds have floors, ceilings and a fixed order");
   assert(DEFAULT_THRESHOLDS.heartbeatIntervalSeconds === 30 && DEFAULT_THRESHOLDS.connectionTimeoutSeconds === 90,
@@ -348,8 +378,8 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
     "summary: presence totals add up across the list");
   assert(s.conditions.active === 2 && s.conditions.suspended === 1 && s.conditions.pending_invitation === 1,
     "summary: account condition totals add up");
-  assert(PRESENCE_FILTERS.length === 9 && CONDITION_FILTERS.length === 7,
-    "filters: every presence state and account condition is offered in the interface");
+  assert(PRESENCE_FILTERS.length === 9 && CONDITION_FILTERS.length === 8,
+    "filters: every presence state and account condition is offered in the interface, Unknown included");
 
   section("12. The published thresholds are the ones the database enforces");
   const sql = readFileSync("supabase/migrations/0050_member_presence.sql", "utf8");

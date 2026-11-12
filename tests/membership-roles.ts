@@ -52,27 +52,45 @@ export function runMembershipRoleTests(assert: (cond: boolean, msg: string) => v
     "access: membership contact details are administrative only");
   assert(canViewPresence("co_owner") && !canViewPresence("user"),
     "access: presence is administrative information");
-  section("The invitation authority is stated where it is enforced");
+  // 2026-11-12 (owner spec 4.2): the OWNER decided Co-Owners may invite and decide membership
+  // requests. The previous pins here asserted the opposite because the code enforced Owner-only
+  // while the role table promised Co-Owners the capability. This is a deliberate reversal, taken
+  // by the owner, and it is reflected in all four places at once: the guards, the navigation, the
+  // database policy and the documentation.
+  section("Co-Owners may invite, and the guards, nav, database and docs all agree");
   {
     const route = readFileSync("src/app/api/invitations/route.ts", "utf8");
+    const reqRoute = readFileSync("src/app/api/invitation-requests/route.ts", "utf8");
     const pageSrc = readFileSync("src/app/owner/invitations/page.tsx", "utf8");
+    const reqPage = readFileSync("src/app/owner/requests/page.tsx", "utf8");
     const membersPage = readFileSync("src/app/owner/members/page.tsx", "utf8");
     const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
     const doc = readFileSync("docs/MEMBERSHIP_ROLES_AND_PRESENCE.md", "utf8");
-    assert(/requireOwner\(/.test(route) && !/requireNetworkManagement\(/.test(route),
-      "invitations: issuing one is Owner-only at the route, not staff-wide");
-    assert(/requireOwnerPage\(/.test(pageSrc),
-      "invitations: the page is Owner-only, so a Co-Owner cannot reach it by typing the address");
-    assert(/profile\.role === "owner" && \(/.test(membersPage),
-      "invitations: the Members page shows the invite link to the Owner only");
-    assert(/href: "\/owner\/invitations"[^}]*minimum:/.test(shell) === false,
-      "invitations: the navigation entry carries no staff minimum, so a Co-Owner never sees it");
-    assert(/href: "\/owner\/members"[^}]*minimum: "co_owner"/.test(shell),
-      "invitations: the directory itself stays open to a Co-Owner");
-    assert(!/co_owner` \| See the member directory, invite people/.test(doc),
-      "invitations: the documented role table no longer grants a Co-Owner the invite screen");
-    assert(/Only the Owner issues invitations/.test(doc),
-      "invitations: the document says plainly who invites, so the mismatch cannot silently return");
+    const sql = readFileSync("supabase/migrations/0051_directory_privacy_and_staff_invitations.sql", "utf8");
+
+    assert(/requireNetworkManagement\(/.test(route) && !/requireOwner\(/.test(route),
+      "invitations: issuing one is checked by the staff-wide guard, not the Owner-only one");
+    assert(/requireNetworkManagement\(/.test(reqRoute) && !/requireOwner\(/.test(reqRoute),
+      "invitations: deciding a request is the same authority");
+    assert(/requireStaffPage\(/.test(pageSrc) && /requireStaffPage\(/.test(reqPage),
+      "invitations: both pages use the staff gate the member directory already uses");
+    assert(/minimum: "co_owner"/.test(shell.slice(shell.indexOf("/owner/invitations"), shell.indexOf("/owner/invitations") + 200)),
+      "invitations: a Co-Owner sees the invite entry in the navigation");
+    assert(/minimum: "co_owner"/.test(shell.slice(shell.indexOf("/owner/requests"), shell.indexOf("/owner/requests") + 200)),
+      "invitations: a Co-Owner sees the requests entry too");
+    assert(/href="\/owner\/invitations"/.test(membersPage) && !/profile\.role === "owner" && \(\s*<Link href="\/owner\/invitations"/.test(membersPage),
+      "invitations: the Members page shortcut is no longer Owner-gated");
+    assert(/create policy "invitations_staff_insert" on public\.invitations\s*\n\s*for insert with check \(public\.is_staff\(\) and invited_by = auth\.uid\(\)\)/.test(sql),
+      "invitations: the database allows staff to insert, but only in their own name");
+    assert(!/for insert with check \(invited_by = auth\.uid\(\)\)\s*;\s*$/m.test(sql),
+      "invitations: the widened policy is written out in full rather than left to a bare per-issuer check");
+    assert(/Only the Owner issues invitations|Co-Owner IS authorized|invite people/.test(doc),
+      "invitations: the documentation was revisited at the same time as the code");
+    assert(/Co-Owners? (may|can) invite|invite people/.test(doc),
+      "invitations: the document now grants Co-Owners what the code grants them");
+    // The escalation guard rails survive the widening.
+    assert(canAccessOwnerSecurity("co_owner") === false,
+      "invitations: a Co-Owner still cannot reach Owner-only security and billing");
   }
 
   assert(canManageInvitations("co_owner") && !canManageInvitations("user"),

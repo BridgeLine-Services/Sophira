@@ -50,16 +50,18 @@ export function canViewPresence(actorRole: Role | string | null | undefined): bo
 }
 
 /**
- * The staff-wide NETWORK MANAGEMENT authority: the member directory, role changes within a
- * Co-Owner's limits, suspending and removing a User or Tester, and the member-facing APIs.
+ * The staff-wide NETWORK MANAGEMENT authority: the member directory, invitations and
+ * invitation requests, role changes within a Co-Owner's limits, and suspending or removing a
+ * User or Tester.
  *
- * It is NOT the authority to issue an invitation. That reads as one label covering two
- * different powers, so it is spelled out here: invitations create accounts, the database
- * policy on `invitations` is per-issuer (`invited_by = auth.uid()`), and issuing one stays
- * Owner-only in both the route (`requireOwner`) and the page (`requireOwnerPage`). A
- * Co-Owner therefore sees no "Invite someone" link and cannot reach the page. Nothing in
- * this file may be read as widening that: `canManageInvitations` is about managing people
- * who are already in the network.
+ * 2026-11-12 (owner spec 4.2): a Co-Owner IS authorized to invite people and to decide
+ * membership requests. That was previously enforced as Owner-only while the published role
+ * table said otherwise; the owner has settled it in favour of the role table, so the code,
+ * the database (migration 0051) and the documentation now agree.
+ *
+ * What this function does NOT authorize, and never has: appointing or removing an Owner or a
+ * Co-Owner, transferring ownership, billing, or security-sensitive settings. Those remain
+ * Owner-only, checked separately, and the database refuses them inside the transaction.
  */
 export function canManageInvitations(actorRole: Role | string | null | undefined): boolean {
   return isStaff(actorRole);

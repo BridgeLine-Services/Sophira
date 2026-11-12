@@ -65,8 +65,8 @@ const OWNER_NAV_GROUPS: Array<{
     heading: "Network Management",
     items: [
       { href: "/owner/members", label: "Members", icon: Users, minimum: "co_owner" },
-      { href: "/owner/invitations", label: "Invite someone", icon: UserPlus },
-      { href: "/owner/requests", label: "Invitation requests", icon: MailQuestion },
+      { href: "/owner/invitations", label: "Invite someone", icon: UserPlus, minimum: "co_owner" },
+      { href: "/owner/requests", label: "Invitation requests", icon: MailQuestion, minimum: "co_owner" },
     ],
   },
   {

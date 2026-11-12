@@ -73,13 +73,6 @@ export function MemberDirectory({
             joined {row.joinedDate} · {row.lastActivityDisplay}
             {row.revokedDate ? ` · revoked ${row.revokedDate}` : ""}
           </p>
-          {(row.subjectUsage?.length ?? 0) > 0 && (
-            <p className="mt-1 flex flex-wrap gap-1">
-              {(row.subjectUsage ?? []).map((sub) => (
-                <Badge key={sub.subject}>{sub.subject} ×{sub.count}</Badge>
-              ))}
-            </p>
-          )}
         </div>
       </div>
     );

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app/AppShell";
 import { RequestsPanel } from "@/components/app/RequestsPanel";
-import { requireOwnerPage } from "@/lib/owner/page-context";
+import { requireStaffPage } from "@/lib/owner/page-context";
 import { loadOwnerRoster } from "@/lib/owner/roster";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * approves or rejects, and a member's request never creates an invitation by itself.
  */
 export default async function OwnerRequestsPage() {
-  const { supabase } = await requireOwnerPage();
+  const { supabase } = await requireStaffPage();
   const { requests, members } = await loadOwnerRoster(supabase);
 
   return (

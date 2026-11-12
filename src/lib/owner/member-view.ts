@@ -22,6 +22,8 @@ import {
   offlineForAccount,
   accountCondition,
   accountConditionLabel,
+  applyInactivity,
+  INACTIVITY_PERIOD_DAYS,
   computePresence,
   presenceColor,
   presenceLabel,
@@ -69,9 +71,6 @@ export interface MemberRow {
   lastActivityDisplay: string;
   /** "Active 3 minutes ago" from the presence session, or "Never seen". */
   lastSeenDisplay: string;
-  responseCount: number;
-  assignmentCount: number;
-  subjectUsage: Array<{ subject: string; count: number }>;
   canRequestInvites: boolean;
   isSelf: boolean;
 }
@@ -88,9 +87,9 @@ export interface MemberRowInput {
   last_active_at?: string | null;
   access_revoked_at?: string | null;
   can_request_invites?: boolean | null;
-  assignment_count?: number | null;
-  response_count?: number | null;
-  subject_usage?: Array<{ subject: string; count: number }> | null;
+  // Deliberately absent (2026-11-12): the directory no longer accepts academic counts or a
+  // subject breakdown, even if an older database still sends them. Ignoring them here is the
+  // second line of defence behind the function that stopped returning them.
   /** Server-computed presence for this member, when the endpoint provided one. */
   presence?: { state?: string | null; session_count?: number | null; last_interaction?: string | null } | null;
   /** Raw sessions, used when the server sent sessions instead of a computed state. */
@@ -146,7 +145,13 @@ export function buildMemberRow(
     ? presence
     : offlineForAccount("This account is not active, so it is offline even if a session row exists.");
 
-  const condition = accountCondition(input.status);
+  // Account condition = what the stored status says, then inactivity applied on top of a
+  // genuinely Active account using verified last-activity data. Unknown never becomes
+  // Inactive, and nobody is Suspended for not logging in.
+  const condition = applyInactivity(accountCondition(input.status), input.last_active_at, {
+    inactivityDays: INACTIVITY_PERIOD_DAYS,
+    now,
+  });
   const lastInteraction = presenceFinal.lastInteraction;
 
   return {
@@ -171,9 +176,6 @@ export function buildMemberRow(
     lastSeenDisplay: lastInteraction
       ? `Active ${relativeTime(lastInteraction, { now, neverLabel: "Never seen" })}`
       : "Never seen",
-    responseCount: Number(input.response_count ?? 0),
-    assignmentCount: Number(input.assignment_count ?? 0),
-    subjectUsage: Array.isArray(input.subject_usage) ? input.subject_usage : [],
     canRequestInvites: Boolean(input.can_request_invites),
     isSelf: Boolean(opts.viewerId && opts.viewerId === input.user_id),
   };
@@ -235,6 +237,7 @@ export const CONDITION_FILTERS: Array<{ id: "all" | AccountCondition; label: str
   { id: "inactive", label: "Inactive accounts" },
   { id: "locked", label: "Locked accounts" },
   { id: "deactivated", label: "Deactivated accounts" },
+  { id: "unknown", label: "Unknown account condition" },
 ];
 
 export interface MemberFilter {
@@ -265,7 +268,7 @@ export function filterMembers(rows: MemberRow[], filter: MemberFilter): MemberRo
 export function summarize(rows: MemberRow[]) {
   const presence = { active: 0, online: 0, idle: 0, away: 0, busy: 0, dnd: 0, offline: 0, unknown: 0 } as Record<PresenceState, number>;
   const conditions = {
-    active: 0, pending_invitation: 0, suspended: 0, inactive: 0, locked: 0, deactivated: 0,
+    active: 0, pending_invitation: 0, suspended: 0, inactive: 0, locked: 0, deactivated: 0, unknown: 0,
   } as Record<AccountCondition, number>;
   for (const row of rows) {
     presence[row.presence.state] += 1;

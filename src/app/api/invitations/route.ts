@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/supabase/guard";
+import { requireNetworkManagement } from "@/lib/supabase/guard";
 import { invitationEmailNote } from "@/lib/invitations/email";
 import { checkEmail, emailProblemMessage, EMAIL_MAX_INPUT } from "@/lib/validation/email";
 import { deliverInvitation, normalizePhone, type Channel } from "@/lib/invitations/delivery";
@@ -9,9 +9,18 @@ import { deliverInvitation, normalizePhone, type Channel } from "@/lib/invitatio
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * 2026-11-12 (owner spec 4.2): a Co-Owner may invite people and manage invitations.
+ *
+ * The guard is the staff-wide network-management one, and the database enforces the same
+ * thing: migration 0051 lets staff insert an invitation but only with invited_by = auth.uid(),
+ * so an invitation is always recorded against the person who issued it and cannot be forged.
+ * Everything still runs on the caller's own request-scoped client - no service-role key ever
+ * reaches this path.
+ */
 async function ownerClient() {
   const supabase = createClient();
-  const guard = await requireOwner(supabase);
+  const guard = await requireNetworkManagement(supabase);
   if (!guard.ok) return { supabase: null, error: guard.response };
   return { supabase, error: null as null };
 }

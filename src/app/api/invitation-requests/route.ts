@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner, requireUser } from "@/lib/supabase/guard";
+import { requireNetworkManagement, requireUser } from "@/lib/supabase/guard";
 import { checkEmail, emailProblemMessage, EMAIL_MAX_INPUT } from "@/lib/validation/email";
 
 export const runtime = "nodejs";
@@ -112,7 +112,10 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const supabase = createClient();
-  const guard = await requireOwner(supabase);
+  // 2026-11-12 (owner spec 4.2): deciding an invitation request is part of managing the
+  // network, which the Co-Owner role includes. Being an Owner is still required elsewhere:
+  // appointing an Owner or Co-Owner, ownership transfer, billing and security settings.
+  const guard = await requireNetworkManagement(supabase);
   if (!guard.ok) return guard.response;
   const ownerId = guard.data.user.id;
 

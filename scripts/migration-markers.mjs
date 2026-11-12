@@ -58,6 +58,11 @@ export const MARKERS = {
     "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'network_member_phones' and n.nspname = 'public' and 'verified' = any(p.proargnames))",
   "0050_member_presence.sql":
     "to_regclass('public.member_presence') is not null",
+  // 0051 changes a function's signature and four policies, so the probe asks for the
+  // invitation policy by name: it exists only once this migration really ran, and the
+  // directory's academic columns are checked by its own test.
+  "0051_directory_privacy_and_staff_invitations.sql":
+    "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'invitations' and policyname = 'invitations_staff_insert')",
   "0046_response_provenance.sql":
     "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'responses' and column_name = 'provider_used')",
   "0045_response_edits.sql":

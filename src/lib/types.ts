@@ -68,9 +68,10 @@ export interface NetworkMemberStats {
   can_request_invites: boolean;
   created_at: string;
   last_active_at: string | null;
-  assignment_count: number;
-  response_count: number;
-  subject_usage: { subject: string; count: number }[];
+  // 2026-11-12: assignment_count, response_count and subject_usage were REMOVED from this
+  // shape on purpose (owner spec 3.5). The directory manages people; it does not report what
+  // they are studying or how much coursework they have done. Aggregates belong in a separate,
+  // privacy-preserving report.
   /** Server-computed presence (2026-11-12). Absent means "not reported", which reads Unknown. */
   presence?: {
     state: string | null;

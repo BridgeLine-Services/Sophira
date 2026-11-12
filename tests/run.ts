@@ -2920,22 +2920,33 @@ async function runInvitationRegressionTests(): Promise<void> {
       "[9,10] approved-request tokens are also 24 random bytes");
 
     // -- [15] Unauthorized users cannot bypass owner approval ------------
-    assert(migrations.includes("invitations_owner_manage"),
-      "[15] invitations are owner-managed via RLS (list/create/update/delete gated)");
-    // lastIndexOf: 0002 REPLACED the 0001 policy — verify the final one.
-    const invPolicyStart = migrations.lastIndexOf('create policy "invitations_owner_manage"');
-    const invPolicyBlock = migrations.slice(invPolicyStart, invPolicyStart + 900).split(";\n")[0];
-    assert(invPolicyBlock.includes("invited_by = auth.uid()")
-      && (invPolicyBlock.match(/p\.role = 'owner'/g) ?? []).length >= 2,
-      "[15] the invitations policy requires BOTH the owner role AND invited_by = auth.uid() in using AND with check (scoped to the policy block)");
+    // 2026-11-12 (owner spec 4.2): the owner decided a Co-Owner may issue invitations. The
+    // guarantee that mattered in the original check is UNCHANGED: every write must be in the
+    // caller's own name, and a non-staff member is refused outright. Only the set of people
+    // allowed to do it widened, and only to staff.
+    const invPolicyStart = migrations.lastIndexOf('create policy "invitations_staff_insert"');
+    assert(invPolicyStart > -1,
+      "[15] invitations are still managed via RLS, now by the staff policies in migration 0051");
+    const invPolicyBlock = migrations.slice(invPolicyStart, invPolicyStart + 400).split(";\n")[0];
+    assert(invPolicyBlock.includes("public.is_staff()") && invPolicyBlock.includes("invited_by = auth.uid()"),
+      "[15] an invitation can only be created by staff AND always in the caller's own name, so nobody can forge one");
+    assert(/create policy "invitations_staff_select" on public\.invitations[\s\S]{0,80}is_staff\(\)/.test(migrations)
+      && /create policy "invitations_staff_delete" on public\.invitations[\s\S]{0,80}is_staff\(\)/.test(migrations),
+      "[15] reading and revoking an invitation are staff decisions, and a plain member holds neither");
+    assert(!/create policy "invitations_[a-z_]*" on public\.invitations[\s\S]{0,200}for insert with check \(true\)/.test(migrations),
+      "[15] no invitation policy was loosened to 'anyone' while widening it to staff");
     assert(/invitation_requests_insert_permitted[\s\S]*?can_request_invites = true/.test(migrations),
       "[15] even FILING a request requires the owner-granted can_request_invites permission (RLS)");
     assert(!/create policy "invitation_requests_requester_update"/.test(migrations),
       "[15] a requester cannot update (approve) their own request — no such policy exists");
-    assert(requestsRoute.includes("requireOwner") && requestsRoute.includes('decision !== "approve"'),
-      "[15] only the owner PATCH path can approve, and approval ISSUES a real invitation");
-    assert(invitationsRoute.includes("requireOwner"),
-      "[15] the invitations API is owner-gated server-side");
+    assert(requestsRoute.includes("requireNetworkManagement") && requestsRoute.includes('decision !== "approve"'),
+      "[15] only the staff PATCH path can approve, and approval ISSUES a real invitation");
+    assert(!requestsRoute.includes("requireOwner("),
+      "[15] request approval no longer claims to be owner-only, because a Co-Owner may now decide one");
+    assert(invitationsRoute.includes("requireNetworkManagement") && !invitationsRoute.includes("requireOwner("),
+      "[15] the invitations API is gated server-side by the staff-wide network authority");
+    assert(invitationsRoute.includes("createClient(") && !/service_role|SERVICE_ROLE_KEY/.test(invitationsRoute),
+      "[15] that path still runs on the caller's own request-scoped client, never the service role");
     assert(guard.includes("Only the owner can do this"),
       "[15] the server guard refuses non-owners on owner endpoints");
 
@@ -5042,12 +5053,24 @@ async function runOwnerRenderSafetyTests(): Promise<void> {
   // 2026-10-28 regression: a null optional field must never throw during
   // render (the owner saw the generic error screen on /owner, and
   // /dashboard redirects owners straight back to /owner).
-  // 2026-11-12: the row is a MemberRow now, so the same guarantee is expressed against
-  // `row.subjectUsage`. The assertion is unchanged in substance: a missing field must not throw.
-  assert(!/\bsubjectUsage\.length/.test(dash) && dash.includes("row.subjectUsage?.length"),
-    "owner: an optional subject_usage field cannot crash the member row");
-  assert(dash.includes("(row.subjectUsage ?? []).map"),
-    "owner: the usage badges render from a guaranteed array");
+  // 2026-11-12 (owner spec 3.5): the academic fields were REMOVED from the directory on
+  // purpose. The original point of these two checks - "a missing optional field must not throw
+  // during render" - is kept, and the field itself is now checked to be genuinely gone from
+  // the interface, the row shape and the database function that feeds it.
+  assert(!/subjectUsage|subject_usage|assignment_count|response_count/.test(dash),
+    "owner: no academic usage field is rendered in the member directory any more");
+  assert(dash.includes("row.presenceLabel") || dash.includes("conditionLabel"),
+    "owner: the identity block still renders, so removing the badges did not gut the row");
+  const view = readFileSync("src/lib/owner/member-view.ts", "utf8");
+  assert(!/subjectUsage:/.test(view) && !/subjectUsage\?:/.test(view),
+    "owner: the row shape no longer carries subject usage, even if an old database sends it");
+  const fn = readFileSync("supabase/migrations/0051_directory_privacy_and_staff_invitations.sql", "utf8");
+  assert(/drop function if exists public\.network_directory\(\)/.test(fn),
+    "privacy: the directory function is recreated rather than left returning academic counts");
+  assert(!/o_assignment_count|o_response_count|o_subject_usage/.test(fn),
+    "privacy: the new directory signature returns no academic content at all");
+  assert(/invited_by = auth\.uid\(\)/.test(fn),
+    "invitations: the per-issuer guarantee survives the widening to staff");
   const setup = readFileSync("src/app/setup/page.tsx", "utf8");
   assert(setup.includes("Create owner account") && setup.includes('href="/login"'),
     "setup: one prominent action leads to the right next step (create the owner account, or sign in)");

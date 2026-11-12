@@ -256,6 +256,10 @@ export const ACCOUNT_CONDITIONS = [
   "suspended",
   "locked",
   "deactivated",
+  // 2026-11-12 (owner spec 3.3): an account whose stored status Sophira cannot interpret is
+  // Unknown. It used to be folded into Inactive, which told the owner something definite and
+  // false about a person's account.
+  "unknown",
 ] as const;
 export type AccountCondition = (typeof ACCOUNT_CONDITIONS)[number];
 
@@ -266,6 +270,7 @@ const CONDITION_LABELS: Record<AccountCondition, string> = {
   suspended: "Suspended",
   locked: "Locked",
   deactivated: "Deactivated",
+  unknown: "Unknown",
 };
 
 export function accountConditionLabel(condition: AccountCondition): string {
@@ -278,18 +283,66 @@ export function accountConditionLabel(condition: AccountCondition): string {
  * exists, the person cannot sign in, and the owner can reinstate it.
  */
 export function accountCondition(status: string | null | undefined): AccountCondition {
-  switch (String(status ?? "").toLowerCase()) {
+  switch (String(status ?? "").toLowerCase().trim()) {
     case "active":
     case "accepted":
       return "active";
     case "pending":
       return "pending_invitation";
     case "revoked":
+    case "suspended":
       return "suspended";
+    // Locked and Deactivated appear only when the lifecycle genuinely stores them.
+    case "locked":
+    case "locked_out":
+      return "locked";
+    case "deactivated":
+    case "disabled":
+      return "deactivated";
+    // NO STATUS AT ALL, or one Sophira does not recognise: Unknown.
+    //
+    // This used to fall through to Inactive, which is a different claim entirely - Inactive
+    // means "we know this account exists and the person has not used Sophira for a long
+    // time". Reporting Unknown as Inactive invented a reason, and an owner reading it would
+    // reasonably conclude the member had gone quiet rather than that the record was
+    // unreadable.
     default:
-      // An unrecognised status is reported honestly rather than dressed up as Active.
-      return "inactive";
+      return "unknown";
   }
+}
+
+/**
+ * INACTIVITY, WHICH IS DERIVED, NOT STORED (2026-11-12, owner spec 3.3).
+ *
+ * Inactive means: the account is fine, the person simply has not used Sophira for longer
+ * than the owner's inactivity period. It is derived from verified last-activity data, so it
+ * can never be asserted when that data is missing (Unknown stays Unknown), and it never
+ * turns into Suspended - nobody is suspended for not logging in.
+ *
+ * `inactivityDays` is the owner's setting; 0 or a non-finite value disables the derivation
+ * rather than guessing a period.
+ */
+/**
+ * The inactivity period Sophira applies when deciding "Inactive". Thirty days matches the
+ * published model. It is a single constant rather than a number sprinkled through the code so
+ * changing it is one edit, and it is stated in the interface so the owner is never guessing.
+ */
+export const INACTIVITY_PERIOD_DAYS = 30;
+
+export function applyInactivity(
+  condition: AccountCondition,
+  lastActiveAt: string | null | undefined,
+  opts: { inactivityDays: number; now?: number },
+): AccountCondition {
+  if (condition !== "active") return condition;
+  const days = opts.inactivityDays;
+  if (!Number.isFinite(days) || days <= 0) return condition;
+  if (!lastActiveAt) return condition; // nothing trustworthy to measure: do not accuse anyone
+  const then = new Date(lastActiveAt).getTime();
+  if (!Number.isFinite(then)) return condition;
+  const now = opts.now ?? Date.now();
+  const elapsedDays = (now - then) / 86_400_000;
+  return elapsedDays > days ? "inactive" : condition;
 }
 
 export interface PresenceCounts {
@@ -316,11 +369,12 @@ export interface ConditionCounts {
   inactive: number;
   locked: number;
   deactivated: number;
+  unknown: number;
 }
 
 export function countConditions(statuses: Array<string | null | undefined>): ConditionCounts {
   const counts: ConditionCounts = {
-    active: 0, pending_invitation: 0, suspended: 0, inactive: 0, locked: 0, deactivated: 0,
+    active: 0, pending_invitation: 0, suspended: 0, inactive: 0, locked: 0, deactivated: 0, unknown: 0,
   };
   for (const status of statuses) counts[accountCondition(status)] += 1;
   return counts;

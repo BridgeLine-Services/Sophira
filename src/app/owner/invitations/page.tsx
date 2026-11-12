@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { AppShell } from "@/components/app/AppShell";
 import { InvitationsPanel } from "@/components/app/InvitationsPanel";
-import { requireOwnerPage } from "@/lib/owner/page-context";
+import { requireStaffPage } from "@/lib/owner/page-context";
 import { loadOwnerRoster } from "@/lib/owner/roster";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * as the provider reported it, with the copy-link fallback always available.
  */
 export default async function OwnerInvitationsPage() {
-  const { supabase } = await requireOwnerPage();
+  const { supabase } = await requireStaffPage();
   const { invitations, members } = await loadOwnerRoster(supabase);
   const hdrs = await headers();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL

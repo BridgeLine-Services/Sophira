@@ -33,9 +33,7 @@ export default async function OwnerMembersPage() {
             </p>
           </div>
           <div className="flex gap-3 text-sm font-medium">
-            {profile.role === "owner" && (
-              <Link href="/owner/invitations" className="text-accent hover:underline">Invite someone</Link>
-            )}
+            <Link href="/owner/invitations" className="text-accent hover:underline">Invite someone</Link>
             <Link href={profile.role === "owner" ? "/owner" : "/dashboard"} className="text-accent hover:underline">
               {profile.role === "owner" ? "Back to overview" : "Back to my workspace"}
             </Link>

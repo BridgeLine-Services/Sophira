@@ -23,21 +23,28 @@ widened the check constraint; no existing row changed.
 | Role | Can | Cannot |
 |---|---|---|
 | `owner` | Everything on the Owner Dashboard: membership, invitations, security, AI providers, integrations, billing-adjacent settings | Read a member's academic content (RLS has no exception for any role) |
-| `co_owner` | See the member directory, change a **User** to Tester and back, suspend or remove a User or Tester | Issue an invitation, decide an invitation request, act on an Owner or another Co-Owner, appoint anyone, promote themselves, change security settings |
+| `co_owner` | See the member directory, invite people, decide invitation requests, change a **User** to Tester and back, suspend or remove a User or Tester | Act on an Owner or another Co-Owner, appoint anyone, promote themselves, change security settings or billing, transfer ownership |
 | `tester` | The normal member workspace plus approved testing features | Anything at all in the member directory |
 | `user` | The normal member workspace | Anything at all in the member directory |
 
 ### Who can invite
 
-Only the Owner issues invitations, and only the Owner decides a pending invitation request.
-A Co-Owner manages people who are **already** in the network. This was previously
-documented the other way round while the code enforced it this way, which is the kind of
-mismatch that turns into a real gap on the day somebody "fixes" the wrong side: the
-`invitations` table policy is per-issuer (`invited_by = auth.uid()`), so a Co-Owner granted
-the screen would see only their own invitations and could not revoke the Owner's. The
-documentation now matches the enforcement, and `tests/membership-roles.ts` pins both. If you
-ever want Co-Owners to invite, that is a deliberate decision: it needs a staff read policy
-on `invitations` first, and it should be made on purpose rather than by drift.
+The Owner **and Co-Owners** issue invitations and decide pending invitation requests. This was
+previously enforced as Owner-only while the published role table said Co-Owners could invite;
+the owner resolved the mismatch in favour of the role table, so the guards, the navigation, the
+documentation and the database now all say the same thing.
+
+The widening is careful on purpose:
+
+- the API guard changed from `requireOwner` to `requireNetworkManagement`, which is the same
+  authority the member directory already uses - not a blanket "any signed-in user";
+- migration 0051 replaced the single Owner policy on `invitations` with four policies that all
+  ask `public.is_staff()`, and the INSERT policy additionally requires
+  `invited_by = auth.uid()`, so an invitation can never be created in someone else's name;
+- a plain User or Tester is still refused by every one of those policies, whatever request they
+  construct by hand;
+- appointing or removing an Owner or a Co-Owner, ownership transfer, billing and
+  security-sensitive settings stay Owner-only.
 
 ### Where the rules live
 
