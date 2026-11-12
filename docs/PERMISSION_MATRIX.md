@@ -57,7 +57,25 @@ may additionally grant to a *lower* role, or narrow for a specific Co-Owner:
 2. A grant can never exceed what the Co-Owner baseline already allows (`D ⊂ C`), so no grant
    can escalate toward Owner.
 3. Closed allowlist of keys; an unrecognised key denies.
-4. Effective permission = role authority AND (baseline OR active grant), never grant alone.
+4. **CORRECTED after Owner review (2026-11-12).** The original rule here read `role authority AND (baseline OR active grant)`. That is wrong: it would make every grant useless to a User or Tester, whose role authority for a delegated key is zero. The evaluator runs four INDEPENDENT tests instead: (a) **eligibility** - may this role receive this key at all (user: narrow allowlist; tester: QA-scoped keys; staff: the delegatable set)? (b) **ceiling** - is the key inside the Co-Owner authority ceiling (`D ⊂ C`)? (c) **active grant** - a grant issued to this person for this key that is neither revoked nor expired, read server-side from the authenticated identity, never from the request? (d) **effective** = `role baseline OR (eligible AND within ceiling AND active grant)`. A grant therefore ADDS authority to a lower role without ever exceeding the ceiling, and can never bypass eligibility.
+
+## Owner decisions (2026-11-12) - these bind the implementation
+
+**D1. Testers and Users may receive grants, under a strict allowlist.** Testers: QA-scoped
+responsibilities only. Users: a narrow, justified set. Membership administration, account
+removal, role assignment and security administration are NEVER grantable below Co-Owner.
+No grant may exceed the Co-Owner ceiling.
+
+**D2. Grants expire after 90 days by default.** The Owner may shorten this, or explicitly
+choose no expiry. Expiry is enforced server-side at read time (not by a cleanup job), and the
+Owner sees a clear indication of expiring grants.
+
+**D3. Grant visibility is role-scoped.** Owner sees all grants; a Co-Owner sees only their own;
+Users and Testers see only their own. Co-Owners cannot see, modify or revoke anyone else's
+grants.
+
+**Gate:** no migration is written until this corrected evaluator is covered by the security
+tests listed in section 3.8 of the directive.
 5. Grant expiry and revocation take effect immediately; every check reads live rows.
 6. Duplicate active grants for the same (user, key) are prevented by a partial unique index.
 7. History is append-only: revoking sets `revoked_at`, nothing is deleted.
