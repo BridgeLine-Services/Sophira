@@ -3,6 +3,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/require-user";
 import { canUseTesterFeatures } from "@/lib/auth/permissions";
+import { normalizeRole } from "@/lib/roles";
+import { needsDatabaseUpdate } from "@/lib/supabase/missing-object";
+import { DatabaseUpdateNotice } from "@/components/system/DatabaseUpdateNotice";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { QaReportForm } from "@/components/tester/QaReportForm";
@@ -31,12 +34,29 @@ export default async function TesterPage() {
   const { data: profile } = await supabase.from("profiles").select("id, role, display_name").eq("id", user.id).maybeSingle();
   if (!profile || !canUseTesterFeatures(profile.role)) redirect("/dashboard");
 
-  const { data: reports } = await supabase
+  const { data: reports, error: reportsError } = await supabase
     .from("qa_reports")
     .select("id, kind, title, area, severity, status, created_at, resolution_note")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(25);
+
+  /*
+   * 2026-11-12: a missing table is NOT "no reports yet". Supabase returns an error and no
+   * rows, and the counts below would confidently read zero. The notice says what is true and
+   * tells an Owner the press that fixes it; anyone else is told who to ask.
+   */
+  if (needsDatabaseUpdate(reportsError)) {
+    return (
+      <AppShell title="Tester Dashboard" role={profile.role}>
+        <DatabaseUpdateNotice
+          feature="your QA reports"
+          error={reportsError}
+          canUpdate={normalizeRole(profile.role) === "owner"}
+        />
+      </AppShell>
+    );
+  }
 
   const rows = reports ?? [];
   const open = rows.filter((r) => r.status === "open" || r.status === "triaged").length;

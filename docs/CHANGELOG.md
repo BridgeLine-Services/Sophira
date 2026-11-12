@@ -1,3 +1,39 @@
+## 2026-11-12 — A page that could not be read no longer looks like an empty page
+
+Sophira's code deploys on merge; the database is updated when the Owner presses **Update
+database**. That gap is normal, and while it exists Supabase answers a read for a table it has not
+been given with `data: null` **and** an error rather than throwing. Every page that wrote
+`data ?? []` showed a confident empty state instead of the truth, and one of them put a composer on
+top of the missing table, so the first sign of trouble would have been a refused send after typing.
+
+Live today this mattered: migrations 0054 and 0055 (`qa_reports`, `learning_goals`,
+`announcements`) are not in the production database, so the Tester workspace, QA triage and
+Announcements would each have read as "nothing here yet".
+
+One detector now answers one question - is this "the database has not been given that part yet", or
+a real failure? (`src/lib/supabase/missing-object.ts`). It recognises the missing-object codes the
+driver actually sends (42P01, 42703, 42883, PGRST205/204/202) plus the wording, and it refuses
+everything else: a permission refusal, an expired session, a dropped connection and a constraint
+error are never turned into a setup step, because pressing update cannot fix any of them. That
+refusal is checked *before* the code, so a contradictory error is read conservatively.
+
+`DatabaseUpdateNotice` then states what is true: what could not be read, that nothing was lost (a
+missing table holds no rows to lose), that the update only adds things and pressing it twice is
+safe, and the four presses in order. An Owner gets a real link to their dashboard; anyone else is
+told to ask the Owner and is never sent to a page that would refuse them. It carries no client
+directive and no handlers, so it renders inside a Server Component and needs no JavaScript.
+
+Wired into the Tester workspace, staff QA triage and Announcements - each asks the question after
+its role gate and before its empty state, and Announcements asks before it offers the composer.
+
+The test runner also learned to resolve `@/...` (`tests/helpers/alias.ts`, imported first by
+`tests/run.ts`), so a suite can render a REAL Server Component with `renderToStaticMarkup` instead
+of searching its source text. That is how the notice's wording, and the absence of a dead button
+for a non-Owner, are now pinned.
+
+Verified: 7665/7665 tests, tsc clean, lint 0 errors (33 warnings, ceiling unchanged), production
+build OK.
+
 ## 2026-11-12 — Four ranks, four dashboards: role-based navigation repaired
 
 The navigation asked a single question four different ways, and answered it wrongly in three of
