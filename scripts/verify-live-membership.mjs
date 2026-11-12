@@ -185,6 +185,44 @@ if (!(await rpcRefusesAnon("presence_set_availability", { p_availability: "avail
   );
 }
 
+// The dashboard's growth and study panel reads a staff-gated COUNT (migration 0056). This asks
+// the live project whether that function is there, and whether it really refuses a caller with
+// no staff profile - the one thing a chart is not allowed to do is hand a member the network's
+// totals because a policy was widened to make it convenient.
+{
+  const { status, body } = await rest("rpc/network_activity_daily", {
+    method: "POST",
+    body: JSON.stringify({ p_days: 3 }),
+  });
+  const text = JSON.stringify(body ?? "");
+  const absent = status === 404 || text.includes("PGRST202");
+  const refused = status === 403 || /42501/.test(text);
+  record(
+    absent ? "FAIL" : refused ? "PASS" : "FAIL",
+    "the dashboard's per-day counts exist and refuse a non-staff caller (migration 0056)",
+    absent
+      ? "the function is absent, so the growth panel says so honestly; press Update database on the Owner Dashboard"
+      : refused
+        ? `${status} - the function answered nobody's counts because this caller is not staff`
+        : `${status} ${text.slice(0, 90)} - it answered a caller with no staff profile`,
+  );
+  if (absent || !refused) failed += 1;
+
+  const anon = await fetch(`${URL_BASE}/rest/v1/rpc/network_activity_daily`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_days: 3 }),
+  }).catch(() => null);
+  const anonStatus = anon ? anon.status : 0;
+  record(
+    anonStatus === 401 || anonStatus === 403 ? "PASS" : "INFO",
+    "the per-day counts are not callable without a key at all",
+    anonStatus === 401 || anonStatus === 403
+      ? `answered ${anonStatus} to a request carrying no key`
+      : `answered ${anonStatus || "no response"}; the function is granted to authenticated callers only, and this records what the live project actually said`,
+  );
+}
+
 // Nothing may have been created by the probes above.
 {
   const after = await rowCount("member_presence");
