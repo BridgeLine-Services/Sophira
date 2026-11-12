@@ -53,8 +53,18 @@ again. Hiding a button changes nothing about what a request is allowed to do.
 
 ### The audit trail
 
-`public.membership_audit` records one row per change: `actor_id`, `target_user_id`,
-`old_role`, `new_role`, `reason`, `created_at`. Only staff can read it
+`public.membership_audit` records one row per attempt: `actor_id`, `target_id`,
+`previous_role`, `new_role`, `success`, `failure_reason`, `created_at`. A **refused**
+attempt is recorded too, so "Sophira stopped this" is visible rather than invisible.
+
+The Members page shows the last eight entries under **Recent role changes**, with each
+one as a sentence ("Dana changed Sam from User to Co-Owner", or "…tried to change… and
+Sophira refused it: this is the only Owner"). A person who has left the network is
+named "Someone no longer in your network" instead of appearing as a blank, and a
+database that has not taken the migration says the list cannot be shown yet rather
+than looking like nothing has ever happened.
+
+Only staff can read it
 (`public.is_staff()`), a member cannot read or write it, and it is deliberately
 **excluded** from the member data export because it names the administrator who
 acted, which is another person's information.

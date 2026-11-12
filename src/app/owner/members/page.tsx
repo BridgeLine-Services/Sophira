@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app/AppShell";
 import { MembersPanel } from "@/components/app/MembersPanel";
 import { PresenceSettings } from "@/components/app/PresenceSettings";
+import { RoleChangeLog } from "@/components/app/RoleChangeLog";
 import { requireStaffPage } from "@/lib/owner/page-context";
 import { loadOwnerRoster } from "@/lib/owner/roster";
 import { isRole } from "@/lib/roles";
@@ -15,7 +16,8 @@ export const dynamic = "force-dynamic";
  */
 export default async function OwnerMembersPage() {
   const { supabase, user, profile } = await requireStaffPage();
-  const { members, statsError, thresholds, presenceAvailable } = await loadOwnerRoster(supabase);
+  const { members, statsError, thresholds, presenceAvailable, roleChanges, roleAuditAvailable } =
+    await loadOwnerRoster(supabase);
 
   return (
     <AppShell title="Members" variant="owner">
@@ -55,6 +57,8 @@ export default async function OwnerMembersPage() {
           presenceAvailable={presenceAvailable}
           initialNotice={statsError}
         />
+
+        <RoleChangeLog changes={roleChanges} available={roleAuditAvailable} />
       </div>
     </AppShell>
   );

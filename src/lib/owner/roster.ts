@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Invitation, InvitationRequest, NetworkMemberStats } from "@/lib/types";
 import { clampThresholds, DEFAULT_THRESHOLDS, type PresenceThresholds } from "@/lib/presence/thresholds";
+import { loadRoleAudit, type RoleChange } from "@/lib/owner/role-audit";
 
 /**
  * Owner roster loader (2026-11-03, phase 1; extended 2026-11-12).
@@ -22,6 +23,9 @@ export interface OwnerRoster {
   statsError: string | null;
   presenceAvailable: boolean;
   thresholds: PresenceThresholds;
+  /** The last few role changes, refusals included. Empty when the table is not there yet. */
+  roleChanges: RoleChange[];
+  roleAuditAvailable: boolean;
 }
 
 export async function loadOwnerRoster(supabase: SupabaseClient): Promise<OwnerRoster> {
@@ -70,6 +74,8 @@ export async function loadOwnerRoster(supabase: SupabaseClient): Promise<OwnerRo
   }
 
   const thresholds = await loadThresholds(supabase);
+  const names = new Map<string, string>(members.map((m) => [m.user_id, m.display_name]));
+  const audit = await loadRoleAudit(supabase, names);
 
   return {
     members,
@@ -78,6 +84,8 @@ export async function loadOwnerRoster(supabase: SupabaseClient): Promise<OwnerRo
     statsError,
     presenceAvailable,
     thresholds,
+    roleChanges: audit.changes,
+    roleAuditAvailable: audit.available,
   };
 }
 

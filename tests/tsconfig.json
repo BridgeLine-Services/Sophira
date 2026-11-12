@@ -38,6 +38,8 @@
     "../src/types/pdf-parse.d.ts",
     "../src/lib/research/policy.ts",
     "../src/lib/research/verify.ts",
-    "../src/lib/invitations/delivery.ts"
+    "../src/lib/invitations/delivery.ts",
+    "../src/lib/owner/role-audit.ts",
+    "../src/lib/roles.ts"
   ]
 }
