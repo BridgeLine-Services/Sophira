@@ -19,6 +19,12 @@ interface TrendChartProps {
   sourceNote?: string;
   /** What one mark counts, named in the accessible description. */
   unit?: string;
+  /**
+   * A second series drawn with the first (2026-11-12): sign-ups beside study sessions, on one
+   * scale so the two lines can be compared honestly. Only the line variant supports it, because
+   * two sets of bars in one slot makes neither readable.
+   */
+  compare?: { label: string; series: DayBar[] };
 }
 
 export function TrendChart({
@@ -29,9 +35,14 @@ export function TrendChart({
   unreadable = false,
   sourceNote,
   unit = "events",
+  compare,
 }: TrendChartProps) {
-  const max = Math.max(1, ...series.map((day) => day.count));
+  // A comparison needs the same axis, so both series share one maximum: two independent scales
+  // would make the taller line look busier when it is only differently normalised.
+  const altSeries = variant === "line" ? compare?.series : undefined;
+  const max = Math.max(1, ...series.map((day) => day.count), ...(altSeries ?? []).map((day) => day.count));
   const total = series.reduce((sum, day) => sum + day.count, 0);
+  const altTotal = (altSeries ?? []).reduce((sum, day) => sum + day.count, 0);
   const width = 100;
   const height = 36;
   const step = series.length > 1 ? width / (series.length - 1) : width;
@@ -42,9 +53,20 @@ export function TrendChart({
       return `${x.toFixed(2)},${y.toFixed(2)}`;
     })
     .join(" ");
+  const altPoints = (altSeries ?? [])
+    .map((day, index) => {
+      const x = series.length > 1 ? index * step : width / 2;
+      const y = height - (day.count / max) * height;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
   const label = `Recorded ${unit} over the last ${series.length} days: ${series
     .map((day) => `${day.label} ${day.count}`)
-    .join(", ")}`;
+    .join(", ")}${
+    altSeries
+      ? `. Compared with ${compare?.label}: ${altSeries.map((day) => `${day.label} ${day.count}`).join(", ")}`
+      : ""
+  }`;
 
   return (
     <div>
@@ -54,7 +76,11 @@ export function TrendChart({
           <p className="dash-panel-sub mt-1">{subtitle}</p>
         </div>
         <p className="dash-chip">
-          {unreadable ? "Could not read" : `${total} ${unit} in ${series.length} days`}
+          {unreadable
+            ? "Could not read"
+            : altSeries
+              ? `${total} ${unit} · ${altTotal} ${compare?.label}`
+              : `${total} ${unit} in ${series.length} days`}
         </p>
       </div>
 
@@ -75,6 +101,14 @@ export function TrendChart({
             <title>{label}</title>
             {variant === "line" ? (
               <>
+                {altSeries && (
+                  <polyline
+                    className="trend-line-alt"
+                    points={altPoints}
+                    fill="none"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
                 <polyline className="trend-line" points={points} fill="none" vectorEffect="non-scaling-stroke" />
                 {series.map((day, index) => {
                   const x = series.length > 1 ? index * step : width / 2;
@@ -103,6 +137,16 @@ export function TrendChart({
               })
             )}
           </svg>
+          {altSeries && (
+            <ul className="trend-legend mt-2">
+              <li>
+                <span className="trend-swatch trend-swatch-main" aria-hidden /> {unit}
+              </li>
+              <li>
+                <span className="trend-swatch trend-swatch-alt" aria-hidden /> {compare?.label}
+              </li>
+            </ul>
+          )}
           <div className="mt-1 flex justify-between gap-1 text-[11px] text-ink-soft">
             {series.map((day, index) => (
               <span key={day.key} className="min-w-0 flex-1 text-center">

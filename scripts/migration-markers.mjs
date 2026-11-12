@@ -133,4 +133,8 @@ export const MARKERS = {
     "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'record_admin_event' and n.nspname = 'public')",
   "0054_tester_workspace_and_learning_goals.sql": "to_regclass('public.qa_reports') is not null",
   "0055_announcements.sql": "to_regclass('public.announcements') is not null",
+  // 0056: the staff-gated per-day counts behind the dashboard charts. The probe asks for the
+  // function itself, which only exists once this migration really ran.
+  "0056_network_activity_series.sql":
+    "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'network_activity_daily' and n.nspname = 'public')",
 };

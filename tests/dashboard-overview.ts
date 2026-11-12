@@ -20,11 +20,13 @@ import {
   buildMilestones,
   buildUpcoming,
   countRows,
+  dailySeries,
   dashboardHeadingFor,
   daysBetween,
   describeDue,
   readCount,
   readList,
+  type ActivityDayRow,
   type CountRead,
   type GoalRow,
 } from "../src/lib/dashboard/overview";
@@ -551,5 +553,89 @@ export function runDashboardOverviewTests(
       "dashboard: the teal hero the reskin substituted is gone");
     assert((css.match(/--hero-bg:/g) ?? []).length === 2,
       "dashboard: one hero gradient per theme, light and dark");
+  }
+
+  // ==== Q. The fuller series: sign-ups and study activity, counted not guessed ====
+  // The owner asked for a richer chart than membership events. Sign-ups, study sessions and
+  // answers are own-rows-only, so the counts come from a staff-gated function; the client only
+  // buckets what that function returned.
+  section("dashboard: the growth series counts real rows, one bar per day");
+  {
+    const rows: ActivityDayRow[] = [
+      { day: "2026-11-12", signups: 2, study_sessions: 5, answers: 9 },
+      { day: "2026-11-10", signups: 1, study_sessions: 0, answers: 0 },
+      { day: "2026-11-03", signups: 4, study_sessions: 4, answers: 4 },
+      { day: "2026-10-01", signups: 99, study_sessions: 99, answers: 99 },
+      { day: "not-a-day", signups: 40, study_sessions: 40, answers: 40 },
+      { day: "2026-11-09", signups: -3, study_sessions: 1.6, answers: 0 },
+    ];
+    const series = dailySeries(rows, "signups", NOW, 14);
+    assert(series.length === 14,
+      "dashboard: the growth series is one bar per day in the window, never fewer");
+    assert(series.every((day, i) => i === 0 || day.key > series[i - 1].key),
+      "dashboard: the days are in order, oldest first");
+    assert(series[series.length - 1].key === "2026-11-12" && series[series.length - 1].isToday,
+      "dashboard: the last bar is today in UTC");
+    assert(series.find((d) => d.key === "2026-11-12")?.count === 2,
+      "dashboard: a day with rows carries its real count");
+    assert(series.find((d) => d.key === "2026-11-10")?.count === 1,
+      "dashboard: a day with activity is drawn with its own number");
+    assert(series.find((d) => d.key === "2026-11-11")?.count === 0,
+      "dashboard: a quiet day is a real zero, not a gap");
+    assert(!series.some((d) => d.count >= 40),
+      "dashboard: a row outside the window, an unparseable day or a negative count is dropped, never drawn");
+    assert(series.find((d) => d.key === "2026-11-13") === undefined,
+      "dashboard: no bar is invented for a day after today");
+    assert(series.reduce((sum, d) => sum + d.count, 0) === 7,
+      "dashboard: the total is the sum of the days that are actually in the window");
+
+    const sessions = dailySeries(rows, "study_sessions", NOW, 14);
+    assert(sessions.find((d) => d.key === "2026-11-12")?.count === 5,
+      "dashboard: the same rows can be read as study sessions");
+    assert(sessions.find((d) => d.key === "2026-11-09")?.count === 2,
+      "dashboard: a fractional count is rounded, never silently truncated to zero");
+
+    const reversed = dailySeries([...rows].reverse(), "signups", NOW, 14);
+    assert(reversed.map((d) => d.count).join(",") === series.map((d) => d.count).join(","),
+      "dashboard: the same rows bucket the same way whatever order they arrive in");
+
+    const migration = readFileSync("supabase/migrations/0056_network_activity_series.sql", "utf8");
+    assert(migration.includes("function public.network_activity_daily"),
+      "dashboard: the per-day counts come from a named database function");
+    assert(migration.includes("if not public.is_staff() then") && migration.includes("42501"),
+      "dashboard: that function refuses anyone who is not staff");
+    assert(migration.includes("security definer") && migration.includes("set search_path = public, pg_temp"),
+      "dashboard: it is SECURITY DEFINER with a pinned search path");
+    assert(migration.includes("revoke all on function public.network_activity_daily(integer) from public, anon"),
+      "dashboard: the function is not callable by anonymous callers");
+    assert(!/create policy|drop policy|alter policy|grant select/i.test(migration),
+      "dashboard: no policy is created, dropped or widened - member tables stay own-rows-only");
+    assert(migration.includes("profiles") && migration.includes("work_sessions") && migration.includes("responses"),
+      "dashboard: the counts come from the real tables, not a summary someone has to maintain");
+    const signature = migration.slice(migration.indexOf("returns table"), migration.indexOf("language plpgsql"));
+    assert(/day date/.test(signature) && /signups integer/.test(signature) &&
+      /study_sessions integer/.test(signature) && /answers integer/.test(signature),
+      "dashboard: the function's shape is a day and three counts");
+    assert(!/user_id|display_name|email|content/.test(signature),
+      "dashboard: no member identity or member work is ever returned");
+    assert(!/select\s+[a-z_.]*user_id|select\s+[a-z_.]*display_name|p\.email|r\.content/i.test(migration),
+      "dashboard: the body counts rows, it does not project a member's identity or text");
+
+    const chart = readFileSync("src/components/dashboard/TrendChart.tsx", "utf8");
+    assert(chart.includes("trend-line-alt") && chart.includes("trend-legend"),
+      "dashboard: a second series is drawn and named in a legend");
+    assert(chart.includes("compare") && chart.includes("altTotal"),
+      "dashboard: the comparison's own total is shown beside the first series");
+    assert(chart.includes("both series share one maximum") || chart.includes("share one maximum"),
+      "dashboard: both lines share one scale, so a busier line cannot be faked by normalising it");
+
+    const ownerPage = readFileSync("src/app/owner/page.tsx", "utf8");
+    assert(ownerPage.includes('rpc("network_activity_daily"'),
+      "dashboard: the owner page reads the staff-gated series");
+    assert(ownerPage.includes('dailySeries(activityDaily, "signups"') &&
+      ownerPage.includes('dailySeries(activityDaily, "study_sessions"'),
+      "dashboard: sign-ups and study sessions are drawn from the same read");
+    assert(ownerPage.includes('unreadable={Boolean(dailyError)}'),
+      "dashboard: a failed growth read says so instead of drawing zeros");
   }
 }

@@ -399,6 +399,15 @@ input, textarea, select {
 
 /* Trend chart (2026-11-12): purple on the white role panels, no literal colour in the tsx. */
 .trend-line { stroke: #6d4bd8; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+/* The second line of a two-series panel: same hue family, lighter and dashed, so the two lines
+   stay distinguishable in greyscale as well as colour. */
+.trend-line-alt { stroke: #b9a4f2; stroke-width: 2; stroke-dasharray: 4 3; stroke-linejoin: round; stroke-linecap: round; }
+/* The chart sits on a theme panel, so the legend follows the theme text colour, not white. */
+.trend-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: rgb(var(--c-ink-soft)); }
+.trend-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.trend-swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+.trend-swatch-main { background: #6d4bd8; }
+.trend-swatch-alt { background: repeating-linear-gradient(90deg, #b9a4f2 0 4px, transparent 4px 7px); }
 .trend-dot { fill: #6d4bd8; }
 .trend-bar { fill: #d9cdf7; }
 .trend-bar[data-on="true"] { fill: #6d4bd8; }

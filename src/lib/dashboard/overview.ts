@@ -245,6 +245,65 @@ export function weekActivity(events: Array<{ at: string }>, now: Date, days = 7)
 }
 
 /* ------------------------------------------------------------------ *
+ * The fuller series: sign-ups and study activity, one bar per day
+ * ------------------------------------------------------------------ */
+
+/** One row of public.network_activity_daily() - counts only, never member data. */
+export interface ActivityDayRow {
+  /** YYYY-MM-DD in UTC. */
+  day: string;
+  signups: number;
+  study_sessions: number;
+  answers: number;
+}
+
+/** Which count a chart is drawing, named so a label can never drift from the numbers. */
+export type ActivityMetric = "signups" | "study_sessions" | "answers";
+
+export const ACTIVITY_METRIC_LABEL: Record<ActivityMetric, string> = {
+  signups: "accounts created",
+  study_sessions: "study sessions",
+  answers: "answers submitted",
+};
+
+/**
+ * Turn the database's per-day rows into chart bars.
+ *
+ * The database already emits one row per day in the window (a generate_series left-joined to
+ * the counts), and this repeats that guarantee on the client: every day in the window becomes a
+ * bar, so a quiet day is a real zero and never a gap. A row outside the window, an unparseable
+ * day, or a negative count is dropped rather than drawn - a chart that invents a day is worse
+ * than one that shows fewer.
+ */
+export function dailySeries(
+  rows: ActivityDayRow[],
+  metric: ActivityMetric,
+  now: Date,
+  days = 14,
+): DayBar[] {
+  const span = Math.max(1, Math.min(90, Math.floor(days)));
+  const buckets: DayBar[] = [];
+  const index = new Map<string, DayBar>();
+  const start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (span - 1) * 86_400_000;
+  for (let i = 0; i < span; i += 1) {
+    const at = new Date(start + i * 86_400_000);
+    const key = at.toISOString().slice(0, 10);
+    const bar: DayBar = { key, label: WEEKDAY_INITIALS[at.getUTCDay()], count: 0, isToday: i === span - 1 };
+    buckets.push(bar);
+    index.set(key, bar);
+  }
+  for (const row of rows) {
+    const key = typeof row?.day === "string" ? row.day.slice(0, 10) : "";
+    const bucket = index.get(key);
+    if (!bucket) continue;
+    const value = Number(row[metric]);
+    if (!Number.isFinite(value) || value < 0) continue;
+    bucket.count += Math.round(value);
+  }
+  return buckets;
+}
+
+/* ------------------------------------------------------------------ *
  * Overall learning progress - one number, and the arithmetic behind it
  * ------------------------------------------------------------------ */
 
