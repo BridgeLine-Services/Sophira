@@ -44,7 +44,12 @@ export default async function TesterPage() {
   const feedback = rows.filter((r) => r.kind === "feedback").length;
 
   return (
-    <AppShell title="Testing workspace">
+    /*
+   * 2026-11-12: the Tester's own home. It stays inside the academic workspace (a Tester is a
+   * working member), and the rank is passed to the shell so their menu shows "Tester
+   * Dashboard" - never the Owner's or the Co-Owner's, and never at all for an ordinary member.
+   */
+  <AppShell title="Tester Dashboard" role={profile.role}>
       <div className="space-y-6">
         <p className="max-w-2xl text-sm text-ink-soft">
           You&apos;re a tester. Use Sophira normally, and when something misbehaves, breaks, or could be better,

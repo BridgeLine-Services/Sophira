@@ -5,6 +5,7 @@
  * Library scoped by course with server-enforced filtering.
  */
 import { existsSync, readFileSync, readdirSync } from "fs";
+import { readNavSurface } from "./helpers/navigation";
 import { join } from "path";
 import { classifyEngine, ENGINES, ENGINE_TOOLS, subjectTools, toolUrl, subjectToolUrl, COURSE_GROUPS } from "../src/lib/courses/engines";
 
@@ -118,7 +119,9 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(!readFileSync("src/lib/courses/engines.ts", "utf8").includes("typingTool"),
     "typing: NO subject workspace lists a typing tool card; the feature is centralized, not repeated under every course");
   {
-    const navShell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+    // 2026-11-12: the menu lives in src/lib/navigation/workspace-nav.ts and the renderers in
+    // AppShell, so the surface is both files. Still exactly ONE entry each way.
+    const navShell = readNavSurface();
     const typingEntries = (navShell.match(/\/writing\/typing/g) ?? []).length;
     assert(typingEntries === 1 && navShell.includes('label: "Typing Calibration"'),
       "typing: exactly ONE dedicated Typing Calibration entry in the user side panel, labeled and centralized");
@@ -136,7 +139,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     "learning: /corrections remains as a backward-compatible redirect (nothing deleted)");
   assert(readFileSync("src/app/memories/page.tsx", "utf8").includes('redirect("/learning")'),
     "learning: /memories remains as a backward-compatible redirect (nothing deleted)");
-  const nav = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  const nav = readNavSurface();
   assert(nav.includes('"Learning / Memory"') && nav.includes('"/learning"'),
     "learning: the navigation exposes ONE Learning / Memory destination");
   assert(nav.includes('href="#main-content"') && nav.includes('id="main-content"') && nav.includes('aria-current={active ? "page" : undefined}'),
@@ -208,12 +211,13 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
 // ---- MASTER STRUCTURE SPEC (2026-10-09): navigation, hierarchy, engines ----
   // Global navigation contains every required destination, including Online.
   const shell = readFileSync("src/components/app/AppShell.tsx", "utf8");
+  const navSurface = readNavSurface();
   for (const required of [
     '/dashboard", label: "Home"', '/courses", label: "Courses"', '/notebooks", label: "Notebooks"',
     '/learning", label: "Learning / Memory"', '/offline", label: "Offline"',
     '/settings", label: "Settings"',
   ]) {
-    assert(shell.includes(required), `nav: primary navigation includes ${required}`);
+    assert(navSurface.includes(required), `nav: primary navigation includes ${required}`);
   }
   assert(!shell.includes('/proposals", label: "Changes"') && !shell.includes('/online", label: "Online"'),
     "nav: global Changes and Online are NOT separate top-level items (Changes merges into Learning / Memory; Online is a status chip)");
@@ -399,14 +403,20 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   // "use client" directive, because the Owner Dashboard's Server Component could not read
   // it out of this Client Component (that import threw on /owner in production).
   const ownerNavSrc = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
-  assert(shell4.includes("OWNER_NAV") && ownerNavSrc.includes("My Workspace") && ownerNavSrc.includes("/dashboard?view=workspace"),
+  assert(shell4.includes("ownerNavGroupsFor(") && ownerNavSrc.includes("My Workspace") && ownerNavSrc.includes("/dashboard?view=workspace"),
     "owner: the owner layout has its own navigation with My Workspace as the single intentional exit into the personal workspace");
   assert(shell4.includes('variant === "owner" ? (') && shell4.includes('variant?: "workspace" | "owner"'),
     "owner: AppShell has separate owner and workspace navigation layouts (variant prop)");
-  // 2026-11-12: the brand link is now adminHomeHref, which is /owner for an Owner,
-  // /owner/members for a Co-Owner (who cannot open /owner) and /dashboard for everyone else.
-  assert(shell4.includes('const adminHomeHref = isOwner ? "/owner" : isCoOwner ? "/owner/members" : "/dashboard"'),
-    "owner: the Sophira logo opens the Owner Dashboard for the owner (workspace users keep /dashboard)");
+  // 2026-11-13: the brand link is the rank's own dashboard, resolved in ONE shared module
+  // instead of an inline ternary. The old inline version sent a Co-Owner to /owner/members
+  // and called that an "Owner Dashboard"; it is /co-owner now.
+  const roleHomeSrc = readFileSync("src/lib/navigation/role-home.ts", "utf8");
+  assert(shell4.includes("const adminHomeHref = adminHomeFor(role)"),
+    "owner: the Sophira logo asks the shared resolver where this rank's home is");
+  assert(/co_owner: \{ href: "\/co-owner", label: "Co-Owner Dashboard" \}/.test(roleHomeSrc) &&
+    /owner: \{ href: "\/owner", label: "Owner Dashboard" \}/.test(roleHomeSrc) &&
+    /user: null/.test(roleHomeSrc),
+    "owner: the resolver sends the Owner to /owner, a Co-Owner to /co-owner and a member to no dashboard at all");
   assert(shell4.includes('workspaceHomeHref = isOwner ? "/dashboard?view=workspace" : "/dashboard"') && shell4.includes('navLink(workspaceHomeHref, "Home", Home)'),
     "workspace: Home inside the workspace opens the WORKSPACE Home even for the owner (no silent reset to the owner view)");
   assert(shell4.includes('href.split("?")[0]') && shell4.includes('pathname === base'),
@@ -706,7 +716,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   section("course-independent lifecycle (save, list, reopen, resume)");
   {
     const dash = readFileSync("src/app/dashboard/page.tsx", "utf8");
-    assert(dash.includes('from("assignments").select("id, title, mode, status, updated_at")') &&
+    assert(dash.includes('from("assignments").select("id, title, mode, status, due_at, updated_at")') &&
       !dash.includes('.eq("course_id"'),
       "my-work: the dashboard lists assignments with NO course filter — course-free work surfaces next to course-associated work");
     const newPage = readFileSync("src/app/assignments/new/page.tsx", "utf8");
@@ -821,7 +831,7 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     // 2026-11-12: the registry is data in src/lib/navigation/owner-nav.ts now. These
     // assertions follow the DATA; AppShell is only checked for consuming it.
     const navRegistry = readFileSync("src/lib/navigation/owner-nav.ts", "utf8");
-    assert(shell.includes("OWNER_NAV_GROUPS"),
+    assert(shell.includes("ownerNavGroupsFor(") && shell.includes("visibleOwnerGroups.map"),
       "owner-nav: the owner sidebar is grouped, not a flat list");
     for (const h of ["Overview", "Network Management", "Configuration", "Personal"]) {
       assert(navRegistry.includes(`heading: "${h}"`),
@@ -833,8 +843,8 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
     const wsPos = navRegistry.indexOf('heading: "Personal"');
     assert(overviewPos < membersPos && membersPos < provPos && provPos < wsPos,
       "owner-nav: groups are ordered Overview -> Network -> Configuration -> Personal");
-    assert(shell.includes("OWNER_NAV_GROUPS.flatMap"),
-      "owner-nav: the tablet row flattens the same groups — one source of truth, no duplicate nav definitions");
+    assert(shell.includes("visibleOwnerGroups.flatMap("),
+      "owner-nav: the tablet row flattens the SAME role-filtered groups — one source of truth, no duplicate nav definitions");
     const flat = navRegistry.slice(navRegistry.indexOf("OWNER_NAV_GROUPS:"), navRegistry.indexOf("];", navRegistry.indexOf("OWNER_NAV_GROUPS:")));
     const wsCount = (flat.match(/view=workspace/g) || []).length;
     assert(wsCount === 1,

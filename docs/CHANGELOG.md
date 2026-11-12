@@ -1,3 +1,48 @@
+## 2026-11-12 — Four ranks, four dashboards: role-based navigation repaired
+
+The navigation asked a single question four different ways, and answered it wrongly in three of
+them. A Co-Owner's "dashboard" entry pointed at `/owner/members` and was labelled **Owner
+Dashboard** in the rail and **Members** in the phone drawer; a Tester had no dashboard entry at
+all although `/tester` existed; the tablet row rendered the **unfiltered** registry, so a Co-Owner
+was shown every Owner-only page; Home was the second item in the menu; Announcements always sent
+"back" to `/co-owner`, whichever rank opened it; and the Co-Owner page linked to three pages
+(network analytics, activity, AI operations) that immediately bounced them to `/dashboard`.
+
+All of it now comes from one place. `src/lib/navigation/role-home.ts` answers "where is this
+person's home?" (`owner → /owner`, `co_owner → /co-owner`, `tester → /tester`, member → no
+administrative dashboard at all), and `src/lib/navigation/workspace-nav.ts` builds the menu with
+Home first and the rank's **own** dashboard as the only dashboard entry. Four renderers - rail,
+tablet row, drawer, phone bottom bar - read those two modules, so they cannot disagree.
+
+Correctness and safety:
+
+- The registry's entries now state who may see them: no marker means Owner-only (as before),
+  `minimum` is a rank, and `roles` is an exact audience, which is how the Co-Owner Dashboard entry
+  stays out of the Owner's menu. A Co-Owner's staff menu is their dashboard, announcements,
+  members, invitations, requests and QA triage - every one of those pages server-side authorises
+  them. No permission was widened to make that true.
+- `/owner/qa` renders in the administrative environment for staff and in the workspace for a
+  Tester; Announcements renders in the administrative environment with the rank's own home as
+  "back"; the Co-Owner page *is* the Co-Owner Dashboard, with its three dead links removed.
+- The shell starts with the rank **unknown**, draws no rank-specific entry until it is known, and
+  fails closed if the read fails. It now reads the signed-in member's own profile row by id - it
+  previously asked for "one profile row", which under a directory policy could be a colleague's -
+  and re-reads on focus, so a promotion or demotion appears without a sign-out. Pages that already
+  read the profile on the server pass that verified rank in, so the right menu is drawn on the
+  first paint.
+
+The member dashboard became honest as well. Every count used `?? 0`, so a failed query rendered as
+a confident zero ("nothing in progress") on the one screen whose job is to say where you stand.
+`src/lib/dashboard/overview.ts` now separates *ready and empty* from *could not be read* in plain
+words, offers only genuinely reopenable work in "Continue where you left off" (assignments,
+notebooks, lecture recordings, goals), puts overdue work first in "Upcoming work", and adds
+**Sophira's Recommendations** - grounded in real rows, always explaining its reason, computed
+without any AI provider, and honest ("nothing needs your attention") rather than inventive when
+there is nothing to go on.
+
+Verified: 7605/7605 tests, `tsc` clean, lint 0 errors (33 warnings, ceiling unchanged), production
+build OK, secret scan CLEAN, repository verify PASS, runtime smoke 100/100.
+
 ## 2026-11-12 — The Owner Dashboard renders again (production incident, digest 3954906548)
 
 `/owner` failed in production for one account with `TypeError: h.OWNER_NAV_GROUPS.map is not a

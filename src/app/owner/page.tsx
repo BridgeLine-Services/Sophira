@@ -196,6 +196,7 @@ export default async function OwnerPage() {
     <AppShell
       title="Owner Dashboard"
       variant="owner"
+      role={profile.role}
       actions={
         <>
         <Link

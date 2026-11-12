@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user";
 import { AppShell } from "@/components/app/AppShell";
 import { isStaff, normalizeRole } from "@/lib/roles";
+import { staffBackHrefFor } from "@/lib/navigation/role-home";
 import { AnnouncementComposer } from "@/components/owner/AnnouncementComposer";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,8 @@ export default async function AnnouncementsPage() {
   const supabase = createClient();
   const user = await requireUser(supabase);
   const { profile } = await readProfileWithRepair(supabase, user.id);
-  if (!isStaff(normalizeRole(profile?.role))) redirect("/dashboard");
+  const role = normalizeRole(profile?.role);
+  if (!isStaff(role)) redirect("/dashboard");
 
   const { data: rows } = await supabase
     .from("announcements")
@@ -20,7 +22,14 @@ export default async function AnnouncementsPage() {
     .limit(50);
 
   return (
-    <AppShell title="Announcements" backHref="/co-owner">
+    /*
+   * 2026-11-12: Announcements is a staff function, not an academic destination, so it renders
+   * inside the ADMINISTRATIVE environment for whichever staff rank opened it - and "back" goes
+   * to that rank's own home (Owner -> /owner, Co-Owner -> /co-owner) instead of always to
+   * /co-owner. The rank comes from the server-read profile, so refreshing or opening the URL
+   * directly cannot put anyone in the other rank's environment.
+   */
+  <AppShell title="Announcements" variant="owner" role={role} backHref={staffBackHrefFor(role)}>
       <div className="space-y-4">
         <p className="text-sm text-ink-soft">
           Network-wide updates for everyone in Sophira. Drafts stay private to staff; published
