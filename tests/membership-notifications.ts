@@ -366,4 +366,10 @@ export function runMembershipNotificationTests(
     "live check: it names the two things it cannot check instead of implying full coverage");
   assert(/"verify:live-membership": "node scripts\/verify-live-membership\.mjs"/.test(pkg),
     "live check: it is one npm command, so nobody has to reconstruct the probes by hand");
+  // 2026-11-13: the AI response-time column is optional and additive, so its absence must read as
+  // information ("times are not measured yet"), never as a red failure that implies a broken app.
+  assert(/columnExists\(/.test(liveCheck) && /0052/.test(liveCheck),
+    "live check: the new AI latency column is checked by its own silent probe, not as a table pass/fail");
+  assert(/latency_ms is absent; request counts still work/.test(liveCheck),
+    "live check: a missing latency column is reported as information, and says what still works");
 }

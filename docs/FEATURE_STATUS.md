@@ -152,5 +152,12 @@ pages - each only when the underlying record says so.
 conversations or learning memory. The analytics page lists what Sophira deliberately does not
 measure rather than drawing an invented line, and no per-member figure is exposed.
 
-Verified: `npm test` 7025/7025, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings,
+Verified: `npm test` 7029/7029, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings,
 production build OK, secret scan clean.
+
+**Live database 2026-11-13:** `npm run verify:live-membership` still passes all 13 existing checks
+and now also reports whether migration 0052 has been applied. It has **not**: the live
+`provider_usage` table has no `latency_ms` column. Nothing is broken - request counts still work,
+the AI Operations page says response time is not measured yet, and the usage insert now retries
+without the column so an un-applied migration cannot silently stop usage logging. To get response
+times, the owner presses **Update database** on the Owner Dashboard.

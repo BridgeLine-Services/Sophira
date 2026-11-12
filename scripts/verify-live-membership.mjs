@@ -69,6 +69,16 @@ async function tableHas(spec) {
   return ok;
 }
 
+/**
+ * Ask whether one column exists WITHOUT recording a pass/fail line of its own. Used by checks that
+ * report an optional, additive column in their own words: the AI latency column missing is not a
+ * broken app, and must not scroll past as a red FAIL.
+ */
+async function columnExists(table, column) {
+  const { status } = await rest(`${table}?select=${encodeURIComponent(column)}&limit=1`);
+  return status === 200;
+}
+
 async function rpcRefusesAnon(fn, payload) {
   const { status, body } = await rest(`rpc/${fn}`, { method: "POST", body: JSON.stringify(payload) });
   if (status !== 200) {
@@ -133,6 +143,21 @@ if (!(await rpcRefusesAnon("presence_set_availability", { p_availability: "avail
   if (!refused) failed += 1;
 }
 
+// 2026-11-13: migration 0052 adds provider_usage.latency_ms. It is additive, and the AI Operations
+// page is built to work without it - but the owner deserves to know whether response times are
+// actually being recorded, instead of reading "not measured yet" and wondering why.
+{
+  const hasLatency = await columnExists("provider_usage", "latency_ms");
+  record(
+    hasLatency ? "PASS" : "INFO",
+    "AI answers record how long they took (migration 0052)",
+    hasLatency
+      ? "provider_usage.latency_ms exists, so response time is measured"
+      : "latency_ms is absent; request counts still work and the AI page says times are not measured",
+  );
+  // Not a failure: the page degrades honestly, and this check must not imply the app is broken.
+}
+
 // Nothing may have been created by the probes above.
 {
   const after = await rowCount("member_presence");
@@ -149,6 +174,7 @@ if (!(await rpcRefusesAnon("presence_set_availability", { p_availability: "avail
 record("INFO", "not checked here: a signed-in member appearing Online", "needs a member test account");
 record("INFO", "not checked here: RLS stopping one member reading another's rows", "verified at SQL level by npm run db:verify:local");
 record("INFO", "not checked here: which migration number the database is at", "Supabase does not expose its history table");
+record("INFO", "not checked here: a real invitation email arriving", "needs a working mail provider on the deployment");
 
 console.log("");
 if (failed > 0) {

@@ -57,7 +57,7 @@ export async function aiChatMeta(
     const admin = createAdminClient();
     record = (r: UseRecord) => {
       try {
-        void admin.from("provider_usage").insert({
+        const row: Record<string, unknown> = {
           provider: r.provider,
           model: r.model,
           classification: r.classification,
@@ -67,7 +67,27 @@ export async function aiChatMeta(
           // Duration only (0052). Null when it was not measured; the owner's AI Operations
           // view reads NULL as "not measured", never as an instant answer.
           latency_ms: typeof r.latencyMs === "number" && r.latencyMs >= 0 ? Math.round(r.latencyMs) : null,
-        });
+        };
+        const write = (payload: Record<string, unknown>) =>
+          admin.from("provider_usage").insert(payload) as unknown as Promise<{
+            error?: { code?: string | null; message?: string | null } | null;
+          }>;
+
+        // A database that has not taken 0052 has no latency column, and one unknown column
+        // rejects the WHOLE row. Rather than lose the record of what was answered, drop the
+        // duration and write the rest: counts must survive an un-applied migration.
+        void write(row)
+          .then(({ error }) => {
+            if (!error) return;
+            const missingColumn =
+              error.code === "42703" || /latency_ms/i.test(error.message ?? "");
+            if (!missingColumn) return;
+            const { latency_ms: _omitted, ...withoutLatency } = row;
+            void write(withoutLatency);
+          })
+          .catch(() => {
+            /* best-effort diagnostics only */
+          });
       } catch {
         /* best-effort diagnostics only */
       }

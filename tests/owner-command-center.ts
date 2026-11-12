@@ -105,6 +105,15 @@ export function runOwnerCommandCenterTests(
       "ai operations: failures can be counted for the overview's attention list");
     assert(countAiFailures(null) === null,
       "ai operations: an unreadable record yields null failures, never zero");
+
+    // The write side matters as much as the read side. One unknown column rejects a whole row in
+    // PostgREST, so on a database without 0052 the latency field would have silently stopped ALL
+    // usage logging - the exact opposite of what the new page needs.
+    const clientSrc = readFileSync(join(ROOT, "src", "lib", "ai", "client.ts"), "utf8");
+    assert(/42703/.test(clientSrc) && /withoutLatency/.test(clientSrc),
+      "ai operations: the usage insert drops the duration and retries, so counts survive a pre-0052 database");
+    assert(/latency_ms: typeof r\.latencyMs === "number"/.test(clientSrc),
+      "ai operations: a duration is recorded only when it was actually measured");
   }
 
   /* ------------------------------------------------------------------ */
