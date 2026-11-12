@@ -484,4 +484,20 @@ export function runDashboardOverviewTests(
     assert(lectures.includes('get("asset")') && lectures.includes("recording-"),
       "dashboard: the lecture studio can reopen the recording it was asked for");
   }
+
+  // ==== N. The same purple shell on every rank's dashboard ====
+  section("dashboard: every role dashboard wears the same purple shell");
+  {
+    for (const file of ["src/app/owner/page.tsx", "src/app/co-owner/page.tsx", "src/app/tester/page.tsx"]) {
+      const src = readFileSync(file, "utf8");
+      assert(src.includes('className="dash-page"') && src.includes('className="dash-stack"'),
+        `${file} uses the shared purple shell`);
+      assert(!/#[0-9a-fA-F]{6}/.test(src), `${file} carries no literal hex`);
+      assert(!/\b(?:bg|text|border)-(?:white|black|gray|slate|zinc|neutral|stone)\b/.test(src),
+        `${file} uses no literal palette utility`);
+    }
+    const css = readFileSync("src/app/globals.css", "utf8");
+    assert(css.includes(".dash-page > .dash-stack > *"),
+      "dashboard: the role shell lifts its blocks onto panels from the stylesheet, not inline");
+  }
 }

@@ -213,6 +213,14 @@ export default async function OwnerPage() {
         </>
       }
     >
+        <div className="dash-page">
+          <div className="dash-stack">
+            <div className="dash-hero">
+              <p className="dash-eyebrow">Owner Dashboard</p>
+              <h2 className="dash-hero-title mt-1">Your network, at a glance</h2>
+              <p className="dash-hero-sub mt-2 max-w-2xl">Everything below is read live from your database. Anything that could not be read says so, rather than showing a zero.</p>
+            </div>
+
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-2 text-sm text-ink-soft">
           <Briefcase className="h-4 w-4 text-accent" />
@@ -312,7 +320,10 @@ export default async function OwnerPage() {
         <CapabilityRegistryCard />
         <ProviderDiagnosticsCard />
       </section>
-    </AppShell>
+    
+          </div>
+        </div>
+</AppShell>
   );
 }
 
