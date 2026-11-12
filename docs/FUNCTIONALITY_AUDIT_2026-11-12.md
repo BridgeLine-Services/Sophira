@@ -336,3 +336,30 @@ verified at source, in the compiled production stylesheet and by test, not by ey
    uploads, and the QA report triage workflow beyond its source-level tests.
 10. **Deployment:** this round is pushed as a branch and a pull request. Production is untouched and
     nothing was deployed without authorisation.
+
+---
+
+## Addendum — merged and verified in production (2026-11-12, after the report above)
+
+PR #81 was merged (`2169cb6`, squash) and Vercel deployed it. `/api/health` reports
+`2169cb6` as the commit production serves, so the fix described above is live.
+
+The deployed stylesheet was fetched from `https://sophira.vercel.app/login` and inspected, so the
+navigation change is verified in production, not only in the branch:
+
+- `:focus-visible{outline:2px solid rgb(var(--c-accent));outline-offset:2px}` — focus is an explicit
+  accent outline; the old `ring-offset-paper` box-shadow mechanism appears **0 times** in the build.
+- `.nav-item:focus-visible,.nav-subitem:focus-visible{outline:2px solid rgb(var(--c-accent));outline-offset:-2px;border-radius:.75rem}`
+  — the navigation ring is inset and follows the row's own radius.
+- `.nav-item:focus:not(:focus-visible),.nav-subitem:focus:not(:focus-visible){outline:none}` — a
+  pointer click leaves no ring behind, while keyboard focus keeps its indicator.
+- `.dash-page>*+*{margin-top:14px}` — the dashboard section rhythm is live.
+
+What this does **not** prove: no signed-in page has been rendered in a browser, dark mode has not
+been seen, and widths other than 1280px remain asserted rather than observed. Those three gaps are
+unchanged and still need either a test member account or the owner naming a screen that looks wrong.
+
+One open item recorded in the blockers list is now characterised: GitHub's remaining open Dependabot
+alert is **glib** in `src-tauri/Cargo.lock` (medium, first fixed in `0.20.0`). It is the Tauri desktop
+shell's GTK binding; the remedy is a locked `cargo update` plus a Rust/GTK build, and this sandbox
+has no Rust toolchain, so it was not attempted rather than half-applied to a lockfile.
