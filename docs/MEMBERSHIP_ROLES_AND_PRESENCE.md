@@ -109,6 +109,25 @@ Active. Nothing about a member's pages, addresses, or device is stored —
 `member_presence` holds a session id, a last-seen time, a last-interaction time
 and an optional label.
 
+### The member's own choice: how they appear
+
+Away, Busy and Do Not Disturb are the member's decision, not Sophira's, so the member makes it.
+Settings has a card headed **How you appear** (`src/components/app/AvailabilityControl.tsx`)
+offering Available, Away, Busy and Do Not Disturb, each written out with a sentence explaining
+it, and a checkbox: *Let other members see my availability.*
+
+That checkbox is enforced by the database, not by the checkbox. Policy
+`member_availability_shared_read` (migration 0050) lets another signed-in member read a row
+**only** when `share_with_members = true` and the choice has not expired; nothing else about
+that member is reachable through it. Sophira's administrators see the availability on the
+Members page as a presence state, which is the administrative view they need to run the network.
+
+The card is deliberately humble about what it knows. Nothing is displayed as saved until the
+server has answered, a refusal is repeated in the server's own words, and if the current value
+cannot be read the card says so and offers *Try again* rather than showing a default the member
+never chose. Choosing "Busy" does not make anyone Online, and closing the tab does not clear
+their choice, because connection and preference are two different questions.
+
 ### Thresholds and why the order matters
 
 `presence_settings` holds six numbers, editable by the Owner on the Members page

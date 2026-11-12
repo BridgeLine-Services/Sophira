@@ -8,6 +8,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, 
 import { fmtDate } from "@/lib/format";
 import type { InvitationRequest, Profile } from "@/lib/types";
 import { ShieldCheck, Smartphone, Download } from "lucide-react";
+import { AvailabilityControl } from "@/components/app/AvailabilityControl";
 import { useAutosave } from "@/lib/save/useAutosave";
 import SaveStatus from "@/components/ui/SaveStatus";
 
@@ -311,6 +312,9 @@ export default function SettingsPage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* How you appear: the member's own availability choice (2026-11-12). */}
+        <AvailabilityControl />
 
         {/* Privacy */}
         <Card>

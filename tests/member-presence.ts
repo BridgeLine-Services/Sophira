@@ -491,3 +491,62 @@ export function runMemberPresenceTests(assert: (cond: boolean, msg: string) => v
   assert(readFileSync("src/app/owner/integrations/page.tsx", "utf8").includes('variant="owner"'),
     "nav: the Integrations page renders inside the owner shell");
 }
+
+/**
+ * 2026-11-12 (owner spec 3.4): the member's own availability control.
+ *
+ * The behaviour that matters is not "a card exists" - it is that the card cannot claim a
+ * choice was saved when it wasn't, cannot invent a choice when the data is unreadable, and
+ * describes the sharing preference the way the database actually enforces it.
+ */
+export function runAvailabilityControlTests(
+  assert: (cond: boolean, msg: string) => void,
+  section: (t: string) => void,
+): void {
+  section("13. A member can choose how they appear, honestly");
+  const control = readFileSync("src/components/app/AvailabilityControl.tsx", "utf8");
+  const route = readFileSync("src/app/api/network/presence/route.ts", "utf8");
+  const settings = readFileSync("src/app/settings/page.tsx", "utf8");
+
+  // The four choices, with a written label rather than colour alone.
+  for (const choice of ["available", "away", "busy", "dnd"]) {
+    assert(control.includes(`id: "${choice}"`), `availability: ${choice} is offered as a choice`);
+  }
+  assert(/Do Not Disturb/.test(control) && /Available/.test(control) && /Away/.test(control) && /Busy/.test(control),
+    "availability: every state is written out, so nobody has to read a colour");
+
+  // It is reachable from the member's own settings, and it uses the existing endpoint.
+  assert(settings.includes("<AvailabilityControl") && settings.includes("components/app/AvailabilityControl"),
+    "availability: the control is on the member settings page, where a member actually looks");
+  assert(control.includes('fetch("/api/network/presence"') && control.includes('method: "PUT"'),
+    "availability: it saves through the existing presence endpoint rather than a second write path");
+
+  // Nothing optimistic: the displayed choice comes from the server response.
+  assert(!/setChoice\(next\)/.test(control),
+    "availability: the chosen value is not displayed before the server confirms it");
+  assert(/isChoice\(body\.availability\)/.test(control),
+    "availability: the displayed choice is the one the server says it stored");
+  assert(/body\.error \|\|/.test(control),
+    "availability: a refusal is shown in the server's own words, not replaced with a friendly lie");
+
+  // Unreadable data is Unknown, not a default.
+  assert(/could not be read/.test(control) && /Nothing has been changed/.test(control),
+    "availability: when the value cannot be read it says so and states that nothing changed");
+  assert(!/\?\? \"available\"/.test(control),
+    "availability: an unreadable value is never silently replaced with Available");
+
+  // The sharing preference matches what the database enforces.
+  const sql = readFileSync("supabase/migrations/0050_member_presence.sql", "utf8");
+  assert(/create policy member_availability_shared_read[\s\S]{0,200}share_with_members = true/.test(sql),
+    "availability: the database is what grants other members a look, and only when the member opted in");
+  assert(/Only this one line is shared/.test(control),
+    "availability: the sharing copy promises exactly what the policy allows, no more");
+  assert(/administrators can see your availability/.test(control),
+    "availability: the member is told who can see it, rather than left guessing");
+
+  // Availability is a separate fact from presence, and the server keeps them apart.
+  assert(/Never touches account standing/.test(route) || /separate from whether you are connected/.test(control),
+    "availability: the control says the choice is separate from being connected");
+  assert(/\["available", "away", "busy", "dnd"\]/.test(route),
+    "availability: the endpoint refuses any value outside the four real choices");
+}
