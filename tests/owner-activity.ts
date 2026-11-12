@@ -55,8 +55,13 @@ export function runOwnerActivityTests(assert: (cond: boolean, msg: string) => vo
     "activity: no simulated or randomly generated events in the feed");
   // 2026-11-03: the feed has its own page now; the derivation itself is unchanged.
   const feed = readFileSync("src/app/owner/activity/page.tsx", "utf8");
-  assert(feed.includes("buildActivity({ members, invitations })"),
-    "activity: the activity page renders the derived feed");
+  // 2026-11-12 (engineering directive, phase 2): the page now reads the AUTHORITATIVE audit
+  // record rather than inferring actions from timestamps. This is a stronger claim than the
+  // old pin: it requires database-side filtering/paging and forbids the timestamp derivation.
+  assert(feed.includes("loadAuditPage(") && feed.includes("parseAuditFilters(") && feed.includes("SecurityHistory"),
+    "activity: the page renders the authoritative audit record with server-side filters and paging");
+  assert(!feed.includes("buildActivity({ members, invitations })"),
+    "activity: the page no longer infers actions from member/invitation timestamps");
   const overview = readFileSync("src/components/app/OwnerDashboard.tsx", "utf8");
   assert(overview.includes('"/owner/activity"') && !overview.includes("buildActivity("),
     "activity: the overview links to the feed instead of duplicating it");
