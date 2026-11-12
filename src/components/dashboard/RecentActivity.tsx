@@ -28,7 +28,7 @@ export function RecentActivity({ events }: { events: ActivityEvent[] }) {
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-soft">Recent activity</h2>
+        <h2 className="dash-panel-title">Recent activity</h2>
         <div className="flex flex-wrap gap-1.5">
           {ACTIVITY_FILTERS.map((f) => (
             <button key={f.key} type="button" onClick={() => setFilter(f.key)} aria-pressed={filter === f.key}

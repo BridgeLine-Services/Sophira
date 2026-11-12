@@ -204,10 +204,205 @@ export function buildProgress(input: ProgressInput): ProgressMetric[] {
 }
 
 /* ------------------------------------------------------------------ *
+ * This week, as bars
+ * ------------------------------------------------------------------ */
+
+export interface DayBar {
+  /** YYYY-MM-DD in UTC, so the same rows always bucket the same way. */
+  key: string;
+  /** Single-letter weekday, for a narrow chart. */
+  label: string;
+  count: number;
+  isToday: boolean;
+}
+
+const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
+
+/**
+ * The last seven days of real activity, oldest first. It counts the events the activity feed
+ * already derived from rows, so the chart cannot show a day with nothing behind it. Days with
+ * no events are drawn as zero-height bars rather than skipped, because a gap is information.
+ */
+export function weekActivity(events: Array<{ at: string }>, now: Date, days = 7): DayBar[] {
+  const span = Math.max(1, Math.min(14, Math.floor(days)));
+  const buckets: DayBar[] = [];
+  const index = new Map<string, DayBar>();
+  const start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (span - 1) * 86_400_000;
+  for (let i = 0; i < span; i += 1) {
+    const at = new Date(start + i * 86_400_000);
+    const key = at.toISOString().slice(0, 10);
+    const bar: DayBar = { key, label: WEEKDAY_INITIALS[at.getUTCDay()], count: 0, isToday: i === span - 1 };
+    buckets.push(bar);
+    index.set(key, bar);
+  }
+  for (const event of events) {
+    const at = new Date(event.at);
+    if (Number.isNaN(at.getTime())) continue;
+    const bucket = index.get(at.toISOString().slice(0, 10));
+    if (bucket) bucket.count += 1;
+  }
+  return buckets;
+}
+
+/* ------------------------------------------------------------------ *
+ * Overall learning progress - one number, and the arithmetic behind it
+ * ------------------------------------------------------------------ */
+
+export interface OverallProgress {
+  state: ReadState;
+  /** 0-100, or null when a percentage would be a guess. */
+  percent: number | null;
+  label: string;
+  /** The calculation, in words, so nobody has to trust a bare percentage. */
+  basis: string;
+  /** A sentence a student can read: what the number counts and what it does not. */
+  detail: string;
+  done: number | null;
+  total: number | null;
+}
+
+/**
+ * HOW "OVERALL PROGRESS" IS CALCULATED (documented, not invented).
+ *
+ *   percent = completed assignments / (completed assignments + open assignments)
+ *
+ * Chosen because both numbers are real `assignments` rows belonging to this member, and the
+ * ratio answers a question a student can actually act on: "of the work I have, how much is
+ * finished?". Deliberate limits, all stated in `detail`:
+ *
+ *   - It is NOT course completion. Enrolling in a course is not progress through it, and
+ *     Sophira has no per-course completion figure it could honestly report.
+ *   - Archived and draft assignments are not counted, because they are not work in flight.
+ *   - It is not weighted by size or grade: an assignment is an assignment. Sophira does not
+ *     have a defensible per-assignment weight, so it does not pretend to.
+ *   - With no assignments at all there is no percentage: `percent` is null and the page says
+ *     so instead of showing a reassuring 0%.
+ *   - If either count could not be read, the state is `unavailable` and no number is shown.
+ */
+export function overallProgress(completed: CountRead, active: CountRead): OverallProgress {
+  const basis =
+    "Finished assignments divided by all assignments you still have (finished + open). " +
+    "Archived drafts are not counted, and course enrolment is never treated as progress.";
+  if (completed.state !== "ready" || active.state !== "ready") {
+    return {
+      state: "unavailable",
+      percent: null,
+      label: "Overall learning progress",
+      basis,
+      detail: "We couldn't read your assignment counts just now, so no percentage is shown rather than a wrong one.",
+      done: null,
+      total: null,
+    };
+  }
+  const done = Math.max(0, completed.value ?? 0);
+  const open = Math.max(0, active.value ?? 0);
+  const total = done + open;
+  if (total === 0) {
+    return {
+      state: "ready",
+      percent: null,
+      label: "Overall learning progress",
+      basis,
+      detail: "No assignments yet, so there is no progress to show. Start one and this will fill in.",
+      done: 0,
+      total: 0,
+    };
+  }
+  const percent = Math.round((done / total) * 100);
+  return {
+    state: "ready",
+    percent,
+    label: "Overall learning progress",
+    basis,
+    detail:
+      done === 0
+        ? `None of your ${plural(total, "assignment")} is finished yet. That is a starting line, not a problem.`
+        : `${done} of ${plural(total, "assignment")} finished. This counts assignments only - it is not a percentage of a course.`,
+    done,
+    total,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Learning milestones
+ * ------------------------------------------------------------------ */
+
+export interface Milestone {
+  id: string;
+  label: string;
+  achieved: boolean;
+  /** "3 of 5" - the visible evidence, never a guess. */
+  detail: string;
+}
+
+export interface MilestoneInput {
+  completed: CountRead;
+  notebooks: ListRead<{ id: string }>;
+  lectures: ListRead<{ id: string; status: string | null }>;
+  goals: ListRead<GoalRow>;
+  courses: CountRead;
+}
+
+export interface MilestonesResult {
+  state: ReadState;
+  items: Milestone[];
+  achieved: number;
+  total: number;
+  /** The next milestone that is not yet reached, or null when every one is. */
+  next: Milestone | null;
+}
+
+const LECTURE_DONE = new Set(["ready", "partial"]);
+
+/**
+ * Milestones are counters over rows that exist. Each tier names the number it needs and shows
+ * how far along it is, so a milestone is never merely "true": 3 of 5 is visible progress even
+ * when the tier is not reached. If a source could not be read, the whole set is marked
+ * `unavailable` rather than reporting milestones that were never checked.
+ */
+export function buildMilestones(input: MilestoneInput): MilestonesResult {
+  const { completed, notebooks, lectures, goals, courses } = input;
+  const readable = [completed, notebooks, lectures, goals, courses].every((r) => r.state === "ready");
+  const n = (v: number | null) => Math.max(0, v ?? 0);
+  const finished = n(completed.value);
+  const notebookCount = notebooks.rows.length;
+  const lectureCount = lectures.rows.filter((l) => LECTURE_DONE.has(String(l.status ?? ""))).length;
+  const achievedGoals = goals.rows.filter((g) => g.status === "achieved").length;
+  const courseCount = n(courses.value);
+
+  const tier = (id: string, label: string, have: number, need: number): Milestone => ({
+    id,
+    label,
+    achieved: have >= need,
+    detail: have >= need ? "Reached" : `${Math.min(have, need)} of ${need}`,
+  });
+
+  const items: Milestone[] = [
+    tier("first-assignment", "First assignment finished", finished, 1),
+    tier("five-assignments", "Five assignments finished", finished, 5),
+    tier("ten-assignments", "Ten assignments finished", finished, 10),
+    tier("first-notebook", "First notebook created", notebookCount, 1),
+    tier("five-notebooks", "Five notebooks created", notebookCount, 5),
+    tier("first-lecture", "First lecture transcribed", lectureCount, 1),
+    tier("first-goal", "First learning goal achieved", achievedGoals, 1),
+    tier("first-course", "First course set up", courseCount, 1),
+  ];
+
+  const achieved = items.filter((m) => m.achieved).length;
+  return {
+    state: readable ? "ready" : "unavailable",
+    items,
+    achieved,
+    total: items.length,
+    next: items.find((m) => !m.achieved) ?? null,
+  };
+}
+
+/* ------------------------------------------------------------------ *
  * Continue where you left off
  * ------------------------------------------------------------------ */
 
-export type ResumeKind = "assignment" | "notebook" | "lecture" | "goal";
+export type ResumeKind = "assignment" | "notebook" | "lecture" | "goal" | "conversation";
 
 export interface ResumeItem {
   id: string;
@@ -224,6 +419,16 @@ export interface ResumeSources {
   notebooks?: ListRead<{ id: string; title: string | null; updated_at: string | null }>;
   lectures?: ListRead<{ id: string; original_filename: string | null; status: string | null; updated_at: string | null }>;
   goals?: ListRead<GoalRow>;
+  /**
+   * AI conversations. In Sophira a conversation is not a separate object: each answer is a
+   * `responses` row, and a response attached to an assignment is reopened by opening that
+   * assignment, which reloads its latest answer and the course/teacher context that produced
+   * it. A response with no `assignment_id` (a free question) has no destination that can
+   * restore it, so it is deliberately NOT offered rather than linked somewhere misleading.
+   */
+  responses?: ListRead<{ id: string; assignment_id: string | null; created_at: string | null }>;
+  /** Assignment id -> title, so a conversation is named after the work it belongs to. */
+  assignmentTitles?: Record<string, string>;
 }
 
 export interface ResumeResult {
@@ -266,6 +471,32 @@ export function buildResumeItems(sources: ResumeSources, limit = 4): ResumeResul
     }
   }
 
+  if (sources.responses) {
+    if (sources.responses.state === "unavailable") unreadable.push("AI conversations");
+    else {
+      const finished = new Set(
+        (sources.assignments?.state === "ready" ? sources.assignments.rows : [])
+          .filter((a) => a.status === "completed" || a.status === "archived")
+          .map((a) => a.id),
+      );
+      for (const r of sources.responses.rows) {
+        // No assignment -> no persistent conversation destination. Skipped, not faked.
+        if (!r.assignment_id || !r.created_at || finished.has(r.assignment_id)) continue;
+        const title = (sources.assignmentTitles?.[r.assignment_id] ?? "").trim();
+        if (!title) continue;
+        items.push({
+          id: `conversation-${r.assignment_id}`,
+          kind: "conversation",
+          title,
+          detail: "AI conversation",
+          href: `/assignments/${r.assignment_id}`,
+          action: "Reopen conversation",
+          at: r.created_at,
+        });
+      }
+    }
+  }
+
   if (sources.notebooks) {
     if (sources.notebooks.state === "unavailable") unreadable.push("notebooks");
     else {
@@ -296,7 +527,8 @@ export function buildResumeItems(sources: ResumeSources, limit = 4): ResumeResul
           kind: "lecture",
           title: name,
           detail: "Lecture recording",
-          href: "/lectures",
+          // The studio reopens one recording when it is named in the URL (?asset=...).
+          href: `/lectures?asset=${l.id}`,
           action: "Continue lecture",
           at: l.updated_at,
         });
@@ -322,17 +554,17 @@ export function buildResumeItems(sources: ResumeSources, limit = 4): ResumeResul
     }
   }
 
+  // Newest first, THEN one row per destination: when an assignment and a conversation point at
+  // the same screen, the one describing the most recent activity is kept.
+  const ordered = [...items].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   const seen = new Set<string>();
-  const unique = items.filter((i) => {
+  const unique = ordered.filter((i) => {
     if (seen.has(i.href)) return false;
     seen.add(i.href);
     return true;
   });
 
-  return {
-    items: unique.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).slice(0, limit),
-    unreadable,
-  };
+  return { items: unique.slice(0, limit), unreadable };
 }
 
 /* ------------------------------------------------------------------ *
@@ -348,6 +580,8 @@ export interface DueRow {
 
 export interface UpcomingItem {
   id: string;
+  /** Where the date comes from, so a study plan is never confused with a submission deadline. */
+  kind: "assignment" | "study";
   title: string;
   href: string;
   due_at: string;
@@ -357,7 +591,23 @@ export interface UpcomingItem {
 
 export interface UpcomingResult {
   items: UpcomingItem[];
+  /** The assignment deadline read failed. */
   unreadable: boolean;
+  /** The study-plan read failed, so a planned session may be missing from the timeline. */
+  studyUnreadable: boolean;
+}
+
+/**
+ * A persisted study plan (work_schedules, migration 0010/0017). This is Sophira's ONLY
+ * scheduling record: there is no separate calendar, no user-created reminder table and no
+ * events feed, so nothing else is claimed below. `deadline` is the plan's target finish.
+ */
+export interface StudySessionRow {
+  id: string;
+  assignment_id: string | null;
+  deadline: string | null;
+  status: string | null;
+  title?: string | null;
 }
 
 const HORIZON_DAYS = 30;
@@ -367,8 +617,15 @@ const HORIZON_DAYS = 30;
  * a real due date are included; nothing is scheduled on the member's behalf, and Sophira has
  * no second scheduling system to consult.
  */
-export function buildUpcoming(rows: ListRead<DueRow>, now: Date, limit = 5): UpcomingResult {
-  if (rows.state === "unavailable") return { items: [], unreadable: true };
+export function buildUpcoming(
+  rows: ListRead<DueRow>,
+  now: Date,
+  limit = 5,
+  sessions?: ListRead<StudySessionRow>,
+): UpcomingResult {
+  const studyUnreadable = sessions?.state === "unavailable";
+  const unreadable = rows.state === "unavailable";
+  if (unreadable && !sessions) return { items: [], unreadable, studyUnreadable };
   const items: UpcomingItem[] = [];
   for (const row of rows.rows) {
     if (!row.due_at || !row.title) continue;
@@ -379,6 +636,7 @@ export function buildUpcoming(rows: ListRead<DueRow>, now: Date, limit = 5): Upc
     if (days > HORIZON_DAYS) continue;
     items.push({
       id: row.id,
+      kind: "assignment",
       title: row.title,
       href: `/assignments/${row.id}`,
       due_at: row.due_at,
@@ -386,11 +644,41 @@ export function buildUpcoming(rows: ListRead<DueRow>, now: Date, limit = 5): Upc
       tone: days < 0 ? "overdue" : days === 0 ? "today" : days <= 3 ? "soon" : "later",
     });
   }
+
+  // A planned or paused study session the member actually saved. Finished plans are history,
+  // not upcoming work, and a session without a date cannot be placed on a timeline.
+  for (const session of sessions?.state === "ready" ? sessions.rows : []) {
+    if (!session.deadline || !session.assignment_id) continue;
+    if (!["planned", "running", "paused"].includes(String(session.status ?? ""))) continue;
+    const deadline = new Date(session.deadline);
+    if (Number.isNaN(deadline.getTime())) continue;
+    const days = daysBetween(now, deadline);
+    if (days > HORIZON_DAYS) continue;
+    const label = (session.title ?? "").trim();
+    items.push({
+      id: `study-${session.id}`,
+      kind: "study",
+      title: `${session.status === "paused" ? "Paused study session: " : "Study session: "}${label || "your assignment"}`,
+      href: `/assignments/${session.assignment_id}`,
+      due_at: session.deadline,
+      when: describeDue(session.deadline, now) ?? "Due soon",
+      tone: days < 0 ? "overdue" : days === 0 ? "today" : days <= 3 ? "soon" : "later",
+    });
+  }
+
+  // One row per destination: a study plan and the assignment deadline it belongs to are the
+  // same place to go, and the deadline row is the more useful of the two.
+  const byHref = new Map<string, UpcomingItem>();
+  for (const item of items.sort((a, b) => (a.due_at < b.due_at ? -1 : a.due_at > b.due_at ? 1 : 0))) {
+    const existing = byHref.get(item.href);
+    if (!existing || (existing.kind === "study" && item.kind === "assignment")) byHref.set(item.href, item);
+  }
   return {
-    items: items
+    items: [...byHref.values()]
       .sort((a, b) => (a.due_at < b.due_at ? -1 : a.due_at > b.due_at ? 1 : 0))
       .slice(0, limit),
-    unreadable: false,
+    unreadable,
+    studyUnreadable,
   };
 }
 
