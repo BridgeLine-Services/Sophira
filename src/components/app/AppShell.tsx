@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { Activity, BookOpen, Brain, Briefcase, ChevronDown, ChartColumn, HardDriveDownload, Home, LogOut, MailQuestion, Menu, NotebookPen, Settings, ShieldCheck, Mic, Sparkles, UserPlus, Users, Wifi, X } from "lucide-react";
-import { Gauge, Keyboard } from "lucide-react";
+import { FlaskConical, Gauge, Keyboard } from "lucide-react";
 import { SUBJECT_TREE, subjectTools, subjectToolUrl } from "@/lib/courses/engines";
 import { ScopeChip } from "@/components/app/ScopeChip";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
@@ -63,6 +63,10 @@ const OWNER_NAV_GROUPS: Array<{
       // 2026-11-11: production drifted nine tables behind with no way to update it
       // from the app. This is that way, labelled in the owner's own words.
       { href: "/owner/database", label: "Database updates", icon: Database },
+      // Tester workspace (2026-11-12): the tester role gets its own home for
+      // filing and following QA reports. Minimum role "tester" means members
+      // and guests never see it, and the page re-checks server-side.
+      { href: "/tester", label: "Testing workspace", icon: FlaskConical, minimum: "tester" },
     ],
   },
   {

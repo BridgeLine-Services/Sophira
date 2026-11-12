@@ -6,6 +6,7 @@ import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge, Button, Card, CardContent, EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
+import { LearningGoals } from "@/components/dashboard/LearningGoals";
 import { Bell, BookOpen, ClipboardCheck, FileText, GraduationCap, HelpCircle, Library, PenLine, Settings, Smartphone, AlertTriangle } from "lucide-react";
 import { safeLink } from "@/lib/notifications/store";
 import LocalDateTime from "@/components/app/LocalDateTime";
@@ -239,6 +240,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <Card><CardContent className="p-4 text-sm text-ink-soft">Nothing to resume yet. Start an assignment above and it will appear here, ready to pick up where you stopped.</CardContent></Card>
           )}
         </div>
+
+        <LearningGoals />
 
         {/* UPCOMING WORK — real deadlines only */}
         <div>

@@ -286,8 +286,8 @@ export function runMembershipNotificationTests(
   // 2026-11-13: 51 -> 52 (0052, the AI response-time column). 2026-11-11: 52 -> 53 (0053, the
   // administrative audit function and its indexes). The notification work itself still needs no
   // migration of its own - the assertion above proves it.
-  assert(migrations.length === 53,
-    "schema: notification changes ride the 0042 table; 0053 adds the administrative audit writer");
+  assert(migrations.length === 54,
+    "schema: notification changes ride the 0042 table; 0054 adds the tester workspace and learning goals");
 
   section("approving a request actually sends the invitation");
 

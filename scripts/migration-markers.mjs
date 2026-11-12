@@ -131,4 +131,5 @@ export const MARKERS = {
   // that writes the other categories, which only exists once this migration really ran.
   "0053_admin_audit_events.sql":
     "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'record_admin_event' and n.nspname = 'public')",
+  "0054_tester_workspace_and_learning_goals.sql": "to_regclass('public.qa_reports') is not null",
 };

@@ -60,6 +60,8 @@ const USER_TABLES = [
   "research_claims",
   "research_verifications",
   "notebooks",
+  "learning_goals",
+  "qa_reports",
   "notebook_notes",
   "notebook_sources",
   "notebook_questions",
