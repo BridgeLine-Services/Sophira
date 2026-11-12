@@ -73,12 +73,16 @@ export default async function CoOwnerPage() {
     { href: "/owner/announcements", title: "Announcements", body: "Write and publish updates for everyone in the network." },
   ];
 
-  const { data: announcementRows } = await supabase
+  // 2026-11-12: `?? []` here meant an announcements table that could not be read (or has not
+  // been created yet) was rendered as "write the first announcement" - a confident empty
+  // state on a table that may already hold posts. The error is now carried and shown.
+  const { data: announcementRows, error: announcementError } = await supabase
     .from("announcements")
     .select("id, title, body, status, published_at")
     .order("created_at", { ascending: false })
     .limit(4);
   const announcements = announcementRows ?? [];
+  const announcementsUnreadable = Boolean(announcementError) || !announcementRows;
 
   return (
     /*
@@ -191,7 +195,17 @@ export default async function CoOwnerPage() {
 
         <section aria-labelledby="co-announce-h">
           <h2 id="co-announce-h" className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">Network announcements</h2>
-          {announcements.length === 0 ? (
+          {announcementsUnreadable ? (
+            <Card><CardContent className="p-4">
+              <p className="text-sm text-ink-soft">
+                Announcements couldn&apos;t be read just now, so this list may be incomplete. Nothing has
+                been lost.
+              </p>
+              <Link href="/owner/announcements" className="mt-2 inline-block text-sm text-accent hover:underline">
+                Open announcements &rarr;
+              </Link>
+            </CardContent></Card>
+          ) : announcements.length === 0 ? (
             <Card><CardContent className="p-4">
               <p className="text-sm text-ink-soft">
                 Nothing announced yet. Published announcements appear here and in every member&apos;s notifications.
@@ -223,7 +237,7 @@ export default async function CoOwnerPage() {
               <li><strong className="text-ink">Members.</strong> Keep the directory accurate, help with account problems, suspend when needed - within your limits.</li>
               <li><strong className="text-ink">Invitations and requests.</strong> {invitations.data || requests.data ? `${(invitations.data?.length ?? 0) + (requests.data?.length ?? 0)} waiting for action.` : "Could not be read just now."}</li>
               <li><strong className="text-ink">QA.</strong> Triage tester reports and confirm fixes before closing them.</li>
-              <li><strong className="text-ink">Analytics.</strong> Watch engagement and completion, and flag anything slipping.</li>
+              <li><strong className="text-ink">Analytics.</strong> The figures at the top of this page are yours to watch - how many members are active, suspended, invited or waiting. The network-wide analytics page is Owner-only, so anything that needs it goes to the Owner.</li>
               <li><strong className="text-ink">Operations.</strong> Coordinate with teachers and staff, and escalate owner-level problems (billing, security, providers) to the Owner.</li>
             </ul>
           </CardContent></Card>

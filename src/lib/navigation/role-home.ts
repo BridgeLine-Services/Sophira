@@ -21,7 +21,7 @@
  * FAIL CLOSED: an unknown, missing or unreadable role gets NO dashboard entry. A member
  * gets none by definition, and nobody is ever shown another rank's dashboard.
  */
-import { normalizeRole, type Role } from "../roles";
+import { isRole, normalizeRole, type Role } from "../roles";
 
 export interface DashboardEntry {
   /** Where this rank's dashboard lives. */
@@ -83,4 +83,28 @@ export function environmentFor(role: Role | string | null | undefined): "owner" 
  */
 export function staffBackHrefFor(role: Role | string | null | undefined): string {
   return adminHomeFor(role);
+}
+
+/**
+ * The rank, in the owner's plain words, for the side panel to show.
+ *
+ * The instruction was "the side panel must identify the account's actual rank". It was not
+ * identified anywhere: a Tester and a Co-Owner saw the same names, and the only hint was
+ * which pages happened to appear. A member is called a Member (not "User"): that is what
+ * the account is, and "user" reads as a database word.
+ *
+ * Unknown or not-yet-read rank returns null so the panel shows NOTHING rather than a guess.
+ */
+export const ROLE_LABELS: Readonly<Record<Role, string>> = {
+  owner: "Owner",
+  co_owner: "Co-Owner",
+  tester: "Tester",
+  user: "Member",
+};
+
+/** The visible rank label, or null when the rank is not known yet (fail closed). */
+export function roleLabelFor(role: Role | string | null | undefined): string | null {
+  // No role, or something we do not recognise: claim nothing. normalizeRole() would call an
+  // unrecognised value "user", which would print "Member" on a staff account mid-load.
+  return isRole(role) ? ROLE_LABELS[role] : null;
 }

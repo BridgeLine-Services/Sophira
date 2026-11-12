@@ -21,7 +21,7 @@ import { ownerNavGroupsFor, type NavRole } from "@/lib/navigation/owner-nav";
 // 2026-11-12: the rank -> dashboard answer and the workspace menu now live in shared,
 // server-safe modules. The shell no longer decides either one for itself, and every
 // navigation variant reads the same list.
-import { adminHomeFor, dashboardForRole } from "@/lib/navigation/role-home";
+import { adminHomeFor, dashboardForRole, roleLabelFor } from "@/lib/navigation/role-home";
 import { workspaceNavFor } from "@/lib/navigation/workspace-nav";
 import { normalizeRole, type Role } from "@/lib/roles";
 
@@ -259,6 +259,12 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
   const roleSettled = useRef(initialRole !== undefined);
   const [roleCheck, setRoleCheck] = useState(0);
   const isOwner = role === "owner";
+  /**
+   * 2026-11-12: the side panel now NAMES the rank. It used to identify an account only by
+   * which pages happened to appear, so a Tester and a Co-Owner looked identical. Null while
+   * the rank is unknown - the panel claims nothing rather than guessing one.
+   */
+  const rankLabel = roleLabelFor(role);
   const [userId, setUserId] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -634,6 +640,12 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
           {onlineChip(false)}
         </nav>
         <div className="border-t border-line p-3">
+          {rankLabel && (
+            <p className="mb-2 flex items-center gap-2 px-2 text-xs text-ink-soft" data-rank={role}>
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Signed in as <span className="font-semibold text-ink">{rankLabel}</span>
+            </p>
+          )}
           <div className="mb-2 px-2"><SyncStatus /></div>
           <button
             onClick={signOut}
@@ -812,6 +824,12 @@ export function AppShell({ title, backHref, actions, variant = "workspace", role
               {onlineChip(true)}
             </nav>
             <div className="border-t border-line p-3">
+              {rankLabel && (
+                <p className="mb-2 flex items-center gap-2 px-2 text-xs text-ink-soft" data-rank={role}>
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Signed in as <span className="font-semibold text-ink">{rankLabel}</span>
+                </p>
+              )}
               <div className="mb-2 px-2"><SyncStatus /></div>
               <button
                 onClick={signOut}

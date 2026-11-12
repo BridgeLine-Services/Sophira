@@ -19,7 +19,7 @@
  * the defect it is guarding so it cannot be weakened into a tautology.
  */
 import { existsSync, readFileSync } from "fs";
-import { dashboardForRole, adminHomeFor, environmentFor, staffBackHrefFor, ROLE_DASHBOARDS } from "../src/lib/navigation/role-home";
+import { dashboardForRole, adminHomeFor, environmentFor, roleLabelFor, staffBackHrefFor, ROLE_DASHBOARDS } from "../src/lib/navigation/role-home";
 import { WORKSPACE_SECTIONS, workspaceNavFor } from "../src/lib/navigation/workspace-nav";
 import { ownerNavGroupsFor } from "../src/lib/navigation/owner-nav";
 import type { Role } from "../src/lib/roles";
@@ -66,6 +66,25 @@ export function runRoleNavigationTests(
     assert(ROLE_DASHBOARDS.owner!.label !== ROLE_DASHBOARDS.co_owner!.label &&
       ROLE_DASHBOARDS.co_owner!.label !== ROLE_DASHBOARDS.tester!.label,
       "role-nav: no two ranks share a dashboard LABEL (the old bug showed 'Owner Dashboard' to a Co-Owner)");
+  }
+
+  // ==== A2. The panel names the rank (the instruction: "the side panel must identify the
+  // account's actual rank"). It never names a rank it has not read. ====
+  section("role-nav: the side panel identifies the account's actual rank");
+  {
+    assert(roleLabelFor("owner") === "Owner" && roleLabelFor("co_owner") === "Co-Owner",
+      "role-nav: staff ranks are named in the panel, in plain words");
+    assert(roleLabelFor("tester") === "Tester" && roleLabelFor("user") === "Member",
+      "role-nav: a Tester is named Tester and an ordinary account is called a Member, not 'User'");
+    for (const unknown of [null, undefined, "", "nonsense", "admin", "OWNER", "co-owner"]) {
+      assert(roleLabelFor(unknown as never) === null,
+        `role-nav: an unreadable rank (${JSON.stringify(unknown)}) prints NO rank label - the panel never guesses`);
+    }
+    const shell = read(SHELL);
+    assert(shell.includes("const rankLabel = roleLabelFor(role)") && (shell.match(/Signed in as/g) ?? []).length === 2,
+      "role-nav: the rail and the phone drawer both name the rank (two panels, one answer)");
+    assert(shell.includes("{rankLabel && (") && shell.includes("data-rank={role}"),
+      "role-nav: the label is drawn only when the rank is known, and carries the raw rank for inspection");
   }
 
   // ==== B. Home and back destinations ====
@@ -261,6 +280,11 @@ export function runRoleNavigationTests(
     assert(!coOwner.includes('href="/owner/analytics"') && !coOwner.includes('href="/owner/activity"') &&
       !coOwner.includes('href="/owner/ai-operations"'),
       "co-owner: the three Owner-only links that used to bounce a Co-Owner are gone");
+
+    assert(coOwner.includes("announcementsUnreadable") && coOwner.includes("couldn&apos;t be read just now"),
+      "co-owner: an unreadable announcements read says so, instead of claiming nothing was ever announced");
+    assert(!coOwner.includes("Watch engagement and completion"),
+      "co-owner: their responsibilities do not promise a page this rank cannot open");
 
     const tester = read("src/app/tester/page.tsx");
     assert(tester.includes('title="Tester Dashboard"') && !tester.includes('variant="owner"'),
