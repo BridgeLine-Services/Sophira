@@ -274,3 +274,9 @@ input, textarea, select {
   color: #fff;
 }
 .dash-page > .dash-stack > .dash-hero .dash-hero-sub { color: rgba(255, 255, 255, 0.72); }
+
+/* Trend chart (2026-11-12): purple on the white role panels, no literal colour in the tsx. */
+.trend-line { stroke: #6d4bd8; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend-dot { fill: #6d4bd8; }
+.trend-bar { fill: #d9cdf7; }
+.trend-bar[data-on="true"] { fill: #6d4bd8; }

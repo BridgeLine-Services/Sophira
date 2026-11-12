@@ -500,4 +500,38 @@ export function runDashboardOverviewTests(
     assert(css.includes(".dash-page > .dash-stack > *"),
       "dashboard: the role shell lifts its blocks onto panels from the stylesheet, not inline");
   }
+
+  // ==== O. The reference's analytics charts, from real rows only ====
+  section("dashboard: the analytics charts draw real rows and never a guessed series");
+  {
+    const chart = readFileSync("src/components/dashboard/TrendChart.tsx", "utf8");
+    assert(chart.includes('"line"') && chart.includes('"bars"'),
+      "dashboard: the shared chart renders the reference's line and bar variants");
+    assert(chart.includes("trend-line") && chart.includes("trend-bar"),
+      "dashboard: chart colours come from the stylesheet classes");
+    assert(!/#[0-9a-fA-F]{3,6}/.test(chart),
+      "dashboard: the chart component carries no literal hex");
+    assert(chart.includes("not the same as a quiet week"),
+      "dashboard: a failed read is a sentence, never a flat line at zero");
+    assert(chart.includes("series.map") && chart.includes("role=\"img\""),
+      "dashboard: every day in the series is drawn, and the chart is described for a screen reader");
+
+    const owner = readFileSync("src/app/owner/page.tsx", "utf8");
+    assert(owner.includes('from("membership_audit")') && owner.includes("weekActivity("),
+      "dashboard: the owner chart counts real membership_audit rows");
+    assert(owner.includes('<TrendChart') && owner.includes('variant="line"'),
+      "dashboard: the owner panel is the reference's line chart");
+    assert(owner.includes("unreadable={Boolean(activityError)}"),
+      "dashboard: the owner chart reports its own read failure");
+
+    const coOwner = readFileSync("src/app/co-owner/page.tsx", "utf8");
+    assert(coOwner.includes('from("membership_audit")') && coOwner.includes("weekActivity("),
+      "dashboard: the co-owner chart counts real membership_audit rows too");
+    assert(coOwner.includes('<TrendChart') && coOwner.includes('variant="bars"'),
+      "dashboard: the co-owner panel is the reference's bar chart");
+
+    const css = readFileSync("src/app/globals.css", "utf8");
+    assert(css.includes(".trend-line") && css.includes(".trend-bar"),
+      "dashboard: the chart classes exist in the stylesheet");
+  }
 }
