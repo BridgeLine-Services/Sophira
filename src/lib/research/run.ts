@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSearchProvider } from "./provider";
+import { getSearchProvider, researchReadiness, type ResearchReadiness } from "./provider";
 import { fetchAndVerify, titlesCorrespond } from "./verify";
 import { dedupeSources } from "./research";
 import { rankCandidatesForAssignment } from "./authority";
@@ -56,6 +56,12 @@ export interface StoredSourceResult {
 export interface ResearchPassResult {
   stored: StoredSourceResult[];
   searchFailures: string[];
+  /**
+   * Set when the pass could NOT run at all (2026-11-13, directive Part 9). This is not a
+   * search that returned nothing: no provider call was made. Callers must report it as
+   * unavailable and must not present it as "no results".
+   */
+  unavailable?: ResearchReadiness;
 }
 
 /** May this project be resumed right now? (pure, testable) */
@@ -90,7 +96,30 @@ export async function executeResearchPass(
   queryRows: { id: string; query: string }[],
   maxCandidates: number,
 ): Promise<ResearchPassResult> {
-  const provider = getSearchProvider();
+  // 2026-11-13 (directive Part 9): readiness is checked BEFORE the provider is constructed,
+  // and construction is guarded, because getSearchProvider() throws when the installation has
+  // no provider or an unusable one. Previously that exception escaped executeResearchPass and
+  // left the project stuck in "searching", which reads like a search is still running.
+  const readiness = researchReadiness();
+  if (!readiness.searchable) return { stored: [], searchFailures: [], unavailable: readiness };
+
+  let provider;
+  try {
+    provider = getSearchProvider();
+  } catch (e) {
+    return {
+      stored: [],
+      searchFailures: [],
+      unavailable: {
+        ...readiness,
+        availability: "unconfigured",
+        searchable: false,
+        code: "search_not_configured",
+        studentMessage: researchReadiness().studentMessage,
+        ownerDetail: `Search provider could not be created: ${e instanceof Error ? e.message : "unknown error"}`,
+      },
+    };
+  }
 
   // Sources already stored for this project — resume never duplicates them.
   const { data: existing } = await supabase
