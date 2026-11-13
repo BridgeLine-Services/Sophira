@@ -288,7 +288,9 @@ export function runMembershipNotificationTests(
   // migration of its own - the assertion above proves it.
   // 2026-11-13: 56 -> 57 (0057, the flashcard decks, cards and review log). The notification
   // work itself still needs no migration of its own - the assertion above proves it.
-  assert(migrations.length === 57,
+  // 2026-11-13: 57 -> 58 (0058, the writing profile contexts). The notification work itself
+  // still needs no migration of its own - the assertion above proves it.
+  assert(migrations.length === 58,
     "schema: notification changes ride the 0042 table; 0055 adds announcements");
 
   section("approving a request actually sends the invitation");

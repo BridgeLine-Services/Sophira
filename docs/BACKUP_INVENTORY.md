@@ -9,7 +9,7 @@ migrations, the tables they create (minus any dropped later) and the storage buc
 and fails the suite when they disagree. A migration added without updating this line
 is a test failure, not a stale document.
 
-**Scope at time of writing:** 57 migrations, 65 application tables, 1 private storage bucket (`private-docs`).
+**Scope at time of writing:** 58 migrations, 65 application tables, 1 private storage bucket (`private-docs`).
 
 ---
 
@@ -131,6 +131,23 @@ study progress. The export scope in `src/app/api/account/export/route.ts` includ
 three tables, so a member can always download them.
 
 ---
+
+
+## 5c. Writing profile contexts (0058)
+
+Added 2026-11-13: a writing profile and a writing sample now declare which register they belong
+to (academic, casual, professional), and a profile carries the student's own 0-100 closeness
+setting. Existing rows are academic by default, so a restore of older data still resolves.
+
+| Column | Why it is protected | Member-owned | Sensitive |
+|---|---|---|---|
+| `writing_profiles.profile_context` | Which register the approved guidance describes. Losing it would collapse three profiles into one. | yes | yes |
+| `writing_profiles.style_closeness` | The student's own preference for how closely their voice is followed. | yes | yes |
+| `writing_samples.profile_context` | Which register a sample represents, so casual samples never feed academic analysis. | yes | yes |
+
+No row is created, moved or deleted by this migration, and no uniqueness rule was added, so an
+older backup restores cleanly and is then brought forward by the migration chain.
+
 
 ## 6. Integrations
 

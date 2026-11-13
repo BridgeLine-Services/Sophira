@@ -842,3 +842,61 @@ source from a real fetch. No ranking weight and no verification threshold moved.
 | API contract changes | additive: new `503` failure answers carry `code` and `search` fields; successful responses unchanged |
 | Verification | suite **8150/8150**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 82 routes, secret scan CLEAN, jargon audit 0, release-gate self-test PASS |
 | Outstanding | live research stays NOT CONFIGURED until the owner adds a search provider. Nothing here can make a real search happen |
+
+---
+
+## 15. Part 5, stage one: the writing profile contexts migration (prepared, NOT applied)
+
+Directive Part 5 wants three separate writing profiles (academic, casual, professional) and a
+student-controlled setting for how closely their approved voice is followed. The directive also
+insists this is staged, because application code that queries a column the live database does not
+have would break working screens. So this stage is the database only: no route, no screen, and no
+runtime code reads the new columns yet.
+
+### 15.1 What the migration does
+
+`supabase/migrations/0058_writing_profile_contexts.sql` adds, additively:
+
+| Table | Column | Type and rule |
+|---|---|---|
+| `writing_profiles` | `profile_context` | text, not null, default `academic`, check in (academic, casual, professional) |
+| `writing_profiles` | `style_closeness` | int, not null, default 70, check between 0 and 100 |
+| `writing_samples` | `profile_context` | text, not null, default `academic`, same check |
+
+Plus two indexes (`user_id, profile_context, created_at desc`) for the reads this feature will do.
+
+Existing profiles and samples become academic automatically, which is the honest reading of the
+old data: until now there was one undifferentiated profile and every existing writing workflow is
+academic. **No uniqueness constraint was added.** `writing_profiles` has never been unique per
+student (0001 and 0003 kept a version column and the app reads the newest row), so a unique rule
+could fail on live data. RLS is untouched: both tables keep their own-row policies from 0001.
+
+### 15.2 Proven, not assumed
+
+`scripts/verify-migrations-local.mjs` gained a named scenario for 0058, run on a throwaway
+PostgreSQL 15. It applies the whole chain to an empty database (58 migrations), writes a profile
+and a sample BEFORE the migration, then applies it and checks: both rows become academic, the
+closeness default is 70, guidance/status/version/text/representativeness all survive, no row is
+deleted, `'poetic'` and `101` are refused by the database itself, closeness 0 with context `casual`
+is accepted, both indexes exist, RLS is still on, both policies are still own-row, and re-running
+the file is idempotent.
+
+### 15.3 Change record
+
+| | |
+|---|---|
+| Change | Part 5 stage one: migration 0058 (profile contexts + closeness), marker, regenerated embedded chain and bootstrap, migration-count updates |
+| Phase | 4 (Part 5) |
+| Reason | Directive Part 5.2, staged exactly as 5.2's release rule requires |
+| Existing behaviour preserved | No column dropped or retyped, no row deleted or merged, no policy changed, no uniqueness rule added, all 57 earlier migrations untouched |
+| Files modified | `supabase/migrations/0058_writing_profile_contexts.sql` (new), `scripts/migration-markers.mjs`, `src/lib/db-migrations.generated.ts` (regenerated), `src/lib/bootstrap-sql.generated.ts` (regenerated), `supabase/bootstrap-all.sql` (regenerated), `scripts/verify-migrations-local.mjs`, `tests/membership-notifications.ts` (count 57 to 58), `docs/BACKUP_INVENTORY.md` |
+| Database changes | 0058: prepared, verified on a throwaway Postgres, **NOT applied to production** |
+| API contract changes | none |
+| Verification | suite **8151/8151**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, secret scan CLEAN, `db:verify:local` PASS on 58 migrations |
+| Outstanding | the owner must apply it at https://sophira.vercel.app/owner/database. Only then can stage two (screens, closeness slider, profile-aware AI routing) be written without risking a broken screen |
+
+### 15.4 Why stage two was not started
+
+Writing the Part 5 screens now would mean querying `profile_context` on a live database that does
+not have it. That is precisely the failure the directive's release rule exists to prevent: the
+writing pages would 500 for every real student. Stage two waits for the owner's one button press.
