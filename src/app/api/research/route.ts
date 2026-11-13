@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
-import { searchProviderConfigured, searchModeNotice } from "@/lib/research/provider";
+import { searchProviderConfigured, searchModeNotice, researchReadiness } from "@/lib/research/provider";
 import { generateQueries } from "@/lib/research/research";
 import { executeResearchPass } from "@/lib/research/run";
 import { evaluateInformationRequest } from "@/lib/research/policy";
@@ -66,6 +66,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // 2026-11-13 (directive Part 9): a fresh run used to create the project and its query rows
+  // BEFORE establishing that a usable search provider exists, so an unconfigured installation
+  // left a project sitting in "searching" (which reads like a run in progress) with no way
+  // forward. Readiness is now checked here: no project, no query rows, and an honest answer.
+  const readiness = researchReadiness();
+  if (!readiness.searchable) {
+    return NextResponse.json(
+      {
+        error: readiness.studentMessage,
+        code: readiness.code,
+        search: { availability: readiness.availability, searchable: false },
+      },
+      { status: 503 },
+    );
+  }
+
   const spec = {
     topic,
     question: body.question ?? null,
@@ -104,9 +120,27 @@ export async function POST(request: NextRequest) {
   // 2-3. Real external search + verification — SHARED EXECUTION CORE
   // (one path for fresh runs and resumes; see lib/research/run.ts).
   const queryRows = (queryRowsRaw ?? []).map((r: { id: string; query: string }) => ({ id: r.id, query: r.query }));
-  const { stored, searchFailures } = await executeResearchPass(
+  const pass = await executeResearchPass(
     supabase, user.id, project.id, spec, queryRows, MAX_CANDIDATES,
   );
+  const { stored, searchFailures } = pass;
+
+  if (pass.unavailable) {
+    // The provider disappeared between the readiness check and the pass (or failed to
+    // construct). Record it honestly: nothing was searched and nothing was invented.
+    await supabase.from("research_projects").update({
+      status: "failed", failure_reason: pass.unavailable.studentMessage, updated_at: new Date().toISOString(),
+    }).eq("id", project.id);
+    return NextResponse.json(
+      {
+        error: pass.unavailable.studentMessage,
+        code: pass.unavailable.code,
+        search: { availability: pass.unavailable.availability, searchable: false },
+        data: { project_id: project.id, status: "failed", sources: [], warning: pass.unavailable.studentMessage },
+      },
+      { status: 503 },
+    );
+  }
 
   if (stored.length === 0) {
     const notice = searchModeNotice();

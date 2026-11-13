@@ -35,8 +35,15 @@ export function runResearchResumeTests(assert: (c: boolean, n: string) => void, 
   const route = readFileSync(path.join(process.cwd(), "src/app/api/research/resume/route.ts"), "utf8");
   assert(route.includes("isResumable(project.status, project.updated_at)") && route.includes("409"),
     "resume: the endpoint enforces the resumable gate server-side (409 on refusal)");
-  assert(route.includes("searchProviderConfigured()") && route.includes("will not invent sources"),
-    "resume: without a configured provider the endpoint fails HONESTLY — never fabricates sources");
+  // 2026-11-13 (directive Part 9): readiness now comes from the SHARED check, and the reply is
+  // student-facing, so the pin moves from a variable name in the reply to the guarantees that
+  // matter: the check happens, the answer is 503, and the project's stored sources survive.
+  assert(route.includes("researchReadiness()") && route.includes("status: 503"),
+    "resume: without a configured provider the endpoint refuses honestly with a 503");
+  assert(!/SEARCH_API_KEY|SEARCH_PROVIDER/.test(route),
+    "resume: the student-facing reply names no configuration variable");
+  assert(!/\.delete\(\)/.test(route),
+    "resume: a blocked resume never deletes a student's stored research");
   assert(route.includes("priorVerified") && route.includes("verification_status", 0) || route.includes('eq("verification_status", "verified")'),
     "resume: sufficiency counts only VERIFIED sources (existing + newly verified)");
   assert(route.includes("No stored queries") || route.includes("no stored queries"),

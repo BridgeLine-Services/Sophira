@@ -66,29 +66,86 @@ export class SearchNotConfiguredError extends Error {
 }
 
 /**
+ * HOW READY IS THIS INSTALLATION FOR ONLINE RESEARCH? (directive Part 9, 2026-11-13)
+ *
+ * One function answers it, so the fresh run, the resume and any screen all report the same
+ * thing. Four states are kept distinct, because collapsing them is exactly how an installation
+ * ends up telling a student "no results" when nothing was ever searched:
+ *
+ *   external      a real provider is configured and could run a search
+ *   local         deliberately switched off; no external call is ever made
+ *   unconfigured  a provider is expected but its key/base URL is missing
+ *   (a search that IS attempted and fails is reported by the caller, per query)
+ *
+ * `studentMessage` is what a student may see: no variable names, no vendor names, no
+ * exceptions. `ownerDetail` is the technical half and belongs on owner-only screens.
+ */
+export type ResearchAvailability = "external" | "local" | "unconfigured";
+
+export interface ResearchReadiness {
+  availability: ResearchAvailability;
+  /** True only when a real external search can actually run right now. */
+  searchable: boolean;
+  /** Stable machine code for an API response; never shown to a student. */
+  code: "search_available" | "search_local_mode" | "search_not_configured";
+  /** Plain language for a student. Safe to display verbatim. */
+  studentMessage: string;
+  /** Setup detail for the owner screen. MUST NOT be shown to a student. */
+  ownerDetail: string;
+}
+
+export const RESEARCH_STUDENT_MESSAGES = {
+  local:
+    "Online research is turned off in this installation. Your saved documents and sources are still available.",
+  unconfigured:
+    "Online research is not available right now. Your saved work is safe. No web search was performed and no sources were invented. Please ask the person who manages Sophira to enable online research.",
+} as const;
+
+export function researchReadiness(): ResearchReadiness {
+  const provider = (process.env.SEARCH_PROVIDER || "brave").toLowerCase();
+  if (provider === "local") {
+    return {
+      availability: "local",
+      searchable: false,
+      code: "search_local_mode",
+      studentMessage: RESEARCH_STUDENT_MESSAGES.local,
+      ownerDetail:
+        "SEARCH_PROVIDER=local: web research is intentionally disabled in this installation. No external call is made and no results are invented. Set SEARCH_PROVIDER (brave/tavily/custom) and SEARCH_API_KEY in the hosting environment to enable it.",
+    };
+  }
+  if (!searchProviderConfigured()) {
+    return {
+      availability: "unconfigured",
+      searchable: false,
+      code: "search_not_configured",
+      studentMessage: RESEARCH_STUDENT_MESSAGES.unconfigured,
+      ownerDetail:
+        "No search provider is configured: SEARCH_PROVIDER and SEARCH_API_KEY (server-only, set in the hosting environment) are missing or incomplete. Nothing is searched and no sources are invented until they are set.",
+    };
+  }
+  return {
+    availability: "external",
+    searchable: true,
+    code: "search_available",
+    studentMessage: "",
+    ownerDetail: `External search provider "${provider}" is configured.`,
+  };
+}
+
+/**
  * Honest, non-technical explanation of WHY no web results can appear.
  * "local" is an intentional mode (no external calls), and a missing key is
  * a configuration gap - the two must never be reported as "you got no
  * results", which implies the search ran. Returns null when a real external
  * provider is configured.
+ *
+ * 2026-11-13: the wording is now student-facing only (no variable or vendor names). The
+ * technical half lives in researchReadiness().ownerDetail for the owner screen.
  */
 export function searchModeNotice(): { mode: "local" | "unconfigured"; message: string } | null {
-  const provider = (process.env.SEARCH_PROVIDER || "brave").toLowerCase();
-  if (provider === "local") {
-    return {
-      mode: "local",
-      message:
-        "Web research is switched off in this installation (SEARCH_PROVIDER=local). Your saved documents and sources still work. To turn on web research, the owner sets SEARCH_PROVIDER and SEARCH_API_KEY in the hosting environment, then redeploys.",
-    };
-  }
-  if (!searchProviderConfigured()) {
-    return {
-      mode: "unconfigured",
-      message:
-        "Web research is not configured yet: the server is missing SEARCH_PROVIDER / SEARCH_API_KEY (server-only values, set in the hosting environment). Nothing was searched and no sources were invented.",
-    };
-  }
-  return null;
+  const readiness = researchReadiness();
+  if (readiness.availability === "external") return null;
+  return { mode: readiness.availability, message: readiness.studentMessage };
 }
 
 export function searchProviderConfigured(): boolean {

@@ -785,3 +785,60 @@ ordinary question ("Explain how paywalls affect open-access publishing") is pinn
 | API contract changes | none |
 | Verification | suite **8112/8112**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 82 routes, secret scan CLEAN, jargon audit 0 |
 | Outstanding | the ten model-judged categories cannot be scored until an AI provider is configured. They report as skipped, never as passed |
+
+---
+
+## 14. Part 9, stage one: research readiness, and an honest failure instead of a stuck project
+
+Directive Part 9 asks for the research workflow to fail honestly when no search provider is
+configured. Production has none (`/api/health` reports `search: false`), so this was a live defect,
+not a theoretical one.
+
+### 14.1 The defect
+
+`POST /api/research` created the `research_projects` row (status `searching`) and its
+`research_queries` rows BEFORE establishing that a usable provider existed. It then called
+`executeResearchPass()`, which constructed the provider at the top, OUTSIDE the per-query error
+handling. On an unconfigured installation `getSearchProvider()` threw, the exception escaped the
+pass, and the project was left sitting in `searching` - a state that reads to a student as "a run
+is in progress" when no search was ever attempted. `POST /api/research/resume` answered with
+environment-variable names in a message the screen displays verbatim.
+
+### 14.2 The fix
+
+One function now answers "can research actually run here": `researchReadiness()` in
+`src/lib/research/provider.ts`. It returns four distinct states - `external`, `local`,
+`unconfigured`, and (reported by the caller) a search that was attempted and failed - plus a
+`studentMessage` with no variable or vendor names and an `ownerDetail` that keeps the setup
+information on owner-only surfaces.
+
+| Path | Before | Now |
+|---|---|---|
+| Fresh run | project + query rows created, provider threw, project stuck in `searching` | readiness checked after the policy screen and BEFORE any row exists; unavailable answers `503` with code `search_local_mode` / `search_not_configured`, creating nothing |
+| `executeResearchPass` | provider constructed outside the error handling | refuses before constructing anything, returns `unavailable` instead of throwing, and writes no source and no query status |
+| Resume | technical message, project marked `failed` | same shared readiness; `503`, stored sources untouched, the project left in an honest recoverable state because nothing was attempted |
+
+A provider that vanishes between the readiness check and the pass is also handled: both routes
+report `503` and record the honest reason, and a mid-run loss can no longer be reported as a
+completed run.
+
+### 14.3 What was deliberately not touched
+
+`verify.ts`, `authority.ts`, `claims.ts`, `citation.ts` and `finalGate.ts` are unchanged, and the
+pass still verifies every candidate and ranks by assignment authority. A source that a search
+provider returned is still NOT verified by that fact alone: `verification_status` is written per
+source from a real fetch. No ranking weight and no verification threshold moved.
+
+### 14.4 Change record
+
+| | |
+|---|---|
+| Change | Part 9 stage one: shared research readiness, no project created when research cannot run, student-facing wording, resume never loses or mislabels stored work |
+| Phase | 4 (Part 9) |
+| Reason | Directive Part 9.2, 9.3, 9.4, 9.5 |
+| Existing behaviour preserved | Successful research response shape unchanged; every stored source, verification verdict and approval kept; resume de-duplication intact; policy screening still runs first; SSRF and restricted-source checks untouched |
+| Files modified | `src/lib/research/provider.ts`, `src/lib/research/run.ts`, `src/app/api/research/route.ts`, `src/app/api/research/resume/route.ts`, `tests/research-readiness.ts` (new), `tests/research-resume.ts`, `tests/run.ts` |
+| Database changes | none |
+| API contract changes | additive: new `503` failure answers carry `code` and `search` fields; successful responses unchanged |
+| Verification | suite **8150/8150**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 82 routes, secret scan CLEAN, jargon audit 0, release-gate self-test PASS |
+| Outstanding | live research stays NOT CONFIGURED until the owner adds a search provider. Nothing here can make a real search happen |

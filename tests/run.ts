@@ -95,6 +95,7 @@ import { runAcademicContextTests } from "./academic-context";
 import { runFlashcardTests, runFlashcardProgressTests, runFlashcardScreenTests, runFlashcardNotebookTests } from "./flashcards";
 import { runIntegrationReadinessTests } from "./integration-readiness";
 import { runJargonTests } from "./jargon";
+import { runResearchReadinessTests } from "./research-readiness";
 import { runDatabaseUpdateNoticeTests } from "./database-update-notice";
 import { runExportTests } from "./document-export";
 import { runResearchResumeTests } from "./research-resume";
@@ -4644,12 +4645,17 @@ async function runResearchModeTests(): Promise<void> {
   try {
     process.env.SEARCH_PROVIDER = "local"; delete process.env.SEARCH_API_KEY;
     const local = searchModeNotice();
-    assert(local?.mode === "local" && local.message.includes("switched off") && local.message.includes("still work"),
-      "research: SEARCH_PROVIDER=local is explained as switched off (never 'no results'), and local work is preserved");
+    // 2026-11-13 (directive Part 9): the student message may no longer name variables or
+    // vendors; it must still say research is off (never "no results") and that saved work
+    // survives. The technical half moved to researchReadiness().ownerDetail.
+    assert(local?.mode === "local" && /turned off/i.test(local.message) && /still available/i.test(local.message),
+      "research: local mode is explained as turned off (never 'no results'), and saved work is preserved");
     process.env.SEARCH_PROVIDER = "brave"; delete process.env.SEARCH_API_KEY;
     const un = searchModeNotice();
-    assert(un?.mode === "unconfigured" && un.message.includes("SEARCH_API_KEY") && /not configured/i.test(un.message),
-      "research: a missing key names the variables and states that nothing was searched or invented");
+    assert(un?.mode === "unconfigured" && /not available right now/i.test(un.message) && /no sources were invented/i.test(un.message),
+      "research: an unconfigured installation says research is unavailable and that nothing was searched or invented");
+    assert(!/SEARCH_API_KEY|SEARCH_PROVIDER|hosting environment/i.test(un?.message ?? ""),
+      "research: the student message names no environment variable and no owner-only setup step");
     assert(!(un?.message ?? "").includes("returned no usable results"),
       "research: configuration gaps are never reported as empty search results");
     process.env.SEARCH_API_KEY = "test-key-not-real";
@@ -5535,5 +5541,6 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     await runFlashcardNotebookTests(assert, section);
     await runIntegrationReadinessTests(assert, section);
     await runJargonTests(assert, section);
+    await runResearchReadinessTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

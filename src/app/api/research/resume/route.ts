@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
-import { searchProviderConfigured } from "@/lib/research/provider";
+import { researchReadiness } from "@/lib/research/provider";
 import { executeResearchPass, isResumable, type ResearchRunSpec } from "@/lib/research/run";
 
 export const runtime = "nodejs";
@@ -50,13 +50,21 @@ export async function POST(request: NextRequest) {
   const gate = isResumable(project.status, project.updated_at);
   if (!gate.ok) return NextResponse.json({ error: gate.reason ?? "Not resumable." }, { status: 409 });
 
-  if (!searchProviderConfigured()) {
-    const reason =
-      "No search provider is configured on the server. Set SEARCH_PROVIDER and SEARCH_API_KEY (server-side environment variables) — Sophira will not invent sources.";
-    await supabase.from("research_projects").update({
-      status: "failed", failure_reason: reason, updated_at: new Date().toISOString(),
-    }).eq("id", projectId);
-    return NextResponse.json({ error: reason }, { status: 503 });
+  // 2026-11-13 (directive Part 9): the same shared readiness check as the fresh run, with
+  // student-facing wording. The project is deliberately NOT touched here: nothing was
+  // attempted, so marking it "failed" would record a run that never happened, and every
+  // stored source and its verification verdict must survive untouched. The project stays in
+  // whatever honest state it already holds, and can be resumed once research is enabled.
+  const readiness = researchReadiness();
+  if (!readiness.searchable) {
+    return NextResponse.json(
+      {
+        error: readiness.studentMessage,
+        code: readiness.code,
+        search: { availability: readiness.availability, searchable: false },
+      },
+      { status: 503 },
+    );
   }
 
   const specRow = (project.research_spec ?? {}) as Record<string, unknown>;
@@ -89,9 +97,28 @@ export async function POST(request: NextRequest) {
     status: "searching", updated_at: new Date().toISOString(),
   }).eq("id", projectId);
 
-  const { stored, searchFailures } = await executeResearchPass(
+  const pass = await executeResearchPass(
     supabase, user.id, projectId, spec, queryRows, 8,
   );
+  const { stored, searchFailures } = pass;
+
+  // The provider vanished between the readiness check and the pass. Nothing was searched,
+  // so the project must not be left looking "in progress", and no stored source is touched:
+  // its verification verdict still describes a real fetch that happened earlier.
+  if (pass.unavailable) {
+    await supabase.from("research_projects").update({
+      status: "failed", failure_reason: pass.unavailable.studentMessage, updated_at: new Date().toISOString(),
+    }).eq("id", projectId);
+    return NextResponse.json(
+      {
+        error: pass.unavailable.studentMessage,
+        code: pass.unavailable.code,
+        search: { availability: pass.unavailable.availability, searchable: false },
+        data: { project_id: projectId, status: "failed", sources: [], resumed: false },
+      },
+      { status: 503 },
+    );
+  }
 
   // Sources already present BEFORE this pass (resume must not lose them).
   // priorVerified drives the honest sufficiency check; priorTotal the display.
