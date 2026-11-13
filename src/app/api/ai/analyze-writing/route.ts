@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import { AI_NOT_CONFIGURED_MESSAGE } from "@/lib/ai/provider";
+import { CONTEXT_LABELS, parseWritingContext } from "@/lib/ai/writing-contexts";
+import { ensureProfileForContext } from "@/lib/ai/writing-profiles";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -26,25 +28,47 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { sample_ids?: string[] } = {};
+  let body: { sample_ids?: string[]; context?: unknown } = {};
   try {
     body = await request.json();
   } catch {
     // no body → analyze all usable samples
   }
 
+  // 2026-11-13 (directive Part 5): analysis is scoped to ONE kind of writing. Without this
+  // a single casual note could reshape the profile applied to every essay. An unset context
+  // stays academic, which is what migration 0058 made every existing sample.
+  const context = parseWritingContext(body.context);
+
   let query = supabase
     .from("writing_samples")
     .select("*")
+    .eq("profile_context", context)
     .neq("representativeness", "not_representative")
     .order("created_at", { ascending: false })
     .limit(20);
   if (body.sample_ids?.length) query = query.in("id", body.sample_ids);
 
-  const { data: samples } = await query;
+  const { data: samples, error: samplesError } = await query;
+  if (samplesError) {
+    // A database without 0058 has no context column. Fall back to the pre-0058 read so the
+    // screen keeps working, and say that contexts are not available yet.
+    const legacy = await supabase
+      .from("writing_samples")
+      .select("*")
+      .neq("representativeness", "not_representative")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (legacy.data?.length) {
+      return NextResponse.json(
+        { error: "Separate writing contexts are not available on this database yet, so this analysis was not run. Nothing was changed." },
+        { status: 503 },
+      );
+    }
+  }
   if (!samples || samples.length === 0) {
     return NextResponse.json(
-      { error: "I need at least one writing sample marked as 'preferred' or 'neutral' before I can analyze your style. I will not invent a writing style without examples." },
+      { error: `I need at least one ${CONTEXT_LABELS[context].toLowerCase()} sample marked as 'preferred' or 'neutral' before I can analyze your style. I will not invent a writing style without examples.` },
       { status: 400 }
     );
   }
@@ -78,25 +102,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "I could not produce a reliable analysis from these samples. Please try again or add more writing." }, { status: 502 });
   }
 
-  // Find or create the single writing profile row.
+  // Find or create the profile row FOR THIS CONTEXT (directive Part 5). A casual analysis
+  // must never propose changes to the academic profile.
+  const ensured = await ensureProfileForContext(supabase, user.id, context);
+  if (!ensured.profileId) {
+    return NextResponse.json({ error: "Could not prepare the writing profile record. Please try again." }, { status: 500 });
+  }
+  const profileId = ensured.profileId;
   const { data: existing } = await supabase
     .from("writing_profiles")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  let profileId = existing?.[0]?.id;
-  let version = (existing?.[0]?.version ?? 1) + 1;
-  if (!profileId) {
-    const { data: created, error: cErr } = await supabase
-      .from("writing_profiles")
-      .insert({ user_id: user.id, summary: {}, guidance: "", status: "draft", version: 1 })
-      .select("id")
-      .single();
-    if (cErr || !created) return NextResponse.json({ error: "Could not create the writing profile record. Please try again." }, { status: 500 });
-    profileId = created.id;
-    version = 2;
-  }
+    .select("version")
+    .eq("id", profileId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const version = ((existing as { version?: number } | null)?.version ?? 1) + 1;
 
   const { data: proposal, error: pErr } = await supabase
     .from("profile_update_proposals")

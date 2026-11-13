@@ -206,6 +206,8 @@ export async function runAcademicContextTests(assert: Assert, section: (name: st
     const writing = fakeClient({ courses: [], teachers: [], teacher_profiles: [], learning_patterns: [], student_memories: [], writing_profiles: [draft, approved] });
     const w = await loadAcademicContext(writing.client as never, USER, { mode: "writing-plan", subject: "english", isWritingTask: true });
     assert(contextPrompt(w).includes("short sentences"), "context: the approved writing profile applies to writing tasks");
+    assert(w.writingContext === "academic",
+      "context: an unset writing context is academic (directive Part 5 - what 0058 backfilled)");
     assert(!contextPrompt(w).includes("DRAFT ONLY"), "context: a draft profile is never applied");
     const tutoring = fakeClient({ courses: [], teachers: [], teacher_profiles: [], learning_patterns: [], student_memories: [], writing_profiles: [approved] });
     const t = await loadAcademicContext(tutoring.client as never, USER, { mode: "tutor", subject: "english" });

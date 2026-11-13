@@ -32,6 +32,8 @@
  *      still the authority behind that filter.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { closenessDirective, contextRegisterRules, parseWritingContext, type WritingContext } from "./writing-contexts";
+import { loadApprovedProfile } from "./writing-profiles";
 import {
   selectRelevantMemories,
   RETRIEVABLE_STATUSES,
@@ -60,6 +62,12 @@ export interface AcademicContextRequest {
   taskType?: string | null;
   /** Approved writing profile applies to writing work only. */
   isWritingTask?: boolean;
+  /**
+   * WHICH kind of writing (2026-11-13, directive Part 5). Unset means academic, which is
+   * what migration 0058 made every existing profile, so every current caller keeps its
+   * behaviour without changing.
+   */
+  writingContext?: string | null;
 }
 
 export interface AcademicContextResult {
@@ -70,6 +78,10 @@ export interface AcademicContextResult {
   patternTitles: string[];
   /** Human-readable reasons a source contributed nothing. Never leaks secrets. */
   degraded: string[];
+  /** Which writing context's profile was considered (directive Part 5). */
+  writingContext?: string;
+  /** The closeness setting applied to it, 0-100. */
+  writingCloseness?: number;
 }
 
 export const MAX_CONTEXT_CHARS = 4000;
@@ -104,7 +116,10 @@ export async function loadAcademicContext(
   const degraded: string[] = [];
   const memoryIds: string[] = [];
   const patternTitles: string[] = [];
-  if (!userId) return { sections, memoryIds, patternTitles, degraded: ["no signed-in student"] };
+  const initialContext: WritingContext = parseWritingContext(req.writingContext);
+  let writingContext: WritingContext = initialContext;
+  let writingCloseness = 70;
+  if (!userId) return { sections, memoryIds, patternTitles, degraded: ["no signed-in student"], writingContext, writingCloseness };
 
   const subject = (req.subject ?? "").split("/").pop() || (req.subject ?? "") || null;
   let courseId = req.courseId ?? null;
@@ -176,20 +191,26 @@ export async function loadAcademicContext(
   }
 
   // --- approved writing profile, writing tasks only ------------------------
+  // 2026-11-13 (directive Part 5): the profile is chosen BY CONTEXT, so a casual piece
+  // never inherits academic habits, and the student's closeness dial decides whether the
+  // guidance is applied at all and how strongly. The register rules for the context are
+  // stated either way, because they describe the kind of document, not the student.
   if (req.isWritingTask) {
     try {
-      const { data, error } = await supabase
-        .from("writing_profiles")
-        .select("guidance, status")
-        .eq("user_id", userId)
-        .eq("status", "approved")
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (error) degraded.push("the approved writing profile was unavailable");
-      const guidance = clip((data?.[0] as { guidance?: string } | undefined)?.guidance, MAX_PROFILE_CHARS);
-      if (guidance) {
-        sections.push(`Approved writing preferences (apply where they do not conflict with the assignment or the teacher): ${guidance}`);
+      const loaded = await loadApprovedProfile(supabase, userId, writingContext);
+      writingContext = loaded.context;
+      const decision = closenessDirective(loaded.profile ? loaded.profile.style_closeness : 70);
+      writingCloseness = decision.closeness;
+      degraded.push(...loaded.degraded);
+      const guidance = clip(loaded.profile?.guidance, MAX_PROFILE_CHARS);
+      if (guidance && decision.applyGuidance) {
+        sections.push(
+          `Approved ${writingContext} writing preferences (apply where they do not conflict with the assignment, this course's teacher requirements, or the register rules below): ${guidance}`,
+        );
       }
+      sections.push(
+        `How closely to follow the student's own habits: ${decision.directive} Register rules for ${writingContext} writing - these hold regardless of that setting: ${contextRegisterRules(writingContext).join(" ")}`,
+      );
     } catch {
       degraded.push("the approved writing profile was unavailable");
     }
@@ -262,7 +283,7 @@ export async function loadAcademicContext(
     }
   }
 
-  return { sections: bounded(sections), memoryIds, patternTitles, degraded };
+  return { sections: bounded(sections), memoryIds, patternTitles, degraded, writingContext, writingCloseness };
 }
 
 /** Keep the assembled prompt under MAX_CONTEXT_CHARS, dropping whole trailing sections. */

@@ -6,7 +6,7 @@ not been touched. A route missing from that file is reported as not-started,
 never as complete.
 
 - Page routes: **82**
-- API routes: **108**
+- API routes: **109**
 - Redesigned: 0 | Partial: 78 | Intentionally unchanged: 0 | Not started: 0
 - Pages using the shared shell: 57 | client components: 33 | with an auth gate in-file: 28
 
@@ -97,7 +97,7 @@ data layer, `auth-gated` = redirects or reads the session itself. A page with no
 | `/tutor` | partial | client, shell | Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in. |
 | `/writing` | partial | ai, client, shell, supabase | Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in. |
 | `/writing/grammar` | partial | client, shell | Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in. |
-| `/writing/new` | partial | auth-gated, client, shell, supabase | Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in. |
+| `/writing/new` | partial | ai, auth-gated, client, shell, supabase | Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in. |
 | `/writing/planning` | partial | client, shell | Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in. |
 | `/writing/review` | partial | auth-gated, shell, supabase | Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in. |
 | `/writing/typing` | partial | auth-gated, shell, supabase | Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in. |
@@ -210,5 +210,6 @@ data layer, `auth-gated` = redirects or reads the session itself. A page with no
 - `/api/typing/profile`
 - `/api/writing/grammar`
 - `/api/writing/plan`
+- `/api/writing/profile`
 - `/api/writing/review`
 - `/auth/callback`

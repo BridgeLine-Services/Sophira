@@ -96,6 +96,7 @@ import { runFlashcardTests, runFlashcardProgressTests, runFlashcardScreenTests, 
 import { runIntegrationReadinessTests } from "./integration-readiness";
 import { runJargonTests } from "./jargon";
 import { runResearchReadinessTests } from "./research-readiness";
+import { runWritingContextTests } from "./writing-contexts";
 import { runDatabaseUpdateNoticeTests } from "./database-update-notice";
 import { runExportTests } from "./document-export";
 import { runResearchResumeTests } from "./research-resume";
@@ -3307,11 +3308,16 @@ async function runStyleSuggestionTests(): Promise<void> {
   // A new profile row is created with EMPTY guidance; nothing may ever be written into it here.
   assert(/\.from\("profile_update_proposals"\)/.test(route),
     "style suggestions: accepted suggestions are filed as proposals");
-  const guidanceWrites = route.split("guidance").length - 1;
-  assert(!route.includes(".update(") && guidanceWrites === 1,
-    "style suggestions: route never updates a profile row and mentions guidance only when creating an empty one");
-  assert(route.includes('guidance: ""'),
-    "style suggestions: a new profile starts with empty guidance, never prefilled text");
+  // 2026-11-13 (directive Part 5): profile creation moved into src/lib/ai/writing-profiles.ts so
+  // every route picks the right CONTEXT's row. The guarantees are asserted there instead of by
+  // counting the word "guidance" in this file.
+  const profileLib = readFileSync("src/lib/ai/writing-profiles.ts", "utf8");
+  assert(!route.includes(".update("),
+    "style suggestions: route never updates a profile row - suggestions are only ever proposals");
+  assert(route.includes("ensureProfileForContext") && !/guidance:/.test(route),
+    "style suggestions: the route asks the shared library for the profile and never writes guidance itself");
+  assert(/guidance: ""/.test(profileLib) && /status: "draft"/.test(profileLib),
+    "style suggestions: a new profile starts as a DRAFT with empty guidance, never prefilled text");
 }
 
 async function runRedesignAuditTests(): Promise<void> {
@@ -5542,5 +5548,6 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     await runIntegrationReadinessTests(assert, section);
     await runJargonTests(assert, section);
     await runResearchReadinessTests(assert, section);
+    await runWritingContextTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 
