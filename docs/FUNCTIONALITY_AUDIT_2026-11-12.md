@@ -415,3 +415,39 @@ Role dashboards (Owner, Co-Owner, Tester) needed no markup change: their hero wa
   production-compiled CSS at three widths, not against a logged-in browser window.
 - Dark mode is proven at the token level (contrast gate, both palettes) plus the gradient variables,
   not on a rendered dark page.
+
+---
+
+## Addendum 2026-11-13 (later): teacher preferences can finally be written
+
+### The gap
+
+The five memory scopes are `General < Subject < Course < Teacher < Assignment`. The engine
+(`src/lib/memory/engine.ts`) ranks them, refuses to apply a teacher-scoped memory to another
+teacher, and `listMemories` has accepted a `teacher_id` filter since migration 0047. But
+`POST /api/memory` accepted only a `course_id`, so **scope 4 and scope 5 could be read and never
+written by a student**. A preference a student wanted applied to one teacher had nowhere to go.
+
+### What changed
+
+| File | Change |
+|---|---|
+| `src/app/api/memory/route.ts` | `GET` passes a `teacher_id` filter through (narrowing an already `user_id`-scoped, RLS-protected list). `POST` accepts `teacher_id`, looks the teacher up with the member's own request-scoped client (`teachers_own` RLS decides what is theirs), and refuses an unknown or someone else's teacher with "That teacher is not in your list." *before* anything is written. |
+| `src/components/app/TeacherPreferences.tsx` (new) | The card on a teacher's page: lists only that teacher's preferences, adds one (stored as `origin: 'student_supplied'`, confidence 1), turns one off, back on, or removes it with confirmation. Says in plain English that these come before course/subject/general preferences and apply only with this teacher. |
+| `src/app/teachers/[id]/page.tsx` | Reads this member's non-forgotten memories for this teacher (`user_id` + `teacher_id` + RLS) and renders the card below the teacher profile. Nothing existing was moved or removed. |
+| `tests/teacher-preferences.ts` (new) | 32 assertions: the bonus ladder and both score comparisons, sideways-leak refusal (teacher A's preference is invisible to teacher B and to no-teacher contexts), the ownership check and its plain-language refusal, `user_id` coming from the session and never the body, the page's scoping, and that the card's student-visible copy contains no database words. |
+
+### Verification
+
+- `npm test` 8320/8320, `npx tsc --noEmit` clean, `npm run build` OK, lint 0 errors / 33 warnings,
+  design-drift 0, accessibility PASS (185 files), contrast PASS, conformance 82 routes, jargon 0,
+  secret scan clean.
+- Runtime: a production build started locally answers `401 {"error":"Not authenticated"}` to both
+  `GET /api/memory?teacher_id=…` and `POST /api/memory`, and `/teachers` answers `307` to the login
+  page. Authentication and scoping were not weakened.
+
+### Still open
+
+- The written path was exercised only through the guard and unit-level assertions: no signed-in
+  request was made, because the stored test-member credentials no longer authenticate.
+- Scope 5 (assignment) has the same missing write path, deliberately left for the assignment editor.
