@@ -97,6 +97,7 @@ import { runIntegrationReadinessTests } from "./integration-readiness";
 import { runJargonTests } from "./jargon";
 import { runResearchReadinessTests } from "./research-readiness";
 import { runWritingContextTests } from "./writing-contexts";
+import { runOwnerStatusVocabularyTests } from "./owner-status-vocabulary";
 import { runDatabaseUpdateNoticeTests } from "./database-update-notice";
 import { runExportTests } from "./document-export";
 import { runResearchResumeTests } from "./research-resume";
@@ -5549,5 +5550,6 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     await runJargonTests(assert, section);
     await runResearchReadinessTests(assert, section);
     await runWritingContextTests(assert, section);
+    await runOwnerStatusVocabularyTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

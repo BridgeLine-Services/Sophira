@@ -6,6 +6,7 @@ import { requireOwnerPage } from "@/lib/owner/page-context";
 import { canReadDirectory } from "@/lib/owner/roster";
 import { buildStatusRows, statusIsHealthy } from "@/lib/owner-status";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
+import { stateExplanation, stateLabel, stateTone } from "@/lib/owner/feature-catalog";
 import { providerDiagnostics, readAiEnv } from "@/lib/ai/provider";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,11 @@ export const dynamic = "force-dynamic";
 /**
  * System Status (2026-11-03, phase 1). Each row is a real configuration or a real request
  * outcome. An optional service that is off is labelled as such and never counted as a failure.
+ *
+ * 2026-11-13 (Part 13): this page used to invent its own three words ("working", "not set up",
+ * "needs attention") while Feature Health used six. The owner had to translate between two
+ * pages describing the same service. Both now read from ONE vocabulary, and the page shows the
+ * legend so a state is never a bare colour.
  */
 export default async function OwnerStatusPage() {
   const { supabase } = await requireOwnerPage();
@@ -29,6 +35,9 @@ export default async function OwnerStatusPage() {
     email: setup.email,
     membersLoaded,
   });
+
+  // Only the states this page can actually show, in the shared order, each explained once.
+  const legend = [...new Set(rows.map((r) => r.stage))];
 
   return (
     <AppShell
@@ -51,17 +60,39 @@ export default async function OwnerStatusPage() {
               <div key={row.key} className="flex items-start gap-3 p-4">
                 <span
                   aria-hidden
-                  className={"mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " + (row.state === "ready" ? "bg-success" : row.state === "attention" ? "bg-warn" : "bg-line")}
+                  className={
+                    "mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " +
+                    (row.stage === "working" ? "bg-success"
+                      : row.stage === "available" ? "bg-accent"
+                        : row.stage === "problems" ? "bg-warn"
+                          : row.stage === "unavailable" ? "bg-danger"
+                            : "bg-line")
+                  }
                 />
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
                     {row.label}
-                    <Badge>{row.state === "ready" ? "working" : row.state === "attention" ? "needs attention" : "not set up"}</Badge>
+                    <Badge tone={stateTone(row.stage)}>{stateLabel(row.stage)}</Badge>
                   </p>
                   <p className="mt-0.5 text-xs text-ink-soft">{row.detail}</p>
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        {/* The legend. Same words as Feature Health, so one page never contradicts the other. */}
+        <Card>
+          <CardContent className="p-4">
+            <h3 className="text-sm font-semibold text-ink">What these words mean</h3>
+            <dl className="mt-2 space-y-1.5">
+              {legend.map((stage) => (
+                <div key={stage} className="flex flex-wrap gap-x-2 text-xs">
+                  <dt className="font-medium text-ink">{stateLabel(stage)}</dt>
+                  <dd className="min-w-0 flex-1 text-ink-soft">{stateExplanation(stage)}</dd>
+                </div>
+              ))}
+            </dl>
           </CardContent>
         </Card>
 
