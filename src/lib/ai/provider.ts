@@ -640,3 +640,22 @@ export function providerDiagnostics(env: AiEnv): ProviderDiagnostics {
     notes,
   };
 }
+
+/**
+ * SHARED PROVIDER READINESS WORDING (2026-11-13, Phase 1 / Part 8.1).
+ *
+ * Several routes used to answer an unconfigured AI with "An administrator needs
+ * to set the OPENAI_API_KEY environment variable" regardless of which provider
+ * the owner actually chose - inaccurate, and it named an environment variable in
+ * a student-facing message. The wording now comes from here, once, so the routes
+ * cannot drift apart again, and it names no secret, variable or vendor.
+ *
+ * It also states the two things a student needs to know: their work is safe, and
+ * who can fix it. Never implies the failure is theirs.
+ */
+export const AI_NOT_CONFIGURED_MESSAGE =
+  "Sophira's AI service is not configured yet, so this feature cannot run. Your work has been saved and nothing was lost. Ask the owner or an administrator to finish setting up the AI service.";
+
+/** Provider is configured but the call failed - retryable, never the student's fault. */
+export const AI_UNAVAILABLE_MESSAGE =
+  "Sophira's AI service is not responding right now. Your work has been saved. Please try again in a moment.";

@@ -4,7 +4,8 @@
 **Author:** Base44 Superagent (acting as architect, engineer, and QA for this round)
 **Repository:** https://github.com/BridgeLine-Services/Sophira
 **Baseline commit:** `516bf5e` (master, what production was serving when this round started)
-**Result of this round:** one Phase 1 defect fixed, verified, and shipped. Phase 0 findings below.
+**Result of this round:** Phase 0 report, the Phase 1 release-gate defect, and Phase 2
+academic-context consistency - all verified and merged to `master`.
 
 ---
 
@@ -48,7 +49,7 @@ All of the following ran on a fresh `npm ci` clone of `516bf5e`, before any edit
 | Gate | Result |
 |---|---|
 | `npx tsc --noEmit` | clean, exit 0 |
-| `npm test` | **7814 passed, 0 failed** |
+| `npm test` | **7814 passed, 0 failed** (7891 after this round's additions) |
 | `npm run lint` | 0 errors, 33 warnings (the configured ceiling) |
 | `npm run build` | production build OK |
 | `node scripts/design-drift.mjs` | 0 literal colour utilities, PASS |
@@ -79,12 +80,19 @@ contract and its own route.
 
 This is the highest-value finding of Phase 0, and it is unchanged from the audit:
 
-| Route | Memory / academic-context calls |
+| Route | What it actually retrieved (measured) |
 |---|---|
-| `src/app/api/ai/solve/route.ts` | **25** references (the full engine: retrieval, scopes, writing profile) |
-| `src/app/api/tutor/route.ts` | **0** |
-| `src/app/api/math/prepare/route.ts` | **0** |
-| `src/app/api/writing/plan/route.ts` | **0** |
+| `src/app/api/ai/solve/route.ts` | The full engine: course, teacher profile, approved writing profile, structured learning patterns, scope-filtered memory, usage recording (25 references) |
+| `src/app/api/tutor/route.ts` | **Nothing.** No memory, no patterns, no teacher rules, no writing profile. Only the course row and the student's explanation level. |
+| `src/app/api/math/prepare/route.ts` | Subject memory only, and **only when no course was selected** (`if (!body.course_id) subjectPromptContext(...)`) - so choosing a course silently dropped the student's history |
+| `src/app/api/writing/plan/route.ts` | Same as math/prepare: subject memory only when no course was selected; no teacher requirements, no approved writing profile, no patterns |
+
+**Correction to an earlier statement in this file.** A first reading of these routes reported
+"0 memory calls" for math/prepare and writing/plan. That was wrong: they reach memory
+*indirectly*, through `subjectPromptContext()` -> `sharedMemoryContext()`
+(`src/lib/courses/subject-context.ts`). The real defects are the two in the table above -
+the tutor's total absence, and the `!course_id` condition that switches memory off exactly
+when a course is selected. Both are fixed in Phase 2 (§9).
 
 So the tutor, the math preparation step and the writing planner do not see the same
 student context the solver does. That is exactly the inconsistency Part 4 asks to close
@@ -114,12 +122,17 @@ this round.**
 `src/lib/readiness/finalGate.ts` are all present; the SSRF/policy boundary is covered by
 its own tests (`tests/ssrf.ts`) and by a release-gate check. Untouched this round.
 
-### 4.5 AI provider readiness messages - already fixed
+### 4.5 AI provider readiness messages - the audit was right, and it is now fixed
 
-The audit expected OpenAI-specific setup text in several endpoints. Grepping
-`src/app/api/**/route.ts` for `OpenAI` returns **nothing**. Part 8.1's message
-standardization is therefore already done; the remaining work there is live configuration,
-not wording.
+Eight routes answered an unconfigured AI with:
+
+> "AI is not configured yet. An administrator needs to set the OPENAI_API_KEY environment variable."
+
+That is wrong whichever provider the owner chose, and it names an environment variable to a
+student. (An earlier note here said this was already fixed; that reading missed the
+uppercase `OPENAI_API_KEY` string. Corrected.) Phase 2 replaces all eight with one shared,
+provider-neutral message that states what happened, that the student's work is safe, and who
+can fix it (`AI_NOT_CONFIGURED_MESSAGE` in `src/lib/ai/provider.ts`).
 
 ### 4.6 What is implemented but not operational (production truth, not code)
 
@@ -140,7 +153,7 @@ not wording.
 | No persistent flashcard / spaced-repetition system | **Valid** (§4.3) |
 | Release gate probes stale migrations | **Fixed this round** (§5) |
 | `docs/RELEASE_GATE.md` names an older chain (0030) | **Fixed this round** |
-| OpenAI-specific readiness messages | **Already resolved before this round** (§4.5) |
+| OpenAI-specific readiness messages in 8 routes | **Fixed this round** (§4.5, §9) |
 | AI and search unconfigured in production | **Valid** |
 | No signed-in screen ever observed | **Valid** (§6) |
 | Dark mode proven at token level only | **Valid** |
@@ -273,6 +286,79 @@ Each step is additive, backs onto existing structures, and is independently test
 **Not started this round:** steps 1-6. This round deliberately stopped after a defect that
 could produce a false "database is ready" verdict, because shipping that is worth more than
 half-finishing a feature.
+
+---
+
+## 9. Phase 2: academic AI consistency (shipped this round)
+
+### 9.1 What changed
+
+New `src/lib/ai/academic-context.ts` - one service that assembles the academic context for an
+AI request from the **same** tables and **same** pure selectors the solver already uses:
+
+- the course row and its instructions (800-char bound),
+- this course's teacher requirements from `teacher_profiles` (bounded, and labelled as
+  overriding the student's own habits),
+- the **approved** writing profile - writing tasks only,
+- structured learning patterns, scope-filtered and capped at 5,
+- long-term memory, scope-filtered and capped at `MAX_PROMPT_MEMORIES` (8),
+- an ORDER OF AUTHORITY line first, so precedence is never ambiguous,
+- a hard 4000-character budget; whole sections drop rather than rules being clipped.
+
+It records `last_used_at` for the memories it actually used (like the solver), never throws,
+and reports an unavailable source in `degraded` instead of inventing context.
+
+Wired into three paths: `POST /api/tutor` (which previously saw nothing),
+`POST /api/math/prepare` and `POST /api/writing/plan` (which previously lost memory when a
+course was selected). **The main solver was deliberately not touched** - it already has the
+full engine, and changing it is the highest-regression-risk edit in the codebase.
+
+Part 8.1 also landed: one shared provider-readiness message across the eight routes that
+previously named `OPENAI_API_KEY` to students.
+
+### 9.2 Change record
+
+| | |
+|---|---|
+| Change | Shared academic context service + shared provider-readiness message |
+| Phase | 2 (academic AI consistency) |
+| Reason | The same student got personalised help from the solver and generic help from the tutor; subject engines discarded memory when a course was selected; unconfigured-AI copy named a vendor variable |
+| Existing behaviour preserved | Solver untouched; every route keeps its response shape, its `AiNotConfiguredError` handling, its status codes (503/422/500) and its plain-language error style; scope isolation and RLS untouched |
+| Files added | `src/lib/ai/academic-context.ts`, `tests/academic-context.ts` |
+| Files modified | `src/app/api/tutor/route.ts`, `src/app/api/math/prepare/route.ts`, `src/app/api/writing/plan/route.ts`, `src/lib/ai/provider.ts`, the other five routes that named `OPENAI_API_KEY`, `tests/run.ts`, this document |
+| Database changes | none - it reads existing tables under existing RLS |
+| API contract changes | none (request bodies gained optional `subject`/`teacher_id`/`assignment_id` on the tutor, which ignores unknown fields; every existing field behaves identically) |
+| New dependencies | none |
+| Environment variables | none |
+| Authorization impact | none: every read is filtered by the signed-in user's id, on top of RLS |
+| Regression risk | Medium: prompts changed on three AI paths. Mitigated by 58 new assertions, an unchanged solver, and bounded context |
+| Rollback | revert the merge; no state, schema or data involved |
+
+### 9.3 Verification for Phase 2
+
+58 new assertions (7891 total, 0 failed) covering: the authority line is always first;
+course and teacher rules are included with precedence stated; memory scoped to another
+course/teacher/assignment is excluded; at most 8 memories and 5 patterns enter the prompt;
+the character cap holds; a draft writing profile never applies and the writing profile
+never enters a non-writing answer; a failed read degrades with an honest note and invents
+nothing; every read carries the signed-in user id; and the routes are actually wired
+(the `!course_id` condition is gone).
+
+Gates after the change: `tsc` clean, 7891/7891 tests, lint 0 errors / 33 warnings,
+production build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 80
+routes, secret scan CLEAN.
+
+**Not verified:** none of these prompts was sent to a live model - production has no AI
+provider configured, so the change is verified by construction and by test, not by reading
+a model's answer. That remains the honest limit on all AI-path work.
+
+### 9.4 What is NOT done from Phase 2
+
+- The solver was not refactored onto the new service. It works, and merging two working
+  implementations during an unverified round would risk the most-used path for tidiness.
+- Expanded AI evaluations (Part 7's 15 categories) are unchanged at 27 cases.
+- Teacher-requirements awareness reached the tutor, math preparation and writing planning;
+  `/api/math/practice` and `/api/writing/grammar` still use subject context only.
 
 ---
 

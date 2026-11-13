@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/supabase/guard";
 import { normalizeObservedMistakes, matchesExistingPattern, bumpedConfidence, type LearningPattern } from "@/lib/learning/patterns";
 import { selectApplicablePatternsAdaptive, explainPatternDecisions, recordPatternEvidence } from "@/lib/learning/evidence";
 import { AiNotConfiguredError, aiChat, aiChatMeta, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
+import { AI_NOT_CONFIGURED_MESSAGE } from "@/lib/ai/provider";
 import { buildClassificationPrompt, buildSystemPrompt, type TaskClassification } from "@/lib/ai/client";
 import { composeAcademicContext, wrapUntrusted, detectInjectionAttempt } from "@/lib/ai/context";
 import { routeSubject, routeMathTopic } from "@/lib/ai/subjects";
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
   // --- Stage 1: classify subject / level / task type -------------------------
   if (!aiConfigured()) {
     return NextResponse.json(
-      { error: "AI is not configured yet. An administrator needs to set the OPENAI_API_KEY environment variable. Nothing was lost — your text is still on this screen." },
+      { error: AI_NOT_CONFIGURED_MESSAGE + " Nothing was lost — your text is still on this screen." },
       { status: 503 }
     );
   }

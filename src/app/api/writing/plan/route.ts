@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { subjectPromptContext } from "@/lib/courses/subject-context";
 import { requireUser } from "@/lib/supabase/guard";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
+import { AI_NOT_CONFIGURED_MESSAGE } from "@/lib/ai/provider";
+import { loadAcademicContext, contextPrompt } from "@/lib/ai/academic-context";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -19,7 +21,7 @@ export async function POST(request: NextRequest) {
 
   if (!aiConfigured()) {
     return NextResponse.json(
-      { error: "AI is not configured yet. An administrator needs to set the OPENAI_API_KEY environment variable." },
+      { error: AI_NOT_CONFIGURED_MESSAGE },
       { status: 503 }
     );
   }
@@ -46,11 +48,18 @@ export async function POST(request: NextRequest) {
       .limit(3);
     if (docs?.length) materials = `\nRelevant saved materials the student provided: ${docs.map((d) => (d.title || "untitled").slice(0, 80)).join(", ")}.`;
   }
-  // Subject workspace context: planning must honor the selected subject,
-  // not silently run as a generic planner (only when no course is selected).
-  if (!body.course_id) {
-    courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject, { courseId: body.course_id ?? null });
-  }
+  // Subject workspace context: planning must honor the selected subject, and
+  // (Phase 2, 2026-11-13) the student's own academic context - this course's teacher
+  // requirements, the APPROVED writing profile, learning patterns and scoped memory -
+  // applies whether or not a course is selected. Teacher rules outrank personal style.
+  courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject, { courseId: body.course_id ?? null });
+  const academic = await loadAcademicContext(supabase, guard.data.user.id, {
+    mode: "writing-plan",
+    subject: body.subject ?? null,
+    courseId: body.course_id ?? null,
+    isWritingTask: true,
+  });
+  courseContext += contextPrompt(academic);
 
   try {
     const raw = await aiChat([

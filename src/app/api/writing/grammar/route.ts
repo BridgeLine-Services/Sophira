@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { subjectPromptContext } from "@/lib/courses/subject-context";
 import { requireUser } from "@/lib/supabase/guard";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
+import { AI_NOT_CONFIGURED_MESSAGE } from "@/lib/ai/provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
 
   if (!aiConfigured()) {
     return NextResponse.json(
-      { error: "AI is not configured yet. An administrator needs to set the OPENAI_API_KEY environment variable. Nothing was lost — your text was not changed." },
+      { error: AI_NOT_CONFIGURED_MESSAGE + " Nothing was lost — your text was not changed." },
       { status: 503 }
     );
   }
