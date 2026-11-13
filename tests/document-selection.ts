@@ -28,8 +28,8 @@ export async function runDocumentSelectionTests(assert: (cond: boolean, label: s
   assert(generated.includes("0034_workload_selections"),
     "0034: embedded in the generated runtime chain");
   const gate = readFileSync("scripts/release-gate.mjs", "utf8");
-  assert(gate.includes("typing_attempts?select=backspaces") && gate.includes("0001-0038"),
-    "gate: the live probe verifies the CURRENT newest migrations (tail markers 0035-0038)");
+  assert(gate.includes("buildProbePlan") && !gate.includes("0001-0038"),
+    "gate: the live probe verifies the repository's newest migrations (derived), not a frozen tail");
   const conn32 = readFileSync("supabase/migrations/0032_provider_connections.sql", "utf8");
   assert(!conn32.includes("create policy"),
     "0032 unchanged: provider tokens remain service-role-only (no client policies) — selections never loosened token isolation");

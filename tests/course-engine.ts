@@ -551,8 +551,9 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
       `gate: the documented checks are numbered in order with no gaps (${ids.length} rows)`);
   }
 
-  assert(gateScript.includes("0001-0038"),
-    "gate: migration range reflects the CURRENT chain end 0038 (tail-marker probe)");
+  const probesScript = readFileSync("scripts/migration-probes.mjs", "utf8");
+  assert(gateScript.includes("buildProbePlan") && probesScript.includes("export function buildProbePlan"),
+    "gate: the migration probe set is DERIVED from migration-markers.mjs, so the check follows the chain end on its own");
 
   // 2026-11-03: only the overview anchor survives on the dashboard; the other sections are
   // real routes, so they need pages rather than anchors.
@@ -1265,9 +1266,10 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   section("live migration verification can never silently pass on the wrong probe");
   {
     const gate = readFileSync("scripts/release-gate.mjs", "utf8");
-    assert(gate.includes("typing_attempts?select=backspaces") && gate.includes("teachers?select=archived_at"),
-      "release gate: the LIVE migration probe checks the NEWEST marker objects (0035-0038), not the stale 0034 table");
-    assert(gate.includes("run the /setup repair to apply the missing tail"),
+    const probes = readFileSync("scripts/migration-probes.mjs", "utf8");
+    assert(gate.includes("buildProbePlan") && !gate.includes("typing_attempts?select=backspaces") && !gate.includes("0001-0038"),
+      "release gate (2026-11-13): the LIVE migration probe derives the newest markers from the marker table - the hand-written 0035-0038 tail that could PASS while 0039-0056 were missing is gone");
+    assert(probes.includes("run the /setup repair to apply the missing tail"),
       "release gate: a partially missing tail is a FAIL with the exact repair action, never a PASS");
     assert(!gate.includes("0001-0034 appear applied"),
       "release gate: no stale '0001-0034' PASS detail remains");

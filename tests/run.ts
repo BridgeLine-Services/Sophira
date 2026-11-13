@@ -90,6 +90,7 @@ import { runOwnerNavBoundaryTests } from "./owner-nav";
 import { runRoleNavigationTests } from "./role-navigation";
 import { runDashboardOverviewTests } from "./dashboard-overview";
 import { runDashboardSectionTests } from "./dashboard-sections";
+import { runMigrationReleaseGateTests } from "./migration-release-gate";
 import { runDatabaseUpdateNoticeTests } from "./database-update-notice";
 import { runExportTests } from "./document-export";
 import { runResearchResumeTests } from "./research-resume";
@@ -5499,5 +5500,9 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     // 2026-11-11: release readiness, reporting periods, delivery and the searchable audit page -
     // where showing "ready" without evidence is the failure that matters.
     runOwnerReadinessTests(assert, section);
+  }).then(async () => {
+    // 2026-11-13: the release gate's migration check was nine migrations behind the chain
+    // and could answer PASS about objects that were no longer the newest ones.
+    runMigrationReleaseGateTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 
