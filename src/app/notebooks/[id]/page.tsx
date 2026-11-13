@@ -793,7 +793,53 @@ function ArtifactView({ artifact }: { artifact: ArtifactRow }) {
         </details>
       )}
       {artifact.content?.honestNote && <p className="text-xs italic text-ink/40">{artifact.content.honestNote}</p>}
+      {artifact.artifact_type === "flashcards" && <StudyTheseCards artifact={artifact} />}
       <ExportButtons artifact={artifact} />
+    </div>
+  );
+}
+
+/**
+ * "Study these cards" (2026-11-13, directive Part 6: generate flashcards from study
+ * material and then actually study them).
+ *
+ * The screen sends only the artifact id: the server turns the generated set into a deck
+ * (keeping each card's source), reuses the deck if it already exists, and this button
+ * opens the study screen. Nothing is scheduled from the browser.
+ */
+function StudyTheseCards({ artifact }: { artifact: ArtifactRow }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const makeDeck = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await fetch("/api/flashcards/decks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artifact_id: artifact.id, notebook_id: artifact.notebook_id ?? null }),
+      });
+      const json = (await res.json()) as { data?: { id: string }; error?: string };
+      if (!res.ok || !json.data?.id) {
+        setNote(json.error ?? "This set could not be opened for study. Your notebook is unchanged.");
+        return;
+      }
+      router.push(`/flashcards/${json.data.id}`);
+    } catch {
+      setNote("This set could not be opened for study just now. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <Button size="sm" variant="secondary" onClick={makeDeck} disabled={busy}>
+        {busy ? <Spinner /> : "Study these cards"}
+      </Button>
+      {note && <p className="text-xs text-ink/50" role="status">{note}</p>}
     </div>
   );
 }
