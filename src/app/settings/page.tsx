@@ -468,11 +468,12 @@ export default function SettingsPage() {
           <CardContent className="space-y-3">
             <p className="text-sm text-ink-soft">
               Download every record you own — courses, assignments, essays, research, learning
-              patterns, memories, typing history, schedules — as a single JSON file. Uploaded
+              patterns, memories, typing history, schedules — as a single data file you can keep
+              or open later. Uploaded
               file contents are listed by record but the bytes stay in private storage.
             </p>
             <Button variant="secondary" disabled={exporting} onClick={downloadMyData}>
-              <Download className="h-4 w-4" /> {exporting ? "Preparing…" : "Download my data (JSON)"}
+              <Download className="h-4 w-4" /> {exporting ? "Preparing…" : "Download all my data"}
             </Button>
           </CardContent>
         </Card>

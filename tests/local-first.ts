@@ -29,8 +29,11 @@ export function runLocalFirstTests(assert: (c: boolean, n: string) => void, sect
   // The landing page explains the mode in plain English and reuses the real engine
   const lp = readFileSync("src/app/local/page.tsx", "utf8");
   assert(lp.includes("Test Sophira locally"), "local: the landing page states its purpose");
-  for (const claim of ["running on this device", "No paid AI is being used", "The model stays on this device",
-    "basic AI tasks run without internet", "Cloud features are unavailable until Supabase is connected",
+  // 2026-11-13 (Part 12): the SAME claims, in words a student can read. The old text named
+  // an API key and a vendor; the honesty being pinned is that the mode is local, free, and
+  // that online features are off - not the engineering vocabulary it was phrased in.
+  for (const claim of ["running on this device", "No paid AI service is being used", "The model stays on this device",
+    "basic AI tasks run without internet", "Account features are unavailable until Sophira is connected",
     "Online research and remote AI are unavailable"]) {
     assert(lp.includes(claim), "local: landing page honestly states: '" + claim + "'");
   }

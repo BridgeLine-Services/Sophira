@@ -94,6 +94,7 @@ import { runMigrationReleaseGateTests } from "./migration-release-gate";
 import { runAcademicContextTests } from "./academic-context";
 import { runFlashcardTests, runFlashcardProgressTests, runFlashcardScreenTests, runFlashcardNotebookTests } from "./flashcards";
 import { runIntegrationReadinessTests } from "./integration-readiness";
+import { runJargonTests } from "./jargon";
 import { runDatabaseUpdateNoticeTests } from "./database-update-notice";
 import { runExportTests } from "./document-export";
 import { runResearchResumeTests } from "./research-resume";
@@ -5516,5 +5517,6 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     await runFlashcardScreenTests(assert, section);
     await runFlashcardNotebookTests(assert, section);
     await runIntegrationReadinessTests(assert, section);
+    await runJargonTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 
