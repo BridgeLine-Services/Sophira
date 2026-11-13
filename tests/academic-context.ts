@@ -255,12 +255,48 @@ export async function runAcademicContextTests(assert: Assert, section: (name: st
   const writingPlan = readFileSync("src/app/api/writing/plan/route.ts", "utf8");
   assert(tutor.includes("loadAcademicContext") && tutor.includes("contextPrompt(academic)"),
     "tutor: the tutor route passes the assembled context into its system prompt");
-  for (const [name, src] of [["math/prepare", mathPrep], ["writing/plan", writingPlan]] as const) {
-    assert(src.includes("loadAcademicContext") && src.includes("contextPrompt(academic)"),
+  const mathPractice = readFileSync("src/app/api/math/practice/route.ts", "utf8");
+  const mathSolve = readFileSync("src/app/api/math/solve/route.ts", "utf8");
+  const grammar = readFileSync("src/app/api/writing/grammar/route.ts", "utf8");
+
+  // 2026-11-13 (Phase 4): ALL FIVE AI paths now use it. practice and grammar were the
+  // last two that read no academic memory, and the solver answered from the problem
+  // alone. The list is explicit so a future route cannot quietly skip the context.
+  const wired: [string, string][] = [
+    ["math/prepare", mathPrep], ["writing/plan", writingPlan],
+    ["math/practice", mathPractice], ["writing/grammar", grammar], ["math/solve", mathSolve],
+  ];
+  for (const [name, src] of wired) {
+    assert(src.includes("loadAcademicContext") && src.includes("contextPrompt(academic"),
       `${name}: uses the shared academic context`);
-    assert(!/if \(!body\.course_id\) \{\s*courseContext \+= await subjectPromptContext/.test(src),
-      `${name}: no longer retrieves memory only when no course is selected (the defect)`);
+    assert(/teacherId: body\.teacher_id \?\? null/.test(src) && /assignmentId: body\.assignment_id \?\? null/.test(src),
+      `${name}: passes the teacher and assignment scope through, so the five scopes stay separate`);
   }
+
+  // The subject WORKSPACE context is a different feature and must survive: practice and
+  // grammar keep it, because science reasoning rules and language preferences live there.
+  for (const [name, src] of [["math/practice", mathPractice], ["writing/grammar", grammar]] as const) {
+    assert(src.includes("subjectPromptContext"),
+      `${name}: still applies the subject workspace context (science reasoning, language preference)`);
+  }
+  // The defect was MEMORY being gated on "no course selected". The academic context is
+  // loaded unconditionally, and the subject workspace text (a different feature) may stay
+  // behind that condition without hiding any memory.
+  const practiceContextLine = mathPractice.indexOf("const academic = await loadAcademicContext");
+  const practiceGate = mathPractice.indexOf("if (!body.course_id) {");
+  assert(practiceContextLine > 0 && practiceContextLine < practiceGate,
+    "math/practice: memory is loaded for EVERY course selection, not only when no course is chosen");
+
+  // THE SOLVER'S DETERMINISM IS NON-NEGOTIABLE: the context may reach the EXPLANATION,
+  // and must never reach the deterministic pipeline, its steps, or its verification.
+  assert(/explainWithAi\(sol, rec, body\.mode, subjectLabel, academicText\)/.test(mathSolve),
+    "math/solve: the academic context reaches the explanation");
+  assert(!/runMathPipeline\([\s\S]{0,200}academicText/.test(mathSolve),
+    "math/solve: the academic context NEVER reaches the deterministic solver");
+  assert(/applyTeacherMethod: applyTeacherMethod\(teacherProfile\)/.test(mathSolve),
+    "math/solve: the existing teacher-method check is unchanged");
+  assert(/isWritingTask: true/.test(grammar) && !/isWritingTask: true/.test(mathPractice),
+    "grammar: asks for the writing profile; math does not");
   assert(/isWritingTask: true/.test(writingPlan), "writing/plan: asks for the writing profile explicitly");
   assert(!/isWritingTask: true/.test(mathPrep) && !/isWritingTask: true/.test(tutor),
     "math and tutor: no writing profile is injected into non-writing work");

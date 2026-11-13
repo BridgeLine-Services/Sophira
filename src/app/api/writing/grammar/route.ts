@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { subjectPromptContext } from "@/lib/courses/subject-context";
+import { loadAcademicContext, contextPrompt } from "@/lib/ai/academic-context";
 import { requireUser } from "@/lib/supabase/guard";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import { AI_NOT_CONFIGURED_MESSAGE } from "@/lib/ai/provider";
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { text?: string; course_id?: string | null; subject?: string | null } = {};
+  let body: { text?: string; course_id?: string | null; subject?: string | null; teacher_id?: string | null; assignment_id?: string | null } = {};
   try { body = await request.json(); } catch { /* empty */ }
   const text = (body.text ?? "").trim();
   if (!text) return NextResponse.json({ error: "Paste or type the text you want checked." }, { status: 400 });
@@ -38,11 +39,25 @@ export async function POST(request: NextRequest) {
     const { data: course } = await supabase.from("courses").select("name, subject, academic_level, instructions").eq("id", body.course_id).single();
     if (course) courseContext = `\nCourse: ${course.name} (${course.subject ?? "unspecified subject"}, ${course.academic_level ?? "unspecified level"}).`;
   }
-  // Subject workspace context: a Biology check must not run as an unscoped
-  // generic check. Only applies when no specific course was selected.
+  // PHASE 4 (2026-11-13, directive Part 4): a grammar check is a writing task, so it
+  // must see the same student as every other writing path - their approved writing
+  // profile, saved corrections, teacher requirements and course rules. Before this it
+  // saw a course NAME and a subject workspace, so the same student got house style in
+  // one screen and a generic check here.
+  // Subject workspace context (unchanged feature): a Biology check must not run unscoped.
   if (!body.course_id) {
     courseContext += await subjectPromptContext(supabase, user.id, body.subject, { courseId: body.course_id ?? null });
   }
+  const academic = await loadAcademicContext(supabase, user.id, {
+    mode: "writing-grammar",
+    subject: body.subject ?? null,
+    courseId: body.course_id ?? null,
+    teacherId: body.teacher_id ?? null,
+    assignmentId: body.assignment_id ?? null,
+    taskType: "grammar",
+    isWritingTask: true,
+  });
+  courseContext += contextPrompt(academic);
 
   const { data: profile } = await supabase.from("profiles").select("explanation_level").eq("id", user.id).single();
 

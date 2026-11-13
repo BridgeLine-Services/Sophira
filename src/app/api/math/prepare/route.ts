@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: AI_NOT_CONFIGURED_MESSAGE }, { status: 503 });
   }
 
-  let body: { topics?: string; exam_date?: string | null; material_ids?: string[]; course_id?: string | null; subject?: string | null } = {};
+  let body: { topics?: string; exam_date?: string | null; material_ids?: string[]; course_id?: string | null; subject?: string | null; teacher_id?: string | null; assignment_id?: string | null } = {};
   try { body = await request.json(); } catch { /* empty */ }
   const topics = (body.topics ?? "").trim();
   if (!topics && !(body.material_ids?.length)) {
@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
     mode: "math-prepare",
     subject: body.subject ?? null,
     courseId: body.course_id ?? null,
+    teacherId: body.teacher_id ?? null,
+    assignmentId: body.assignment_id ?? null,
   });
   courseContext += contextPrompt(academic);
 
