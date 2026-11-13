@@ -318,5 +318,13 @@
   "/writing/typing": {
     "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, section headings, panels, plain-language subtitle under the title, semantic tokens only, dead utility names repaired). Suite, type check and production build pass. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in.",
     "status": "partial"
+  },
+  "/flashcards": {
+    "status": "partial",
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, plain-language subtitle under the title, semantic tokens only). Added 2026-11-13 with directive Part 6: every count is computed by the server, every answer is a plain word, no scheduler term is shown, and a failure says the work is safe. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in."
+  },
+  "/flashcards/[id]": {
+    "status": "partial",
+    "reason": "Uses the shared shell and the 2026-11-12 design vocabulary (page frame, plain-language subtitle under the title, semantic tokens only). Added 2026-11-13 with directive Part 6: every count is computed by the server, every answer is a plain word, no scheduler term is shown, and a failure says the work is safe. Not marked complete: the rendered page has not been inspected in a browser in either theme at any width while signed in."
   }
 }

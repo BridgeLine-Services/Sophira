@@ -23,6 +23,7 @@ import {
   Home,
   Keyboard,
   Mic,
+  Layers,
   NotebookPen,
   Settings,
 } from "lucide-react";
@@ -46,6 +47,8 @@ export const WORKSPACE_SECTIONS: WorkspaceNavItem[] = [
   { href: "/writing/typing", label: "Typing Calibration", icon: Keyboard, kind: "section" },
   { href: "/courses", label: "Courses", icon: BookOpen, kind: "section" },
   { href: "/notebooks", label: "Notebooks", icon: NotebookPen, kind: "section" },
+  // Flashcards (2026-11-13, Part 6): the decks a student actually studies.
+  { href: "/flashcards", label: "Flashcards", icon: Layers, kind: "section" },
   // Lecture studio: the only screen that drives the media pipeline
   // (upload -> transcribe -> study notes -> slides).
   { href: "/lectures", label: "Lectures", icon: Mic, kind: "section" },

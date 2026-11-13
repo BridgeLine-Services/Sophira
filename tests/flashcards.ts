@@ -289,3 +289,84 @@ export async function runFlashcardProgressTests(assert: Assert, section: (name: 
   assert(/course_id/.test(deckList) && /deckQuery = deckQuery\.eq\("course_id"/.test(deckList),
     "decks: the list can be narrowed to one course, so decks can be organised by subject");
 }
+
+/**
+ * THE STUDY SCREENS (2026-11-13, directive Part 6 "student interface" + Part 12).
+ *
+ * Phase 3 shipped a tested engine and API with nothing a student could open. These
+ * assertions pin what makes the two screens safe rather than what makes them pretty:
+ * the queue and the labels come from tested code, the browser never sends its own
+ * schedule, wrong input is refused in plain words, and no technical vocabulary
+ * reaches a student.
+ */
+export async function runFlashcardScreenTests(assert: Assert, section: (name: string) => void) {
+  section("flashcards: the study screens are plain, honest and keyboard-usable");
+
+  const listPage = readFileSync("src/app/flashcards/page.tsx", "utf8");
+  const studyPage = readFileSync("src/app/flashcards/[id]/page.tsx", "utf8");
+  const listLoading = readFileSync("src/app/flashcards/loading.tsx", "utf8");
+  const studyLoading = readFileSync("src/app/flashcards/[id]/loading.tsx", "utf8");
+  const nav = readFileSync("src/lib/navigation/workspace-nav.ts", "utf8");
+  const inventory = readFileSync("docs/REDESIGN_INVENTORY.md", "utf8");
+
+  // --- every screen is reachable and states what it is for ---------------
+  for (const [name, src] of [["deck list", listPage], ["study screen", studyPage]] as const) {
+    assert(/<AppShell[\s\S]*title=/.test(src), `${name}: renders inside the shared shell with a real title`);
+    assert(/subtitle="[A-Z][^"]{20,}"/.test(src), `${name}: carries a plain-language subtitle, like the other 80 screens`);
+    assert(/\bh2\b/.test(src) || /EmptyState/.test(src), `${name}: names its sections instead of stacking unlabelled panels`);
+  }
+  assert(/href: "\/flashcards"/.test(nav), "navigation: the screens are reachable from the workspace menu");
+  for (const loading of [listLoading, studyLoading]) {
+    assert(/Spinner/.test(loading) && /text-sm text-ink-soft/.test(loading) && !/animate-pulse/.test(loading),
+      "loading: says what is happening in words, with no fake skeleton content");
+  }
+  assert(/`\/flashcards\//.test(inventory) || /\/flashcards/.test(inventory),
+    "inventory: both new routes are in the generated route inventory, not quietly missing");
+
+  // --- the browser never decides the schedule ---------------------------
+  assert(/body: JSON\.stringify\(\{ card_id: current\.id, rating \}\)/.test(studyPage),
+    "study screen: sends only the card id and the chosen answer - the server decides the next date");
+  assert(!/interval_days|\bease\b/.test(studyPage) && !/due_at:\s*(new|Date)/.test(studyPage),
+    "study screen: it only READS the card's due date to order the queue, and never writes a schedule");
+  assert(/buildQueue\(/.test(studyPage), "study screen: the queue comes from the tested helper, not a second implementation");
+  assert(/RATING_GUIDE\.map/.test(studyPage), "study screen: the four answer buttons are the plain labels, not raw codes");
+  assert(/title=\{g\.meant\}/.test(studyPage), "study screen: each answer explains itself on hover and in the list below");
+
+  // --- honest states, in plain words ------------------------------------
+  assert(/Nothing is due right now/.test(studyPage), "study screen: an empty queue is a real state, not a blank page");
+  assert(/You answered \$\{answered\}/.test(studyPage), "study screen: a finished session reports how many cards were answered");
+  assert(/could not be loaded just now\. Nothing has been changed or lost/.test(listPage) &&
+    /could not be opened just now\. Nothing has been changed or lost/.test(studyPage),
+    "errors: a failed read says the work is safe and offers Try again");
+  assert(/No decks yet/.test(listPage) && /notebooks/.test(listPage),
+    "empty state: a new account is told exactly where cards come from");
+  assert(RATING_GUIDE.find((g) => g.rating === "again")!.meant.includes("could not recall"),
+    "wording: an incorrect answer is described kindly and clearly");
+
+  // --- no technical vocabulary on a student screen ----------------------
+  // Comments are allowed to name the internals; a student never sees them.
+  const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const studentText = `${strip(listPage)}\n${strip(studyPage)}`;
+  for (const banned of ["SM-2", "interval_days", "ease factor", "PATCH ", "supabase", "RLS", "API route"]) {
+    assert(!studentText.includes(banned), `wording: "${banned}" never appears on a student screen (Part 12)`);
+  }
+
+  // --- card tools are safe and confirmed --------------------------------
+  assert(/fetch\(`\/api\/flashcards\/cards\/\$\{cardId\}`, \{\s*method: "PATCH"/.test(studyPage),
+    "card tools: editing goes through the owner-scoped card route");
+  assert(/Remove this card for good\?/.test(studyPage) && /Yes, remove it/.test(studyPage),
+    "card tools: removing a card asks first and names what will happen");
+  assert(/Its review schedule was left alone/.test(studyPage),
+    "card tools: an edit tells the student their progress was not reset");
+  assert(/Its history is kept/.test(studyPage), "card tools: retiring says the history is kept");
+
+  // --- accessibility of the interactive controls ------------------------
+  const labels = ((studyPage.match(/htmlFor=/g) ?? []).length) + ((listPage.match(/htmlFor=/g) ?? []).length);
+  const inputs = (studyPage.match(/<Input/g) ?? []).length + (listPage.match(/<Input/g) ?? []).length;
+  assert(labels >= inputs, `a11y: every text input has a real label (${labels} labels for ${inputs} inputs)`);
+  assert(/aria-labelledby="cards-in-deck"/.test(studyPage), "a11y: the card list is a labelled region");
+  assert(!/<Button[^>]*>\s*<(Plus|Layers)[^<]*<\/Button>/.test(listPage + studyPage),
+    "a11y: no icon-only button without text");
+  assert(/role="status"/.test(listPage) && /role="status"/.test(studyPage),
+    "a11y: save results and failures are announced, not just printed");
+}

@@ -156,8 +156,10 @@ export function runRoleNavigationTests(
     assert(WORKSPACE_SECTIONS[0].href === "/dashboard" && WORKSPACE_SECTIONS[0].label === "Home",
       "role-nav: Home is the FIRST academic section, not the second");
     const sectionOrder = WORKSPACE_SECTIONS.map((i) => i.href);
-    assert(sectionOrder.join("|") === ["/dashboard", "/writing/typing", "/courses", "/notebooks", "/lectures", "/learning", "/notifications", "/offline", "/settings"].join("|"),
-      "role-nav: the academic order is Home, Typing Calibration, Courses, Notebooks, Lectures, Learning / Memory, Notifications, Offline, Settings");
+    // 2026-11-13: Flashcards joins the menu directly after Notebooks, because a deck is made FROM
+    // a notebook. The existing order is otherwise unchanged; Settings is still last.
+    assert(sectionOrder.join("|") === ["/dashboard", "/writing/typing", "/courses", "/notebooks", "/flashcards", "/lectures", "/learning", "/notifications", "/offline", "/settings"].join("|"),
+      "role-nav: the academic order is Home, Typing Calibration, Courses, Notebooks, Flashcards, Lectures, Learning / Memory, Notifications, Offline, Settings");
     assert(WORKSPACE_SECTIONS.filter((i) => i.href === "/dashboard").length === 1,
       "role-nav: Home appears exactly once (no duplicated destination)");
   }
