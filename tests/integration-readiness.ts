@@ -82,4 +82,12 @@ export async function runIntegrationReadinessTests(assert: Assert, section: (nam
   assert(/invitation_email|invitation email/i.test(report), "report: still covers invitation email");
   assert(!/Not exposed by `\/api\/health`, so unverified this round/.test(report),
     "report: the 'unverified this round' note is replaced once the probe exists, so the document cannot go stale");
+  // 2026-11-13 (Part 13): the report used to tell the owner to apply 0057 long after it was
+  // applied. A stale instruction is worse than none, so the fact is pinned both ways.
+  assert(!/the live database does not have it yet/i.test(report),
+    "report: does not still claim a migration is missing once it is applied");
+  assert(/0057 and 0058|0057 og 0058/.test(report) && /\*\*Yes\*\*: both applied/.test(report),
+    "report: records that 0057 AND 0058 are applied, with how that was confirmed");
+  assert(/read-only probe/i.test(report),
+    "report: says the confirmation came from a read-only probe, not from a press of a button alone");
 }
