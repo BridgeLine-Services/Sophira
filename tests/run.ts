@@ -92,6 +92,7 @@ import { runDashboardOverviewTests } from "./dashboard-overview";
 import { runDashboardSectionTests } from "./dashboard-sections";
 import { runMigrationReleaseGateTests } from "./migration-release-gate";
 import { runAcademicContextTests } from "./academic-context";
+import { runFlashcardTests } from "./flashcards";
 import { runDatabaseUpdateNoticeTests } from "./database-update-notice";
 import { runExportTests } from "./document-export";
 import { runResearchResumeTests } from "./research-resume";
@@ -5508,5 +5509,7 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
   }).then(async () => {
     // 2026-11-13 (Phase 2): every AI path must see the same student.
     await runAcademicContextTests(assert, section);
+    // 2026-11-13 (Phase 3): flashcards are a study system, not only a generated artifact.
+    await runFlashcardTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

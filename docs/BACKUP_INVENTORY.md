@@ -9,7 +9,7 @@ migrations, the tables they create (minus any dropped later) and the storage buc
 and fails the suite when they disagree. A migration added without updating this line
 is a test failure, not a stale document.
 
-**Scope at time of writing:** 56 migrations, 62 application tables, 1 private storage bucket (`private-docs`).
+**Scope at time of writing:** 57 migrations, 65 application tables, 1 private storage bucket (`private-docs`).
 
 ---
 
@@ -111,6 +111,24 @@ Every table below is owned by exactly one member and must come back to that same
 | `notebook_questions` | Questions raised. | yes | yes |
 | `notebook_evidence` | Evidence attached to notebook claims. | yes | yes |
 | `notebook_artifacts` | Generated artifacts. | yes | yes |
+
+---
+
+## 5b. Flashcards (0057)
+
+Added 2026-11-13: a deck, its cards and its review history. The card row holds current
+review state and `flashcard_reviews` is an append-only log of every answer, so a restore
+returns both what a member knows and how they got there.
+
+| Table | Why it is protected | Member-owned | Sensitive |
+|---|---|---|---|
+| `flashcard_decks` | A member's study decks, optionally linked to a notebook and the artifact they came from. | yes | yes |
+| `flashcards` | The cards themselves plus their current interval, ease, repetitions, lapses and due date. | yes | yes |
+| `flashcard_reviews` | Append-only history of every answer a member gave, with what changed. | yes | yes |
+
+**Not restorable from a backup if lost today:** the review history is the only record of
+study progress. The export scope in `src/app/api/account/export/route.ts` includes all
+three tables, so a member can always download them.
 
 ---
 

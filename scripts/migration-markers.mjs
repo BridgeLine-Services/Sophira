@@ -137,4 +137,8 @@ export const MARKERS = {
   // function itself, which only exists once this migration really ran.
   "0056_network_activity_series.sql":
     "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'network_activity_daily' and n.nspname = 'public')",
+  // 0057: a deck is the object that only exists once flashcards became a study
+  // system. The probe asks for the table, not a column, so a half-applied
+  // migration cannot pass.
+  "0057_flashcard_decks.sql": "to_regclass('public.flashcard_decks') is not null",
 };

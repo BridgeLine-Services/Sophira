@@ -6,7 +6,7 @@ not been touched. A route missing from that file is reported as not-started,
 never as complete.
 
 - Page routes: **80**
-- API routes: **101**
+- API routes: **105**
 - Redesigned: 0 | Partial: 76 | Intentionally unchanged: 0 | Not started: 0
 - Pages using the shared shell: 55 | client components: 31 | with an auth gate in-file: 28
 
