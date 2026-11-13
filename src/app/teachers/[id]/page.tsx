@@ -4,6 +4,8 @@ import { AppShell } from "@/components/app/AppShell";
 import { ProposalsPanel } from "@/components/app/ProposalsPanel";
 import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
 import { TeacherProfileEditor } from "./TeacherProfileEditor";
+import { TeacherPreferences } from "@/components/app/TeacherPreferences";
+import type { StudentMemory } from "@/lib/memory/engine";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,19 @@ export default async function TeacherDetailPage({ params }: { params: Promise<{ 
   const { data: teacher } = await supabase.from("teachers").select("*").eq("id", id).single();
   if (!teacher) notFound();
 
-  const [{ data: profile }, { data: courses }] = await Promise.all([
+  const [{ data: profile }, { data: courses }, { data: teacherMemories }] = await Promise.all([
     supabase.from("teacher_profiles").select("*").eq("teacher_id", teacher.id).single(),
     supabase.from("courses").select("id, name").eq("teacher_id", teacher.id),
+    // SCOPE 4 (2026-11-13): only this teacher's preferences, read with the member's own
+    // request-scoped client. user_id + teacher_id + RLS: never another member's rows, and
+    // never a preference attached to a different teacher.
+    supabase
+      .from("student_memories")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("teacher_id", teacher.id)
+      .neq("status", "forgotten")
+      .order("last_observed", { ascending: false }),
   ]);
 
   return (
@@ -42,6 +54,15 @@ export default async function TeacherDetailPage({ params }: { params: Promise<{ 
           </CardHeader>
           <CardContent>
             <TeacherProfileEditor teacher={teacher} profile={profile ?? null} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <TeacherPreferences
+              teacherId={teacher.id}
+              teacherName={teacher.name}
+              initialMemories={(teacherMemories ?? []) as StudentMemory[]}
+            />
           </CardContent>
         </Card>
       </div>
