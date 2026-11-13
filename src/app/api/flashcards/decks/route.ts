@@ -110,6 +110,23 @@ export async function POST(request: NextRequest) {
   }
   if (!title) title = "Flashcards";
 
+  // Idempotent by source: pressing "Study these cards" twice must not make two decks
+  // from the same notebook artifact. An existing deck is returned, not duplicated, so a
+  // student's review history stays attached to the cards they already studied.
+  if (sourceArtifactId) {
+    const { data: existing } = await supabase
+      .from("flashcard_decks")
+      .select("id, title, description, notebook_id, course_id, source_artifact_id, created_at, updated_at")
+      .eq("user_id", guard.data.user.id)
+      .eq("source_artifact_id", sourceArtifactId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (existing) {
+      return NextResponse.json({ data: existing, existing: true, skipped }, { status: 200 });
+    }
+  }
+
   const { data: deck, error: deckError } = await supabase
     .from("flashcard_decks")
     .insert({

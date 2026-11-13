@@ -92,7 +92,7 @@ import { runDashboardOverviewTests } from "./dashboard-overview";
 import { runDashboardSectionTests } from "./dashboard-sections";
 import { runMigrationReleaseGateTests } from "./migration-release-gate";
 import { runAcademicContextTests } from "./academic-context";
-import { runFlashcardTests, runFlashcardProgressTests, runFlashcardScreenTests } from "./flashcards";
+import { runFlashcardTests, runFlashcardProgressTests, runFlashcardScreenTests, runFlashcardNotebookTests } from "./flashcards";
 import { runDatabaseUpdateNoticeTests } from "./database-update-notice";
 import { runExportTests } from "./document-export";
 import { runResearchResumeTests } from "./research-resume";
@@ -5513,5 +5513,6 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     await runFlashcardTests(assert, section);
     await runFlashcardProgressTests(assert, section);
     await runFlashcardScreenTests(assert, section);
+    await runFlashcardNotebookTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

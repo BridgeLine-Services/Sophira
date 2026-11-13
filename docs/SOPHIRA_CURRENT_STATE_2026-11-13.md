@@ -566,7 +566,7 @@ the largest remaining gap in Phase 3 and it is now closed at the screen level.
 | API contract changes | none (the screens consume the routes added in #85 and #86) |
 | Verification | suite **8044/8044**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS 32 pairs both themes, conformance **82 routes**, secret scan CLEAN |
 | **Still not verified** | **the rendered screens in a browser.** No usable test member exists and invitation-only access is a standing rule, so these two routes are marked `partial` in the inventory, exactly like the other 76 screens |
-| Remaining Phase 3 item | a "Study these cards" button on the notebook artifact view. The API already accepts an `artifact_id`; only the button is missing |
+| Remaining Phase 3 item | **closed in #88**: the notebook flashcard set now opens as a deck (§10.11) |
 
 ### 10.10 Part 6 status after this round
 
@@ -582,6 +582,37 @@ the largest remaining gap in Phase 3 and it is now closed at the screen level.
 | Track progress | Done: counts, accuracy with its sample size, difficult cards |
 | Identify difficult cards | Done (2+ lapses, surfaced on the card) |
 | Resume unfinished study sessions | Partial: the queue is rebuilt from what is due on each visit, so nothing is lost, but there is no saved mid-session position |
+| A generated set opens as a deck | Done (#88): "Study these cards" on the notebook artifact, idempotent by source |
 | Spaced repetition responding to recall | Done (deterministic SM-2 style, clamped, tested) |
 | Phone / tablet / desktop | Layouts use the existing responsive grid; **not verified on a device** |
 | Privacy: decks and history scoped to the student | Done at the database (RLS) and in every route |
+
+---
+
+## 10.11 Phase 3, fourth slice: "Study these cards" (closed Phase 3)
+
+The last link: a generated flashcard set in a notebook could not be opened as a deck, so a student
+who had just made cards had nowhere to study them.
+
+| Piece | File | What it does |
+|---|---|---|
+| The button | `src/app/notebooks/[id]/page.tsx` | On a flashcard set only: sends the artifact id, then opens the study screen. A failure says the notebook is unchanged |
+| Idempotent deck creation | `src/app/api/flashcards/decks/route.ts` | A deck already built from that artifact is returned (the OLDEST, owner-scoped) instead of a duplicate, so a double press cannot strand a student's review history |
+
+### 10.12 Change record
+
+| | |
+|---|---|
+| Change | Flashcards: a generated notebook set opens as a study deck, once |
+| Phase | 3 (fourth slice, closes Phase 3) |
+| Reason | Part 6: cards generated from study material must be studiable |
+| Existing behaviour preserved | The notebook page keeps every existing tool; the button is added beside Export and renders only for `artifact_type === "flashcards"`. The deck POST keeps its previous behaviour for every other request; only the artifact path gained the reuse check |
+| Files modified | `src/app/notebooks/[id]/page.tsx` (one component, one insertion), `src/app/api/flashcards/decks/route.ts` (reuse check), `tests/flashcards.ts` (+11 assertions), `tests/run.ts`, this document |
+| Database changes | none |
+| API contract changes | none: an existing deck now returns 200 with `existing: true` where a duplicate would previously have been created. No client depended on the duplicate |
+| Regression risk | the notebook page has its own passing tests; the change is additive and the suite is green |
+| Verification | suite **8055/8055**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 82 routes, secret scan CLEAN |
+| Outstanding | the rendered screens are still unseen in a browser (no usable test member) |
+
+**Phase 3 is now complete at the code level.** Everything Part 6 lists as required behaviour exists
+and is covered by tests; the one thing no amount of code can supply is a signed-in browser pass.

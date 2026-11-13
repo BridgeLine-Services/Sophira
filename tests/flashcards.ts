@@ -370,3 +370,40 @@ export async function runFlashcardScreenTests(assert: Assert, section: (name: st
   assert(/role="status"/.test(listPage) && /role="status"/.test(studyPage),
     "a11y: save results and failures are announced, not just printed");
 }
+
+/**
+ * "STUDY THESE CARDS" FROM THE NOTEBOOK (2026-11-13, Part 6 end to end).
+ *
+ * The last link in the chain: a generated flashcard set in a notebook must be
+ * openable as a deck. Two things must stay true - the notebook screen never builds
+ * cards itself (the server owns that), and pressing the button twice must not make a
+ * second deck and strand the first one's review history.
+ */
+export async function runFlashcardNotebookTests(assert: Assert, section: (name: string) => void) {
+  section("flashcards: a generated set opens as a deck, once");
+
+  const notebookPage = readFileSync("src/app/notebooks/[id]/page.tsx", "utf8");
+  const decksRoute = readFileSync("src/app/api/flashcards/decks/route.ts", "utf8");
+
+  assert(/Study these cards/.test(notebookPage), "notebook: the flashcard set offers a Study these cards button");
+  assert(/artifact\.artifact_type === "flashcards" && <StudyTheseCards/.test(notebookPage),
+    "notebook: the button appears ONLY on a flashcard set, not on every artifact");
+  assert(/body: JSON\.stringify\(\{ artifact_id: artifact\.id, notebook_id:/.test(notebookPage),
+    "notebook: the screen sends the artifact id only - the server builds the cards");
+  assert(!/front:|buildQueue|due_at/.test(notebookPage),
+    "notebook: nothing about cards or scheduling is decided in the notebook screen");
+  assert(/router\.push\(`\/flashcards\/\$\{json\.data\.id\}`\)/.test(notebookPage),
+    "notebook: a deck opens straight into the study screen");
+  assert(/Your notebook is unchanged/.test(notebookPage),
+    "notebook: a failure says the notebook is unchanged and offers a retry");
+  assert(/role="status"/.test(notebookPage), "notebook: the result is announced, not just printed");
+
+  assert(/\.eq\("source_artifact_id", sourceArtifactId\)/.test(decksRoute),
+    "decks: creation is idempotent by source artifact, so a double press cannot make two decks");
+  assert(/existing: true/.test(decksRoute),
+    "decks: the existing deck is returned rather than duplicated, keeping the review history attached");
+  assert(/order\("created_at", \{ ascending: true \}\)/.test(decksRoute),
+    "decks: the OLDEST deck for that artifact is reused, so a student never loses the one they studied");
+  assert(/\.eq\("user_id", guard\.data\.user\.id\)[\s\S]{0,200}source_artifact_id/.test(decksRoute),
+    "decks: the reuse check is scoped to the signed-in student");
+}
