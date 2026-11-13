@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { instructions?: string; topic?: string; deadline?: string | null; course_id?: string | null; subject?: string | null } = {};
+  let body: { instructions?: string; topic?: string; deadline?: string | null; course_id?: string | null; subject?: string | null; teacher_id?: string | null; assignment_id?: string | null } = {};
   try { body = await request.json(); } catch { /* empty */ }
   const instructions = (body.instructions ?? "").trim();
   const topic = (body.topic ?? "").trim();
@@ -57,6 +57,8 @@ export async function POST(request: NextRequest) {
     mode: "writing-plan",
     subject: body.subject ?? null,
     courseId: body.course_id ?? null,
+    teacherId: body.teacher_id ?? null,
+    assignmentId: body.assignment_id ?? null,
     isWritingTask: true,
   });
   courseContext += contextPrompt(academic);

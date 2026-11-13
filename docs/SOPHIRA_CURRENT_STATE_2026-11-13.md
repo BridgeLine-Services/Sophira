@@ -644,3 +644,45 @@ closed, and it was the Phase 4 code item I stopped in front of last round.
 | Security impact | none widened: booleans only, no value, variable name or hostname in any response or screen, and the status page stays owner-guarded |
 | Verification | suite **8080/8080**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 82 routes, secret scan CLEAN, env validation PASS |
 | Outstanding | none for this slice. The next Phase 4 item is the same list of owner decisions the report names: an AI provider, a search provider, a test member, device access, backup credentials and migration 0057 |
+
+---
+
+## 11. Part 4 completed: every AI path now sees the same student
+
+Part 4 asks that academic memory and personalisation apply across the whole system, not one
+screen. Four of the six AI paths already did (tutor, `math/prepare`, `writing/plan`). This round
+finished the other two and the one route that was deliberately left alone.
+
+| Path | Before | Now |
+|---|---|---|
+| `/api/math/practice` | read a course name and the subject workspace only: no memory, no teacher rules, no corrections | loads the shared academic context for BOTH modes ("generate" and "check"), before either branch runs |
+| `/api/writing/grammar` | same gap, so a check ignored the student's approved writing profile and saved corrections | loads the shared context as a writing task (`isWritingTask: true`), so the approved profile applies |
+| `/api/math/solve` | explained the solution from the problem alone | the DETERMINISTIC pipeline is untouched; the EXPLANATION now receives the context |
+
+Plus: all five context-consuming routes now forward `teacher_id` and `assignment_id`, so the
+five memory scopes stay separate end to end instead of collapsing to subject/course.
+
+### 11.1 What must never change, and is now pinned by a test
+
+- The solver's steps, final answer and independent verification are computed exactly as before.
+  A test fails if `academicText` ever reaches `runMathPipeline`.
+- The existing teacher-method check (`applyTeacherMethod`) is unchanged.
+- The subject WORKSPACE context is a different feature (science reasoning rules, foreign-language
+  preferences) and is preserved in both routes. My first attempt replaced it; two existing tests
+  caught that immediately, which is exactly what they are for.
+- `math/practice` loads memory on EVERY request, including when a course is selected. A test pins
+  that ordering, because "memory only when no course is chosen" was the original defect.
+
+### 11.2 Change record
+
+| | |
+|---|---|
+| Change | Part 4 complete: the solver explanation, math practice (both modes) and the grammar check use the shared academic context; teacher/assignment scope forwarded everywhere |
+| Phase | 4 (Part 4 completion) |
+| Reason | Directive Part 4: the same student must get the same academic context in every AI path |
+| Existing behaviour preserved | No route's response shape changed; no prompt rule was removed; the deterministic solver, the teacher-method check and the subject workspace context are all intact |
+| Files modified | `src/app/api/math/solve/route.ts`, `src/app/api/math/practice/route.ts`, `src/app/api/writing/grammar/route.ts`, `src/app/api/math/prepare/route.ts`, `src/app/api/writing/plan/route.ts` (scope forwarding), `tests/academic-context.ts` (+10 assertions) |
+| Database changes | none |
+| API contract changes | additive only: five routes now accept optional `teacher_id` / `assignment_id` |
+| Verification | suite **8093/8093**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 82 routes, secret scan CLEAN |
+| Outstanding | nothing functional. Whether the model USES the context well cannot be verified without a live AI provider |

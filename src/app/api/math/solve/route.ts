@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { subjectBySlug } from "@/lib/courses/engines";
 import { requireUser } from "@/lib/supabase/guard";
 import { runMathPipeline, type MathPipelineResult } from "@/lib/math/pipeline";
+import { loadAcademicContext, contextPrompt } from "@/lib/ai/academic-context";
 import { aiChat, aiConfigured, parseJsonLoose, TUTOR_PERSONA } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
@@ -61,7 +62,11 @@ export async function POST(request: NextRequest) {
   if (!guard.ok) return guard.response;
   const { user } = guard.data;
 
-  let body: { image_data_url?: string; rotation?: number; confirmed_expression?: string | null; expression?: string; mode?: string; subject?: string | null };
+  let body: {
+    image_data_url?: string; rotation?: number; confirmed_expression?: string | null;
+    expression?: string; mode?: string; subject?: string | null;
+    course_id?: string | null; teacher_id?: string | null; assignment_id?: string | null;
+  };
   try {
     body = await request.json();
   } catch {
@@ -84,6 +89,22 @@ export async function POST(request: NextRequest) {
   // deterministic solver and the same AI; no separate science backend.
   const subjectLabel = body.subject ? (subjectBySlug(body.subject)?.label ?? null) : null;
 
+  // PHASE 4 (2026-11-13, directive Part 4): the solver was the last AI path still
+  // answering from the problem alone. Its DETERMINISTIC pipeline is untouched - the
+  // steps, the answer and the independent verification are computed exactly as before.
+  // What changes is the EXPLANATION: it now sees the student's course rules, teacher
+  // method, saved corrections and preferred explanation level, so the same student is
+  // taught the same way here as in the tutor.
+  const academic = await loadAcademicContext(supabase, user.id, {
+    mode: "math-solve",
+    subject: body.subject ?? null,
+    courseId: body.course_id ?? null,
+    teacherId: body.teacher_id ?? null,
+    assignmentId: body.assignment_id ?? null,
+    taskType: "solve",
+  });
+  const academicText = contextPrompt(academic);
+
   try {
     if (body.expression) {
       // typed/confirmed path — the user already corrected it (step 8 done)
@@ -91,7 +112,7 @@ export async function POST(request: NextRequest) {
         ocr: async () => ({ text: body.expression!, confidence: 1, engine: "deterministic", notes: ["typed by the user (or confirmed by the user)"] }),
         alreadyConfirmed: true,
         preprocess: { cropped: false, rotationDegrees: 0, deskewDegrees: 0, method: "none" },
-        explain: aiConfigured() ? (sol, rec) => explainWithAi(sol, rec, body.mode, subjectLabel) : undefined,
+        explain: aiConfigured() ? (sol, rec) => explainWithAi(sol, rec, body.mode, subjectLabel, academicText) : undefined,
         applyTeacherMethod: applyTeacherMethod(teacherProfile),
       });
       return NextResponse.json({ result });
@@ -114,7 +135,7 @@ export async function POST(request: NextRequest) {
         ocr: async () => ({ text: ocr.text, confidence: ocr.confidence, engine: "vision-llm", notes: ocr.notes }),
         confirmedExpression: body.confirmed_expression ?? null,
         preprocess: { cropped: true, rotationDegrees: rotation, deskewDegrees: 0, method: "canvas" },
-        explain: aiConfigured() ? (sol, rec) => explainWithAi(sol, rec, body.mode, subjectLabel) : undefined,
+        explain: aiConfigured() ? (sol, rec) => explainWithAi(sol, rec, body.mode, subjectLabel, academicText) : undefined,
         applyTeacherMethod: applyTeacherMethod(teacherProfile),
       }
     );
@@ -128,7 +149,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function explainWithAi(solution: { kind: string; finalAnswer: string; steps: { text: string; expr?: string }[] }, recognized: { expression: string }, mode?: string, subjectLabel?: string | null): Promise<string> {
+async function explainWithAi(
+  solution: { kind: string; finalAnswer: string; steps: { text: string; expr?: string }[] },
+  recognized: { expression: string },
+  mode?: string,
+  subjectLabel?: string | null,
+  academicText?: string,
+): Promise<string> {
   const teachMode = mode === "teach";
   const stepList = solution.steps.map((s, i) => `${i + 1}. ${s.text}${s.expr ? ` — ${s.expr}` : ""}`).join("\n");
   const raw = await aiChat(
@@ -143,6 +170,7 @@ async function explainWithAi(solution: { kind: string; finalAnswer: string; step
           subjectLabel
             ? `The student is working in a ${subjectLabel} context: interpret the mathematics in that scientific setting — attend to units, scientific notation, and physical meaning. The computed steps and final answer remain final.`
             : "",
+          academicText ? `This is the student's academic context. Follow it, and never contradict the computed steps or final answer: ${academicText}` : "",
           teachMode
             ? "TEACH MODE: this student asked to be TAUGHT, not just shown. Identify the underlying concept and method by name, explain WHY the method works (not just the steps), and end with a section called 'Try it yourself next time' with two short hints for recognizing when to use this method — without giving away any new answer."
             : "",

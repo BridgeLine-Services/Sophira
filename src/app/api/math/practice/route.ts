@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { subjectPromptContext } from "@/lib/courses/subject-context";
+import { loadAcademicContext, contextPrompt } from "@/lib/ai/academic-context";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import { AI_NOT_CONFIGURED_MESSAGE } from "@/lib/ai/provider";
 
@@ -30,11 +31,26 @@ export async function POST(request: NextRequest) {
     material_ids?: string[];
     course_id?: string | null;
     subject?: string | null;
+    teacher_id?: string | null;
+    assignment_id?: string | null;
     problem?: string;
     student_answer?: string;
     past_problems?: string[];
   } = {};
   try { body = await request.json(); } catch { /* empty */ }
+
+  // PHASE 4 (2026-11-13, directive Part 4): practice was the last math path that read
+  // no academic memory. Problems and the honest check now see the same student as the
+  // tutor and the solver - course rules, teacher method, saved corrections.
+  const academic = await loadAcademicContext(supabase, guard.data.user.id, {
+    mode: "math-practice",
+    subject: body.subject ?? null,
+    courseId: body.course_id ?? null,
+    teacherId: body.teacher_id ?? null,
+    assignmentId: body.assignment_id ?? null,
+    taskType: "practice",
+  });
+  const academicText = contextPrompt(academic);
 
   if (body.mode === "check") {
     if (!body.problem || !body.student_answer) {
@@ -42,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
     try {
       const raw = await aiChat([
-        { role: "system", content: "You are a math practice tutor checking a student's OWN attempt. Judge the attempt fairly and honestly — do not inflate. Point to the exact step where it went wrong (if it did), explain the correct approach, and suggest one targeted follow-up problem on the demonstrated weakness. Verify arithmetic carefully before concluding." },
+        { role: "system", content: `You are a math practice tutor checking a student's OWN attempt. Judge the attempt fairly and honestly — do not inflate. Point to the exact step where it went wrong (if it did), explain the correct approach, and suggest one targeted follow-up problem on the demonstrated weakness. Verify arithmetic carefully before concluding.${academicText}` },
         { role: "user", content: `Problem: ${body.problem}\nStudent's attempt: ${body.student_answer}\n\nReturn ONLY JSON: {"correct": true|false, "where": "the exact step where it went wrong, or where it is correct", "explanation": "clear explanation of the correct approach", "follow_up": "one similar practice problem targeting the demonstrated weakness, solvable with the same method"}` },
       ], { jsonMode: true });
       const parsed = parseJsonLoose<{ correct?: boolean; where?: string; explanation?: string; follow_up?: string }>(raw);
@@ -69,10 +85,11 @@ export async function POST(request: NextRequest) {
     const { data: course } = await supabase.from("courses").select("name, subject, academic_level").eq("id", body.course_id).single();
     if (course) courseContext = ` Course: ${course.name} (${course.subject ?? "math"}, ${course.academic_level ?? "unspecified level"}).`;
   }
-  // Subject workspace context: practice honors the selected subject.
+  // Subject workspace context (unchanged feature): practice honors the selected subject.
   if (!body.course_id) {
     courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject, { courseId: body.course_id ?? null });
   }
+  courseContext += academicText;
 
   try {
     const past = body.past_problems?.length ? `\nDo not repeat these earlier problems: ${body.past_problems.slice(-15).join(" | ")}` : "";
