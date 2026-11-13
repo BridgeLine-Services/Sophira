@@ -13,6 +13,8 @@ export interface StatusInput {
   google: boolean;
   search: boolean;
   membersLoaded: boolean;
+  /** Absent when the caller has no delivery-layer fact to report. Never guessed. */
+  email?: boolean;
 }
 
 export interface StatusRow {
@@ -52,6 +54,17 @@ export function buildStatusRows(input: StatusInput): StatusRow[] {
       state: input.google ? "ready" : "optional_off",
       detail: input.google ? "Members can connect their Google account." : "Not set up. Members simply won't see this option.",
     },
+    // 2026-11-13 (Part 13): invitation email was the one capability the owner could not
+    // see the state of anywhere. It is an optional extra - invitations still work by
+    // sharing the link - so "not set up" never makes the system unhealthy.
+    ...(input.email === undefined ? [] : [{
+      key: "email",
+      label: "Invitation email",
+      state: (input.email ? "ready" : "optional_off") as StatusState,
+      detail: input.email
+        ? "Invitations can be emailed to new members. You can still share the link yourself."
+        : "Not set up. Invitations still work: copy the invitation link and send it yourself.",
+    }]),
     {
       key: "search",
       label: "Web search for research",

@@ -616,3 +616,31 @@ who had just made cards had nowhere to study them.
 
 **Phase 3 is now complete at the code level.** Everything Part 6 lists as required behaviour exists
 and is covered by tests; the one thing no amount of code can supply is a signed-in browser pass.
+
+---
+
+## 10.13 Phase 4, first code slice: the owner can see what is on
+
+The readiness report could not state three capabilities, because nothing exposed them. That gap is
+closed, and it was the Phase 4 code item I stopped in front of last round.
+
+| Piece | File | What changed |
+|---|---|---|
+| One source of truth | `src/lib/integrations/setup-status.ts` | `providerSetupStatus()` now also answers for invitation email and SMS, using the delivery functions the invitations themselves call |
+| Public readiness | `src/app/api/health/route.ts` | Reports `google_documents`, `microsoft_documents`, `invitation_email`, `sms` - booleans only, from that same function |
+| Owner-facing words | `src/lib/owner-status.ts`, `src/app/owner/status/page.tsx` | A new "Invitation email" row in plain language. Off reads "Invitations still work: copy the invitation link and send it yourself" and never makes a healthy system look broken. An unknown fact is omitted, never shown as off |
+
+### 10.14 Change record
+
+| | |
+|---|---|
+| Change | Integration readiness is observable: health flags plus a plain-language owner row |
+| Phase | 4 (first code slice) |
+| Reason | Part 13: the Owner Dashboard must distinguish implemented / configured / operational / tested / blocked, and the readiness report had three rows it could only call unknown |
+| Existing behaviour preserved | `buildStatusRows` keeps its five existing rows and their order; the new field is optional, and without it the output is byte-identical. `/api/health` keeps every existing key. No route, no schema, no permission changed |
+| Files modified | `src/lib/integrations/setup-status.ts`, `src/lib/owner-status.ts`, `src/app/api/health/route.ts`, `src/app/owner/status/page.tsx`, `tests/integration-readiness.ts` (new, 25 assertions), `tests/run.ts`, `docs/INTEGRATION_READINESS_2026-11-13.md` (unknown rows replaced with the live probe) |
+| Database changes | none |
+| API contract changes | additive only: four new boolean keys on `/api/health` |
+| Security impact | none widened: booleans only, no value, variable name or hostname in any response or screen, and the status page stays owner-guarded |
+| Verification | suite **8080/8080**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 82 routes, secret scan CLEAN, env validation PASS |
+| Outstanding | none for this slice. The next Phase 4 item is the same list of owner decisions the report names: an AI provider, a search provider, a test member, device access, backup credentials and migration 0057 |

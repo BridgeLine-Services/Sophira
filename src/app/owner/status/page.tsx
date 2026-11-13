@@ -26,6 +26,7 @@ export default async function OwnerStatusPage() {
     microsoft: setup.microsoft,
     google: setup.google,
     search: setup.search,
+    email: setup.email,
     membersLoaded,
   });
 

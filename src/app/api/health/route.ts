@@ -1,4 +1,5 @@
 import { searchProviderConfigured } from "../../../lib/research/provider";
+import { providerSetupStatus } from "../../../lib/integrations/setup-status";
 import { healthConfiguration } from "../../../lib/env";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,12 @@ export async function GET(request: Request) {
       configuration: {
         ...healthConfiguration(),
         search: searchProviderConfigured(),
+        // 2026-11-13 (Part 13): these three were the "unknown" rows in the readiness
+        // report. Same functions the features call, booleans only.
+        google_documents: providerSetupStatus().google,
+        microsoft_documents: providerSetupStatus().microsoft,
+        invitation_email: providerSetupStatus().email,
+        sms: providerSetupStatus().sms,
       },
       // Present only when asked for: the cheap path stays cheap.
       ...(checks ? { checks } : {}),
