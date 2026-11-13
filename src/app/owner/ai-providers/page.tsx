@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/Badge";
 import { stateLabel, stateTone } from "@/lib/owner/feature-catalog";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ModelCheck } from "@/components/app/ModelCheck";
 import { requireOwnerPage } from "@/lib/owner/page-context";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
 import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
@@ -83,6 +84,17 @@ export default async function OwnerAiProvidersPage() {
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm font-medium text-ink">Can your own model do the work?</p>
+            <p className="mt-1 mb-3 text-xs text-ink-soft">
+              Reachable is not the same as capable. This asks your model four fixed questions and
+              reports exactly what it got right.
+            </p>
+            <ModelCheck />
           </CardContent>
         </Card>
 

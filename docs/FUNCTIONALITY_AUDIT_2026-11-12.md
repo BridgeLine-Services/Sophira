@@ -451,3 +451,51 @@ written by a student**. A preference a student wanted applied to one teacher had
 - The written path was exercised only through the guard and unit-level assertions: no signed-in
   request was made, because the stored test-member credentials no longer authenticate.
 - Scope 5 (assignment) has the same missing write path, deliberately left for the assignment editor.
+
+---
+
+## Addendum 2026-11-13 (Phase 2): reachable is not capable
+
+### The gap
+
+The architecture says the local/self-hosted model is the primary engine. The only thing
+measured until now was whether a server answered on its models endpoint
+(`selfhostRuntime`). A listening server proves nothing about whether the model can follow an
+instruction, get arithmetic right, return parseable data, or refuse to invent a grade. An
+owner pressing "is my AI working?" got a reachability fact dressed as a capability claim.
+
+### What was added
+
+| File | Purpose |
+|---|---|
+| `src/lib/ai/benchmark.ts` (new) | Four fixed checks — explain, worked steps, structure, honesty — each with a pure scorer that says exactly what was wrong, plus `summariseBenchmark` mapping runs onto the same six readiness states Part 13 established. No IO, no clock, no randomness. |
+| `src/app/api/owner/ai-benchmark/route.ts` (new) | Owner-only `POST`. Calls the **self-hosted** model only (`selfhostChat`), never a cloud provider, so pressing it cannot spend money or send member work anywhere. Unconfigured is a `not-configured` answer with the reason, not an error. One dead server stops the run instead of four timeouts. Failures are trimmed to one credential-free sentence. |
+| `src/components/app/ModelCheck.tsx` (new) | One button on AI Providers: "Check my model". Says "Not measured yet." before any run, shows each check's own sentence and time, and renders a failed request as *no answer*, never a tick. |
+| `tests/model-benchmark.ts` (new) | 56 assertions, deliberately including the plausible-but-wrong answers: an invented `87%`, a hedge followed by `80%`, a wrong final answer, the right answer with no working, prose instead of JSON, an invented difficulty value, extra keys, an empty response. Both directions of every check are pinned. |
+
+Two defects found by writing those tests, both fixed rather than papered over:
+
+1. `x = 5.` at the end of a sentence failed the answer check, because the guard excluded a
+   following period as well as a following digit. A correct answer was being marked wrong.
+2. A hedge followed by an invented number ("I cannot know, but realistically you will get
+   around 80%") passed the honesty check, because uncertainty anywhere in the answer excused
+   a fabricated figure. Any stated percentage now fails, however it is prefixed.
+3. A run where some tasks never answered reported **working** when the tasks that did answer
+   passed. Unproven checks now read as `problems`, with "Answered 1 of 2 checks".
+
+### Verification
+
+- `npm test` 8383/8383, `npx tsc --noEmit` clean, `npm run build` OK, lint 0 errors / 33
+  warnings (ceiling unchanged), design-drift 0, accessibility PASS, contrast PASS, conformance
+  82 routes, jargon 0, secret scan clean, inventory 82 pages / 110 API routes.
+- Runtime on a local production build: `POST /api/owner/ai-benchmark` → `401 {"error":"Not
+  authenticated"}` signed out, `GET` → `405`, `/owner/ai-providers` → `307` to the login page.
+
+### Still open
+
+- No live numbers: `LOCAL_LLM_BASE_URL` is unset in production, so the button honestly reports
+  `not-configured`. The moment the owner connects a model server, the same button produces
+  latency and per-check results with no code change.
+- The benchmark is deliberately four checks, not a benchmark suite. It answers "can this model
+  do Sophira's job at all", not "which of two models is better"; model-to-model comparison needs
+  two servers configured and is not attempted.
