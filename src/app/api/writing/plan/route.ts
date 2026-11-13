@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
     teacherId: body.teacher_id ?? null,
     assignmentId: body.assignment_id ?? null,
     isWritingTask: true,
+    // 2026-11-13 (directive Part 5): which kind of writing this is decides which profile applies.
+    writingContext: typeof (body as { context?: unknown })?.context === "string" ? (body as { context?: string }).context : null,
   });
   courseContext += contextPrompt(academic);
 

@@ -8,6 +8,7 @@ import type { Course } from "@/lib/types";
 import { useComposerDraft } from "@/lib/save/useComposerDraft";
 import { browserDraftStorage } from "@/lib/save/composer-draft-browser";
 import { draftKey } from "@/lib/save/composer-draft";
+import { CONTEXT_DESCRIPTIONS, CONTEXT_LABELS, WRITING_CONTEXTS } from "@/lib/ai/writing-contexts";
 
 const LEVELS = ["Kindergarten/Elementary", "Middle school", "High school", "College/Undergraduate", "Graduate/Master's", "PhD", "Other"];
 const GENRES = ["Essay", "Discussion post", "Short answer", "Lab report", "Reflection", "Research writing", "Other"];
@@ -19,6 +20,9 @@ export default function NewWritingSamplePage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [form, setForm] = useState({
     title: "", genre: "Essay", course_id: "", academic_level: "", sample_date: "", representativeness: "preferred", content: "",
+    // 2026-11-13 (directive Part 5): which kind of writing this sample is. Academic is the
+    // default because that is what every existing sample was, and what most samples are.
+    profile_context: "academic",
   });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -97,6 +101,7 @@ export default function NewWritingSamplePage() {
       academic_level: form.academic_level || null,
       sample_date: form.sample_date || null,
       representativeness: form.representativeness,
+      profile_context: form.profile_context,
       content: form.content,
     });
     setBusy(false);
@@ -144,6 +149,19 @@ export default function NewWritingSamplePage() {
             <Label htmlFor="date">Date written</Label>
             <Input id="date" type="date" className="mt-1.5" value={form.sample_date} onChange={(e) => set("sample_date", e.target.value)} />
           </div>
+        </div>
+        <div>
+          {/* 2026-11-13 (directive Part 5): the kind of writing this sample is. It decides
+              which profile the sample can shape, so a chat message never rewrites an essay. */}
+          <Label htmlFor="context">What kind of writing is this?</Label>
+          <Select id="context" className="mt-1.5" value={form.profile_context} onChange={(e) => set("profile_context", e.target.value)}>
+            {WRITING_CONTEXTS.map((c) => (
+              <option key={c} value={c}>{CONTEXT_LABELS[c]}</option>
+            ))}
+          </Select>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {CONTEXT_DESCRIPTIONS[form.profile_context as (typeof WRITING_CONTEXTS)[number]]}
+          </p>
         </div>
         <div>
           <Label htmlFor="repr">Does this represent how you want to write?</Label>
