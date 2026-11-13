@@ -522,3 +522,66 @@ is claimed as verified that was not actually run.
 
 **Parts 2, 3, 9, 10, 11, 12, 14, 17 and 18 are no longer "unknown":** the full directive is now on
 file and every part is statused in §11.
+
+---
+
+## 10.8 Phase 3, third slice: the study screens (shipped this round)
+
+The engine shipped in #85 and the card tools in #86 with nothing a student could open. That was
+the largest remaining gap in Phase 3 and it is now closed at the screen level.
+
+| Screen | File | What a student does |
+|---|---|---|
+| Your decks | `src/app/flashcards/page.tsx` | Sees each deck with cards / learned / new and how many are due, opens one, or makes a deck by hand (name + first card). An empty account is told to generate flashcards in a notebook |
+| Study one deck | `src/app/flashcards/[id]/page.tsx` | Opens the deck and starts: question, "Show the answer", then four plain answers (Not yet / Partially / Correct / Confident), each explained. A finished session says how many cards were answered. Below it, every card can be edited, retired (history kept) or removed, and removal asks first |
+| Loading states | `src/app/flashcards/loading.tsx`, `src/app/flashcards/[id]/loading.tsx` | Words in the existing convention, never a fake skeleton |
+| Navigation | `src/lib/navigation/workspace-nav.ts` | Flashcards sits directly after Notebooks, because a deck is made from a notebook |
+
+### Why the screens are safe to have shipped
+
+- **The browser cannot invent progress.** Each answer posts `{ card_id, rating }`; the server
+  schedules. The screen reads a card's due date only to order the queue, and a test refuses any
+  scheduling value in what it sends.
+- **The queue is not a second implementation.** `buildQueue()` (already unit-tested) decides what
+  comes first, so the screen and the tests cannot disagree about what "due" means.
+- **No technical vocabulary.** A test strips comments and fails if any of "SM-2", "interval_days",
+  "ease factor", "PATCH", "supabase", "RLS" or "API route" appears on a student screen (Part 12).
+- **Honest failure states.** A failed read says the work is safe and offers Try again; a failed
+  save says nothing changed; an edit tells the student their review schedule was left alone.
+- **Accessibility of the new controls.** Every input has a real label, the card list is a labelled
+  region, no icon-only button exists, and results are announced through `role="status"`. The
+  repository-wide a11y and contrast gates still pass.
+
+### 10.9 Change record
+
+| | |
+|---|---|
+| Change | Flashcards: deck list, study flow and card tools as real screens |
+| Phase | 3 (third slice) |
+| Reason | Part 6 requires a student interface: "open a deck and begin reviewing without understanding any technical settings", on phone, tablet and desktop |
+| Existing behaviour preserved | No existing page, route or component changed except one ADDED entry in the shared workspace menu. Every screen still renders the shared shell and the existing design vocabulary |
+| Files added | `src/app/flashcards/page.tsx`, `src/app/flashcards/[id]/page.tsx`, two `loading.tsx` files |
+| Files modified | `src/lib/navigation/workspace-nav.ts` (one entry), `docs/redesign-status.json` (two routes), `docs/REDESIGN_INVENTORY.md` (regenerated: 82 pages), `tests/flashcards.ts` (+31 assertions), `tests/run.ts`, `tests/role-navigation.ts` (the order pin now includes Flashcards after Notebooks, with the reason recorded) |
+| Database changes | none |
+| API contract changes | none (the screens consume the routes added in #85 and #86) |
+| Verification | suite **8044/8044**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS 32 pairs both themes, conformance **82 routes**, secret scan CLEAN |
+| **Still not verified** | **the rendered screens in a browser.** No usable test member exists and invitation-only access is a standing rule, so these two routes are marked `partial` in the inventory, exactly like the other 76 screens |
+| Remaining Phase 3 item | a "Study these cards" button on the notebook artifact view. The API already accepts an `artifact_id`; only the button is missing |
+
+### 10.10 Part 6 status after this round
+
+| Part 6 requirement | State |
+|---|---|
+| Generate flashcards from study material | Already existed (notebook artifacts), unchanged |
+| Create decks manually | Done (#86 API, screens this round) |
+| Edit flashcards | Done |
+| Delete cards they own | Done |
+| Organise decks by subject and course | Deck has `course_id` + notebook link, list filters by course; a course picker inside the deck screen is not built yet |
+| Save decks / review cards / schedule future reviews | Done |
+| Mark answers correct / partially understood / incorrect | Done, in plain words: Correct / Partially / Not yet (plus Confident) |
+| Track progress | Done: counts, accuracy with its sample size, difficult cards |
+| Identify difficult cards | Done (2+ lapses, surfaced on the card) |
+| Resume unfinished study sessions | Partial: the queue is rebuilt from what is due on each visit, so nothing is lost, but there is no saved mid-session position |
+| Spaced repetition responding to recall | Done (deterministic SM-2 style, clamped, tested) |
+| Phone / tablet / desktop | Layouts use the existing responsive grid; **not verified on a device** |
+| Privacy: decks and history scoped to the student | Done at the database (RLS) and in every route |
