@@ -16,6 +16,7 @@ import {
   MAX_INTERVAL_DAYS, MAX_EASE, MIN_EASE, RELEARN_MINUTES, RATINGS, type CardState,
 } from "../src/lib/flashcards/schedule";
 import { cardsFromArtifact, normalizeCard, buildQueue, MAX_CARDS_PER_DECK } from "../src/lib/flashcards/decks";
+import { summarizeReviews, difficultCards, progressSentence, RATING_GUIDE, type ReviewRow } from "../src/lib/flashcards/progress";
 
 type Assert = (cond: boolean, msg: string) => void;
 
@@ -198,4 +199,93 @@ export async function runFlashcardTests(assert: Assert, section: (name: string) 
   assert(/delete\(\)\s*[\s\S]{0,200}\.eq\("user_id"/.test(oneDeck), "deck route: deletion is owner-scoped");
   assert(/released_at/.test(due) && /lte\("due_at", nowISO\)/.test(due),
     "due route: the queue is built from the SERVER clock, not the browser's");
+}
+
+/**
+ * PROGRESS AND CARD MANAGEMENT (2026-11-13, directive Part 6: "track progress",
+ * "identify difficult cards", "edit flashcards", "delete flashcards they own").
+ *
+ * Progress must be counted from the append-only log, never assumed: with no
+ * reviews the accuracy is null rather than a flattering 100%, and a log row with an
+ * unreadable or future date is ignored instead of being counted as a success.
+ */
+export async function runFlashcardProgressTests(assert: Assert, section: (name: string) => void) {
+  section("flashcards: progress is counted from real answers, never assumed");
+
+  const empty = summarizeReviews([], T0, 30);
+  assert(empty.reviews === 0 && empty.accuracy === null,
+    "progress: with no reviews the accuracy is null, not a fake 100%");
+  assert(progressSentence(empty, 0, 0).startsWith("No cards yet"),
+    "progress: an empty account is told how to begin");
+  assert(progressSentence(empty, 4, 4).includes("not reviewed any yet"),
+    "progress: cards that exist but are unstudied say exactly that");
+
+  const rows: ReviewRow[] = [
+    { rating: "good", reviewedAt: daysLater(-1) },
+    { rating: "good", reviewedAt: daysLater(-1) },
+    { rating: "easy", reviewedAt: daysLater(-2) },
+    { rating: "again", reviewedAt: daysLater(-2) },
+  ];
+  const sum = summarizeReviews(rows, T0, 30);
+  assert(sum.reviews === 4 && sum.correct === 3 && sum.incorrect === 1,
+    "progress: correct answers (good + easy) and misses are counted separately");
+  assert(sum.accuracy === 75, `progress: accuracy is the real ratio (3 of 4 = 75%, got ${sum.accuracy})`);
+  assert(sum.byDay.length === 2 && sum.byDay[0].reviews === 2,
+    "progress: reviews are grouped by calendar day, oldest first");
+  assert(progressSentence(sum, 2, 10).includes("75%"), "progress: the sentence carries the real percentage");
+  assert(progressSentence(sum, 1, 10).includes("1 card due now"),
+    "progress: a single due card reads naturally, not '1 cards'");
+
+  const old: ReviewRow[] = [{ rating: "good", reviewedAt: daysLater(-90) }];
+  assert(summarizeReviews(old, T0, 30).reviews === 0,
+    "progress: a review outside the window is not counted in it");
+  const skewed: ReviewRow[] = [
+    { rating: "good", reviewedAt: daysLater(5) },
+    { rating: "good", reviewedAt: "not-a-date" },
+  ];
+  assert(summarizeReviews(skewed, T0, 30).reviews === 0,
+    "progress: a future-dated or unreadable log row is ignored, never counted as correct");
+
+  const guideText = RATING_GUIDE.map((g) => `${g.label} ${g.meant}`).join(" ");
+  assert(RATING_GUIDE.length === 4 && RATING_GUIDE.every((g) => g.label.length > 2 && g.meant.length > 10),
+    "progress: all four answers have a plain label and an explanation");
+  assert(!/SM-2|interval|ease|algorithm|schedul/i.test(guideText),
+    "progress: no scheduler term reaches a student (Part 12)");
+
+  const cards = [
+    { id: "a", front: "hard one", lapses: 4, reps: 6, dueAt: daysLater(1) },
+    { id: "b", front: "harder", lapses: 4, reps: 5, dueAt: daysLater(-1) },
+    { id: "c", front: "easy one", lapses: 0, reps: 5, dueAt: daysLater(9) },
+    { id: "d", front: "retired", lapses: 9, reps: 2, dueAt: daysLater(-9), retired: true },
+  ];
+  const difficult = difficultCards(cards, 2, 10);
+  assert(difficult.length === 2, "difficult: only cards with repeated lapses are listed");
+  assert(difficult[0].id === "b", "difficult: ties are broken by which card is due soonest");
+  assert(!difficult.some((c) => c.id === "d"), "difficult: a retired card is never outstanding work");
+  assert(difficultCards(cards, 2, 1).length === 1, "difficult: the list is capped");
+
+  section("flashcards: editing a card never resets its progress");
+
+  const cardRoute = readFileSync("src/app/api/flashcards/cards/[id]/route.ts", "utf8");
+  const addCard = readFileSync("src/app/api/flashcards/decks/[id]/cards/route.ts", "utf8");
+  const progressRoute = readFileSync("src/app/api/flashcards/progress/route.ts", "utf8");
+  const deckList = readFileSync("src/app/api/flashcards/decks/route.ts", "utf8");
+  assert(/A card needs both a front and a back/.test(cardRoute),
+    "card edit: emptying one side is refused instead of saving an unanswerable card");
+  assert(!/interval_days|ease:|due_at:/.test(cardRoute),
+    "card edit: an edit cannot change the interval, ease or due date - a typo fix must not reset progress");
+  assert(/\.eq\("user_id", guard\.data\.user\.id\)/.test(cardRoute), "card edit: scoped to the signed-in student");
+  assert(/That card could not be found/.test(cardRoute), "card edit: another student's card is a 404");
+  assert(/retired/.test(cardRoute), "card edit: a card can be retired without deleting its history");
+  assert(/\.eq\("user_id", guard\.data\.user\.id\)/.test(addCard) && /That deck could not be found/.test(addCard),
+    "add card: the deck is verified to belong to the student before anything is written");
+  assert(/due_at: new Date\(\)\.toISOString\(\)/.test(addCard),
+    "add card: a new card is due immediately, so it can be studied now");
+  assert(/\.eq\("user_id", guard\.data\.user\.id\)/.test(progressRoute) && /flashcard_reviews/.test(progressRoute),
+    "progress: reads the student's own cards and their own review log");
+  assert(/warning: reviewError/.test(progressRoute),
+    "progress: a failed history read is disclosed, not rendered as zero progress");
+  assert(/Math\.min\(365, Math\.max\(1/.test(progressRoute), "progress: the window is clamped to a sane range");
+  assert(/course_id/.test(deckList) && /deckQuery = deckQuery\.eq\("course_id"/.test(deckList),
+    "decks: the list can be narrowed to one course, so decks can be organised by subject");
 }

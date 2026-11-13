@@ -442,24 +442,83 @@ applied instead of claiming the database is ready.
 
 ---
 
-## 11. Directive status: what is done, what is not
+## 11. Directive status: all 18 parts
 
-Parts I can name and status from the copy of the directive I retained. **My retained copy is
-truncated after Part 1**, so parts 2, 3, 9-12, 14, 17 and 18 cannot be titled honestly here;
-paste those headings and they will be folded into this table rather than guessed at.
+The full directive text is now on file, so every part can be titled and statused. Nothing here
+is claimed as verified that was not actually run.
 
 | Part | Subject | State |
 |---|---|---|
-| 1 | Non-negotiable safety requirements (do not break what works) | **Honoured every round**: no rebuilds, no removed routes, no schema rewrites, no weakened RLS, gates run before every push (§3, §5, §9, §10) |
-| 4 | Shared academic context: the same student everywhere | **Done** (§9) for tutor, math preparation and writing planning. Not yet: solver refactor onto the shared service, and `/api/math/practice` + `/api/writing/grammar` |
-| 5 | Writing profile variants and style-following control | **Not started** |
-| 6 | Flashcards: persistent decks and spaced repetition | **Data model, scheduler, API and tests done** (§10); screens not started |
-| 7 | AI evaluations across the required categories | **Not started**: still 27 cases |
-| 8 | Provider readiness in plain language | **Done** (§4.5, §9.1): one shared message, eight routes, no vendor variable |
-| 13 | Integration readiness shown honestly in the Owner Dashboard | **Not started** |
-| 15 | The phased plan (Phase 5 = full regression and signed-in acceptance) | Phases 0-3 done; **Phase 5 blocked** on a usable test member (§6) |
-| 16 | Change record for every change | **Done**: §5.3, §9.2, §10.3 |
+| 1 | Non-negotiable safety requirements | **Honoured every round**: no rebuild, no removed route, no schema rewrite, no weakened RLS, no removed test, gates before every push. Destructive operations listed in 1.6 were never performed |
+| 2 | Understand what Sophira already is (three systems: A academic teacher, B work assistant, C personalised companion) | **Verified and mapped** in §2 and §4: the repository IS the deployed application (§2.1), all three systems exist, and the gaps against A/B/C are named |
+| 3 | Preserve and extend the seven existing AI modes (Learn, Assignment, Check, Writing, Study, Explain, Custom) | **Preserved**: no mode was replaced or removed. Study mode gained real persistence (§10); the assignment solver and writing generator still generate, and the plan route does not restrict them |
+| 4 | Unify personalisation and academic memory | **Done** (§9) for tutor, math preparation and writing planning. Not yet: solver refactor onto the shared service, plus `/api/math/practice` and `/api/writing/grammar` |
+| 5 | Writing personalisation: context-specific profiles, style-following control, approval intact | **Not started**. The approved-profile gate is preserved and now enforced on the AI paths (§9); separate academic/casual/professional profiles and a closeness control do not exist |
+| 6 | Complete the flashcard and spaced-repetition system | **Engine, data and API done** (§10, §10.6): decks, cards, edit/delete/retire, add-a-card, due queue, review, scheduling, progress, difficult cards, subject/course organisation. **Missing: the student screens** |
+| 7 | Stronger academic AI evaluation system (15 categories, synthetic cases, honest reporting) | **Not started**: still 27 cases, and the runner still reports blocked rather than passed when no provider is configured |
+| 8 | Fix and verify AI provider configuration, standardise readiness | **8.1 done** (§9.1): one shared provider-neutral message, no secret names, eight routes. 8.2 (failure behaviour) was already correct and was preserved |
+| 9 | Research and citation reliability, submission readiness | **Preserved, not extended**: URL safety, authority, claims, citations and the READY/NOT READY gate are untouched and their tests still pass. No research-provider work was done because production has no search provider configured |
+| 10 | Correct the database migration release-gate discrepancy | **Done** (§5): the gate derives probes from the real marker table, the newest migration is mandatory, a partial chain is FAIL, an unprovable chain is BLOCKED, docs updated, 19 tests |
+| 11 | Security and privacy must remain intact | **Enforced in every change**: RLS owner-only on the three new tables, append-only review log, every route filters on the signed-in user, no button-hiding relied on, no new public endpoint. Live cross-student verification is **still not possible** (no test member) |
+| 12 | Make Sophira easy for non-technical users | **Applied to everything built**: plain-language readiness messages that say the work is safe, review answers labelled "Not yet / Partially / Correct / Confident", no scheduler term in any student-facing string (pinned by a test), plain sentences for progress. The wider audit of existing screens is **not done** |
+| 13 | Owner Dashboard and external integrations, honest states | **Not started**. The Owner Dashboard exists and was not changed this round |
+| 14 | Automated testing and regression protection | **Continuous**: suite 7974 to 8007 with no test deleted or weakened; two existing tests were updated only after the intended behaviour changed (migration count 56 to 57, API count 101 to 108, inventory updated) and the reason is recorded in the commit |
+| 15 | Required implementation order | Phases 0, 1, 2 and 3 (engine) complete. Phase 3 screens outstanding. Phases 4 and 5 **blocked** as described below |
+| 16 | Exact change management record | **Done**: §5.3, §9.2, §10.3, §10.7 for every change |
+| 17 | Definition of done | **Not met, and cannot be met yet**: it requires a configured AI provider, a configured research provider, live integrations, backup/restore verification and authenticated workflow testing. §12 lists exactly what stands between here and that |
+| 18 | How to begin (inspect first, report, wait for approval before high-risk work) | **Done**: §2 and §5 are the inspection report; no destructive or high-risk operation was performed; every change so far is additive |
 
-**Standing blocker across all of it:** no signed-in verification is possible. There is still no
-usable test member, and invitation-only access is a standing owner rule. Every member-side claim
-in this document is code-, schema- and test-level.
+### 11.1 The three things that block Parts 5, 13, 15(Phases 4-5), 17
+
+1. **No signed-in verification.** There is no usable test member, and invitation-only access is a
+   standing owner rule. Every member-side claim in this document is code-, schema- and test-level.
+2. **No AI provider in production.** `configuration.ai` is `false`, so no prompt change can be
+   checked against a real model answer and Part 7's live categories cannot pass.
+3. **No research provider, no OAuth connectors, no backup credentials** in the environment,
+   which is what Parts 9, 13 and 17 need before they can be called operational.
+
+---
+
+## 12. What stands between here and Part 17 (definition of done)
+
+| Requirement | Today |
+|---|---|
+| Existing pages, APIs, workflows, auth, permissions still work | True by construction and by test; the suite has never gone red on `master` |
+| Tutoring, assignment generation, writing generation work with a configured provider | **Unverified**: no provider configured |
+| Personalisation applied consistently | Done for three AI paths (§9); not for every path |
+| Persistent flashcards and spaced repetition work | Engine and API done; **no screens** |
+| Search configured and tested, citations verifiable | **Not configured** |
+| Student data isolated, roles correct, admin access protected, secrets unexposed | Enforced and tested offline; **not live-verified** |
+| Required migrations verified | Gate now correct and honest; **live database is missing 0057 until the owner presses Update database** |
+| Backup and restore verified | Not run in this environment |
+| Production acceptance checks completed | Partly: health, gates, conformance, a11y, contrast, probes. Not: signed-in flows |
+
+---
+
+## 10.6 Phase 3, second slice: card management and progress (shipped this round)
+
+| Piece | File | What it does |
+|---|---|---|
+| Edit / retire / delete a card | `src/app/api/flashcards/cards/[id]/route.ts` | Both sides stay required; an edit **cannot** touch interval, ease or due date, so fixing a typo never resets progress; retire keeps history, delete removes it |
+| Add a card to a deck | `src/app/api/flashcards/decks/[id]/cards/route.ts` | Deck ownership verified first; the card arrives due now |
+| Organisation by subject/course | `src/app/api/flashcards/decks/route.ts` | `GET ?course_id=` narrows the list |
+| Progress in plain language | `src/lib/flashcards/progress.ts` + `GET /api/flashcards/progress` | Accuracy from the append-only log **with the number it came from**, null when there are no reviews, per-day counts, difficult cards (2+ lapses), and one plain sentence. No scheduler term reaches a student |
+
+### 10.7 Change record
+
+| | |
+|---|---|
+| Change | Flashcards: full card management, course organisation and honest progress reporting |
+| Phase | 3 (second slice) |
+| Reason | Part 6 requires editing and deleting cards, organising decks by subject and course, tracking progress and identifying difficult cards |
+| Existing behaviour preserved | No schema change (0057 already carries every column). No route or response removed. The review scheduler and its bounds are untouched |
+| Files added | `src/lib/flashcards/progress.ts`, `src/app/api/flashcards/cards/[id]/route.ts`, `src/app/api/flashcards/decks/[id]/cards/route.ts`, `src/app/api/flashcards/progress/route.ts` |
+| Files modified | `src/app/api/flashcards/decks/route.ts` (course filter), `tests/flashcards.ts` (+33 assertions), `tests/run.ts`, `docs/REDESIGN_INVENTORY.md` (API count) |
+| Database changes | none |
+| API contract changes | new routes only; the deck list gained an optional query parameter |
+| Authorization impact | none: every new route filters on the signed-in user, and another student's card or deck is a 404 |
+| Verification | suite **8007/8007**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS 32 pairs both themes, conformance 80 routes, secret scan CLEAN |
+| Outstanding | the student screens. Nothing in this slice is user-visible yet |
+
+**Parts 2, 3, 9, 10, 11, 12, 14, 17 and 18 are no longer "unknown":** the full directive is now on
+file and every part is statused in §11.

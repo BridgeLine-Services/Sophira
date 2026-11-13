@@ -24,16 +24,20 @@ interface CardRow extends ReviewableCard {
   lapses: number;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = createClient();
   const guard = await requireUser(supabase);
   if (!guard.ok) return guard.response;
 
-  const { data: decks, error } = await supabase
+  // Optional narrowing by course, so decks can be organised by subject (Part 6).
+  const courseId = new URL(request.url).searchParams.get("course_id");
+  let deckQuery = supabase
     .from("flashcard_decks")
     .select("id, title, description, notebook_id, course_id, source_artifact_id, created_at, updated_at")
     .eq("user_id", guard.data.user.id)
     .order("updated_at", { ascending: false });
+  if (courseId) deckQuery = deckQuery.eq("course_id", courseId);
+  const { data: decks, error } = await deckQuery;
   if (error) return NextResponse.json({ error: "Could not load your decks." }, { status: 500 });
 
   const { data: cards } = await supabase
