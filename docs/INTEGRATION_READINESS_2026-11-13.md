@@ -22,8 +22,8 @@ five states it has actually reached.
 
 | Integration | What it does for students | Implemented | Configured | Operational | Tested | What is missing |
 |---|---|---|---|---|---|---|
-| Supabase (database, sign-in, storage) | Holds every account, course, notebook and study record | Yes (0057 migrations) | **Yes** (`supabase: true`, `supabase_service_role: true`) | **Yes**: live tables and functions answer | **Yes**: read-only live checks pass, RLS enforced | nothing |
-| Migrations 0057 | The three flashcard tables the new study screens read | Yes | **No**: the live database does not have it yet | No | No | **one owner action**: press Update database at `/owner`. The release gate names it exactly: `flashcard_decks (0057_flashcard_decks.sql)` |
+| Supabase (database, sign-in, storage) | Holds every account, course, notebook and study record | Yes (58 migrations) | **Yes** (`supabase: true`, `supabase_service_role: true`) | **Yes**: live tables and functions answer | **Yes**: read-only live checks pass, RLS enforced | nothing |
+| Migrations 0057 and 0058 | The three flashcard tables the study screens read, and the three writing-profile contexts | Yes | **Yes**: both applied (see 2a) | **Yes**: a read-only probe returns every new table and column | Yes: the probe is how this was confirmed | nothing: the owner applied it on 2026-11-13 |
 | AI provider (all seven modes) | Tutoring, assignment help, checking, writing, study, explanation | Yes: 7 modes preserved, one shared academic context | **No** (`ai: false`, `ai_selfhost: false`) | **No**: every AI route answers with the plain readiness message | Offline only: 27 deterministic cases pass, live cases are skipped and never counted as passes | a provider key. The free path is a Gemini key; OpenAI only counts if paid use is explicitly allowed. The owner decides; nothing paid was enabled |
 | Local / self-hosted inference | The intended primary engine | Yes: the provider architecture supports it | **No** (`ai_selfhost: false`) | No | No | an inference server, then a benchmark (this is the Phase 2 dev item still open) |
 | Research / web search | Live source-backed research and citations | **Yes**: URL safety, authority, claims, citations, READY/NOT READY gate all preserved | **No** (`search: false`) | No | Offline only: scope and SSRF tests pass | a search provider key. Research degrades gracefully: study tools still work |
@@ -56,18 +56,23 @@ when something is off.
 These four rows are now self-reporting: the next report reads them from `/api/health` instead of
 asking anybody to remember whether a setting exists.
 
-## 2. The one thing the owner can do today
+## 2. Nothing is waiting on the owner in the database (closed 2026-11-13)
 
-The live database is missing exactly one migration, and until it is applied the new study screens
-have no tables to read in production. The release gate reports it by name rather than pretending
-the database is ready:
+This section previously named one owner action: press **Update database** to apply 0057. The
+owner did it, and it worked. Two additions arrived after that and needed the same button, so the
+history is worth keeping straight rather than deleting:
 
-```
-flashcard_decks (0057_flashcard_decks.sql) — run the /setup repair to apply the missing tail
-```
+1. 0057 (flashcard tables) - applied. The key study screens have real tables behind them.
+2. 0058 (writing-profile contexts and the closeness setting) - written after the first press,
+   then applied by the same button on 2026-11-13.
 
-Press **Update database** once at https://sophira.vercel.app/owner and paste back the message it
-shows. That closes the only code-side blocker in this report.
+## 2a. How that was confirmed, rather than assumed
+
+A read-only probe with the service key asked the live database for each new table and column.
+All of them answered, including `writing_profiles.profile_context`,
+`writing_profiles.style_closeness` and `writing_samples.profile_context`. No write was made and
+no row was changed. The chain is 58 migrations, and it applies from empty on a throwaway
+PostgreSQL 15 with every existing row preserved.
 
 ## 3. What is blocked, and on whom
 
