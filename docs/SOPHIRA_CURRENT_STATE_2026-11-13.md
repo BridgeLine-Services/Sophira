@@ -372,3 +372,94 @@ a model's answer. That remains the honest limit on all AI-path work.
 - Live database state is now *proven*, not inferred: window 0045-0056 applied.
 - The biggest product gap is unchanged and clearly identified: the tutor does not yet see
   the student context the solver sees.
+
+---
+
+## 10. Phase 3: flashcards as a study system (shipped this round)
+
+### 10.1 The gap, measured
+
+Flashcards already existed as a *generated* artifact: `notebook_artifacts` with
+`artifact_type = 'flashcards'` holding a question and an answer per section in JSONB, with
+provenance, under RLS. What did not exist anywhere in the codebase or the schema: decks, per-card
+review state, a review schedule, mastery tracking, or a queue ("spaced repetition", "SM-2",
+"review_schedule" returned nothing). A student could generate cards and had no way to study them.
+
+### 10.2 What now exists
+
+| Piece | File | What it does |
+|---|---|---|
+| Schema (migration 0057) | `supabase/migrations/0057_flashcard_decks.sql` | `flashcard_decks`, `flashcards` (current interval/ease/reps/lapses/due), `flashcard_reviews` (append-only log). RLS owner-only on all three; the log has insert+read policies and no update/delete policy |
+| Scheduler | `src/lib/flashcards/schedule.ts` | Pure SM-2 style: `again` returns in 10 minutes, resets repetitions, counts a lapse, drops ease; ease clamped 1.3-2.8; interval capped at 365 days; `elapsedDays` is null on a first review, never negative |
+| Deck assembly | `src/lib/flashcards/decks.ts` | Turns a generated artifact into cards, stripping `Q:`/`A:` prefixes, keeping citations, and **reporting** any section that cannot become a card instead of inventing one |
+| Reading | `GET /api/flashcards/decks`, `GET /api/flashcards/decks/[id]`, `GET /api/flashcards/due` | Decks with honest counts, one deck with its cards, and the due queue built from the server clock |
+| Writing | `POST /api/flashcards/decks`, `PATCH`/`DELETE /api/flashcards/decks/[id]`, `POST /api/flashcards/review` | Create from an artifact or hand-written cards, rename, remove, and answer one card |
+
+The client never sends an interval, an ease or a due date: the server schedules from a
+validated rating, so progress cannot be inflated from the browser.
+
+### 10.3 Change record
+
+| | |
+|---|---|
+| Change | Flashcards became a study system (decks, review state, schedule, history) |
+| Phase | 3 |
+| Reason | Generated cards had nowhere to be studied; Part 6 asks for persistent decks and spaced repetition |
+| Existing behaviour preserved | `notebook_artifacts` and the generation path are untouched; a deck may reference the artifact it came from. No existing table altered, no existing policy changed |
+| Files added | the migration, `src/lib/flashcards/schedule.ts`, `src/lib/flashcards/decks.ts`, four route files, `tests/flashcards.ts` |
+| Files modified | `scripts/migration-markers.mjs` (0057 probe), `src/app/api/account/export/route.ts` (three tables added to the member export), `docs/BACKUP_INVENTORY.md`, `docs/REDESIGN_INVENTORY.md`, `tests/membership-notifications.ts` (migration count), `tests/run.ts`, the generated `bootstrap-all.sql` and `db-migrations.generated.ts`, this document |
+| Database changes | ADDITIVE migration 0057: three new tables, three indexes, RLS, triggers. Nothing dropped, nothing altered |
+| API contract changes | new routes only |
+| New dependencies | none |
+| Rollback | revert the merge; the tables can stay harmlessly, or `drop table` them in a later migration |
+| **Owner action required** | **the live database does not have 0057 yet.** Until the owner presses Update database in the Owner Dashboard, the release gate correctly reports FAIL naming `flashcard_decks (0057_flashcard_decks.sql)` and the study screens have nothing to read. This is the honest state, not a broken deploy |
+
+### 10.4 Verification
+
+| Check | Result |
+|---|---|
+| `npm test` | **7974 passed, 0 failed** (+83 versus 7891) |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | 0 errors, 33 warnings (ceiling unchanged) |
+| `npm run build` | OK |
+| design-drift / a11y / contrast / conformance / secret scan | PASS / PASS / PASS 32 pairs both themes / 80 routes / CLEAN |
+| `node scripts/gen-bootstrap-sql.mjs` | 57 migrations, idempotent |
+| `node scripts/gen-db-migrations.mjs` | 57 migrations embedded, markers on 57 |
+| Live migration probe (read-only, service role) | **FAIL, correctly**: "live schema is missing migration markers in the 0046-0057 window: flashcard_decks (0057_flashcard_decks.sql) - run the /setup repair to apply the missing tail" |
+
+That last line is the Phase 1 gate doing its job: it names exactly the migration that is not
+applied instead of claiming the database is ready.
+
+### 10.5 What Phase 3 still lacks
+
+- **No screens.** There is no deck list, study card or review UI yet. The API and the data model
+  are complete and tested; a screen must be built against the existing design system and cannot
+  be verified in a signed-in browser (see §6), which is why it was not rushed in this round.
+- **No automatic deck creation from the notebook page.** The API accepts an `artifact_id`; a
+  "Study these cards" button in the notebook UI is still to be added.
+- No card editing (add/remove a single card) or manual retirement UI, though the schema and the
+  scheduler already support retired cards.
+
+---
+
+## 11. Directive status: what is done, what is not
+
+Parts I can name and status from the copy of the directive I retained. **My retained copy is
+truncated after Part 1**, so parts 2, 3, 9-12, 14, 17 and 18 cannot be titled honestly here;
+paste those headings and they will be folded into this table rather than guessed at.
+
+| Part | Subject | State |
+|---|---|---|
+| 1 | Non-negotiable safety requirements (do not break what works) | **Honoured every round**: no rebuilds, no removed routes, no schema rewrites, no weakened RLS, gates run before every push (§3, §5, §9, §10) |
+| 4 | Shared academic context: the same student everywhere | **Done** (§9) for tutor, math preparation and writing planning. Not yet: solver refactor onto the shared service, and `/api/math/practice` + `/api/writing/grammar` |
+| 5 | Writing profile variants and style-following control | **Not started** |
+| 6 | Flashcards: persistent decks and spaced repetition | **Data model, scheduler, API and tests done** (§10); screens not started |
+| 7 | AI evaluations across the required categories | **Not started**: still 27 cases |
+| 8 | Provider readiness in plain language | **Done** (§4.5, §9.1): one shared message, eight routes, no vendor variable |
+| 13 | Integration readiness shown honestly in the Owner Dashboard | **Not started** |
+| 15 | The phased plan (Phase 5 = full regression and signed-in acceptance) | Phases 0-3 done; **Phase 5 blocked** on a usable test member (§6) |
+| 16 | Change record for every change | **Done**: §5.3, §9.2, §10.3 |
+
+**Standing blocker across all of it:** no signed-in verification is possible. There is still no
+usable test member, and invitation-only access is a standing owner rule. Every member-side claim
+in this document is code-, schema- and test-level.

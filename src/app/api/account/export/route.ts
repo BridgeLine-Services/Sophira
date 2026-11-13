@@ -68,6 +68,9 @@ const USER_TABLES = [
   "notebook_evidence",
   "notebook_artifacts",
   "student_memories",
+  "flashcard_decks",
+  "flashcards",
+  "flashcard_reviews",
   "subject_preferences",
   "student_memory_evidence",
   // Added with 0042: a member's own notices and notification choices are their data.
