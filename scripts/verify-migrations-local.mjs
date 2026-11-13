@@ -79,6 +79,11 @@ const M45 = allMigrations.find((f) => f.startsWith("0045_")) || null;
 // "is it the newest", so the provenance guarantee keeps being verified after newer
 // migrations land on top of it (2026-11-11).
 const PROVENANCE = allMigrations.find((f) => f.startsWith("0046_")) || null;
+// The migration that gave writing profiles and samples a context (academic / casual /
+// professional) and gave a profile the student's own 0-100 closeness setting. Checked by
+// name for the same reason as 0046: its guarantee - every pre-existing row becomes an
+// academic profile, with nothing lost - must keep being verified as newer migrations land.
+const WRITING_CONTEXTS = allMigrations.find((f) => f.startsWith("0058_")) || null;
 // The NEWEST migration by filename, whatever its number: adding a migration must
 // not slip past this check by being newer than a hardcoded name (2026-11-11).
 const NEWEST = allMigrations.length > 0 ? allMigrations[allMigrations.length - 1] : null;
@@ -209,12 +214,86 @@ try {
     ]);
   }
 
+
+  // 2d. Writing profile contexts (0058): rows that existed BEFORE it become academic
+  //     profiles and academic samples automatically, the closeness default is the neutral
+  //     middle (70), the allowed values are enforced, no existing text is lost, no row is
+  //     deleted, RLS is untouched, and re-running the file changes nothing.
+  if (!WRITING_CONTEXTS) {
+    check(false, "the writing-context migration (0058) is present");
+  } else {
+    freshDatabase();
+    if (applyUpTo(WRITING_CONTEXTS)) {
+      const U = "22222222-2222-2222-2222-222222222222";
+      psql(DB, ["-c", `insert into auth.users (id) values ('${U}') on conflict do nothing`]);
+      const seedProfile = psql(DB, ["-c",
+        `insert into public.writing_profiles (user_id, summary, guidance, status, version)
+         values ('${U}', '{"sentence_length":"medium"}', 'legacy guidance', 'approved', 3)`]);
+      const seedSample = psql(DB, ["-c",
+        `insert into public.writing_samples (user_id, title, genre, representativeness, content)
+         values ('${U}', 'legacy essay', 'essay', 'preferred', 'legacy sample text')`]);
+      check(seedProfile.status === 0 && seedSample.status === 0,
+        "0058: a profile and a sample can be written before the migration",
+        (seedProfile.stderr || seedSample.stderr || "").slice(0, 160));
+
+      const applied = psql(DB, ["-f", `${MIGRATION_DIR}/${WRITING_CONTEXTS}`]);
+      check(applied.status === 0, `${WRITING_CONTEXTS} applies over existing data`,
+        (applied.stderr || "").slice(0, 200));
+
+      const profile = psql(DB, ["-tAc",
+        "select profile_context || '|' || style_closeness || '|' || guidance || '|' || status || '|' || version from public.writing_profiles"]);
+      check((profile.stdout || "").trim() === "academic|70|legacy guidance|approved|3",
+        "0058: an existing profile becomes an ACADEMIC profile at closeness 70, with guidance, status and version intact",
+        `got ${JSON.stringify((profile.stdout || "").trim())}`);
+
+      const sample = psql(DB, ["-tAc",
+        "select profile_context || '|' || content || '|' || representativeness from public.writing_samples"]);
+      check((sample.stdout || "").trim() === "academic|legacy sample text|preferred",
+        "0058: an existing sample becomes an ACADEMIC sample, with its text and representativeness intact",
+        `got ${JSON.stringify((sample.stdout || "").trim())}`);
+
+      const noRowsLost = psql(DB, ["-tAc", "select (select count(*) from public.writing_profiles) || '/' || (select count(*) from public.writing_samples)"]);
+      check((noRowsLost.stdout || "").trim() === "1/1",
+        "0058: no writing profile and no sample is deleted or merged", `got ${JSON.stringify((noRowsLost.stdout || "").trim())}`);
+
+      const badContext = psql(DB, ["-c",
+        `insert into public.writing_profiles (user_id, profile_context) values ('${U}', 'poetic')`]);
+      check(badContext.status !== 0,
+        "0058: a context other than academic/casual/professional is refused by the database, not just the app");
+
+      const badCloseness = psql(DB, ["-c",
+        `insert into public.writing_profiles (user_id, style_closeness) values ('${U}', 101)`]);
+      check(badCloseness.status !== 0, "0058: a closeness value outside 0-100 is refused by the database");
+
+      const goodRow = psql(DB, ["-c",
+        `insert into public.writing_profiles (user_id, profile_context, style_closeness) values ('${U}', 'casual', 0)`]);
+      check(goodRow.status === 0, "0058: a casual profile at closeness 0 is accepted (the boundary is real)");
+
+      const indexes = psql(DB, ["-tAc",
+        "select count(*) from pg_indexes where indexname in ('writing_profiles_user_context_idx','writing_samples_user_context_idx')"]);
+      check((indexes.stdout || "").trim() === "2", "0058: both context indexes exist");
+
+      const rls = psql(DB, ["-tAc",
+        "select count(*) from pg_class where relname in ('writing_profiles','writing_samples') and relrowsecurity"]);
+      check((rls.stdout || "").trim() === "2", "0058: row level security is still on for both writing tables");
+
+      const policies = psql(DB, ["-tAc",
+        "select count(*) from pg_policies where tablename in ('writing_profiles','writing_samples') and cmd = 'ALL' and qual like '%auth.uid()%' and with_check like '%auth.uid()%'"]);
+      check((policies.stdout || "").trim() === "2",
+        "0058: both tables still only let a student reach their own rows (a policy was not widened)");
+
+      const again = psql(DB, ["-f", `${MIGRATION_DIR}/${WRITING_CONTEXTS}`]);
+      check(again.status === 0, "0058: re-running the migration is safe (idempotent)",
+        (again.stderr || "").slice(0, 200));
+    }
+  }
+
   // 2c. The NEWEST migration, whatever it is, against a row that predates it. When
   //     it is one of the two above, that scenario already covered it and a second run
   //     would only re-prove the same thing, so it is not re-run (and not claimed).
   if (!NEWEST) {
     check(false, "the newest migration is present");
-  } else if (NEWEST === M45 || NEWEST === PROVENANCE) {
+  } else if (NEWEST === M45 || NEWEST === PROVENANCE || NEWEST === WRITING_CONTEXTS) {
     console.log(`NOTE  ${NEWEST} is the newest migration and was checked against existing rows above.`);
   } else {
     runOverExistingRows(NEWEST);

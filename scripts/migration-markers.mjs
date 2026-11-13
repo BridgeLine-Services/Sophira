@@ -141,4 +141,10 @@ export const MARKERS = {
   // system. The probe asks for the table, not a column, so a half-applied
   // migration cannot pass.
   "0057_flashcard_decks.sql": "to_regclass('public.flashcard_decks') is not null",
+  // 0058: the two context columns that make separate academic/casual/professional
+  // profiles possible. The probe asks for the COLUMNS together with their value
+  // constraint, so a half-applied migration (columns added, constraint missing)
+  // cannot pass.
+  "0058_writing_profile_contexts.sql":
+    "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'writing_profiles' and column_name = 'profile_context') and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'writing_profiles' and column_name = 'style_closeness') and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'writing_samples' and column_name = 'profile_context') and exists (select 1 from pg_constraint where conname = 'writing_profiles_style_closeness_check')",
 };
