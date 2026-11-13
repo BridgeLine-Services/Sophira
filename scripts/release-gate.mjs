@@ -417,7 +417,7 @@ function runGate() {
   });
 }
 
-// db-migrations runs asynchronously — hoist it out of the sync registry
+// db-migrations runs asynchronously — hoisted out of the sync registry
 async function dbMigrations() {
   const url = env("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
   const key = env("SUPABASE_SERVICE_ROLE_KEY");
@@ -429,38 +429,26 @@ async function dbMigrations() {
     return;
   }
   try {
-    // Probe the NEWEST marker objects (the tail of the chain): a column
-    // select via the production REST API returns 200 only when the column
-    // exists in the live schema cache — exactly what burned production when
-    // 0035-0038 were silently skipped while the gate probed only 0034.
-    // Probing the tail proves the whole strictly-linear chain is applied.
-    const probes = [
-      { label: "typing_attempts.backspaces (0035)", path: "/rest/v1/typing_attempts?select=backspaces&limit=0" },
-      { label: "invitations.email_status (0036)", path: "/rest/v1/invitations?select=email_status&limit=0" },
-      { label: "notebooks.archived_at (0037)", path: "/rest/v1/notebooks?select=archived_at&limit=0" },
-      { label: "teachers.archived_at (0038)", path: "/rest/v1/teachers?select=archived_at&limit=0" },
-    ];
-    const failed = [];
-    for (const probe of probes) {
-      const res = await fetch(`${url.value.replace(/\/$/, "")}${probe.path}`, {
-        method: "GET",
-        headers: { apikey: key.value, Authorization: `Bearer ${key.value}` },
-        signal: AbortSignal.timeout(20000),
-      });
-      if (!res.ok) failed.push(`${probe.label}: HTTP ${res.status}`);
-    }
-    if (failed.length === 0) {
-      target.status = "PASS";
-      target.detail = "newest migration markers (0035-0038) verified in the LIVE production schema via REST — the strictly linear chain 0001-0038 is applied";
+    // The probe set is DERIVED from scripts/migration-markers.mjs, the single source
+    // of truth CI (apply-migrations.mjs) and the first-launch wizard already share,
+    // so the gate follows the chain end on its own. Before 2026-11-13 the list was
+    // hand-written at 0035-0038: it could answer PASS while migrations 0039-0056
+    // were missing, because the objects it asked for were no longer the newest ones.
+    // See scripts/migration-probes.mjs for what a PASS does and does not prove.
+    const { MARKERS } = await import("./migration-markers.mjs");
+    const { buildProbePlan, runMigrationProbes } = await import("./migration-probes.mjs");
+    const dir = path.join(process.cwd(), "supabase", "migrations");
+    const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+    const plan = buildProbePlan({ markers: MARKERS, migrationFiles: files });
+    if (plan.error) {
+      // Never PASS when the chain end itself cannot be proven.
+      target.status = "BLOCKED";
+      target.detail = plan.error;
       return;
     }
-    if (failed.length === probes.length) {
-      target.status = "FAIL";
-      target.detail = `production database rejected every migration probe (${failed.join("; ").slice(0, 150)}) — migrations may be missing`;
-    } else {
-      target.status = "FAIL";
-      target.detail = `live schema is missing the newest migrations (${failed.join("; ").slice(0, 150)}) — run the /setup repair to apply the missing tail`;
-    }
+    const outcome = await runMigrationProbes({ baseUrl: url.value, apiKey: key.value, plan });
+    target.status = outcome.status;
+    target.detail = outcome.detail;
   } catch (e) {
     target.status = "BLOCKED";
     target.detail = `could not reach the production database (${String(e).slice(0, 120)})`;
