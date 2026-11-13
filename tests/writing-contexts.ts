@@ -249,6 +249,22 @@ export async function runWritingContextTests(assert: Assert, section: (name: str
   assert(/WRITING_CONTEXTS\.map/.test(newSample),
     "screen: the picker offers the three contexts and nothing else");
 
+  const writingScreen = readFileSync("src/app/writing/page.tsx", "utf8");
+  assert(/WRITING_CONTEXTS\.map/.test(writingScreen) && /role="tab"/.test(writingScreen),
+    "screen: the writing page offers the three kinds of writing as tabs");
+  assert(/type="range"/.test(writingScreen) && /closenessLabel/.test(writingScreen) && /closenessExplanation/.test(writingScreen),
+    "screen: the closeness dial is a real control, labelled in words at both ends");
+  assert(/PATCH/.test(writingScreen) && /\/api\/writing\/profile/.test(writingScreen),
+    "screen: moving the dial saves through the profile API, not a direct database write");
+  assert(/onPointerUp=\{\(\) => void saveDial/.test(writingScreen) && /onBlur=\{\(\) => void saveDial/.test(writingScreen),
+    "screen: the setting is saved when the student lets go or leaves the control");
+  assert(/Your assignment and your teacher always win/.test(writingScreen),
+    "screen: the student is told the assignment and teacher outrank their preferences");
+  assert(/forContext\.map/.test(writingScreen),
+    "screen: the sample list shows only the chosen kind of writing");
+  assert(/changeSampleContext/.test(writingScreen),
+    "screen: a sample can be moved to another kind of writing without being deleted");
+
   const engine = readFileSync("src/lib/ai/academic-context.ts", "utf8");
   assert(/writingContext/.test(engine) && /closenessDirective/.test(engine) && /contextRegisterRules/.test(engine),
     "engine: the shared context service applies the context, the dial and the register rules");
