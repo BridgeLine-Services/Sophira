@@ -78,6 +78,31 @@ export interface FeatureInputs {
 
 const NOT_RECORDED = "Not recorded";
 
+/**
+ * The one order these states are listed in, everywhere. Exporting it (2026-11-13, Part 13)
+ * means a second page cannot invent its own sequence or its own words.
+ */
+export const FEATURE_STATE_ORDER: readonly FeatureState[] = [
+  "working",
+  "available",
+  "not-configured",
+  "problems",
+  "unavailable",
+  "not-implemented",
+];
+
+/** The chip/dot colour for a state. Kept beside the labels for the same reason. */
+export function stateTone(state: FeatureState): "success" | "accent" | "neutral" | "warn" | "danger" {
+  switch (state) {
+    case "working": return "success";
+    case "available": return "accent";
+    case "not-configured": return "neutral";
+    case "problems": return "warn";
+    case "unavailable": return "danger";
+    case "not-implemented": return "neutral";
+  }
+}
+
 export function stateLabel(state: FeatureState): string {
   switch (state) {
     case "working": return "Working";

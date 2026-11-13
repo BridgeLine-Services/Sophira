@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/Badge";
+import { stateLabel, stateTone } from "@/lib/owner/feature-catalog";
 import { Card, CardContent } from "@/components/ui/Card";
 import { requireOwnerPage } from "@/lib/owner/page-context";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
@@ -64,11 +65,19 @@ export default async function OwnerAiProvidersPage() {
           <CardContent className="divide-y divide-line p-0">
             {rows.map((row) => (
               <div key={row.key} className="flex items-start gap-3 p-4">
-                <span aria-hidden className={"mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " + (row.on ? "bg-success" : "bg-line")} />
+                {/* 2026-11-13 (Part 13): a configured provider is "Available, not verified here",
+                    never "working" - nothing on this page sent it a request. Same words as
+                    System Status and Feature Health. */}
+                <span
+                  aria-hidden
+                  className={"mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " + (row.on ? "bg-accent" : "bg-line")}
+                />
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
                     {row.label}
-                    <Badge>{row.on ? "working" : "not set up"}</Badge>
+                    <Badge tone={stateTone(row.on ? "available" : "not-configured")}>
+                      {stateLabel(row.on ? "available" : "not-configured")}
+                    </Badge>
                   </p>
                   <p className="mt-0.5 text-xs text-ink-soft">{row.detail}</p>
                 </div>
