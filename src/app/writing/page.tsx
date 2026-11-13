@@ -12,6 +12,18 @@ import { PenLine, RefreshCw } from "lucide-react";
 import { ProfileVersionHistory } from "@/components/app/ProfileVersionHistory";
 import type { WritingProfile, WritingSample } from "@/lib/types";
 import { guardedAiFetch } from "@/lib/ai/offline-guard";
+import {
+  closenessExplanation,
+  closenessLabel,
+  CONTEXT_DESCRIPTIONS,
+  CONTEXT_LABELS,
+  parseWritingContext,
+  WRITING_CONTEXTS,
+  type WritingContext,
+} from "@/lib/ai/writing-contexts";
+
+/** A profile row with the two columns migration 0058 added (2026-11-13, directive Part 5). */
+type ProfileRow = WritingProfile & { profile_context?: string | null; style_closeness?: number | null };
 
 const REPR_BADGE = {
   preferred: { tone: "success" as const, label: "Preferred" },
@@ -22,7 +34,12 @@ const REPR_BADGE = {
 export default function WritingPage() {
   const supabase = createClient();
   const { toast } = useToast();
-  const [profile, setProfile] = useState<WritingProfile | null>(null);
+  // THREE PROFILES, ONE PER KIND OF WRITING (directive Part 5). The student switches between
+  // them instead of one profile quietly governing every kind of writing they do.
+  const [context, setContext] = useState<WritingContext>("academic");
+  const [profiles, setProfiles] = useState<Partial<Record<WritingContext, ProfileRow>>>({});
+  const [dial, setDial] = useState(70);
+  const [savingDial, setSavingDial] = useState(false);
   const [samples, setSamples] = useState<WritingSample[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -30,14 +47,24 @@ export default function WritingPage() {
 
   const load = useCallback(() => {
     Promise.all([
-      supabase.from("writing_profiles").select("*").order("created_at", { ascending: false }).limit(1),
+      // Every profile, not just the newest: the newest row for one kind of writing has no
+      // business answering another.
+      supabase.from("writing_profiles").select("*").order("created_at", { ascending: false }),
       supabase.from("writing_samples").select("*").order("created_at", { ascending: false }),
     ]).then(([p, s]) => {
-      setProfile((p.data?.[0] as WritingProfile) ?? null);
+      const rows = (p.data ?? []) as ProfileRow[];
+      const grouped: Partial<Record<WritingContext, ProfileRow>> = {};
+      for (const row of rows) {
+        const key = parseWritingContext(row.profile_context);
+        if (!grouped[key]) grouped[key] = row;
+      }
+      setProfiles(grouped);
+      const current = grouped[context];
+      setDial(typeof current?.style_closeness === "number" ? current.style_closeness : 70);
       setSamples((s.data as WritingSample[]) ?? []);
       setLoaded(true);
     });
-  }, [supabase]);
+  }, [supabase, context]);
 
   useEffect(() => {
     load();
@@ -49,7 +76,8 @@ export default function WritingPage() {
       const res = await guardedAiFetch("/api/ai/analyze-writing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        // Scoped to the tab the student is on, so a casual note cannot reshape an essay.
+        body: JSON.stringify({ context }),
       });
       const json = await res.json();
       if (res.ok) {
@@ -63,6 +91,43 @@ export default function WritingPage() {
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  /**
+   * The closeness dial. This is the student's own preference, so it is saved directly -
+   * no approval step - and the number shown is always the value the server stored back.
+   */
+  async function saveDial(next: number) {
+    setSavingDial(true);
+    try {
+      const res = await fetch("/api/writing/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context, closeness: next }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast("error", json.error || "Your setting was not saved.");
+        return;
+      }
+      setDial(json.closeness);
+      setProfiles((prev) => ({ ...prev, [context]: { ...(prev[context] ?? ({} as ProfileRow)), style_closeness: json.closeness } }));
+    } catch {
+      toast("error", "Could not reach the server. Your setting was not saved.");
+    } finally {
+      setSavingDial(false);
+    }
+  }
+
+  /** Move a sample to another kind of writing. Reversible, one tap, nothing is deleted. */
+  async function changeSampleContext(id: string, next: string) {
+    const { error } = await supabase.from("writing_samples").update({ profile_context: next }).eq("id", id);
+    if (error) {
+      toast("error", "Could not move this sample. Nothing was changed.");
+      return;
+    }
+    setSamples((rows) => rows.map((x) => (x.id === id ? ({ ...x, profile_context: next } as WritingSample) : x)));
+    toast("success", "Moved to " + CONTEXT_LABELS[parseWritingContext(next)].toLowerCase() + ".");
   }
 
   async function changeRepr(id: string, repr: string) {
@@ -88,7 +153,10 @@ export default function WritingPage() {
     toast("success", "Sample deleted.");
   }
 
-  const usable = samples.filter((s) => s.representativeness !== "not_representative");
+  const profile = profiles[context] ?? null;
+  // Samples of the chosen kind, and of those the ones that may teach a style.
+  const forContext = samples.filter((s) => parseWritingContext((s as { profile_context?: string }).profile_context) === context);
+  const usable = forContext.filter((s) => s.representativeness !== "not_representative");
 
   return (
     <>
@@ -106,6 +174,30 @@ export default function WritingPage() {
       }
     >
       <div className="space-y-6">
+        {/* Which kind of writing. Three tabs, plain words, one choice at a time. */}
+        <div role="tablist" aria-label="Kind of writing" className="flex flex-wrap gap-2">
+          {WRITING_CONTEXTS.map((c) => {
+            const selected = c === context;
+            return (
+              <button
+                key={c}
+                role="tab"
+                aria-selected={selected}
+                type="button"
+                onClick={() => setContext(c)}
+                className={
+                  "rounded-lg border px-3 py-1.5 text-sm transition " +
+                  (selected ? "border-accent bg-accent/10 font-medium text-ink" : "border-line text-ink-soft hover:text-ink")
+                }
+              >
+                {CONTEXT_LABELS[c]}
+                {profiles[c]?.status === "approved" && <span aria-label="approved" className="ml-1.5">&#10003;</span>}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-sm text-ink-soft">{CONTEXT_DESCRIPTIONS[context]}</p>
+
         <ProposalsPanel targetType="writing" />
 
         {/* Profile card */}
@@ -149,14 +241,44 @@ export default function WritingPage() {
                 )}
               </Button>
               {usable.length === 0 && (
-                <p className="text-xs text-ink-soft">I need at least one sample marked preferred or neutral before I can analyze.</p>
+                <p className="text-xs text-ink-soft">
+                  I need at least one {CONTEXT_LABELS[context].toLowerCase()} sample marked preferred or neutral before I can analyze.
+                </p>
               )}
+
+              {/* How closely to follow this profile. 0 keeps it but does not apply it. */}
+              <div className="mt-2 rounded-lg border border-line p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label htmlFor="closeness" className="text-sm font-medium text-ink">
+                    How closely should Sophira follow your {CONTEXT_LABELS[context].toLowerCase()}?
+                  </label>
+                  <span className="text-sm text-ink-soft">{closenessLabel(dial)}{savingDial ? " · saving…" : ""}</span>
+                </div>
+                <input
+                  id="closeness"
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={dial}
+                  onChange={(e) => setDial(Number(e.target.value))}
+                  onPointerUp={() => void saveDial(dial)}
+                  onKeyUp={() => void saveDial(dial)}
+                  onBlur={() => void saveDial(dial)}
+                  className="mt-2 w-full"
+                  aria-describedby="closeness-help"
+                />
+                <p id="closeness-help" className="mt-1.5 text-xs text-ink-soft">{closenessExplanation(dial)}</p>
+                <p className="mt-1 text-xs text-ink-soft">
+                  Your assignment and your teacher always win over these preferences.
+                </p>
+              </div>
             </CardContent>
           </Card>
         ) : (
           <EmptyState
             icon={<PenLine className="h-6 w-6" />}
-            title="No writing profile yet"
+            title={`No ${CONTEXT_LABELS[context].toLowerCase()} profile yet`}
             description={'I won\u0027t guess your writing style. Add at least one writing sample marked "preferred" or "neutral", then analyze.'}
             action={<Link href="/writing/new"><Button size="sm">Add a writing sample</Button></Link>}
           />
@@ -164,16 +286,16 @@ export default function WritingPage() {
 
         {/* Samples */}
         <section>
-          <h2 className="mb-3 meta-strong">My writing samples</h2>
-          {samples.length === 0 ? (
+          <h2 className="mb-3 meta-strong">{CONTEXT_LABELS[context]} samples</h2>
+          {forContext.length === 0 ? (
             <EmptyState
               title="No samples yet"
-              description="Add essays, discussion posts, or any writing that sounds like you."
+              description={`Nothing here yet. Add ${CONTEXT_LABELS[context].toLowerCase()} that sounds like you, or move one of your other samples into this group.`}
               action={<Link href="/writing/new"><Button size="sm">Add your first sample</Button></Link>}
             />
           ) : (
             <div className="space-y-3">
-              {samples.map((s) => {
+              {forContext.map((s) => {
                 const b = REPR_BADGE[s.representativeness];
                 return (
                   <Card key={s.id}>
@@ -187,6 +309,7 @@ export default function WritingPage() {
                       </details>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         {s.genre && <Badge>{s.genre}</Badge>}
+                        <Badge tone="neutral">{CONTEXT_LABELS[parseWritingContext((s as { profile_context?: string }).profile_context)]}</Badge>
                         <Badge tone={b.tone}>{b.label}</Badge>
                         <div className="ml-auto flex items-center gap-2">
                           <Select
@@ -198,6 +321,16 @@ export default function WritingPage() {
                             <option value="preferred">Preferred</option>
                             <option value="neutral">Neutral</option>
                             <option value="not_representative">Not representative</option>
+                          </Select>
+                          <Select
+                            aria-label="Kind of writing"
+                            className="w-auto text-sm"
+                            value={parseWritingContext((s as { profile_context?: string }).profile_context)}
+                            onChange={(e) => void changeSampleContext(s.id, e.target.value)}
+                          >
+                            {WRITING_CONTEXTS.map((c) => (
+                              <option key={c} value={c}>{CONTEXT_LABELS[c]}</option>
+                            ))}
                           </Select>
                           <Button variant="ghost" size="sm" className="text-danger" onClick={() => setConfirmDelete(s.id)}>
                             Delete
