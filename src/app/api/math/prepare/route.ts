@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { subjectPromptContext } from "@/lib/courses/subject-context";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
+import { AI_NOT_CONFIGURED_MESSAGE } from "@/lib/ai/provider";
+import { loadAcademicContext, contextPrompt } from "@/lib/ai/academic-context";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -19,7 +21,7 @@ export async function POST(request: NextRequest) {
   if (!guard.ok) return guard.response;
 
   if (!aiConfigured()) {
-    return NextResponse.json({ error: "AI is not configured yet. An administrator needs to set the OPENAI_API_KEY environment variable." }, { status: 503 });
+    return NextResponse.json({ error: AI_NOT_CONFIGURED_MESSAGE }, { status: 503 });
   }
 
   let body: { topics?: string; exam_date?: string | null; material_ids?: string[]; course_id?: string | null; subject?: string | null } = {};
@@ -39,10 +41,17 @@ export async function POST(request: NextRequest) {
     const { data: course } = await supabase.from("courses").select("name, subject, academic_level").eq("id", body.course_id).single();
     if (course) courseContext = ` Course: ${course.name} (${course.subject ?? "math"}, ${course.academic_level ?? "unspecified level"}).`;
   }
-  // Subject workspace context: test preparation honors the selected subject.
-  if (!body.course_id) {
-    courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject, { courseId: body.course_id ?? null });
-  }
+  // Subject workspace context: test preparation honors the selected subject, and
+  // (Phase 2, 2026-11-13) the student's own academic context is collected whether
+  // or not a course is selected. Before this, choosing a course silently dropped
+  // the student's learning history at the moment the context was richest.
+  courseContext += await subjectPromptContext(supabase, guard.data.user.id, body.subject, { courseId: body.course_id ?? null });
+  const academic = await loadAcademicContext(supabase, guard.data.user.id, {
+    mode: "math-prepare",
+    subject: body.subject ?? null,
+    courseId: body.course_id ?? null,
+  });
+  courseContext += contextPrompt(academic);
 
   try {
     const raw = await aiChat([

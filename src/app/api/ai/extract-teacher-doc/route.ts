@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { AiNotConfiguredError, aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
+import { AI_NOT_CONFIGURED_MESSAGE } from "@/lib/ai/provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   if (!aiConfigured()) {
     return NextResponse.json(
-      { error: "AI is not configured yet. An administrator needs to set the OPENAI_API_KEY environment variable. Your document text is preserved on this screen." },
+      { error: AI_NOT_CONFIGURED_MESSAGE + " Your document text is preserved on this screen." },
       { status: 503 }
     );
   }
