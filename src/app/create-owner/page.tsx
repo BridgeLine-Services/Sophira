@@ -164,7 +164,7 @@ export default function CreateOwnerPage() {
           );
         } else if (classified.kind === "invitation_required") {
           setError(
-            "The database rejected this registration (invitation-only). An owner account may have just been created by someone else, or this database needs the first-owner bootstrap migration (0025) - see the setup diagnostics."
+            "This system has already been set up, so it only accepts people who were invited. If the owner account already exists, sign in instead. If it does not, use Repair setup below and try again."
           );
         } else {
           setError(classified.userMessage);

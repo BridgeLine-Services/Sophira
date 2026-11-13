@@ -686,3 +686,51 @@ five memory scopes stay separate end to end instead of collapsing to subject/cou
 | API contract changes | additive only: five routes now accept optional `teacher_id` / `assignment_id` |
 | Verification | suite **8093/8093**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 82 routes, secret scan CLEAN |
 | Outstanding | nothing functional. Whether the model USES the context well cannot be verified without a live AI provider |
+
+---
+
+## 12. Part 12 completed: an audit of every student screen, not just the new ones
+
+Part 12 says technical implementation details must never reach a student. Until now that was
+"applied to everything new", which proves only that the newest screens were clean. It also could
+not see the problem, because the text a student reads is buried inside TSX.
+
+`scripts/jargon-audit.mjs` now extracts the text a student can actually see - JSX text nodes and
+the string props that render - from every screen under `src/app`, excluding staff screens
+(`/owner`, `/co-owner`, `/tester`, `/setup`, `/admin`) where technical wording belongs. Comments
+are stripped, so an engineer naming an internal in a comment is not counted.
+
+**Result: 6 findings, all real, all fixed.**
+
+| Screen | Was | Now |
+|---|---|---|
+| First-owner page | "this database needs the first-owner bootstrap migration (0025)" | "This system has already been set up... use Repair setup below and try again" |
+| Signup | "check that email confirmation is turned off in their Supabase settings" | "ask the person who invited you to send you a new link" |
+| Settings export button | "Download my data (JSON)" | "Download all my data" |
+| Settings export text | "...as a single JSON file" | "...as a single data file you can keep or open later" |
+| Local mode | "no OpenAI, no Gemini, no API key" | "No paid AI service is being used, and nothing is charged to you" |
+| Local mode | "until Supabase is connected" | "until Sophira is connected to its online service" |
+
+### 12.1 The scanner is tested before its verdict is trusted
+
+A clean report from a broken scanner is worse than no scanner. `--selftest` proves it extracts
+real screen text, ignores a comment that names an internal, still flags a genuine leak, and reads
+visible prop strings. `tests/jargon.ts` runs that self-test first and only then asserts zero
+findings, so a vacuous pass is impossible.
+
+Three existing tests pinned the OLD wording. They were updated to the new wording with their
+intent preserved, and one gained a stronger pin: the export button must not name a file format.
+
+### 12.2 Change record
+
+| | |
+|---|---|
+| Change | Part 12 complete: a plain-language audit across all 82 student screens, with the scanner and its test |
+| Phase | 4 (Part 12 completion) |
+| Reason | Directive Part 12: no technical details in student-facing language, across the whole app |
+| Existing behaviour preserved | Wording only. No route, control, permission or data changed; the export still works, local mode still explains itself, signup still explains invitations. Test intent preserved, two pins made stronger |
+| Files modified | `scripts/jargon-audit.mjs` (new), `tests/jargon.ts` (new), `tests/run.ts`, `src/app/create-owner/page.tsx`, `src/app/signup/page.tsx`, `src/app/settings/page.tsx`, `src/app/local/page.tsx`, `tests/local-first.ts`, `tests/account-export.ts` |
+| Database changes | none |
+| API contract changes | none |
+| Verification | suite **8106/8106**, tsc clean, lint 0 errors / 33 warnings, build OK, design-drift 0, a11y PASS, contrast PASS both themes, conformance 82 routes, secret scan CLEAN, audit 0 findings |
+| Outstanding | anything rendered only behind sign-in is still unverified in a browser; the audit covers the source text, which is what a student sees for those screens too |

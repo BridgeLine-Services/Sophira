@@ -82,8 +82,12 @@ export function runAccountExportTests(assert: (c: boolean, n: string) => void, s
 
   // UI: Settings offers the download, reports failures honestly, no fake success
   const settings = readFileSync("src/app/settings/page.tsx", "utf8");
-  assert(settings.includes("/api/account/export") && settings.includes("Download my data"),
-    "export: the Settings page offers 'Download my data (JSON)' backed by the export route");
+  // 2026-11-13 (Part 12): the button names the human action ("Download all my data"), not the
+  // file format. What this pin protects is unchanged: a real download control wired to the route.
+  assert(settings.includes("/api/account/export") && settings.includes("Download all my data"),
+    "export: the Settings page offers a download control backed by the export route");
+  assert(!/Download my data \(JSON\)/.test(settings),
+    "export: the button does not name a file format at a student");
   assert(settings.includes("Could not prepare the export") || settings.includes("Could not reach the server"),
     "export: export failures surface an honest error message in the UI");
   assert(settings.includes("Could not reach the server"),

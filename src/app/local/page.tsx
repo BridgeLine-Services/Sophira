@@ -17,11 +17,11 @@ export default function LocalTestPage() {
         <CardHeader><CardTitle className="flex items-center gap-2"><Cpu className="h-4 w-4" /> What this mode means</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm text-ink-soft">
           <p>1. Sophira is running on this device.</p>
-          <p>2. No paid AI is being used — no OpenAI, no Gemini, no API key.</p>
+          <p>2. No paid AI service is being used, and nothing is charged to you.</p>
           <p>3. You can download a local AI model (you choose which — never automatic).</p>
           <p>4. The model stays on this device. Your prompts are not sent to any server.</p>
           <p>5. After the model is downloaded, basic AI tasks run without internet.</p>
-          <p>6. Cloud features are unavailable until Supabase is connected — accounts, invitations, and sync do not work in this mode.</p>
+          <p>6. Account features are unavailable until Sophira is connected to its online service — accounts, invitations, and syncing do not work in this mode.</p>
           <p>7. Online research and remote AI are unavailable in this mode.</p>
         </CardContent>
       </Card>
