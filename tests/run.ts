@@ -4782,14 +4782,31 @@ async function runPdfFragilityPins(): Promise<void> {
 }
 
 async function runOfflineEvalTests(): Promise<void> {
-  const { runOfflineEvals, validateCorpus } = await import("./ai-evals/runner");
+  const { runOfflineEvals, validateCorpus, categoryReport } = await import("./ai-evals/runner");
+  const { EVAL_CATEGORIES } = await import("./ai-evals/categories");
   const problems = validateCorpus();
   assert(problems.length === 0, `evals: corpus is well-formed (${problems.join("; ")})`);
   const results = runOfflineEvals();
   const failed = results.filter((r: { status: string }) => r.status === "fail");
   assert(failed.length === 0, `evals: every deterministic case passes (${failed.map((f: { id: string; detail: string }) => f.id + ":" + f.detail).join("; ")})`);
   const skipped = results.filter((r: { status: string }) => r.status === "skipped");
-  assert(results.length >= 20, "evals: the corpus covers the required categories");
+  assert(results.length >= 20, "evals: the corpus is large enough to be meaningful");
+
+  // 2026-11-13 (Part 7): fifteen CATEGORIES, not a case count. Every one carries at least
+  // one case, and the per-area report can never present a skipped case as coverage.
+  assert(EVAL_CATEGORIES.length === 15, `evals: exactly fifteen categories (${EVAL_CATEGORIES.length})`);
+  const report = categoryReport(results);
+  assert(report.length === 15 && report.every((c: { cases: number }) => c.cases > 0),
+    "evals: every category carries at least one case");
+  assert(report.every((c: { verdict: string }) => c.verdict.length > 10 && !/100%|all good/i.test(c.verdict)),
+    "evals: each category explains its own state in plain words, with no blanket assurance");
+  const offlineChecked = report.filter((c: { pass: number }) => c.pass > 0);
+  assert(offlineChecked.length >= 3,
+    `evals: at least three areas are judged here without a model (${offlineChecked.map((c: { id: string }) => c.id).join(", ")})`);
+  const modelOnly = report.filter((c: { needsModel: boolean }) => c.needsModel);
+  assert(modelOnly.every((c: { skipped: number; pass: number }) => c.skipped === c.pass + c.skipped),
+    "evals: a model-only area reports its cases as skipped, never as checked");
+  assert(report.every((c: { fail: number }) => c.fail === 0), "evals: no category has a failing case");
   // Honesty: a skipped case is never reported as a pass.
   assert(skipped.every((r: { detail: string }) => r.detail.includes("not run offline")),
     "evals: live-model cases are marked skipped, never passed");
