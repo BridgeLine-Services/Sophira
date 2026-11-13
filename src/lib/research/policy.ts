@@ -184,12 +184,21 @@ export function evaluateInformationRequest(text: string): RequestDecision {
   const t = (text || "").toLowerCase();
   if (!t.trim()) return { blocked: false, code: "empty", message: "" };
 
+  // 2026-11-13 (directive Part 7): the corpus found two rephrasings that slipped through.
+  //   - "Find the SIPR-only network documentation for the operation." The marker was written
+  //     as "sipr-only" and the noun as "documentation", and neither matched.
+  //   - "How do I bypass the paywall on that journal?" Getting around an access control on
+  //     published work is the same boundary as getting around a clearance; the honest answer
+  //     is the library, interlibrary loan, or an open-access copy.
+  // Widening these only ever REFUSES more carefully-worded requests for material Sophira
+  // does not obtain - no ordinary academic question is affected (pinned by ACADEMIC-20,
+  // GOV-PUBLIC-19 and the new ALLOW cases).
   const bypassIntent =
-    /\b(bypass|get around|circumvent|break into|get past)\b[^.?!]{0,40}\b(clearance|access control|login|password|permission|classification)\b/.test(t) ||
+    /\b(bypass|get around|circumvent|break into|get past)\b[^.?!]{0,40}\b(clearance|access control|login|password|permission|classification|paywall|subscription|sso|mfa)\b/.test(t) ||
     /\b(leak|exfiltrate|dump)\b[^.?!]{0,30}\b(classified|restricted|secret)\b/.test(t);
   const restrictedIntent =
-    /\b(classified|top secret|secret|restricted|confidential|controlled unclassified|cui|noforn|no-foreign|noforeign|not-releasable|sipr|jwics)\b[^.?!]{0,40}\b(document|documents|report|reports|file|files|database|material|briefing|cable|cables|annex|annexes|annexure)\b/.test(t) ||
-    /\b(document|documents|report|file|database|material)\b[^.?!]{0,25}\b(classified|top secret|restricted|confidential)\b/.test(t);
+    /\b(classified|top secret|secret|restricted|confidential|controlled unclassified|cui|noforn|no-foreign|noforeign|not-releasable|sipr(?:[-\s]?only)?|jwics)\b[^.?!]{0,40}\b(document|documents|documentation|report|reports|file|files|database|material|briefing|cable|cables|annex|annexes|annexure|network|networks|records)\b/.test(t) ||
+    /\b(document|documents|documentation|report|file|database|material|network|records)\b[^.?!]{0,25}\b(classified|top secret|restricted|confidential)\b/.test(t);
 
   if (bypassIntent) {
     return {
