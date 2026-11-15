@@ -10,6 +10,7 @@
 import "./helpers/alias"; // must be first: maps "@/..." for the compiled suites
 import { runProviderKeyOptimizationTests } from "./provider-key-optimization";
 import { runAutonomousAssignmentTests } from "./autonomous-assignment";
+import { runAutonomousSurfaceTests } from "./autonomous-surface";
 import { hostIs, mentionsHost, schemeIs } from "./helpers/url";
 import { composeAcademicContext, findSourceConflicts, activeDocs, wrapUntrusted, detectInjectionAttempt } from "../src/lib/ai/context";
 import { routeSubject, routeMathTopic } from "../src/lib/ai/subjects";
@@ -5579,5 +5580,6 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     await runOwnerStatusVocabularyTests(assert, section);
     // 2026-11-15: the autonomous assignment mode, its governance and its zero-regression pins.
     runAutonomousAssignmentTests(assert, section);
+    runAutonomousSurfaceTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

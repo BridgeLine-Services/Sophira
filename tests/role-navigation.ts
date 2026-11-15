@@ -158,8 +158,10 @@ export function runRoleNavigationTests(
     const sectionOrder = WORKSPACE_SECTIONS.map((i) => i.href);
     // 2026-11-13: Flashcards joins the menu directly after Notebooks, because a deck is made FROM
     // a notebook. The existing order is otherwise unchanged; Settings is still last.
-    assert(sectionOrder.join("|") === ["/dashboard", "/writing/typing", "/courses", "/notebooks", "/flashcards", "/lectures", "/learning", "/notifications", "/offline", "/settings"].join("|"),
-      "role-nav: the academic order is Home, Typing Calibration, Courses, Notebooks, Flashcards, Lectures, Learning / Memory, Notifications, Offline, Settings");
+    // 2026-11-15: Assignment runs joins directly after Typing Calibration; both are writing tools and
+    // the runs screen is reached from the writing workspace. Nothing else moved.
+    assert(sectionOrder.join("|") === ["/dashboard", "/writing/typing", "/writing/autonomous", "/courses", "/notebooks", "/flashcards", "/lectures", "/learning", "/notifications", "/offline", "/settings"].join("|"),
+      "role-nav: the academic order is Home, Typing Calibration, Assignment runs, Courses, Notebooks, Flashcards, Lectures, Learning / Memory, Notifications, Offline, Settings");
     assert(WORKSPACE_SECTIONS.filter((i) => i.href === "/dashboard").length === 1,
       "role-nav: Home appears exactly once (no duplicated destination)");
   }

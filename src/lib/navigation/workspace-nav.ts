@@ -26,6 +26,7 @@ import {
   Layers,
   NotebookPen,
   Settings,
+  ListChecks,
 } from "lucide-react";
 import type { Role } from "../roles";
 import { dashboardForRole } from "./role-home";
@@ -45,6 +46,8 @@ export interface WorkspaceNavItem {
 export const WORKSPACE_SECTIONS: WorkspaceNavItem[] = [
   { href: "/dashboard", label: "Home", icon: Home, kind: "home" },
   { href: "/writing/typing", label: "Typing Calibration", icon: Keyboard, kind: "section" },
+  // Assignment runs (2026-11-15, Part 4/7): the screen that drives the autonomous runner.
+  { href: "/writing/autonomous", label: "Assignment runs", icon: ListChecks, kind: "section" },
   { href: "/courses", label: "Courses", icon: BookOpen, kind: "section" },
   { href: "/notebooks", label: "Notebooks", icon: NotebookPen, kind: "section" },
   // Flashcards (2026-11-13, Part 6): the decks a student actually studies.
