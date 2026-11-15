@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Spinner, useToast } from "@/components/ui";
 import type { SourceSummary } from "@/lib/research/source-intelligence";
 import { SourceTypeLabel } from "@/components/app/SourceTypeLabel";
+import { DocumentUpload } from "@/components/app/DocumentUpload";
 import { Search, ExternalLink, CheckCircle2, XCircle, ShieldAlert, BookOpenCheck, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 
 interface SourceRow {
@@ -275,6 +276,8 @@ export function ResearchPanel({
   const approved = data?.sources.filter((s) => s.approval === "approved" && (s.verification_status === "verified" || s.verification_status === "partially_verified")) ?? [];
 
   return (
+    <div className="space-y-4">
+    <DocumentUpload projectId={projectId} onAdded={() => projectId && void load(projectId)} />
     <Card>
       <CardHeader>
         <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen((o) => !o)}>
@@ -498,5 +501,6 @@ export function ResearchPanel({
         </CardContent>
       )}
     </Card>
+    </div>
   );
 }

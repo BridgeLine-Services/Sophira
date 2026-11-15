@@ -1228,21 +1228,26 @@ fixtures would fail. 80 new assertions across extraction, the six statuses, esca
 paragraph handling, the size cap, plain-language messages, the route's honesty rules, and the
 instruction-injection case.
 
-`npm test` 8842/8842, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings,
+`npm test` 8854/8854, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings,
 `npm run build` OK, `npm run verify` PASS, `npm run scan:secrets` CLEAN, accessibility PASS
 (188 files), plain-language audit 0 findings, design-drift 0, inventory regenerated
 (82 pages, 111 API routes).
 
-### 19.5 What Part 9 still needs, and why it cannot be finished from here
+### 19.5 The screen, in the same round
 
-- **A screen to add a file.** The endpoint is complete and tested; the research panel needs an
-  "Add a document" control wired to it. That is UI work with its own accessibility review.
+`src/components/app/DocumentUpload.tsx` is now mounted on the research panel, so the endpoint is
+reachable by a student: choose a file, and the answer says plainly what happened. It keeps the
+same honesty rules the endpoint does - what the student reads is the server's own sentence, and a
+file with no words says plainly that nothing was added.
+
+### 19.6 What Part 9 still needs, and why it cannot be finished from here
+
 - **OCR for scans** and **transcription for recordings** need a service decision by the owner.
   Both are recognised, named and refused honestly until one exists.
 - Document text is not yet fed into claim extraction (the step that turns prose into citable
   claims); it is stored as evidence and visible, which is what makes it quotable.
 
-### 19.6 Rollback
+### 19.7 Rollback
 
 Revert the commit. The route disappears, the library stops being reachable, and rows already
 stored as `source_type = "document"` remain readable by existing code as ordinary sources.

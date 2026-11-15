@@ -257,6 +257,27 @@ export async function runDocumentTests(assert: Assert, section: (name: string) =
   assert(!/text: extraction\.text/.test(route), "route: the whole document is not echoed back to the browser");
   assert(/preview: extraction\.text\.slice\(0, 600\)/.test(route), "route: only a short preview is returned");
 
+
+  section("documents: the screen that adds a file (Parts 9, 11)");
+
+  const upload = readFileSync("src/components/app/DocumentUpload.tsx", "utf8");
+  assert(/fetch\("\/api\/research\/documents"/.test(upload), "screen: the control calls the document endpoint");
+  assert(/MAX_BYTES = 12 \* 1024 \* 1024/.test(upload) && /larger than 12 MB/.test(upload), "screen: an oversized file is refused before it is uploaded, in plain words");
+  assert(/accept="\.pdf,\.docx/.test(upload), "screen: the picker offers PDF and Word, the formats that are actually read");
+  assert(/result\.message/.test(upload), "screen: what the student reads is the server's honest sentence, not a green tick of its own");
+  assert(
+    /Nothing from this file was added as a source, because there are no words in it to quote/.test(upload),
+    "screen: an unreadable file says plainly that nothing was added",
+  );
+  assert(/<details/.test(upload), "screen: the preview sits behind a disclosure, so the document is not dumped onto the page");
+  assert(/sr-only/.test(upload) && /ref=\{inputRef\}/.test(upload), "screen: one real button and a hidden input, so there is a single accessible control");
+  assert(/id="research-document"/.test(upload), "screen: the file input has an id, so its button can be labelled by association");
+  assert(!/innerHTML|dangerouslySetInnerHTML/.test(upload), "screen: extracted text is rendered as text, never as markup");
+
+  const panelWithUpload = readFileSync("src/components/app/ResearchPanel.tsx", "utf8");
+  assert(/<DocumentUpload projectId=\{projectId\}/.test(panelWithUpload), "screen: the control is mounted on the research panel");
+  assert(/onAdded=\{\(\）|onAdded=\{/.test(panelWithUpload), "screen: the panel reloads its sources after a document is added");
+
   const scanResult = scanPdf(buildPdfShowText("Read me.", { withImage: true }));
   assert(scanResult.streams === 2 && scanResult.decodedStreams >= 1, "pdf: every stream is accounted for, so a partial read can be reported");
   assert(!scanResult.imageOnly, "pdf: a PDF with both text and an image is not mistaken for a scan");
