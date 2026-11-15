@@ -1165,3 +1165,84 @@ plain-language audit 0 findings, design-drift 0.
 
 Revert the commit. No data migration to undo. Rows already written keep their extra JSON key,
 which older code ignores; no reader depends on it.
+
+## 19. Round of 2026-11-15 (third): a student's own documents join the research (Part 9)
+
+Part 9 is the largest item that had not been started. The research pipeline only ever saw web
+pages: `fetchAndVerify` takes a URL, and nothing else could enter. A student whose assignment
+rests on a PDF handout, their own draft, or a recorded lecture had no path in at all.
+
+### 19.1 What was built
+
+`src/lib/research/documents.ts` reads files with **no new dependency and no new service**:
+
+- **PDF** - finds each content stream, decodes it when it is Flate-compressed, and reads the
+  text-showing operators (`Tj`, `'`, `"`, and `TJ` arrays), including PDF string escapes
+  (`\(`, `\\`, octal) and hex strings. The stated page count is read when the file gives one.
+- **DOCX** - a zip reader written against the format (central directory, local headers,
+  deflate), then `word/document.xml`, with paragraphs as lines, plus title and author from the
+  file's own `docProps/core.xml` properties.
+- **HTML, RTF, plain text, Markdown** - extracted with scripts and styles excluded.
+- One whitespace convention everywhere, and a character cap so a huge file cannot exhaust
+  memory.
+
+`POST /api/research/documents` takes a file from a signed-in student, extracts it, classifies it
+with the Part 5 engine, and - when a project is named - stores it as a source with
+`source_type = "document"`. It then appears in the research panel with the same Part 11 labels,
+can be cited, and is audited by the same code that audits a web page. No migration: every column
+used already existed.
+
+### 19.2 The rule this round is built around
+
+**A file Sophira cannot read is reported, not faked.** Six statuses, each a true statement:
+
+| Status | Meaning |
+|---|---|
+| `extracted` | words were read and can be quoted |
+| `empty` | the file was read and genuinely contains no text |
+| `needs_ocr` | pixels with no text layer (a scan, a photo, a screenshot) |
+| `needs_transcription` | a recording with no text at all |
+| `unsupported` | a format Sophira does not read (an old .doc, an encrypted PDF) |
+| `corrupt` | the right format, unreadable bytes |
+
+A scan is never reported as "no content", and no text is ever invented for one: a wrongly
+guessed word in a quotation is worse than no quotation. OCR and transcription are named as what
+is needed, and are **not** wired - there is no OCR engine or speech service in this installation,
+and pretending otherwise would put a fabricated quotation in a student's bibliography.
+
+Two further honesty rules: only a file whose words were actually read becomes a source (an
+unreadable file would otherwise sit in the project looking like a dead link), and the route
+returns a 600-character preview rather than echoing the document back to the browser.
+
+### 19.3 An uploaded file is data, never instruction
+
+Text inside a document is quoted content. A sentence in a PDF saying "ignore all previous
+instructions" is preserved so a student can see it and so it can be labelled - it is not
+removed, and it is not obeyed. A test pins that.
+
+### 19.4 Verification
+
+Files in the test suite are built byte by byte from each format's own rules - a real
+Flate-compressed PDF stream, a real zip container for Word - so a parser that only works on tidy
+fixtures would fail. 80 new assertions across extraction, the six statuses, escapes, hex strings,
+paragraph handling, the size cap, plain-language messages, the route's honesty rules, and the
+instruction-injection case.
+
+`npm test` 8842/8842, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings,
+`npm run build` OK, `npm run verify` PASS, `npm run scan:secrets` CLEAN, accessibility PASS
+(188 files), plain-language audit 0 findings, design-drift 0, inventory regenerated
+(82 pages, 111 API routes).
+
+### 19.5 What Part 9 still needs, and why it cannot be finished from here
+
+- **A screen to add a file.** The endpoint is complete and tested; the research panel needs an
+  "Add a document" control wired to it. That is UI work with its own accessibility review.
+- **OCR for scans** and **transcription for recordings** need a service decision by the owner.
+  Both are recognised, named and refused honestly until one exists.
+- Document text is not yet fed into claim extraction (the step that turns prose into citable
+  claims); it is stored as evidence and visible, which is what makes it quotable.
+
+### 19.6 Rollback
+
+Revert the commit. The route disappears, the library stops being reachable, and rows already
+stored as `source_type = "document"` remain readable by existing code as ordinary sources.
