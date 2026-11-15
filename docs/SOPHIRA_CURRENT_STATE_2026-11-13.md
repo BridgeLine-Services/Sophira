@@ -1312,3 +1312,62 @@ bibliography in all four styles, the stored-copy re-check in both directions, th
 `npm test` 8911/8911, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings,
 `npm run build` OK, `npm run verify` PASS, `npm run scan:secrets` CLEAN, accessibility PASS
 (193 files), plain-language audit 0 findings, design-drift 0.
+
+---
+
+## §21. Provider-key optimisation: local-first file processing (2026-11-15)
+
+The owner's directive was not "add OCR and transcription" but "do it without another key,
+another subscription or a fake". Three questions decided the shape of the work: what the
+existing architecture already did, what the current hosting can actually run, and what the
+student must be told when the answer is no.
+
+### 21.1 What was found before anything changed
+
+- Extraction already handled text PDFs (two parsers, fallback, page map), Word, HTML, RTF,
+  text and Markdown. Scanned PDFs produced an honest `needs_ocr` with no text.
+- A Tesseract client (`src/lib/extract/ocr.ts`) and a Whisper client
+  (`src/lib/media/transcribe.ts`) already existed for the owner's OWN services, wired into
+  the image path only. There was no key to add and no vendor to buy.
+- The blocker was never the key: it was that the PDF path had no page route, and the
+  capability was described in no single place.
+
+### 21.2 What was built
+
+- **Scans:** `src/lib/extract/pdf-ocr.ts` + the `POST /ocr/pdf` contract. Only pages with no
+  text layer are sent; page numbers come from the parser's page map; a page that is not
+  returned stays blank and reported; a failed attempt never overwrites extracted text. An
+  ordinary text PDF makes no call at all.
+- **Recordings:** the format gate moved ahead of the upload (a container the engine cannot
+  decode is refused before any bytes leave the server), a 25 MB ceiling with a plain
+  sentence, and the engine's own certainty (`avg_logprob`, `no_speech_prob`) is used when it
+  reports one and never invented when it does not.
+- **A model pass over the student's own file:** `src/lib/extract/analysis.ts` +
+  `POST /api/extract/analyze`, reusing `aiChat`, the existing provider plan and the shared
+  academic context. Every quotation is checked against the extracted text and removed if it
+  is not there; page numbers are attached only from the page map. The extracted text is
+  returned even when the model fails.
+- **One capability vocabulary:** `src/lib/capabilities/file-capabilities.ts`, seven states,
+  `available` only when something answered, published in `/api/health` (states only) and
+  rendered on Owner > AI Providers through the EXISTING Part 13 owner vocabulary.
+- **One reader:** `src/lib/extract/read.ts`, so the analysis route and the upload route share
+  one extraction instead of drifting apart.
+
+### 21.3 Hosting reality, stated rather than worked around
+
+Tesseract and Whisper are native binaries and cannot run inside a Vercel serverless request
+timeout. That is reported as `unsupported_by_hosting` (a permanent state, not a missing
+setting), while the same capabilities through the owner's separate inference server are
+`requires_installation` until a probe answers. Nothing in the product pretends otherwise.
+
+### 21.4 Verification
+
+`tests/provider-key-optimization.ts`, 78 assertions: the seven states and their mapping,
+scanned-page selection and merge, a text PDF making zero scan calls, a reader without the PDF
+route, engine-reported certainty, unsupported and oversized recordings refused before upload,
+silence as a failure, quotation verification against the page text, `ai_not_configured` /
+`ai_failed` / `bad_output` / no_text, research intake accepting a scan only when it was read,
+and the analysis route's auth, ordering, retention and no-logging pins.
+
+Suite 9017/9017, tsc clean, lint 0 errors / 33 warnings, build OK, verify PASS, secret scan
+CLEAN, plain-language audit 0 findings, design-drift 0, inventory 82 pages / 112 API routes.
