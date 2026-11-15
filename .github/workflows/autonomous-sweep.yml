@@ -1,0 +1,60 @@
+# AUTONOMOUS ASSIGNMENT SWEEP (directive 2026-11-15, Part 4.4)
+#
+# A run advances one bounded step per call. Without something calling this on a schedule, a run
+# only moves while a Sophira page is open — which is what the student's screen says. This
+# workflow is that "something": GitHub calls the app's own sweep endpoint every 15 minutes.
+#
+# It is safe to leave in place with the feature switched off, and it says nothing when the
+# password has not been added yet:
+#   - no CRON_SECRET repository secret  -> the job exits before making any request
+#   - SOPHIRA_AUTONOMOUS_ESSAY not "1"  -> the app replies "switched off" and advances nothing
+#   - no runs are due                    -> the app advances nothing and returns an empty list
+#
+# The secret is read from the repository's own secrets store and is never echoed, so it cannot
+# appear in a log or in this file.
+
+name: Autonomous assignment sweep
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: autonomous-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Advance any runs that are due
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.SOPHIRA_APP_URL || 'https://sophira.vercel.app' }}
+        run: |
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "No scheduled worker is configured for this repository (CRON_SECRET is not set)."
+            echo "Runs advance only while a Sophira page is open, and the student's screen says so."
+            exit 0
+          fi
+          code=$(curl --silent --show-error --output /tmp/sweep.json --write-out '%{http_code}' \
+            --max-time 60 \
+            -X POST "${APP_URL%/}/api/essay/autonomous/tick" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --data '{}') || code="000"
+          echo "HTTP ${code}"
+          # The body never contains the secret; it is the app's own summary of what it did.
+          head -c 2000 /tmp/sweep.json || true
+          echo
+          case "${code}" in
+            200) exit 0 ;;
+            401|402|403|404) echo "The sweep endpoint refused this call (HTTP ${code}). Nothing was advanced."; exit 0 ;;
+            000) echo "The app could not be reached. Nothing was advanced; the runs are stored and will resume."; exit 0 ;;
+            *) echo "The sweep returned HTTP ${code}. Nothing is assumed to have advanced."; exit 0 ;;
+          esac

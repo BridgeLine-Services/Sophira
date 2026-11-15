@@ -81,4 +81,32 @@ export function runAutonomousSurfaceTests(assert: (cond: boolean, msg: string) =
     assert(!new RegExp(`\\b${jargon}\\b`).test(copy),
       `surface: the panel never says "${jargon}" to a student`);
   }
+
+  section("autonomous runs: something can advance a run with no page open");
+
+  const sweepPath = ".github/workflows/autonomous-sweep.yml";
+  assert(existsSync(sweepPath), "sweep: a scheduled job exists, so a run can advance with nobody at the keyboard");
+  const sweep = readFileSync(sweepPath, "utf8");
+  assert(/cron:\s*"\*\/15 \* \* \* \*"/.test(sweep), "sweep: it runs every fifteen minutes");
+  assert(sweep.includes("workflow_dispatch"), "sweep: the owner can also run it by hand");
+  assert(sweep.includes("contents: read"), "sweep: the job can write nothing in the repository");
+  assert(sweep.includes("secrets.CRON_SECRET") && !/echo\s+["']?\$\{?CRON_SECRET/.test(sweep),
+    "sweep: the password comes from the repository's secrets and is never printed");
+  assert(!sweep.includes("set -x"), "sweep: shell tracing stays off, so the password cannot leak into a log");
+  assert(sweep.includes("/api/essay/autonomous/tick") && sweep.includes('Authorization: Bearer'),
+    "sweep: it calls the app's own sweep endpoint with the password the endpoint requires");
+  assert(sweep.includes("Nothing was advanced") || sweep.includes("nothing is assumed"),
+    "sweep: a refusal or an unreachable app is reported as no progress, not as success");
+  assert(existsSync("src/app/api/essay/autonomous/tick/route.ts"),
+    "sweep: the endpoint it calls exists in this application");
+
+  // A sentence that says "a scheduled job advances this" must be backed by a configured job.
+  const manifest = readFileSync("src/config/env.manifest.json", "utf8");
+  const envDoc = readFileSync("docs/ENVIRONMENT_VARIABLES.md", "utf8");
+  for (const name of ["SOPHIRA_AUTONOMOUS_ESSAY", "SOPHIRA_AUTONOMOUS_SCHEDULE", "CRON_SECRET"]) {
+    assert(manifest.includes(name) && envDoc.includes(name),
+      `sweep: ${name} is in the variable manifest and the owner's variable guide`);
+  }
+  assert(envDoc.includes("set both or neither"),
+    "sweep: the guide warns that the schedule sentence is only true when the sweep is set up too");
 }
