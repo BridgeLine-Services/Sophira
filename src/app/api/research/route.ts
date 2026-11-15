@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
   const { data: queries } = await supabase.from("research_queries")
     .select("id, query, status, created_at").eq("project_id", projectId);
   const { data: sources } = await supabase.from("research_sources")
-    .select("id, original_url, final_url, canonical_url, domain, title, author, publisher, publication_date, retrieval_date, source_type, http_status, redirect_count, verification_status, verification_notes, approval, content_chars")
+    .select("id, original_url, final_url, canonical_url, domain, title, author, publisher, publication_date, retrieval_date, source_type, http_status, redirect_count, verification_status, verification_notes, approval, content_chars, authority_decision")
     .eq("project_id", projectId)
     .order("created_at", { ascending: true });
   const { data: claims } = await supabase.from("research_claims")

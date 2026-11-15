@@ -4,6 +4,7 @@ import { fetchAndVerify, titlesCorrespond } from "./verify";
 import { dedupeSources } from "./research";
 import { rankCandidatesForAssignment } from "./authority";
 import { parseISODateLoose } from "./citation";
+import { assessSource, summarizeSourceAssessment, type SourceSummary } from "./source-intelligence";
 
 /**
  * SHARED RESEARCH EXECUTION CORE (resumable research round, 2026-10-11).
@@ -51,6 +52,11 @@ export interface StoredSourceResult {
   publication_date: string | null;
   notes: string[];
   authority: Record<string, unknown>;
+  /**
+   * What KIND of source this is (directive Part 8). Optional so every existing caller and
+   * test that builds or reads a StoredSourceResult keeps compiling and passing unchanged.
+   */
+  intelligence?: SourceSummary;
 }
 
 export interface ResearchPassResult {
@@ -166,6 +172,24 @@ export async function executeResearchPass(
       notes.push("URL resolves, page is live and meaningful, listed title matches the page.");
     }
 
+    // Directive Part 8: classification happens on the SAME verified page the citation will
+    // rest on, using the title and byline the page itself supplied - never a guess from the
+    // search listing. A source that may not be used as evidence is still STORED (the student
+    // asked for it and can see it), but it is labelled and refused as evidence.
+    const intelligence = summarizeSourceAssessment(
+      assessSource({
+        url: v.finalUrl || hit.url,
+        title: v.title || hit.title,
+        publisher: v.domain,
+        byline: v.author ?? null,
+        publishedDate: v.publicationDate ?? null,
+        content: v.text.slice(0, 20_000),
+      }),
+    );
+    if (!intelligence.usable && intelligence.blockedReason) {
+      notes.push(`Cannot be used as evidence: ${intelligence.blockedReason}`);
+    }
+
     const { data: row } = await supabase
       .from("research_sources")
       .insert({
@@ -191,7 +215,9 @@ export async function executeResearchPass(
         integrity_hash: v.hash,
         approval: "pending",
         authority_category: decision.category,
-        authority_decision: decision,
+        // The authority decision keeps its exact shape; the classification rides alongside it
+        // under its own key, so no reader of the existing fields is affected (no migration).
+        authority_decision: { ...decision, source_intelligence: intelligence },
       })
       .select("id")
       .single();
@@ -223,6 +249,7 @@ export async function executeResearchPass(
       author: v.author,
       publication_date: parseISODateLoose(v.publicationDate),
       notes,
+      intelligence,
       authority: {
         category: decision.category,
         tier: decision.tier,

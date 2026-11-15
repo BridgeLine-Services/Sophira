@@ -467,6 +467,51 @@ export interface SourceMetadata {
   section?: string | null;
 }
 
+/**
+ * The compact form stored beside a verified source and shown on screen (Part 8 wiring).
+ *
+ * Deliberately small: every field here is something a student can read. The full
+ * assessment stays in this module, so the stored record never becomes a second copy of
+ * the classifier's internals that could drift from it.
+ */
+export interface SourceSummary {
+  /** The student-facing words, e.g. "News reporting", "Satire", "Opinion". */
+  label: string;
+  /** One sentence a non-specialist can act on. */
+  explanation: string;
+  primaryFormat: ArticleFormat;
+  formats: ArticleFormat[];
+  role: "primary" | "secondary" | "unclear";
+  peerReview: PeerReviewStatus;
+  publicationState: PublicationState;
+  risk: MisinformationRisk;
+  satire: boolean;
+  /** May this be used as factual evidence for an assignment? */
+  usable: boolean;
+  /** Why not, when it may not. */
+  blockedReason: string | null;
+  uncertainty: string;
+}
+
+/** Reduces a full assessment to the stored, student-facing summary. Pure. */
+export function summarizeSourceAssessment(assessment: SourceAssessment): SourceSummary {
+  const suitability = evidenceSuitability(assessment);
+  return {
+    label: assessment.label,
+    explanation: assessment.explanation,
+    primaryFormat: assessment.primaryFormat,
+    formats: assessment.formats,
+    role: assessment.evidenceRole,
+    peerReview: assessment.peerReview,
+    publicationState: assessment.publicationState,
+    risk: assessment.misinformationRisk,
+    satire: assessment.satire.isSatire,
+    usable: suitability.allowed && assessment.usableAsEvidence,
+    blockedReason: suitability.allowed && assessment.usableAsEvidence ? null : suitability.reason,
+    uncertainty: assessment.uncertainty,
+  };
+}
+
 export interface SourceAssessmentInput {
   url: string;
   title?: string | null;

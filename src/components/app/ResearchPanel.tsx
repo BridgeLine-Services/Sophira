@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Spinner, useToast } from "@/components/ui";
+import type { SourceSummary } from "@/lib/research/source-intelligence";
+import { SourceTypeLabel } from "@/components/app/SourceTypeLabel";
 import { Search, ExternalLink, CheckCircle2, XCircle, ShieldAlert, BookOpenCheck, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 
 interface SourceRow {
@@ -17,6 +19,8 @@ interface SourceRow {
   http_status: number | null;
   redirect_count: number;
   content_chars: number;
+  /** Directive Part 8: what kind of source this is, stored when it was verified. */
+  authority_decision?: { source_intelligence?: SourceSummary } | null;
 }
 
 interface ProjectData {
@@ -264,6 +268,10 @@ export function ResearchPanel({
     }
   }
 
+  // Directive Part 11: one visible count, so a student is never left to spot the red
+  // label among many rows. Satire, advertising and retracted papers land here.
+  const unusableCount = data?.sources.filter((s) => s.authority_decision?.source_intelligence?.usable === false).length ?? 0;
+
   const approved = data?.sources.filter((s) => s.approval === "approved" && (s.verification_status === "verified" || s.verification_status === "partially_verified")) ?? [];
 
   return (
@@ -328,6 +336,7 @@ export function ResearchPanel({
                 <Badge tone="neutral">{data.sources.length} candidate sources</Badge>
                 <Badge tone="success">{approved.length} approved &amp; verified</Badge>
                 <Badge tone="danger">{data.sources.filter((s) => s.verification_status === "failed" || s.verification_status === "inaccessible").length} dead/blocked</Badge>
+                {unusableCount > 0 && <Badge tone="danger">{unusableCount} cannot be used as evidence</Badge>}
                 <Button size="sm" variant="secondary" onClick={verifyAllAgain} disabled={reverifyBusy}>
                   <RotateCcw className="mr-1 h-3.5 w-3.5" /> Verify all sources again
                 </Button>
@@ -386,6 +395,9 @@ export function ResearchPanel({
                       {s.author && <span className="text-ink-soft">— {s.author}</span>}
                       {s.approval !== "pending" && <Badge tone={s.approval === "approved" ? "success" : "danger"}>{s.approval}</Badge>}
                     </div>
+                    {s.authority_decision?.source_intelligence && (
+                      <SourceTypeLabel summary={s.authority_decision.source_intelligence} />
+                    )}
                     <p className="mt-1 text-xs text-ink-soft">
                       HTTP {s.http_status ?? "—"} · {s.redirect_count} redirect(s) · {s.content_chars.toLocaleString()} chars retrieved
                     </p>

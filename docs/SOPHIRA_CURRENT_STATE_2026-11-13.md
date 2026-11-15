@@ -1109,3 +1109,59 @@ offline, plus `tests/doi-metadata.ts` (64 assertions):
 No migration, no schema change, no key, no environment variable. Not yet wired into a route: the
 citation gate still reports its existing four statuses exactly as before (pinned by a test), so
 this is a validated extension waiting for the round that mounts it.
+
+## 18. Round of 2026-11-15 (second): the classification reaches the student (Parts 8 and 11)
+
+Parts 5, 6 and 4 built the classifier, the DOI validation and the registry, but nothing used
+them: they were imported only by their own tests. A module that no student can see is not a
+capability. This round connects them.
+
+### 18.1 Part 8 - classification of the page that was actually verified
+
+`src/lib/research/run.ts` now classifies every source at the moment it is verified, using the
+page's own title, byline and text (the first 20,000 characters), not the search listing. The
+result is reduced by `summarizeSourceAssessment()` to twelve readable fields and stored under a
+new `source_intelligence` key inside the existing `authority_decision` JSON column.
+
+That last detail is the whole safety story: **no migration, no schema change, no new column, no
+change to any existing field**. `authority_decision` keeps its exact shape and every existing
+reader is unaffected; a new key is additive inside a document that was already free-form.
+
+A source that may not be used as evidence is **still stored**. The student asked for it, it is on
+their screen, and it is labelled. Dropping it silently would be the worse failure: the student
+would see fewer results with no explanation. Its notes now carry the refusal and its reason.
+
+### 18.2 Part 11 - the words a student reads
+
+New `src/components/app/SourceTypeLabel.tsx`, mounted on every source in the research panel:
+
+- the kind of source in plain words - *News reporting*, *Opinion*, *Editorial*, *Satire*,
+  *Advertising*, *Press release*, *Research article*, *Government publication*, *Dataset*;
+- whether it is a first-hand account or describes someone else's work, in those words;
+- *Not yet reviewed* for a preprint, *Retracted* for a retracted paper;
+- **Not usable as evidence** plus the reason, whenever the classification refuses it;
+- one visible count above the list ("2 cannot be used as evidence"), so a student is not left to
+  spot a red chip among thirty rows.
+
+No jargon: the test suite renders the component with `react-dom/server` and greps the rendered
+text for engineering vocabulary, so the check is on the words that reach the page rather than on
+an intermediate object. The component holds no state and makes no request, which is what makes
+that rendered check meaningful.
+
+### 18.3 Files
+
+New: `src/components/app/SourceTypeLabel.tsx`, `tests/source-labels.ts` (52 assertions).
+Modified: `src/lib/research/run.ts`, `src/lib/research/source-intelligence.ts` (added
+`summarizeSourceAssessment` and `SourceSummary`), `src/app/api/research/route.ts` (one extra
+field in the select), `src/components/app/ResearchPanel.tsx`, `tests/run.ts`, this document.
+
+### 18.4 Verification
+
+`npm test` 8762/8762 (53 new assertions), `npx tsc --noEmit` clean, `npm run lint` 0 errors /
+33 warnings, `npm run build` OK, `npm run scan:secrets` CLEAN, accessibility PASS (188 files),
+plain-language audit 0 findings, design-drift 0.
+
+### 18.5 Rollback
+
+Revert the commit. No data migration to undo. Rows already written keep their extra JSON key,
+which older code ignores; no reader depends on it.
