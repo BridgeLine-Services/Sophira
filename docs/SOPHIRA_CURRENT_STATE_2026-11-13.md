@@ -1459,3 +1459,75 @@ the runner's block-on-failure, and the link both ends), tsc clean, lint 0 errors
 build OK, jargon 0, design drift 0, secret scan CLEAN. Still unverified live: delivery has not
 been exercised against the real database, because that needs a signed-in member account and an AI
 provider key so a run can actually complete.
+
+## §24. The record the Owner reads, and the file a student keeps (2026-11-15, commit 34cb087)
+
+Baseline before anything changed: `master` at `022f9cc`, clean tree, 9358 tests passed / 0 failed,
+type check clean, lint 0 errors / 33 warnings. Production served `022f9cc`. Every statement below
+is measured against that baseline, not against an older audit.
+
+### What was actually wrong
+
+Two capabilities existed and could not be reached by the person they were for.
+
+1. The requirement record named `src/app/owner/requirements/page.tsx` as its evidence. That file
+   did not exist. The evidence was a promise, and the Owner had no screen that answered "what did
+   I ask for, what is done, what is waiting on me?"
+2. A run could reach `completed` with every section verified, and the finished text lived only in
+   the run's own row and the essay library. There was no way to take the document out as a file.
+
+A third problem was documentation that had gone stale in the direction of *understating* the
+system: R7 and `docs/AUTONOMOUS_ASSIGNMENTS.md` both asserted this deployment has "no cron and no
+background worker" while `.github/workflows/autonomous-sweep.yml` had existed since `33325c3`.
+
+### Root cause
+
+The requirement record and the audit documents were written in the same round the features were
+designed, so they described the design rather than the deployment. Nothing in the suite compared
+the words to the branch. The export and the Owner screen were simply unbuilt while being cited.
+
+### Files changed
+
+| Path | Change |
+|---|---|
+| `src/app/owner/requirements/page.tsx` | New Owner screen: every requirement, its status, where it can be checked, what is missing, what waits on the Owner, plus the dated change record. |
+| `src/lib/owner/change-log.ts` | New: the change record as data (six kinds, each dated with evidence), assembled from what the repository already asserts. |
+| `src/lib/essay/export.ts` | New: pure export of a completed run to markdown or plain text with a provenance block. Refuses an unfinished run. |
+| `src/app/api/essay/autonomous/[id]/export/route.ts` | New route. Shared auth guard, user-scoped read, 409 on an unfinished run, 404 for another student's run, download disposition. |
+| `src/lib/navigation/owner-nav.ts` | One new Owner destination; nothing removed or renamed. |
+| `src/lib/governance/product-spec.ts` | R7 rewritten into four states; R16's citation made true and its remaining limit named. |
+| `docs/PRODUCT_REQUIREMENTS.md` | R7 and implementation-limit 1 corrected, with the old audit explicitly kept as history. |
+| `docs/AUTONOMOUS_ASSIGNMENTS.md` | §4 rewritten to the same four states. |
+| `.github/workflows/autonomous-sweep.yml` | An unreachable or broken production now fails the job instead of exiting 0. A refusal (401/403/404) is still reported without failing, because that is configuration, not a fault. |
+| `tests/autonomous-assignment.ts`, `tests/owner-nav.ts` | 58 new assertions; nav pins 19 -> 20. |
+
+### Preserved deliberately
+
+No page, route, table, column, migration, permission or AI mode was removed or renamed. No
+migration was added. The manual essay workflow, the writing profile system, student memory, the
+teacher requirement precedence and every existing test are untouched. The student's essay library,
+not a new store, is still where a finished run lands.
+
+### Verification
+
+* Offline, on the pushed commit: 9416 tests passed / 0 failed (was 9358 / 0), `tsc --noEmit`
+  clean, lint 0 errors / 33 warnings, production build OK, `npm run verify` PASS, release gate
+  self-test PASS, secret scan CLEAN, design drift 0, a11y PASS (192 files), contrast PASS (32 pairs,
+  both themes), page conformance 84 routes / 0 without h1 / 0 without landmark / 0 signed-in
+  without loading, jargon 0.
+* CI on `34cb087`: migrations success, CodeQL `Analyze (actions)` success, remaining jobs running
+  at the time of writing (the Rust analysis takes 15-25 minutes).
+* Production: `/api/health` serves `34cb08752414ffe24ec9f6b25fc4b7793700b6e2`, `ok: true`.
+* The scheduled sweep: one run exists in its history, `workflow_dispatch`, completed `success`.
+  It advanced nothing, because `CRON_SECRET` is not configured. That is the designed behaviour and
+  the reason every screen still says `on_open`.
+
+### Still not verified, and what it needs
+
+1. `/owner/requirements` has never been opened with a signed-in Owner account. It needs a working
+   member session; the test-member credentials in the environment are unusable.
+2. The export route has never been exercised against the live database. It needs a completed run,
+   which needs an AI provider key.
+3. The scheduled worker has never advanced a run. It needs the same password in Vercel and in the
+   repository secrets, plus the two switches set together.
+4. No phone, tablet, iOS or Android verification was performed this round.
