@@ -1078,3 +1078,34 @@ Retrieval adapters for the registry are not implemented in this round: the regis
 each source *may* be reached, and no adapter is registered yet, so nothing is reported as
 Available that cannot genuinely run. Live classification of a real URL needs `SEARCH_API_KEY`
 and the `fetchAndVerify` pipeline, which is unchanged.
+
+### 17.9 Part 6, in the same round: DOI metadata validation
+
+Part 6 items 1-5 (DOI resolution, venue verification, author metadata, peer-review status,
+retraction and correction) had no implementation: a DOI was treated as a string that made a
+source peer reviewed. That was wrong in both directions - most preprint servers register DOIs
+(bioRxiv, medRxiv, SSRN, arXiv, PsyArXiv, Preprints.org, Research Square), and a registered DOI
+can be retracted afterwards, so a retracted paper passed the old check.
+
+New `src/lib/research/doi.ts`, with the network call injected so the judgement is testable
+offline, plus `tests/doi-metadata.ts` (64 assertions):
+
+- **Syntax and extraction.** A bare DOI, a `doi:` prefix and a `https://doi.org/...` address all
+  normalise to the same identifier; trailing punctuation is not part of it; absent stays absent.
+- **Registration record.** Title, venue, publisher, work type, licence, authors (person or
+  organisation, in order) and the publication date are read from the record. A missing date stays
+  missing and is never replaced with today, and a year-only date is not padded with a fake month.
+- **Peer review is never assumed.** A journal-article DOI returns `research_unconfirmed`, with a
+  sentence saying why: registration does not record review. A preprint server returns `preprint`
+  and is never citable as reviewed research.
+- **Retraction and correction.** `update-to` entries (retraction, correction, expression of
+  concern) and `is-retracted-by` relations are caught; a retracted work is not usable and says so
+  in plain words; a corrected work stays usable with the correction noted.
+- **Four resolution states, never confused.** `resolved`, `not_registered`, `invalid` and
+  `unavailable`. A network failure is `unavailable` and says the citation is unconfirmed and
+  nothing was invented - it is never reported as "not registered", which would be a false claim
+  about the work. The live call has an 8-second timeout and only a 404 means "not registered".
+
+No migration, no schema change, no key, no environment variable. Not yet wired into a route: the
+citation gate still reports its existing four statuses exactly as before (pinned by a test), so
+this is a validated extension waiting for the round that mounts it.
