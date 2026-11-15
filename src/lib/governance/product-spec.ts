@@ -121,9 +121,13 @@ export const PRODUCT_REQUIREMENTS: readonly ProductRequirement[] = [
     group: "Academic AI",
     statement: "Sophira never claims an assignment keeps generating while the app is closed unless a real worker is running. The status view names the mode.",
     status: "IMPLEMENTED AND TESTED",
-    evidence: ["continuationMode() in src/lib/essay/autonomous.ts", "docs/PRESERVATION_AUDIT_2026-11-15.md §5"],
-    remaining: null,
-    ownerAction: "Optional: approve a cron line or an external queue to make continuation run with the page closed.",
+    evidence: [
+      "continuationMode() in src/lib/essay/autonomous.ts (scheduled only when the schedule flag AND a >=16-character secret exist)",
+      ".github/workflows/autonomous-sweep.yml (every 15 minutes) and the authenticated /api/essay/autonomous/tick endpoint",
+      "docs/PRODUCT_REQUIREMENTS.md R7 keeps the four states - in code, configured, running, verified - apart",
+    ],
+    remaining: "The worker exists in code and in GitHub Actions but is NOT running in this deployment: no CRON_SECRET is configured and SOPHIRA_AUTONOMOUS_SCHEDULE is unset, so every screen honestly reports 'advances while a Sophira page is open'. No run has yet been advanced by the schedule.",
+    ownerAction: "Add the same 16-plus-character password as CRON_SECRET in Vercel and in GitHub Actions secrets, then set SOPHIRA_AUTONOMOUS_ESSAY and SOPHIRA_AUTONOMOUS_SCHEDULE to 1 together.",
   },
   {
     id: "R8",
@@ -211,8 +215,8 @@ export const PRODUCT_REQUIREMENTS: readonly ProductRequirement[] = [
     group: "Dashboards",
     statement: "The Owner can see approved, implemented, in-progress, blocked, unstarted and awaiting-approval requirements with evidence, and a change log of specification, agent, flag, permission, migration and deployment changes.",
     status: "IMPLEMENTED, LIVE VERIFICATION REQUIRED",
-    evidence: ["src/lib/governance/product-spec.ts", "src/app/owner/requirements/page.tsx", "src/lib/owner/change-log.ts"],
-    remaining: "The change log reads real audit rows, so it needs a signed-in Owner against the live database to display.",
+    evidence: ["src/lib/governance/product-spec.ts (16 requirements, statuses, evidence, remaining, owner action)", "src/app/owner/requirements/page.tsx (the screen that renders them)", "src/lib/owner/change-log.ts (six change kinds, each dated with its evidence)", "tests/autonomous-assignment.ts pins document, code and page together"],
+    remaining: "The screen and its data are built and pinned offline; nobody has yet opened /owner/requirements with a signed-in Owner account, which needs a working member session.",
     ownerAction: null,
   },
 ];

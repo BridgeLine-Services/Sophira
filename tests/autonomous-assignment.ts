@@ -55,6 +55,9 @@ import {
   hasEvidence,
 } from "../src/lib/governance/product-spec";
 import { FLAG_KEYS, FLAGS, flagDisabledMessage, flagEnabled, flagStates } from "../src/lib/features/flags";
+import { EXPORT_FORMATS, exportFilename, isExportFormat, renderExport } from "../src/lib/essay/export";
+import { changeSummary, changesIn, recentChanges, silentCategories } from "../src/lib/owner/change-log";
+import { CHANGE_CATEGORIES, CHANGE_CATEGORY_LABELS } from "../src/lib/governance/product-spec";
 
 const ROOT = join(__dirname, "..", "..");
 type Check = (condition: boolean, message: string) => void;
@@ -521,4 +524,95 @@ export function runAutonomousAssignmentTests(assert: Check, section: (title: str
   assert(states[0].enabled === false && /not set/.test(states[0].detail), "and states that it is not set");
   assert(/manual essay workflow is unchanged/.test(flagDisabledMessage("autonomous_essay")), "the disabled message says what still works");
   assert(FLAGS.autonomous_essay.rollback.length > 20, "the flag documents its own rollback");
+
+  /* ---------------------------------------------------------------- */
+  section("Delivery to a file - a finished run exports, an unfinished one refuses");
+  /* ---------------------------------------------------------------- */
+
+  assert(EXPORT_FORMATS.join() === "md,txt", "export: two formats, both readable without extra software");
+  assert(isExportFormat("md") && isExportFormat("txt") && !isExportFormat("docx"), "export: the format is validated, never trusted");
+
+  const refused = renderExport(plannedRun(), "md");
+  assert(refused.ok === false, "export: an unfinished run cannot be handed back as a finished document");
+  assert(/section|verification/i.test(refused.reason ?? ""), "export: the refusal names what is actually missing");
+
+  const completeRun: RunRecord = { ...fullyDrafted(), state: "completed" };
+  const md = renderExport(completeRun, "md");
+  assert(md.ok === true && typeof md.body === "string", "export: a complete run exports");
+  const body = md.body as string;
+  assert(body.includes("# New Deal"), "export: the document carries its own title");
+  assert(/## Introduction/.test(body), "export: every section keeps its heading");
+  assert(/Text for s1/.test(body), "export: the text is the stored draft, not a fresh generation");
+  assert(/About this draft/.test(body), "export: a provenance block is included");
+  assert(/Final check: VERIFIED/.test(body), "export: the file states what the final check said");
+  assert(/No research sources were used/.test(body), "export: the absence of sources is stated, not glossed over");
+  assert(/draft to read, edit and submit as your own work/i.test(body), "export: the file is honest about what it is");
+  assert(!/written by hand|human-authored|no AI/i.test(body), "export: the file never claims human authorship");
+
+  const txt = renderExport(completeRun, "txt");
+  assert(txt.ok === true && /NEW DEAL/.test(txt.body ?? ""), "export: the plain-text version is readable too");
+  assert(/Final check: VERIFIED/.test(txt.body ?? ""), "export: and carries the same provenance, so choosing a format hides nothing");
+
+  const withFindings = renderExport(
+    { ...completeRun, findings: [{ stage: "planning" as const, severity: "limitation" as const, text: "No approved sources were attached." }] },
+    "md",
+  );
+  assert(/Limitations recorded/.test(withFindings.body ?? ""), "export: recorded limitations reach the file, not only the screen");
+  assert(/No approved sources were attached/.test(withFindings.body ?? ""), "export: and the limitation text is the real one");
+
+  assert(exportFilename(completeRun, "md").endsWith(".md"), "export: the download has a .md extension");
+  assert(exportFilename(completeRun, "txt").endsWith(".txt"), "export: and a .txt extension for plain text");
+  assert(/^[a-z0-9-]+\.(md|txt)$/.test(exportFilename(completeRun, "md")), "export: the filename is safe for a downloads folder");
+  assert(exportFilename({ ...completeRun, request: { question: "!!!" } }, "md").startsWith("assignment-"), "export: an untitled run still gets a usable filename");
+
+  const exportRoute = readFileSync(join(ROOT, "src/app/api/essay/autonomous/[id]/export/route.ts"), "utf8");
+  assert(/requireUser\(supabase\)/.test(exportRoute), "export: the route uses the shared authentication guard");
+  assert(/guard\.data\.user\.id/.test(exportRoute), "export: and scopes the read to the signed-in student");
+  assert(/status: 409/.test(exportRoute), "export: an unfinished run answers 409 rather than a half document");
+  assert(/content-disposition/.test(exportRoute), "export: the file is delivered as a download, not rendered inline");
+  assert(!/createAdminClient/.test(exportRoute), "export: and never touches the service-role client");
+
+  /* ---------------------------------------------------------------- */
+  section("The change record - every kind recorded or declared empty");
+  /* ---------------------------------------------------------------- */
+
+  const log = recentChanges(50);
+  assert(log.length >= 6, `change log: it holds real entries (${log.length})`);
+  assert(log.every((e) => e.evidence.length > 0), "change log: every entry names where it can be verified");
+  assert(log.every((e) => e.decidedBy.length > 0), "change log: every entry names who decided it");
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(log[0].date), "change log: entries are dated");
+  assert(log[0].date >= log[log.length - 1].date, "change log: newest first");
+  for (const category of CHANGE_CATEGORIES) {
+    assert(changesIn(category).length > 0, `change log: the ${category} change is recorded, not silent`);
+  }
+  const summary = changeSummary();
+  assert(summary.total === log.length, "change log: the summary counts the same entries the list shows");
+  assert(summary.silent === silentCategories().length, "change log: empty kinds are counted, never hidden");
+  assert(silentCategories().length === 0, "change log: no kind of change is left unrecorded");
+  assert(CHANGE_CATEGORIES.length === 6, "change log: all six kinds the directive names exist");
+  assert(Object.keys(CHANGE_CATEGORY_LABELS).length === CHANGE_CATEGORIES.length, "change log: every kind has a plain-English label");
+
+  /* ---------------------------------------------------------------- */
+  section("The Owner's requirements screen - the record the suite pins, rendered");
+  /* ---------------------------------------------------------------- */
+
+  const reqPage = readFileSync(join(ROOT, "src/app/owner/requirements/page.tsx"), "utf8");
+  assert(/requireOwnerPage\(\)/.test(reqPage), "requirements page: it authorises on the server, so a member cannot open it");
+  assert(!/createAdminClient/.test(reqPage), "requirements page: it never uses the service-role client");
+  assert(!/"use client"/.test(reqPage), "requirements page: it stays a server component");
+  assert(/PRODUCT_REQUIREMENTS/.test(reqPage) && /REQUIREMENT_STATUSES/.test(reqPage), "requirements page: it renders the same statuses the suite pins");
+  assert(/recentChanges\(/.test(reqPage) && /silentCategories\(/.test(reqPage), "requirements page: it renders the change record rather than restating it");
+  assert(/Nothing is recorded yet for/.test(reqPage), "requirements page: an unrecorded kind is shown as unrecorded");
+  assert(/What is still missing/.test(reqPage) && /What you need to do/.test(reqPage), "requirements page: each row says what is missing and what the Owner must do");
+  assert(/IMPLEMENTED, LIVE VERIFICATION REQUIRED/.test(reqPage) || /STATUS_MEANING/.test(reqPage), "requirements page: it explains the status words instead of assuming they are understood");
+  assert(/aria-labelledby="req-changes"/.test(reqPage), "requirements page: the change section is announced to a screen reader");
+
+  const nav = readFileSync(join(ROOT, "src/lib/navigation/owner-nav.ts"), "utf8");
+  assert(nav.includes('href: "/owner/requirements"'), "requirements page: it is reachable from the Owner menu");
+  assert(!/textarea|input/.test(reqPage), "requirements page: it takes no input, so it cannot be used to change a requirement");
+
+  // The citation is now true: the page the specification names exists.
+  const r16 = PRODUCT_REQUIREMENTS.find((r) => r.id === "R16");
+  assert(Boolean(r16) && (r16!.evidence.join(" ").includes("src/app/owner/requirements/page.tsx")), "requirements record: R16 cites the screen");
+  assert(existsSync(join(ROOT, "src/app/owner/requirements/page.tsx")), "requirements record: and that screen exists, so the citation is not a promise");
 }

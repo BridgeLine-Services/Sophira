@@ -56,6 +56,7 @@ const EXPECTED_HREFS = [
   "/owner/ai-operations",
   "/owner/backup",
   "/owner/release-readiness",
+  "/owner/requirements",
   "/owner/security",
   "/owner/ai-providers",
   "/owner/integrations",
@@ -164,7 +165,7 @@ export function runOwnerNavBoundaryTests(
     assert(iconMarkup.every((m) => m.includes("<svg")),
       "owner-nav: every icon is a real renderable component — the server grid can draw all of them");
     assert(hrefsFor("owner").join("|") === EXPECTED_HREFS.join("|"),
-      "owner-nav: all 19 Owner destinations survive, in registry order");
+      "owner-nav: all 20 Owner destinations survive, in registry order");
     assert(allItems.length === EXPECTED_HREFS.length + 1 && allItems.some((i) => i.href === "/co-owner"),
       "owner-nav: the registry holds exactly ONE entry the Owner does not see — the Co-Owner's own dashboard");
     assert(allItems.filter((i) => i.href.includes("view=workspace")).length === 1,
@@ -340,7 +341,7 @@ export function runOwnerNavBoundaryTests(
         const ownerHtml = draw("owner");
         const missing = EXPECTED_HREFS.filter((href) => !ownerHtml.includes(`href="${href}"`));
         assert(missing.length === 0,
-          "owner-nav: the Owner's grid renders all 19 destinations on the server" +
+          "owner-nav: the Owner's grid renders all 20 destinations on the server" +
             (missing.length ? " — missing " + missing.slice(0, 3).join(", ") : ""));
         assert(EXPECTED_HEADINGS.every((h) => ownerHtml.includes(h)),
           "owner-nav: every group heading renders, in the grid, from the shared registry");

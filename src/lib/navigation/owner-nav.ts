@@ -37,6 +37,7 @@ import {
   Activity,
   Briefcase,
   ChartColumn,
+  ClipboardList,
   Database,
   FlaskConical,
   Gauge,
@@ -135,6 +136,10 @@ export const OWNER_NAV_GROUPS: OwnerNavGroup[] = [
       // 2026-11-11: "is the app ready to go out?" had no single answer. The page reuses the
       // release gate's own results; it is not a second gate.
       { href: "/owner/release-readiness", label: "Release readiness", icon: ShieldCheck },
+      // 2026-11-15: the directive asked for one understandable place stating what the Owner asked
+      // for, what is done, what is waiting on them, and what changed. The page renders the same
+      // record the test suite pins, so the screen cannot drift from the evidence.
+      { href: "/owner/requirements", label: "Requirements and changes", icon: ClipboardList },
     ],
   },
   {

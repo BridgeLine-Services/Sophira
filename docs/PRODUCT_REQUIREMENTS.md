@@ -99,8 +99,26 @@ attempts, `step_index`), step idempotency assertions, and the migration's unique
 ### R7 — No invented background execution
 Sophira must not claim an assignment continues generating while the application is closed
 unless a real worker is running. The status view states which continuation mode is active.
-*Status:* `IMPLEMENTED AND TESTED`. *Evidence:* `continuationMode()`; the deployment has no cron
-and no queue (`docs/PRESERVATION_AUDIT_2026-11-15.md` §5).
+
+Four states, kept apart on purpose:
+
+| State | What it means here |
+|---|---|
+| Implemented in source | `continuationMode()` in `src/lib/essay/autonomous.ts` returns `scheduled` only when `SOPHIRA_AUTONOMOUS_SCHEDULE` is on **and** a `CRON_SECRET` of at least 16 characters exists. The authenticated sweep endpoint is `src/app/api/essay/autonomous/tick/route.ts`. |
+| Configured in GitHub Actions | `.github/workflows/autonomous-sweep.yml` exists on `master` and runs `*/15 * * * *` plus manual dispatch. GitHub schedules at five-minute granularity, so 15 minutes is within limits; GitHub delays scheduled runs at busy times, so "every 15 minutes" is a best effort, not a guarantee. |
+| Configured in the hosting environment | **Not configured.** No `CRON_SECRET` is present in Vercel or in the repository's secrets, and `SOPHIRA_AUTONOMOUS_SCHEDULE` is unset. The workflow therefore exits before making a request, and says so in its log. |
+| Running and verified against production | **No.** No run has been advanced by the schedule. Every student screen reports `on_open`: the run advances while a page is open and resumes where it stopped. |
+
+*Status:* `IMPLEMENTED AND TESTED` (the no-false-claims rule itself holds, and the worker's
+refusal paths are pinned). The scheduled worker is `BLOCKED` on the Owner action below.
+*Evidence:* `continuationMode()`, the workflow file, `tests/autonomous-assignment.ts`, and the
+workflow's own log line when the password is absent. *Owner action:* add one 16-plus-character
+password as `CRON_SECRET` in Vercel and in GitHub Actions secrets, then set
+`SOPHIRA_AUTONOMOUS_ESSAY=1` and `SOPHIRA_AUTONOMOUS_SCHEDULE=1` together.
+
+*History:* the 2026-11-15 preservation audit recorded "no cron, no queue" (§5) because that was
+true when it was written, before the workflow existed. The audit is a historical record and is
+not rewritten; this requirement section states the current position.
 
 ### R8 — One academic context for every AI path
 Every new assignment path uses the existing shared context service: course, teacher
@@ -193,9 +211,12 @@ what the artefact claims to be true, and it is reported rather than assumed.
 These are technical facts about *this* deployment. They are not statements about what the
 product should be, and they do not remove anything from the roadmap.
 
-1. **No durable worker exists.** `vercel.json` has no `crons`; there is no queue service and no
-   background function. Assignment runs advance on an open page or on the next visit, and say so.
-   A cron line or an external queue is a one-line/one-account change the Owner can approve.
+1. **The scheduled worker exists but is not switched on.** `vercel.json` still carries no
+   `crons` on purpose: the schedule lives in `.github/workflows/autonomous-sweep.yml`, which
+   calls the app's own authenticated sweep endpoint every 15 minutes. Until `CRON_SECRET` is set
+   in both places and `SOPHIRA_AUTONOMOUS_SCHEDULE` is turned on, the workflow exits without
+   making a request and runs advance only while a Sophira page is open - which is exactly what
+   the student's screen says. Nothing about this is hidden from the student or the Owner.
 2. **Serverless time is bounded.** One function invocation cannot generate a whole essay. Hence
    one bounded step per call.
 3. **Vercel plan limits cron frequency.** A schedule the plan does not permit fails the
