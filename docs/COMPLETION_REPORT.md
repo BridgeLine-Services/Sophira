@@ -1,4 +1,10 @@
-# Sophira Completion Report (latest round: 2026-10-14)
+# Sophira Completion Report (historical rounds, through 2026-11-11)
+
+> **HISTORICAL (corrected 2026-11-14):** this is a record of past rounds, not the current
+> status. The header used to say "latest round: 2026-10-14" while the body documented the
+> 2026-11-11 round, which made an old report read as current. For the current, evidence-based
+> readiness picture see **docs/SOPHIRA_CURRENT_STATE_2026-11-13.md** and the release gate in
+> **docs/release-gate-report.json**.
 
 > Evidence-based status only. Historical rounds remain in git history.
 

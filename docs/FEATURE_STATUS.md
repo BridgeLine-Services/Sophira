@@ -1,6 +1,7 @@
 > **SUPERSEDED (2026-10-13):** this document is a historical
-> snapshot. The current, authoritative status is **docs/COMPLETION_REPORT.md**
-> and the current owner checklist is **docs/WHAT_I_NEED_TO_DO_NEXT.md**.
+> snapshot. The current, authoritative status is **docs/SOPHIRA_CURRENT_STATE_2026-11-13.md**
+> (2026-11-14: this used to point at docs/COMPLETION_REPORT.md, which is itself a historical
+> record) and the current owner checklist is **docs/WHAT_I_NEED_TO_DO_NEXT.md**.
 
 # Sophira — Feature Status
 

@@ -1,6 +1,6 @@
 # Sophira: current state, safety report and change record
 
-**Date:** 2026-11-13
+**Date:** 2026-11-13 (kept current: last updated 2026-11-14, see §16)
 **Author:** Base44 Superagent (acting as architect, engineer, and QA for this round)
 **Repository:** https://github.com/BridgeLine-Services/Sophira
 **Baseline commit:** `516bf5e` (master, what production was serving when this round started)
@@ -900,3 +900,105 @@ the file is idempotent.
 Writing the Part 5 screens now would mean querying `profile_context` on a live database that does
 not have it. That is precisely the failure the directive's release rule exists to prevent: the
 writing pages would 500 for every real student. Stage two waits for the owner's one button press.
+
+---
+
+## 16. Round of 2026-11-14: the fifth memory scope, and the precedence inversion it exposed
+
+This section keeps the document current. Everything above it describes the 2026-11-13 round and
+is left as it was written; nothing here contradicts it.
+
+### 16.1 Baseline taken before touching anything
+
+`master` was `02e4781` (PR #101), the tree was clean, 0 open pull requests, only `master` on the
+remote, and production `/api/health` reported `02e4781` with `ok: true`. The verification baseline
+was **8383/8383** tests, `tsc --noEmit` clean, and `npm run lint` at 0 errors / 33 warnings. Live
+configuration was unchanged and still owner-blocked: `ai: false`, `ai_selfhost: false`,
+`search: false`.
+
+### 16.2 What was actually missing (Part 8, scope 5)
+
+The standing rule is five memory scopes, widest to narrowest: General < Subject < Course <
+Teacher < Assignment. Four of them had a write path. The narrowest did not:
+
+| Layer | State before this round |
+|---|---|
+| Database | `student_memories.assignment_id` exists and is applied (migration 0047, `on delete set null`, indexed) |
+| Engine | `relevanceScore` gives an assignment match the highest bonus, and `selectRelevantMemories` already refuses a memory belonging to a different assignment |
+| Storage | `listMemories` accepts an `assignment_id` filter and `recordMemoryEvidence` accepts an assignment when the learning system creates a row |
+| AI routes | all four (`/api/ai/solve`, `/api/math/prepare`, `/api/math/solve`, `/api/math/practice`) already pass `assignmentId` into `loadAcademicContext` |
+| `/api/memory` | **had no `assignment_id` at all** - not on read, not on write |
+
+So the deepest scope was reachable only by the learning system, never by the student the note is
+about. That is the gap this round closed.
+
+### 16.3 A real precedence defect, found by writing the tests
+
+Precedence was documented as absolute: "no combination of the wider bonuses can overtake a
+narrower match". It was not true. A memory scoped to a teacher *and* a course added both bonuses
+(1.1 + 0.8 = 1.9) and therefore outranked the student's own note for the assignment in front of
+them (1.4). Two memories that disagree would have been ordered the wrong way round, and the model
+reads them in score order.
+
+The fix keeps every single-scope score exactly as it was and only changes what stacking does: the
+narrowest matching scope decides the bonus, and each additional wider match adds
+`WIDER_SCOPE_TIEBREAK` (0.05). A stacked memory now sits just above its narrowest scope and can
+never leapfrog a narrower one. Nothing was removed from the engine, the eligible-memory rules are
+untouched, and no stored row changed.
+
+### 16.4 Where it landed
+
+PR #102, squash-merged as **`ef88327`** after CI, all four CodeQL analyses (actions,
+javascript-typescript, java-kotlin, rust) and the Vercel preview were green. The feature branch was
+deleted. Production `https://sophira.vercel.app/api/health` then reported `commit: ef88327`,
+`ok: true` - production serves the merge, and it is the only commit on `master`'s tip. 0 open pull
+requests, tree clean.
+
+The release gate, re-run on the merged state and regenerated into `docs/release-gate-report.json`:
+**41 checks, 25 PASS, 1 FAIL, 14 BLOCKED, 1 NOT RUN**. The single FAIL is "Production URL works",
+which fails only because `/api/health` reports `ai: false`; every BLOCKED check names an
+owner-supplied credential or device. None of them is a regression from this round: the same 41
+checks produced the same shape before the change.
+
+### 16.5 Change record
+
+| | |
+|---|---|
+| Change | Part 8: assignment-scoped memory becomes writable (scope 5), plus the scope-stacking precedence fix |
+| Phase | Part 8 (memory), the last scope with no student write path |
+| Reason | Directive §8 "Determine whether assignment-scoped memory creation ... is fully implemented" - it was not; and §20's precedence requirement, which the stacking case violated |
+| Existing behaviour preserved | No schema change, no new migration, no policy or RLS change, no route removed or re-pathed, no default changed for an existing user. A memory with one scope scores exactly as before. `user_id` still comes only from the session |
+| Files modified | `src/app/api/memory/route.ts`, `src/lib/memory/engine.ts`, `src/app/assignments/[id]/page.tsx`, `src/components/app/AssignmentNotes.tsx` (new), `tests/assignment-memory-scope.ts` (new), `tests/course-engine.ts` (re-pinned), `tests/run.ts` |
+| Database changes | none (0047's columns and indexes were already live) |
+| API contract changes | additive only: `GET /api/memory` accepts an optional `assignment_id` filter; `POST /api/memory` accepts an optional `assignment_id` |
+| Verification | suite **8431/8431**, `tsc` clean, lint 0 errors / 33 warnings, build OK, `npm run verify` PASS, secret scan CLEAN, design-drift 0, a11y PASS (187 files), contrast PASS (32 pairs, both themes), conformance 82 routes / 0 without h1 / 0 without landmark |
+| Rollback | revert the commit. No data migration to undo, and the new card simply stops rendering |
+
+### 16.6 What a student now sees
+
+On any assignment, a "Notes for this assignment" card: the notes that apply to *that* assignment
+only, with add, turn off, turn back on and remove. It says, in plain words, that the note is used
+only here, that it comes before teacher, course and subject preferences, and that the brief and the
+teacher still come first. Nothing about scopes, identifiers or databases appears on screen - the
+test suite greps the rendered copy for that vocabulary and fails if it appears.
+
+### 16.7 Documentation corrections in the same round
+
+- `README.md`: said "Node.js 20.9 or newer (22 recommended)" and "Install Node.js 20+" while
+  `package.json` requires `node: 22.x` and `.nvmrc` pins 22; said the in-app setup applies "all 45
+  migrations, `0001`-`0045`" while the chain is 58 migrations, `0001`-`0058`. Both corrected to the
+  measured values, Next and React to their exact installed versions.
+- `docs/COMPLETION_REPORT.md`: header claimed "latest round: 2026-10-14" while the body documented
+  the 2026-11-11 round, which made an old report read as current. Now labelled historical, with a
+  pointer here.
+- `docs/FEATURE_STATUS.md`: already marked superseded, but pointed at `COMPLETION_REPORT.md`, which
+  is itself historical. It now points at this document.
+- `docs/release-gate-report.json`: regenerated from a current run.
+
+### 16.8 Still waiting on the owner (unchanged by this round)
+
+AI provider key, search provider key, a signed-in test member account, a physical device, the legal
+owner business details, and backup/restore credentials. Each one is the gate on a live check that
+cannot be faked: live AI readiness and the model benchmark (needs the inference server URL),
+live research (needs `SEARCH_API_KEY`), the signed-in isolation matrices, device acceptance for the
+PWA and APK, the legal placeholders, and a restore drill.
