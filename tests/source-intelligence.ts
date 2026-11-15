@@ -673,7 +673,8 @@ export async function runSourceIntelligenceTests(assert: Assert, section: (name:
     { title: "blog", url: "https://someone.blogspot.com/post", snippet: "s" },
     { title: "gov", url: "https://www.nasa.gov/report", snippet: "s" },
   ]);
-  assert(ranked[0].url.includes("nasa.gov"), "preserved: candidate ranking still prefers official sources");
+  const rankedHost = new URL(ranked[0].url).hostname.replace(/^www\./, "");
+  assert(rankedHost === "nasa.gov", `preserved: candidate ranking still prefers official sources (got ${rankedHost})`);
 
   const apa = formatCitation(
     {
