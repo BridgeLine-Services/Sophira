@@ -13,6 +13,7 @@
  * a probe is never reported as working.
  */
 import { createServer, type Server } from "http";
+import { readFileSync } from "fs";
 import {
   audioFormatSupport,
   MAX_AUDIO_BYTES,
@@ -437,6 +438,32 @@ export async function runProviderKeyOptimizationTests(assert: Assert, section: (
   );
   assert(!noText.ok && noText.reason === "no_text" && chatCalls === 0,
     "analysis: an empty file is never sent to a model");
+
+  /* ------------------------------------------------------------------ */
+  section("provider-key optimisation: the student's own boundaries");
+
+  const routeSrc = readFileSync("src/app/api/extract/analyze/route.ts", "utf8");
+  assert(routeSrc.includes("requireUser("), "analyze route: the student must be signed in");
+  assert(routeSrc.indexOf("readUploadedFile") < routeSrc.indexOf("analyzeDocument("),
+    "analyze route: the file is read BEFORE any model is called, so a failed read sends nothing");
+  assert(routeSrc.includes("text_retained: true"),
+    "analyze route: the words that were read come back even when the model fails");
+  assert(!/console\.(log|error|warn|info)/.test(routeSrc),
+    "analyze route: nothing about the student's file is written to a log");
+  assert(routeSrc.includes("MAX_BYTES") && routeSrc.includes("413"),
+    "analyze route: an oversized file is refused with a stated limit");
+  assert(routeSrc.includes("loadAcademicContext(") && routeSrc.includes("bounded("),
+    "analyze route: it receives the same academic context as every other AI path");
+  assert(!/API_KEY|Authorization:\s*Bearer/.test(routeSrc),
+    "analyze route: no second provider, key or credential of its own");
+
+  const uploadSrc = readFileSync("src/components/app/DocumentUpload.tsx", "utf8");
+  assert(uploadSrc.includes('"/api/extract/analyze"'),
+    "upload screen: the student can actually reach the analysis, not just the endpoint");
+  assert(uploadSrc.includes("quote.page") && uploadSrc.includes("discarded_quotes"),
+    "upload screen: a quotation shows its page, and removed quotations are accounted for");
+  assert(uploadSrc.includes('where === "local"'),
+    "upload screen: the student is told whether their own machine or a service did the reading");
 
   /* ------------------------------------------------------------------ */
   section("provider-key optimisation: seven honest capability states");
