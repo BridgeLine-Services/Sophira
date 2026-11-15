@@ -147,4 +147,7 @@ export const MARKERS = {
   // cannot pass.
   "0058_writing_profile_contexts.sql":
     "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'writing_profiles' and column_name = 'profile_context') and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'writing_profiles' and column_name = 'style_closeness') and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'writing_samples' and column_name = 'profile_context') and exists (select 1 from pg_constraint where conname = 'writing_profiles_style_closeness_check')",
+  // 0059: the durable record behind an autonomous assignment run. The probe asks for the table
+  // itself, which only exists once this migration really ran.
+  "0059_assignment_runs.sql": "to_regclass('public.assignment_runs') is not null",
 };

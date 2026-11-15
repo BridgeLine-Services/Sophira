@@ -35,6 +35,8 @@ const USER_TABLES = [
   "writing_profiles",
   "writing_samples",
   "essay_sessions",
+  // 0059: the student's own autonomous assignment runs. Their work, their export.
+  "assignment_runs",
   "learning_patterns",
   "typing_attempts",
   "typing_profiles",

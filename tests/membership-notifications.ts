@@ -290,7 +290,9 @@ export function runMembershipNotificationTests(
   // work itself still needs no migration of its own - the assertion above proves it.
   // 2026-11-13: 57 -> 58 (0058, the writing profile contexts). The notification work itself
   // still needs no migration of its own - the assertion above proves it.
-  assert(migrations.length === 58,
+  // 2026-11-15: 58 -> 59 (0059, the autonomous assignment runs). The notification work still
+  // needs no migration of its own - the assertion above proves it.
+  assert(migrations.length === 59,
     "schema: notification changes ride the 0042 table; 0055 adds announcements");
 
   section("approving a request actually sends the invitation");

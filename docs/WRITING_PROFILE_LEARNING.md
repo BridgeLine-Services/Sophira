@@ -22,7 +22,17 @@ until the user accepts it. Approved suggestions belong in the existing
 - Deterministic: same input, same output, same ids. Pinned by 15 tests.
 - No network calls, no file access, no external data source of any kind.
 
-## What was declined, and why
+## A historical implementation decision, and who it belonged to
+
+**Reclassified 2026-11-15.** What follows was recorded by an earlier automated development
+process as though it settled the product question permanently. It did not. The Owner is the
+authority over Sophira's product specification (`docs/PRODUCT_REQUIREMENTS.md`); an agent's
+implementation decision is history, not law, and it cannot forbid a future Owner requirement.
+
+The reasoning is preserved below because it is still the right engineering and integrity
+argument for *this* feature. It is no longer presented as a standing instruction to future
+developers, and the "do not rebuild it" paragraph has been replaced.
+
 
 A request asked for "human-like typing": chunked insertion with deliberate
 mistyped characters, so Google Docs' own version history would show a plausible
@@ -40,8 +50,11 @@ It would also have been bad engineering on its own terms: Google rejects
 trail would surface as conflicts rather than revisions, and the Word path would
 fill a student's OneDrive with near-duplicate files.
 
-**Do not rebuild it.** If a future request asks again, the honest answer is
-still no, and this note is the record of the reasoning.
+**Recorded as history (2026-11-15).** This reasoning is preserved, and the integrity
+boundary it describes still holds — see `docs/PRODUCT_REQUIREMENTS.md` §4, which is the
+authoritative statement, and which separates an *integrity* boundary (a refusal made because the
+artefact would claim something false) from a *product* decision (the Owner's to make). Any future
+request about this area is answered against those two documents, not against this note.
 
 ## The legitimate half of that request
 

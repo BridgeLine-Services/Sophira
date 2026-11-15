@@ -9,7 +9,7 @@ migrations, the tables they create (minus any dropped later) and the storage buc
 and fails the suite when they disagree. A migration added without updating this line
 is a test failure, not a stale document.
 
-**Scope at time of writing:** 58 migrations, 65 application tables, 1 private storage bucket (`private-docs`).
+**Scope at time of writing:** 59 migrations, 66 application tables, 1 private storage bucket (`private-docs`).
 
 ---
 
@@ -68,6 +68,7 @@ Every table below is owned by exactly one member and must come back to that same
 | `responses` | A member's own answers and drafts. | yes | yes |
 | `feedback` | Feedback attached to work. | yes | yes |
 | `essay_sessions` | Essay planning sessions. | yes | yes |
+| `assignment_runs` | Durable records of autonomous assignment runs (0059): state, plan, stored sections, verdict. | yes | yes |
 | `writing_samples` | Samples used to learn a member's writing voice. | yes | yes |
 | `writing_profiles` | The learned style profile, applied only with member approval. | yes | yes |
 | `learning_patterns` | Observed study patterns used for personalisation. | yes | yes |

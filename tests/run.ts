@@ -9,6 +9,7 @@
 
 import "./helpers/alias"; // must be first: maps "@/..." for the compiled suites
 import { runProviderKeyOptimizationTests } from "./provider-key-optimization";
+import { runAutonomousAssignmentTests } from "./autonomous-assignment";
 import { hostIs, mentionsHost, schemeIs } from "./helpers/url";
 import { composeAcademicContext, findSourceConflicts, activeDocs, wrapUntrusted, detectInjectionAttempt } from "../src/lib/ai/context";
 import { routeSubject, routeMathTopic } from "../src/lib/ai/subjects";
@@ -4249,7 +4250,7 @@ async function runAccessControlTests(): Promise<void> {
     // any account exists. Fixed schema text from the public migrations,
     // accepts no input, contains no secret (machine-checked in
     // tests/owner-setup-automation.ts).
-    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status", "/api/ai/health", "/api/setup-repair", "/api/setup-sql"];
+    const intentionallyPublic = ["/api/health", "/api/invitations/accept", "/api/setup-status", "/api/ai/health", "/api/setup-repair", "/api/setup-sql", "/api/essay/autonomous/tick"];
     for (const rf of routeFiles) {
       const rel = ("/api" + rf.slice(apiRoot.length)).replaceAll("\\", "/").replace("/route.ts", "");
       const src = fs.readFileSync(rf, "utf8");
@@ -4279,6 +4280,9 @@ async function runAccessControlTests(): Promise<void> {
           rel === "/api/ai/health" ||
           rel === "/api/setup-repair" ||
           rel === "/api/setup-sql" ||
+          // 2026-11-15: a scheduler has no session, so the sweep authenticates with its own
+          // bearer secret and refuses outright when none is configured.
+          (rel === "/api/essay/autonomous/tick" && src.includes("CRON_SECRET")) ||
           src.includes("token"),
           `access: public route ${rel} is health/ai-health/setup-status/setup-repair (categorical status only) or operates solely on its single-use token`
         );
@@ -5573,5 +5577,7 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     // reports seven honest capability states instead of claiming a service is connected.
     await runProviderKeyOptimizationTests(assert, section);
     await runOwnerStatusVocabularyTests(assert, section);
+    // 2026-11-15: the autonomous assignment mode, its governance and its zero-regression pins.
+    runAutonomousAssignmentTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

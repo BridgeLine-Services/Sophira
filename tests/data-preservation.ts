@@ -77,6 +77,11 @@ export function runDataPreservationTests(
     // synonym for "open".
     "/api/complete-owner",
     "/api/invitations/accept",
+    // 2026-11-15: the autonomous assignment sweep is called by a scheduler, not a person, so it
+    // cannot carry a member session. It authenticates with its own bearer secret, refuses when
+    // no secret is configured, and does the work as the run's own owner (asserted below and in
+    // tests/autonomous-assignment.ts).
+    "/api/essay/autonomous/tick",
   ]);
     // 2026-11-12: the guard family gained requireStaff / requireNetworkManagement / requireTester
   // with the four-role model. The audit still demands a SHARED guard call on every route; it
@@ -105,6 +110,17 @@ export function runDataPreservationTests(
     const source = readFileSync(file, "utf8");
     assert(marker.test(source) && /getUser\(\)/.test(source),
       `api: ${file.split("/api/")[1]} identifies the caller itself instead of trusting the request`);
+  }
+
+  // The scheduled sweep must prove it authenticates itself, since it has no session to lean on.
+  {
+    const sweep = readFileSync("src/app/api/essay/autonomous/tick/route.ts", "utf8");
+    assert(/CRON_SECRET/.test(sweep) && /authorization/i.test(sweep) && /Bearer/.test(sweep),
+      "api: the assignment sweep demands its own bearer secret instead of trusting the request");
+    assert(/Not authorized/.test(sweep) && /503/.test(sweep),
+      "api: the sweep refuses an unauthenticated caller, and refuses entirely when no secret exists");
+    assert(sweep.indexOf("const secret") < sweep.indexOf("admin = createAdminClient()"),
+      "api: the sweep authenticates the caller BEFORE it creates a privileged client");
   }
 
   // Identity must not be keyed on email: revocation and reinstatement depend on the

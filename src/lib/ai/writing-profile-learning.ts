@@ -11,12 +11,14 @@
  * - It does not analyse, model, or attempt to defeat any AI-detection system.
  * - It makes no claim about who authored any text, and emits no authorship
  *   score, typing speed, pause metric, or "human-ness" estimate.
- * - It cannot be used to fake a revision trail. A previous request asked for
- *   simulated human typing, injected deliberate typos and staggered Word drafts
- *   so a document would *look* written by hand. That was declined and is
- *   recorded in docs/WRITING_PROFILE_LEARNING.md so it is not rebuilt by
- *   accident: manufacturing false evidence of authorship harms the student it
- *   is meant to help.
+ * - It cannot be used to fake a revision trail. That is an INTEGRITY boundary, not a
+ *   product decision: it refuses a mechanism whose only effect is to make text claim an
+ *   authorship it does not have. Recorded in docs/PRODUCT_REQUIREMENTS.md §4, which is
+ *   authoritative.
+ * - GOVERNANCE (2026-11-15): an earlier automated development process recorded the related
+ *   2026-10-29 refusal as a permanent product decision ("do not rebuild it"). That wording
+ *   was removed. Product decisions belong to the Owner; an agent's decision is history. See
+ *   docs/PRODUCT_REQUIREMENTS.md before treating any comment in this file as a rule.
  *
  * The honest value is the opposite of disguise: help the user write more like
  * themselves, consistently, at the level their course expects.

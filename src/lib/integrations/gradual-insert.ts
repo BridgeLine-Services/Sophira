@@ -2,6 +2,10 @@
 //
 // PURPOSE: let a student WATCH a long insertion happen and stay in control of it.
 //
+// GOVERNANCE (2026-11-15): what follows describes what THIS file does. It is not a
+// product decision and does not limit what the Owner may request - the authoritative
+// statement, including the integrity boundary, is docs/PRODUCT_REQUIREMENTS.md.
+//
 // This is NOT a simulation of human authorship. There are no deliberate typos, no
 // invented keystrokes, no manufactured revision trail, and no artificial delay
 // designed to look human. Each chunk is a real Google Docs insertText call, the
