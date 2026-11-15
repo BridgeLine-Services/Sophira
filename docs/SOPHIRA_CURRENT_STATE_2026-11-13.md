@@ -1251,3 +1251,64 @@ file with no words says plainly that nothing was added.
 
 Revert the commit. The route disappears, the library stops being reachable, and rows already
 stored as `source_type = "document"` remain readable by existing code as ordinary sources.
+
+## 20. Round of 2026-11-15 (fourth): a supplied document now counts (Part 9, stage two)
+
+Stage one let a student's file in. Stage two is the part that decides whether it counts, and it
+found three places where the pipeline still assumed every source was a web page. All three
+failed on a file, and one of them failed in a way that harmed the student.
+
+### 20.1 The three defects, and what each did
+
+| Where | What it did to a supplied document |
+|---|---|
+| `formatCitation` | Printed `upload://handout.pdf` in the bibliography: a link no reader could follow. |
+| `/api/research/audit` | Re-fetched every cited source over the network at submission. A file cannot be fetched, so it came back **dead**; the source was marked failed and its claims were **downgraded to unverified**. A student's own handout poisoned their integrity report. |
+| `/api/ai/solve` integrity checks | Compared a search-listing title against a page title and looked the publisher up in a domain registry. Neither means anything for a file, so both checks were meaningless noise. |
+
+### 20.2 The fix, in one shared module
+
+`src/lib/research/document-source.ts` answers one question honestly: is this a file, and if so
+what is the true thing to say about it?
+
+- **Citation** - the entry names the file and says who supplied it (`Handout supplied by the
+  student (rivers.pdf)`). No address is invented, and an ordinary web page keeps its URL
+  unchanged.
+- **Re-checking at submission** - a file has no address, so the only true check is the stored
+  copy: is it still there, does it still carry words, and does its hash still match the file that
+  was added? The result is recorded in `research_verifications` like every other verification,
+  and its note says exactly what was and was not checked.
+- **Standing as evidence** - decided when the file's words were read, by the same classifier a
+  web page goes through. A satire handout or a retracted paper is refused here for the same
+  reason a web page is. A file with no stored verdict is **not** trusted: a student choosing a
+  file is not evidence that the file is authoritative.
+- **Title check** - a file's title is the file's own. There is no listing to correspond with, so
+  the honest check is that a title exists.
+
+No migration, no changed field, no route removed, no response contract broken.
+
+### 20.3 Part 9 status
+
+Documents are now complete end to end for every format Sophira reads: read, classified,
+labelled, quotable, citable, re-checked, and audited by the same code as a web page.
+
+What still cannot be done from here, and why:
+
+- **OCR for scans and transcription for recordings.** Both need a service decision by the owner.
+  Recognised, named and refused honestly until one exists. Nothing is guessed from pixels or
+  audio.
+- **Claims written by the model from document text specifically.** Document text already reaches
+  claim verification (it is a source with an extract, so claims can rest on it). What does not
+  exist is a model pass that reads only the student's file: that needs the AI provider key,
+  which is owner-blocked.
+
+### 20.4 Verification
+
+57 new assertions in `tests/document-source.ts`, covering the file-vs-page distinction, the
+bibliography in all four styles, the stored-copy re-check in both directions, the authority rule
+(usable / satire / retracted / no verdict), and source-level proof that the audit branches
+**before** it ever fetches.
+
+`npm test` 8911/8911, `npx tsc --noEmit` clean, `npm run lint` 0 errors / 33 warnings,
+`npm run build` OK, `npm run verify` PASS, `npm run scan:secrets` CLEAN, accessibility PASS
+(193 files), plain-language audit 0 findings, design-drift 0.

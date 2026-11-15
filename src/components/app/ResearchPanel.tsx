@@ -4,6 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, 
 import type { SourceSummary } from "@/lib/research/source-intelligence";
 import { SourceTypeLabel } from "@/components/app/SourceTypeLabel";
 import { DocumentUpload } from "@/components/app/DocumentUpload";
+import { isUploadedDocumentUrl, uploadedDocumentName } from "@/lib/research/document-source";
 import { Search, ExternalLink, CheckCircle2, XCircle, ShieldAlert, BookOpenCheck, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 
 interface SourceRow {
@@ -392,9 +393,15 @@ export function ResearchPanel({
                   <li key={s.id} className="panel-flat p-3 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={VERIF_TONE[s.verification_status]}>{s.verification_status.replace(/_/g, " ")}</Badge>
-                      <a href={s.final_url || s.original_url} target="_blank" rel="noreferrer" className="font-medium text-ink underline decoration-ink/20 hover:decoration-ink">
-                        {s.title || "(no title extracted)"} <ExternalLink className="inline h-3 w-3" />
-                      </a>
+                      {isUploadedDocumentUrl(s.final_url || s.original_url) ? (
+                        <span className="font-medium text-ink">
+                          {s.title || uploadedDocumentName(s.final_url || s.original_url)} <Badge tone="neutral">your file</Badge>
+                        </span>
+                      ) : (
+                        <a href={s.final_url || s.original_url} target="_blank" rel="noreferrer" className="font-medium text-ink underline decoration-ink/20 hover:decoration-ink">
+                          {s.title || "(no title extracted)"} <ExternalLink className="inline h-3 w-3" />
+                        </a>
+                      )}
                       {s.author && <span className="text-ink-soft">— {s.author}</span>}
                       {s.approval !== "pending" && <Badge tone={s.approval === "approved" ? "success" : "danger"}>{s.approval}</Badge>}
                     </div>
@@ -402,7 +409,9 @@ export function ResearchPanel({
                       <SourceTypeLabel summary={s.authority_decision.source_intelligence} />
                     )}
                     <p className="mt-1 text-xs text-ink-soft">
-                      HTTP {s.http_status ?? "—"} · {s.redirect_count} redirect(s) · {s.content_chars.toLocaleString()} chars retrieved
+                      {isUploadedDocumentUrl(s.final_url || s.original_url)
+                        ? `${s.content_chars.toLocaleString()} characters read from the file you supplied`
+                        : `HTTP ${s.http_status ?? "—"} · ${s.redirect_count} redirect(s) · ${s.content_chars.toLocaleString()} chars retrieved`}
                     </p>
                     {s.verification_notes && <p className="mt-1 text-xs text-ink-soft">{s.verification_notes}</p>}
                     {reverify?.results[s.final_url || s.original_url] && (

@@ -13,6 +13,7 @@ import { subjectBySlug } from "@/lib/courses/engines";
 import { normalizeMethodCompliance } from "@/lib/ai/compliance";
 import { runMachineChecks } from "@/lib/ai/mathverify";
 import { MODE_MAP } from "@/lib/modes";
+import { isUploadedDocumentUrl, uploadedDocumentAuthorityOk } from "@/lib/research/document-source";
 import { formatCitation } from "@/lib/research/citation";
 import { titlesCorrespond } from "@/lib/research/verify";
 import { normalizeClaimCandidates, extractFactualSentences, verifyClaims, buildIntegrityReport, formatIntegrityReport, authorityVerdict, type ClaimCandidate, type ClaimEvidenceRecord, type IntegrityReport } from "@/lib/research/claims";
@@ -277,6 +278,9 @@ export async function POST(request: NextRequest) {
     id: string; title: string; author: string | null; publisher: string | null;
     publication_date: string | null; url: string; accessed: string; doi: string | null; extract: string;
     domain: string; listed_title: string; verification_status: string;
+    // Stored when the source was classified; a supplied document's standing comes from here
+    // because a domain lookup means nothing for a file (Part 9).
+    authority_decision: { teacher_required?: boolean; source_intelligence?: { usable?: boolean } } | null;
   }[] = [];
   let researchCitationStyle = "generic";
   let researchSourceType: string | null = null;
@@ -702,12 +706,18 @@ export async function POST(request: NextRequest) {
     const authority_ok: Record<string, boolean> = {};
     for (const r of researchSources) {
       url_resolves[r.id] = r.verification_status === "verified" || r.verification_status === "partially_verified";
-      title_match[r.id] = titlesCorrespond(r.listed_title, r.title);
+      // A supplied file has no search listing to compare a page title against: the title IS
+      // the file's own, so the honest check is that it has one (Part 9).
+      title_match[r.id] = isUploadedDocumentUrl(r.url) ? Boolean(String(r.title ?? "").trim()) : titlesCorrespond(r.listed_title, r.title);
       // Teacher-required sources satisfy the authority check via their
       // STORED decision; otherwise the deterministic verdict applies.
-      authority_ok[r.id] =
-        authorityVerdict({ domain: r.domain, doi: r.doi }, researchSourceType).ok ||
-        researchAuthorityDecisions[r.id]?.teacher_required === true;
+      // A document's standing was decided when its words were read by the Part 5
+      // classifier and stored with the source; a domain lookup means nothing for a file, and
+      // assuming a student's own file is authoritative would be just as wrong.
+      authority_ok[r.id] = isUploadedDocumentUrl(r.url)
+        ? uploadedDocumentAuthorityOk({ authority_decision: r.authority_decision })
+        : authorityVerdict({ domain: r.domain, doi: r.doi }, researchSourceType).ok ||
+          researchAuthorityDecisions[r.id]?.teacher_required === true;
     }
     integrityReport = buildIntegrityReport(claimRows, {
       url_resolves, title_match, authority_ok,

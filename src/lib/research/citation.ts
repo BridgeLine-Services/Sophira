@@ -6,6 +6,8 @@
  * fabricated. Quotations must appear verbatim in retrieved content.
  */
 
+import { isUploadedDocumentUrl, uploadedDocumentCitationLabel } from "./document-source";
+
 export type CitationStyle = "MLA" | "APA" | "CHICAGO" | "generic";
 
 export interface CitationSource {
@@ -41,6 +43,21 @@ function mlaDate(date: string | null): string {
 
 export function formatCitation(src: CitationSource, style?: string | null): string {
   const st = normalizeStyle(style);
+  // A file the student supplied has no address a reader could follow. Printing one would put
+  // a broken link in a bibliography, so the entry names the file instead (Part 9).
+  if (isUploadedDocumentUrl(src.url)) {
+    const accessedDoc = new Date(src.accessedISO).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+    const authorDoc = src.author?.trim() || null;
+    return [
+      authorDoc ? `${authorDoc}.` : "",
+      `"${src.title}".`,
+      uploadedDocumentCitationLabel(src.url) + ".",
+      `Accessed ${accessedDoc}.`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
   const author = src.author?.trim() || null;
   const publisher = src.publisher?.trim() || null;
   const domain = (() => { try { return new URL(src.url).hostname.replace(/^www\./, ""); } catch { return src.url; } })();

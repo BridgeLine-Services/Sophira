@@ -100,6 +100,7 @@ import { runSourceIntelligenceTests } from "./source-intelligence";
 import { runDoiTests } from "./doi-metadata";
 import { runSourceLabelTests } from "./source-labels";
 import { runDocumentTests } from "./documents";
+import { runDocumentSourceTests } from "./document-source";
 import { runWritingContextTests } from "./writing-contexts";
 import { runTeacherPreferenceTests } from "./teacher-preferences";
 import { runAssignmentMemoryTests } from "./assignment-memory-scope";
@@ -5560,6 +5561,7 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     await runDoiTests(assert, section);
     await runSourceLabelTests(assert, section);
     await runDocumentTests(assert, section);
+    await runDocumentSourceTests(assert, section);
     await runWritingContextTests(assert, section);
     runTeacherPreferenceTests(assert, section);
     // 2026-11-14: the fifth and narrowest memory scope becomes writable by the student.

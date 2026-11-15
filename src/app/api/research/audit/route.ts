@@ -6,6 +6,7 @@ import { wrapUntrusted } from "@/lib/ai/context";
 import { fetchAndVerify } from "@/lib/research/verify";
 import { extractCitationMarkers, quoteInContent, formatCitation } from "@/lib/research/citation";
 import { titlesCorrespond } from "@/lib/research/verify";
+import { isUploadedDocumentUrl, verifyUploadedDocument } from "@/lib/research/document-source";
 import {
   buildIntegrityReport,
   formatIntegrityReport,
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
 
   const { data: sources } = await supabase
     .from("research_sources")
-    .select("id, title, listed_title, author, publisher, publication_date, url:final_url, original_url, domain, retrieval_date, verification_status, approval, content_extract, doi, authority_decision")
+    .select("id, title, listed_title, author, publisher, publication_date, url:final_url, original_url, domain, retrieval_date, verification_status, approval, content_extract, integrity_hash, doi, authority_decision")
     .eq("project_id", projectId)
     .in("approval", ["approved"]);
   const approved = (sources ?? []).filter((s) => (s.verification_status === "verified" || s.verification_status === "partially_verified"));
@@ -156,6 +157,33 @@ export async function POST(request: NextRequest) {
   for (const s of approved) {
     if (!citedIds.has(s.id)) continue;
     const url = (s.url || s.original_url) as string;
+
+    // A supplied file cannot be re-fetched over the web. Re-checking it against the stored
+    // copy is the only true check available, and skipping the check entirely would let a
+    // citation ride on a file that is no longer in the record (Part 9).
+    if (isUploadedDocumentUrl(url)) {
+      const check = verifyUploadedDocument({ content_extract: s.content_extract, integrity_hash: (s as { integrity_hash?: string }).integrity_hash });
+      await supabase.from("research_verifications").insert({
+        user_id: guard.data.user.id,
+        source_id: s.id,
+        http_status: null,
+        final_url: url,
+        reachable: check.reachable,
+        content_chars: check.contentChars,
+        title_match: Boolean(String(s.title ?? "").trim()),
+        notes: check.notes,
+        status: check.status,
+      });
+      if (check.status !== s.verification_status) {
+        await supabase.from("research_sources").update({
+          verification_status: check.status,
+          verification_notes: check.notes,
+        }).eq("id", s.id);
+      }
+      reverify.push({ source_id: s.id, status: check.status, notes: check.notes, live_title: String(s.title ?? "") });
+      continue;
+    }
+
     const v = await fetchAndVerify(url, { timeoutMs: 12_000 });
     let status: string;
     const notes: string[] = [];
