@@ -15,6 +15,7 @@
 import { createServer, type Server } from "http";
 import {
   audioFormatSupport,
+  MAX_AUDIO_BYTES,
   normalizeTranscription,
   transcribeMedia,
 } from "../src/lib/media/transcribe";
@@ -35,6 +36,7 @@ import {
   normalizeDocumentAnalysis,
 } from "../src/lib/extract/analysis";
 import {
+  capabilityOwnerState,
   capabilityStates,
   documentAnalysisCapability,
   fileCapabilities,
@@ -144,6 +146,12 @@ export async function runProviderKeyOptimizationTests(assert: Assert, section: (
   assert(JSON.stringify(normalized.unread) === "[3]",
     "pdf ocr: a page returned with no words is reported unread, not filled in");
   assert(normalized.rejected === 2, "pdf ocr: unrequested or duplicate pages are counted as rejected");
+
+  const poorScan = normalizePdfOcrPayload({ pages: [{ page: 1, text: "Faint unreadable scrawl.", mean_confidence: 41 }] }, [1]);
+  assert(poorScan.pages[0].confidence === "low",
+    "pdf ocr: a poor-quality scan is banded low, so the reader is warned before quoting it");
+  assert(poorScan.pages[0].meanConfidence === 0.41,
+    "pdf ocr: the measured confidence is reported as well as the band");
 
   const noConfidence = normalizePdfOcrPayload({ pages: [{ page: 1, text: "Some words here." }] }, [1]);
   assert(noConfidence.pages[0].confidence === "low" && noConfidence.pages[0].meanConfidence === null,
@@ -300,6 +308,23 @@ export async function runProviderKeyOptimizationTests(assert: Assert, section: (
       "transcription: an unsupported recording is refused BEFORE anything is uploaded");
   } finally {
     await closeServer(asrRefuse.server);
+  }
+
+  let oversizeHits = 0;
+  const oversizeServer = await startServer(() => {
+    oversizeHits++;
+    return { status: 200, json: { segments: [] } };
+  });
+  try {
+    const oversize = await transcribeMedia(Buffer.alloc(MAX_AUDIO_BYTES + 1), "lecture.mp3", "audio/mpeg", {
+      env: { SOPHIRA_ASR_URL: oversizeServer.url },
+    });
+    assert(!oversize.ok && oversizeHits === 0,
+      "transcription: an oversized recording is refused BEFORE the upload, so it never fails halfway");
+    assert(/25 MB/.test(oversize.notes) && /untouched/.test(oversize.notes),
+      "transcription: the oversized message gives the size, the next step, and says the file is untouched");
+  } finally {
+    await closeServer(oversizeServer.server);
   }
 
   const noSpeech = await startServer(() => ({ status: 200, json: { text: "", segments: [] } }));
@@ -483,6 +508,19 @@ export async function runProviderKeyOptimizationTests(assert: Assert, section: (
   const allText = JSON.stringify(bare);
   assert(!allText.includes("reader.example.net") && !allText.includes(SECRET) && !allText.includes("://"),
     "capabilities: no address, token or protocol ever appears in a capability report");
+  assert(capabilityOwnerState("local") === "working" && capabilityOwnerState("available") === "available",
+    "capabilities: what works locally reads 'working', a configured service reads 'available'");
+  assert(capabilityOwnerState("requires_installation") === "not-configured"
+    && capabilityOwnerState("requires_provider_configuration") === "not-configured"
+    && capabilityOwnerState("requires_api_key") === "not-configured",
+    "capabilities: every 'your move, owner' state uses the one existing owner word, not a new one");
+  assert(capabilityOwnerState("temporarily_unavailable") === "problems"
+    && capabilityOwnerState("unsupported_by_hosting") === "not-implemented",
+    "capabilities: a silent service reads 'problems' and a hosting limit reads 'not-implemented'");
+  const ownerStates = ["local", "available", "requires_installation", "requires_provider_configuration", "requires_api_key", "temporarily_unavailable", "unsupported_by_hosting"] as const;
+  assert(ownerStates.every((st) => typeof capabilityOwnerState(st) === "string"),
+    "capabilities: every one of the seven states maps into the owner vocabulary (no blanks)");
+
   assert(stateLabel("temporarily_unavailable") === "Temporarily unavailable" && stateLabel("local").length > 0,
     "capabilities: every state has a plain-English label for the owner screen");
   assert(inProcessMediaCapability().ownerDetail.toLowerCase().includes("serverless"),

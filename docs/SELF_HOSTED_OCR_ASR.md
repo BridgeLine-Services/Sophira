@@ -108,6 +108,9 @@ Both are open source. No account, no key, no invoice.
 - **Speakers are only claimed when the engine supplies them.** Otherwise the
   member is told plainly that speaker separation is unavailable.
 - **The original file is always kept** in private storage.
+- **A recording over 25 MB is refused before the upload** (2026-11-15), with the
+  size, the next step (split it) and the fact that the file is untouched. A 413
+  halfway through a two-hour lecture is not an acceptable way to learn this.
 - **Tokens never appear** in results, messages or logs.
 - **Public endpoints must use HTTPS.** Media is member data; a plain-http
   public address is refused. Loopback/private addresses may stay http (that is
@@ -147,7 +150,9 @@ Where they are wired:
 `available` is only ever green when a probe answered; a configured service that
 nobody has pinged is `available` with `verified: false`, which never counts as
 usable. `/api/health` publishes the states (no URLs, hosts or tokens) and
-`/api/provider-status` gives the owner the full list with the next step.
+`/api/provider-status` gives the owner the full list with the next step, and
+Owner > AI Providers renders it in the ONE owner vocabulary (Part 13) through
+`capabilityOwnerState`, so the owner is never asked to learn a second set of words.
 The serverless limit is itself a state (`unsupported_by_hosting`), not a footnote.
 
 **Not built yet (next, in order):**

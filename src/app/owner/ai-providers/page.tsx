@@ -7,6 +7,8 @@ import { ModelCheck } from "@/components/app/ModelCheck";
 import { requireOwnerPage } from "@/lib/owner/page-context";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
 import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
+import { capabilityOwnerState, fileCapabilities } from "@/lib/capabilities/file-capabilities";
+import { probeSelfHosted } from "@/lib/media/selfhost";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,15 @@ export default async function OwnerAiProvidersPage() {
   const diag = providerDiagnostics(env);
   const setup = providerSetupStatus();
   const paid = paidAllowed(env);
+
+  // 2026-11-15: what Sophira can do with a file the member brings. Both services are asked
+  // (1.5s each, in parallel) so "Available" means something answered, and "Problems" means a
+  // configured service did not. Nothing here costs a key: these are the owner's own services.
+  const [ocrProbe, asrProbe] = await Promise.all([
+    probeSelfHosted("ocr", { timeoutMs: 1500 }),
+    probeSelfHosted("asr", { timeoutMs: 1500 }),
+  ]);
+  const fileRows = fileCapabilities(process.env, { ocr: ocrProbe, asr: asrProbe });
 
   const rows = [
     {
@@ -84,6 +95,45 @@ export default async function OwnerAiProvidersPage() {
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="divide-y divide-line p-0">
+            <div className="p-4">
+              <p className="text-sm font-medium text-ink">Reading the files members bring</p>
+              <p className="mt-1 text-xs text-ink-soft">
+                Typed text is read here on the server with no service at all. Scans and recordings use
+                the reader and transcriber you run yourself, which is why they need no key and send
+                nothing to another company.
+              </p>
+            </div>
+            {fileRows.map((row) => {
+              const ownerState = capabilityOwnerState(row.state);
+              return (
+                <div key={row.id} className="flex items-start gap-3 p-4">
+                  <span
+                    aria-hidden
+                    className={
+                      "mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full " +
+                      (row.state === "local" || row.verified ? "bg-accent" : "bg-line")
+                    }
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
+                      {row.label}
+                      <Badge tone={stateTone(ownerState)}>{stateLabel(ownerState)}</Badge>
+                    </p>
+                    <p className="mt-0.5 text-xs text-ink-soft">{row.ownerDetail}</p>
+                    {!row.verified && row.state === "available" && (
+                      <p className="mt-0.5 text-xs text-ink-soft">
+                        Set up, but nothing answered a check just now, so this is not claimed as working.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 

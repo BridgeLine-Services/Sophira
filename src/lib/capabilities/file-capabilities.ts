@@ -28,6 +28,7 @@
  */
 import { readSelfHostedConfig } from "../media/selfhost";
 import { providerDiagnostics, readAiEnv, type AiEnv } from "../ai/provider";
+import type { FeatureState } from "../owner/feature-catalog";
 
 export type CapabilityState =
   | "local"
@@ -83,6 +84,31 @@ export const CAPABILITY_STATE_LABELS: Record<CapabilityState, string> = {
   temporarily_unavailable: "Temporarily unavailable",
   unsupported_by_hosting: "Not possible on this hosting",
 };
+
+/**
+ * The owner screens already have ONE readiness vocabulary (Part 13: working, available,
+ * not-configured, problems, unavailable, not-implemented). Rather than teach the owner a
+ * second set of words, every file capability is shown through that existing vocabulary.
+ * "Needs a key" and "needs setup" are both the owner's job, so both read "not-configured";
+ * a service that was configured and did not answer reads "problems"; a serverless limit reads
+ * "not-implemented" because nothing the owner configures will change it.
+ */
+export function capabilityOwnerState(state: CapabilityState): FeatureState {
+  switch (state) {
+    case "local":
+      return "working";
+    case "available":
+      return "available";
+    case "requires_installation":
+    case "requires_provider_configuration":
+    case "requires_api_key":
+      return "not-configured";
+    case "temporarily_unavailable":
+      return "problems";
+    case "unsupported_by_hosting":
+      return "not-implemented";
+  }
+}
 
 export function stateLabel(state: CapabilityState): string {
   return CAPABILITY_STATE_LABELS[state];

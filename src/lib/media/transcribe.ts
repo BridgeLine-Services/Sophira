@@ -177,6 +177,14 @@ export function normalizeTranscription(json: unknown): {
   };
 }
 
+/**
+ * The size a Whisper-compatible server will actually accept in one request.
+ * 25 MB is the common ceiling (`whisper.cpp`, `faster-whisper`, and the hosted
+ * APIs all agree on it). Refusing above it BEFORE the upload keeps a two-hour
+ * lecture from failing halfway with an opaque 413.
+ */
+export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+
 export async function transcribeMedia(
   bytes: Uint8Array,
   filename: string,
@@ -200,6 +208,11 @@ export async function transcribeMedia(
     return empty("No self-hosted transcription service is configured, so Sophira does not claim to transcribe audio or video.");
   }
   if (bytes.byteLength === 0) return empty("The file was empty, so there was nothing to transcribe. Your original file was kept.");
+  if (bytes.byteLength > MAX_AUDIO_BYTES) {
+    return empty(
+      "This recording is larger than 25 MB, which is more than the transcriber accepts in one request. Split it into shorter parts and add them one at a time; the recording you added is untouched."
+    );
+  }
   const formatCheck = audioFormatSupport(filename, mime);
   if (!formatCheck.supported) {
     return empty(formatCheck.reason || "This recording is in a format Sophira's transcriber cannot read. Convert it and add it again.");
