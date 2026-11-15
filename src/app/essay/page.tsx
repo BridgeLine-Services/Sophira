@@ -102,14 +102,24 @@ function EssayPageInner() {
     }
   }, []);
 
+  // A link from the assignment-run screen names the essay it delivered, so opening that link
+  // restores that piece even if it is not the one this device opened last.
+  const requestedSession = searchParams.get("session");
+
   useEffect(() => {
     void loadProfile();
-    // restore the last session on reopen (progress restore is per-section below)
+    // restore the requested session first, otherwise the last one this device opened
+    // (progress restore is per-section below)
     try {
+      if (requestedSession) {
+        localStorage.setItem("sophira:essay:last-session", requestedSession);
+        void restoreSession(requestedSession);
+        return;
+      }
       const lastId = localStorage.getItem("sophira:essay:last-session");
       if (lastId) void restoreSession(lastId);
     } catch { /* storage unavailable */ }
-  }, [loadProfile, restoreSession]);
+  }, [loadProfile, restoreSession, requestedSession]);
 
   async function createPlan() {
     if (!form.question.trim()) { toast("error", "Describe the assignment first."); return; }

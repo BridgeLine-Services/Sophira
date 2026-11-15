@@ -16,6 +16,7 @@
  *     calls `canClaimCompletion` first.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { deliverRunToLibrary, DELIVERY_NEEDS_LIBRARY } from "./delivery";
 import { aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
 import { AI_NOT_CONFIGURED_MESSAGE } from "@/lib/ai/provider";
 import { wrapUntrusted } from "@/lib/ai/context";
@@ -508,6 +509,20 @@ export async function advanceRun(
     } else if (action.kind === "complete") {
       adjusted = { ...adjusted, completion_claim: completionClaim(adjusted) };
       did = "finished and recorded the verdict";
+
+      // The hand-off (Part 6): the finished text must be in the student's own essay library
+      // before the run may be called complete. A run whose essay cannot be found is not finished.
+      const delivered = await deliverRunToLibrary(supabase, userId, adjusted);
+      if (delivered.error || !delivered.sessionId) {
+        const blocked = blockRun(adjusted, delivered.error ?? DELIVERY_NEEDS_LIBRARY, nowMs);
+        const err = await saveRun(supabase, userId, blocked);
+        if (err) return { status: "failed", run: blocked, view: view(blocked), reason: err };
+        return { status: "blocked", run: blocked, view: view(blocked), reason: blocked.last_error ?? DELIVERY_NEEDS_LIBRARY };
+      }
+      adjusted = { ...adjusted, essay_session_id: delivered.sessionId };
+      did = delivered.created
+        ? "finished, checked, and put the piece in your library"
+        : "finished, checked, and updated the piece in your library";
     }
 
     adjusted = { ...adjusted, lease_token: null, lease_expires_at: null };

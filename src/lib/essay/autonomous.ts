@@ -139,6 +139,8 @@ export interface RunRecord {
   sections: RunSection[];
   final_verification: FinalVerification | null;
   findings: RunFinding[];
+  /** The essay this run delivered into the student's library, once it finished. */
+  essay_session_id: string | null;
   request: RunRequest;
   context?: CapturedContext | null;
   last_error: string | null;
@@ -175,6 +177,7 @@ export function newRun(params: {
     sections: [],
     final_verification: null,
     findings: [],
+    essay_session_id: null,
     request: params.request,
     context: null,
     last_error: null,
@@ -623,6 +626,8 @@ export interface RunView {
   feasibility: Feasibility;
   /** Never the full text: the library is the place for that. */
   sectionCount: number;
+  /** The essay this run delivered, or null before it finished. */
+  documentSessionId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -640,6 +645,7 @@ export function runView(run: RunRecord, nowMs: number, env: EnvLike = process.en
     canRetry: canRetry(run),
     feasibility: feasibility(run, nowMs),
     sectionCount: run.sections.length,
+    documentSessionId: run.essay_session_id,
     createdAt: run.created_date,
     updatedAt: run.updated_date,
   };

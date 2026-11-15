@@ -1417,3 +1417,45 @@ it depends on is documented), tsc clean, lint 0 errors / 33 warnings, build OK, 
 findings, design drift 0, secret scan CLEAN, inventory 83 pages / 117 API routes. Live checks
 still blocked on the same owner credentials as before: no signed-in member session, no AI
 provider key, so no run has been observed progressing against the real provider yet.
+
+---
+
+## §23. The hand-off: a finished run becomes an essay the student can open (2026-11-15)
+
+This round closed the last hole in the autonomous path, and it was a real one: a run could reach
+"completed" with every section written and verified, and the piece existed **only** inside
+`assignment_runs` — a table no student screen reads. The work was genuine and unreachable.
+
+### 23.1 What now happens
+
+`src/lib/essay/delivery.ts` places the finished text into `essay_sessions`, the table the essay
+workspace already reads and the manual workflow already writes, in the same stage
+(`final_verification`) and status (`verified`) the manual path reaches. The outline is recorded
+as approved because the runner drafted every section against it, the verification result travels
+with the piece, and the assignment, course and teacher the run was started for are kept.
+
+The runner calls delivery as part of its completion step. **If delivery fails, the run is blocked,
+not finished** — an essay the student cannot find is not a delivered essay, and the screen says so
+in those words.
+
+### 23.2 Why it cannot duplicate the work
+
+The run stores the id of the essay it created (`assignment_runs.essay_session_id`, a column that
+existed from the start and was never written). A retry updates that same essay. If the student
+deleted it, delivery creates a fresh one rather than reporting a delivery that no longer exists.
+Every read and write is filtered on the student's own `user_id` through their signed-in client;
+the service role never touches a member's essay.
+
+### 23.3 How the student finds it
+
+The run list now links "Open the finished piece" straight to `/essay?session=<id>`, and the essay
+workspace honours that parameter, so a delivered piece opens even on a device that has never
+opened it and becomes the session that device reopens next time.
+
+### 23.4 Verification
+
+Suite 9358/9358 (26 new assertions: the refusal gate, the stored columns, the idempotent retry,
+the runner's block-on-failure, and the link both ends), tsc clean, lint 0 errors / 33 warnings,
+build OK, jargon 0, design drift 0, secret scan CLEAN. Still unverified live: delivery has not
+been exercised against the real database, because that needs a signed-in member account and an AI
+provider key so a run can actually complete.

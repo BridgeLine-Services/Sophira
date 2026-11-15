@@ -40,6 +40,7 @@ export interface RunRow {
   sections: RunSection[];
   final_verification: FinalVerification | null;
   findings: RunFinding[];
+  essay_session_id: string | null;
   progress: { context?: CapturedContext | null } | null;
   request: RunRequest;
   last_error: string | null;
@@ -69,6 +70,7 @@ export function toRecord(row: RunRow): RunRecord {
     sections: Array.isArray(row.sections) ? row.sections : [],
     final_verification: row.final_verification ?? null,
     findings: Array.isArray(row.findings) ? row.findings : [],
+    essay_session_id: row.essay_session_id ?? null,
     request: (row.request ?? { question: "" }) as RunRequest,
     context: row.progress?.context ?? null,
     last_error: row.last_error,
@@ -96,6 +98,7 @@ export function toRowPatch(run: RunRecord): Record<string, unknown> {
     sections: run.sections,
     final_verification: run.final_verification,
     findings: run.findings,
+    essay_session_id: run.essay_session_id,
     progress: { context: run.context ?? null },
     last_error: run.last_error,
     completion_claim: run.completion_claim,
@@ -107,7 +110,7 @@ export function toRowPatch(run: RunRecord): Record<string, unknown> {
 }
 
 const COLUMNS =
-  "id, user_id, state, step_index, total_steps, attempt, max_attempts, lease_token, lease_expires_at, plan, outline, outline_approved, sections, final_verification, findings, progress, request, last_error, completion_claim, deadline, started_at, finished_at, cancelled_at, created_date, updated_date";
+  "id, user_id, state, step_index, total_steps, attempt, max_attempts, lease_token, lease_expires_at, plan, outline, outline_approved, sections, final_verification, findings, essay_session_id, progress, request, last_error, completion_claim, deadline, started_at, finished_at, cancelled_at, created_date, updated_date";
 
 export async function loadRun(
   supabase: SupabaseClient,

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Spinner, useToast } from "@/components/ui";
-import { ListChecks, Play, RotateCw, X, AlertCircle } from "lucide-react";
+import { ListChecks, Play, RotateCw, X, AlertCircle, FileText } from "lucide-react";
+import Link from "next/link";
 
 /**
  * AUTONOMOUS ASSIGNMENT RUNS (directive 2026-11-15, Part 4 and Part 7).
@@ -39,6 +40,7 @@ interface RunView {
   canRetry: boolean;
   feasibility: { feasible: boolean; verdict: string; remainingSteps: number; estimatedSeconds: number };
   sectionCount: number;
+  documentSessionId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -241,6 +243,14 @@ export function AutonomousRuns() {
                     <div className="h-full rounded-full bg-accent" style={{ width: `${run.progress.percent}%` }} />
                   </div>
                   <p className="text-xs text-ink-soft">{run.progress.percent}% · {run.progress.label}</p>
+
+                  {run.documentSessionId && (
+                    <p className="text-xs text-ink-soft">
+                      <Link href={`/essay?session=${run.documentSessionId}`} className="inline-flex items-center gap-1 underline">
+                        <FileText className="h-3 w-3" /> Open the finished piece
+                      </Link>
+                    </p>
+                  )}
 
                   {run.completionClaim ? (
                     <p className="text-xs text-ink-soft">{run.completionClaim}</p>
