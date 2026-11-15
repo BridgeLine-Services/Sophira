@@ -1002,3 +1002,110 @@ owner business details, and backup/restore credentials. Each one is the gate on 
 cannot be faked: live AI readiness and the model benchmark (needs the inference server URL),
 live research (needs `SEARCH_API_KEY`), the signed-in isolation matrices, device acceptance for the
 PWA and APK, the legal placeholders, and a restore drill.
+
+## 17. Round of 2026-11-15: source intelligence and the source registry (directive Part 5 and Part 4)
+
+The 2026-11-15 directive asked for a dedicated source-intelligence engine - satire, parody,
+opinion, fiction, sponsorship, peer review, retraction and claim verification - and a
+configurable registry of supported sources. The audit confirmed neither existed: the repository
+had authority ranking (`authority.ts`), claim-to-passage tracing (`claims.ts`) and the 12-step
+citation invariant (`citation-invariant.ts`), but nothing that answered "what KIND of source is
+this, and is it usable as evidence". Both are now built, as new files. No existing module was
+rewritten, and no existing test was removed.
+
+### 17.1 What was changed, and why
+
+| Change | Why it was necessary |
+|---|---|
+| New `src/lib/research/source-registry.ts` | Part 4 asks for a registry recording name, category, description, official site, retrieval method, API availability, authentication, restrictions, licensing, content types, reliability and last successful verification. None of that existed as data. |
+| New `src/lib/research/source-intelligence.ts` | Part 5: "the repository audit did not find a dedicated satire and misinformation classifier." Correct - there was none, and authority ranking cannot say "this is satire but its factual claim may still be true". |
+| New `tests/source-intelligence.ts`, registered in `tests/run.ts` | Part 14 requires tests for every new feature; 214 assertions, all offline. |
+
+### 17.2 Files
+
+New: `src/lib/research/source-registry.ts` (95 sources across 13 categories), `src/lib/research/source-intelligence.ts`,
+`tests/source-intelligence.ts`. Modified: `tests/run.ts` (one import, one call - no existing test
+deleted or changed), this document.
+
+### 17.3 The rule that was enforced in code, not in prose
+
+Part 4 states: *"A website must not be marked connected simply because its name exists in a
+configuration file."* `sourceStatus()` therefore requires a capability that can actually reach the
+source AND a recorded live check (`lastVerified`) inside a 90-day window before it may say
+*Connected*. Everything else reports one of the six words the owner dashboard already uses:
+
+- **Connected** - capability present and a live check succeeded recently.
+- **Available** - capability present, never checked on this installation.
+- **Requires owner setup** - needs a key that is not set, or web search is switched off.
+- **Not connected** - licensed or account-gated; Sophira only links the student to it.
+- **Needs attention** - the last successful check is older than 90 days.
+- **Unavailable** - no usable retrieval path.
+
+On a fresh install the count of Connected is **zero**, and a test pins that.
+
+### 17.4 Satire, and the rule that satire is not a lie
+
+The classifier records *formats* (plural) and one primary format. A satirical article keeps both
+labels, and a satirical publication is a strong **initial** signal rather than the final decision:
+the section decides, so a reported feature in *The New Yorker* is not satire while the Borowitz
+Report inside it is. A claim supported only by satire returns `satirical_only` - never `false` -
+and the explanation says that whether the underlying event happened is a separate question needing
+normal sources.
+
+### 17.5 Security and database implications
+
+No migration, no schema change, no new table, no new dependency, no network call, no environment
+variable read. The government boundary is untouched and re-tested with six new adversarial
+wordings; the six public-access cases it must keep allowing are re-asserted beside them.
+
+### 17.6 Verification actually run
+
+`npm test` 8645/8645 (baseline was 8431, so 214 new), `npx tsc --noEmit` clean, `npm run lint`
+0 errors / 33 warnings (unchanged ceiling), `npm run build` OK, `npm run verify` PASS,
+`npm run scan:secrets` CLEAN, release gate 41 checks / 25 PASS / 1 FAIL / 14 BLOCKED / 1 NOT RUN
+(unchanged from the previous round; every blocker is an owner credential or device),
+design-drift 0, accessibility PASS (187 files), contrast PASS (32 pairs, both themes),
+plain-language audit 0 findings, conformance 82 routes, inventory 82 pages / 110 API routes.
+
+### 17.7 Rollback
+
+Revert the commit. Both new modules are imported only by their own test file, so nothing in the
+running application changes behaviour until a later round wires them into a route.
+
+### 17.8 What this does NOT do
+
+Retrieval adapters for the registry are not implemented in this round: the registry records how
+each source *may* be reached, and no adapter is registered yet, so nothing is reported as
+Available that cannot genuinely run. Live classification of a real URL needs `SEARCH_API_KEY`
+and the `fetchAndVerify` pipeline, which is unchanged.
+
+### 17.9 Part 6, in the same round: DOI metadata validation
+
+Part 6 items 1-5 (DOI resolution, venue verification, author metadata, peer-review status,
+retraction and correction) had no implementation: a DOI was treated as a string that made a
+source peer reviewed. That was wrong in both directions - most preprint servers register DOIs
+(bioRxiv, medRxiv, SSRN, arXiv, PsyArXiv, Preprints.org, Research Square), and a registered DOI
+can be retracted afterwards, so a retracted paper passed the old check.
+
+New `src/lib/research/doi.ts`, with the network call injected so the judgement is testable
+offline, plus `tests/doi-metadata.ts` (64 assertions):
+
+- **Syntax and extraction.** A bare DOI, a `doi:` prefix and a `https://doi.org/...` address all
+  normalise to the same identifier; trailing punctuation is not part of it; absent stays absent.
+- **Registration record.** Title, venue, publisher, work type, licence, authors (person or
+  organisation, in order) and the publication date are read from the record. A missing date stays
+  missing and is never replaced with today, and a year-only date is not padded with a fake month.
+- **Peer review is never assumed.** A journal-article DOI returns `research_unconfirmed`, with a
+  sentence saying why: registration does not record review. A preprint server returns `preprint`
+  and is never citable as reviewed research.
+- **Retraction and correction.** `update-to` entries (retraction, correction, expression of
+  concern) and `is-retracted-by` relations are caught; a retracted work is not usable and says so
+  in plain words; a corrected work stays usable with the correction noted.
+- **Four resolution states, never confused.** `resolved`, `not_registered`, `invalid` and
+  `unavailable`. A network failure is `unavailable` and says the citation is unconfirmed and
+  nothing was invented - it is never reported as "not registered", which would be a false claim
+  about the work. The live call has an 8-second timeout and only a 404 means "not registered".
+
+No migration, no schema change, no key, no environment variable. Not yet wired into a route: the
+citation gate still reports its existing four statuses exactly as before (pinned by a test), so
+this is a validated extension waiting for the round that mounts it.
