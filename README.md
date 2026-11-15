@@ -4,9 +4,10 @@ A private, invite-only AI academic assistant. Sophira adapts to your courses,
 your teachers' exact requirements, and your own writing style — from
 elementary school through PhD work — and installs on your phone as an app.
 
-Built with Next.js 16.4 (App Router) and React 19.3, Supabase (auth +
+Built with Next.js 16.4.6 (App Router) and React 19.3.1, Supabase (auth +
 database + private storage, row-level security on every table), and a
-free-first AI stack. Runs on Node.js 20.9 or newer (22 recommended). The
+free-first AI stack. Runs on Node.js 22: `.nvmrc` pins 22 and `package.json`
+requires `22.x`, so an older Node is refused rather than half-working. The
 authentication entry point is `src/proxy.ts` — Next.js 16 renamed the old
 `middleware` file convention to `proxy`; the rules inside it are unchanged.
 
@@ -43,7 +44,8 @@ authentication entry point is `src/proxy.ts` — Next.js 16 renamed the old
 1. **Get the code.** In a terminal:
    `git clone https://github.com/BridgeLine-Services/Sophira.git && cd Sophira`
    (no Git? On the repository page: Code → Download ZIP, then unzip).
-   Install Node.js 20+ from nodejs.org.
+   Install Node.js 22 from nodejs.org (the version `.nvmrc` pins and
+   `package.json` requires).
 2. **Install and configure.** Run `npm run setup` — it installs
    dependencies, creates `.env.local` from the generated `.env.example`, and
    validates your configuration without ever printing secret values. Then
@@ -54,7 +56,7 @@ authentication entry point is `src/proxy.ts` — Next.js 16 renamed the old
    `SUPABASE_SERVICE_ROLE_KEY`).
 4. **Run it.** `npm run dev` → http://localhost:3000. For a deployed app,
    open `/setup` and click **Set Up Sophira** — the app applies its own
-   migration chain (all 45 migrations, `0001`–`0045`) from inside the app. No SQL editor, ever.
+   migration chain (all 58 migrations, `0001`–`0058`) from inside the app. No SQL editor, ever.
 5. **Create the owner account.** With no owner yet, the sign-in screen shows
    **Create Owner Account** (also at **/create-owner**). Enter your email and
    choose your own password: migration 0025 makes the FIRST completed
