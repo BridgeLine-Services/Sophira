@@ -1371,3 +1371,49 @@ and the analysis route's auth, ordering, retention and no-logging pins.
 
 Suite 9017/9017, tsc clean, lint 0 errors / 33 warnings, build OK, verify PASS, secret scan
 CLEAN, plain-language audit 0 findings, design-drift 0, inventory 82 pages / 112 API routes.
+
+---
+
+## §22. The screen and the worker behind autonomous runs (2026-11-15)
+
+The runner had a state machine, a lease, a duplicate-run index, five routes and a migration, and
+still could not be used: there was no screen to start a run and nothing on a schedule to advance
+one. A capability nobody can reach is not a capability, so this round added the two ends.
+
+### 22.1 The screen
+
+`/writing/autonomous` plus `src/components/app/AutonomousRuns.tsx`. It starts a run from the
+student's own description of the assignment, then reports what the server stored: the runner's
+measured progress and the count behind it, the server's own completion sentence and never one
+written in the screen, every limitation the run recorded, the last error, how much work the
+runner estimates is left, and where the work continues. With the feature switched off it says so
+and names the manual workflow as still working, instead of showing a dead button.
+
+Reached from the writing workspace and from the workspace navigation, with an inventory row.
+
+### 22.2 The worker
+
+`.github/workflows/autonomous-sweep.yml` posts to the existing `/api/essay/autonomous/tick`
+every fifteen minutes with the password that endpoint requires. It exists because the
+continuation sentence shown to a student already claimed a scheduled job advances their run;
+without this file that sentence was a promise nothing kept.
+
+It makes no request at all when the password has not been added, has `contents: read`, never
+echoes the password, keeps shell tracing off, and treats a refusal, a timeout or an unreachable
+app as "nothing advanced" rather than as progress. With the feature switch off the endpoint
+replies that it skipped, and the job still exits cleanly.
+
+### 22.3 What the owner has to do for it, and it is only this
+
+Set `CRON_SECRET` in Vercel and again in GitHub (Settings, Secrets and variables, Actions) with
+the same value, set `SOPHIRA_AUTONOMOUS_ESSAY=1`, and only then set
+`SOPHIRA_AUTONOMOUS_SCHEDULE=1`. All three are documented in `docs/ENVIRONMENT_VARIABLES.md` in
+plain words, with the warning that the schedule sentence is true only when both are set.
+
+### 22.4 Verification
+
+Suite 9332/9332 (20 new assertions on the sweep, its password handling, and that every variable
+it depends on is documented), tsc clean, lint 0 errors / 33 warnings, build OK, jargon audit 0
+findings, design drift 0, secret scan CLEAN, inventory 83 pages / 117 API routes. Live checks
+still blocked on the same owner credentials as before: no signed-in member session, no AI
+provider key, so no run has been observed progressing against the real provider yet.
