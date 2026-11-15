@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
-import { extractDocument, extractionMessage, type DocumentExtraction } from "@/lib/research/documents";
+import { extractionMessage } from "@/lib/research/documents";
+import { intakeDocument } from "@/lib/research/document-intake";
 import { assessSource, summarizeSourceAssessment } from "@/lib/research/source-intelligence";
 
 export const runtime = "nodejs";
@@ -52,7 +53,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "That file is larger than 12 MB. Add a smaller copy or split it up." }, { status: 413 });
   }
 
-  const extraction: DocumentExtraction = extractDocument(bytes, { filename });
+  // 2026-11-15 (directive: provider-key optimisation): a scan is now read by the
+  // installation's own page reader when that is set up. When it is not, the file is still
+  // refused honestly and nothing is invented. `scan` says exactly what happened.
+  const intake = await intakeDocument(bytes, { filename });
+  const extraction = intake.extraction;
 
   const projectId = (body.project_id || "").trim();
   const userId = guard.data.user.id;
@@ -140,6 +145,8 @@ export async function POST(request: NextRequest) {
       notes: extraction.notes,
       // A preview, not the whole document: enough to show the student the words were read.
       preview: extraction.text.slice(0, 600),
+      // Additive: what the page reader did, or null when the file was text all along.
+      scan: intake.scan,
       source_id: sourceId,
     },
   });

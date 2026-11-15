@@ -8,6 +8,7 @@
  */
 
 import "./helpers/alias"; // must be first: maps "@/..." for the compiled suites
+import { runProviderKeyOptimizationTests } from "./provider-key-optimization";
 import { hostIs, mentionsHost, schemeIs } from "./helpers/url";
 import { composeAcademicContext, findSourceConflicts, activeDocs, wrapUntrusted, detectInjectionAttempt } from "../src/lib/ai/context";
 import { routeSubject, routeMathTopic } from "../src/lib/ai/subjects";
@@ -4032,7 +4033,8 @@ async function runPdfExtractionTests(): Promise<void> {
     "pdf: when both parsers fail the result is honestly empty, never a fabricated success");
 
   const route = fs.readFileSync("src/app/api/extract/route.ts", "utf8");
-  assert(route.includes("extractPdfText") && route.includes('via === "none"'),
+  const reader = fs.readFileSync("src/lib/extract/read.ts", "utf8");
+  assert(route.includes('from "@/lib/extract/read"') && reader.includes("extractPdfWithOcr") && reader.includes('via === "none"'),
     "pdf: the extract route reports failure from the helper instead of an inline parser call");
   const rep = fs.readFileSync("docs/AI_CAPABILITY_IMPROVEMENT_FINAL_REPORT.md", "utf8");
   assert(/BLOCKED/.test(rep) && /eslint is NOT installed/.test(rep) && /never reported as passing/i.test(rep),
@@ -5567,6 +5569,9 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     // 2026-11-14: the fifth and narrowest memory scope becomes writable by the student.
     runAssignmentMemoryTests(assert, section);
     runModelBenchmarkTests(assert, section);
+    // 2026-11-15: the file pipeline reuses the existing provider, reads scans locally and
+    // reports seven honest capability states instead of claiming a service is connected.
+    await runProviderKeyOptimizationTests(assert, section);
     await runOwnerStatusVocabularyTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

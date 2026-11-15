@@ -117,8 +117,13 @@ export async function runExtractionProvenanceTests(): Promise<{ passed: number; 
 
     // ---- additive-only contract pins -------------------------------------
     const route = readFileSync("src/app/api/extract/route.ts", "utf8");
-    assert(route.includes("provenance: buildPdfProvenance("), "3a: the extract route attaches provenance to PDF results");
-    assert(route.includes('confidence: "failed"') && route.includes('text,'), "3a: the existing response fields (text/confidence/notes) are unchanged");
+    const reader = readFileSync("src/lib/extract/read.ts", "utf8");
+    assert(route.includes('from "@/lib/extract/read"'),
+      "3a: the extract route delegates to the ONE shared reader, so there is no second copy of extraction");
+    assert(reader.includes("buildPdfProvenance(") && route.includes("provenance"),
+      "3a: the extract route attaches provenance to PDF results");
+    assert(reader.includes('confidence: "failed"') && reader.includes("text,"),
+      "3a: the existing response fields (text/confidence/notes) are unchanged");
     const pdfSrc = readFileSync("src/lib/extract/pdf.ts", "utf8");
     assert(pdfSrc.includes("pages?: { page: number; text: string }[] | null"), "3a: PdfExtraction gains pages additively (optional field)");
     assert(pdfSrc.includes("pdf-parse cannot report page boundaries"), "3a: the primary path documents WHY pages are null");

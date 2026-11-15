@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/supabase/guard";
 import { providerDiagnostics, readAiEnv, paidAllowed } from "@/lib/ai/provider";
+import { fileCapabilities, summarizeCapabilities } from "@/lib/capabilities/file-capabilities";
+import { probeSelfHosted } from "@/lib/media/selfhost";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +65,12 @@ export async function GET() {
         ? "Cost unknown — paid provider enabled by explicit owner configuration"
         : "No remote provider active — on-device model costs nothing to run";
 
+  // 2026-11-15 (directive: provider-key optimisation, part 4). The owner's own view of what
+  // the file pipeline can do. Each service is asked, so "available" here means something
+  // answered; "needs setup" means nothing is installed; nothing here costs a new key.
+  const [ocrProbe, asrProbe] = await Promise.all([probeSelfHosted("ocr"), probeSelfHosted("asr")]);
+  const fileCapabilityList = fileCapabilities(process.env, { ocr: ocrProbe, asr: asrProbe });
+
   const remainingQuota =
     diag.activeProvider === "gemini"
       ? "Unknown — Google does not expose remaining free-tier quota through the API; rate-limit errors are surfaced honestly when hit"
@@ -88,5 +96,7 @@ export async function GET() {
     usageNote,
     cost,
     remainingQuota,
+    // Additive block: seven honest states per file capability, with what to do next.
+    fileCapabilities: summarizeCapabilities(fileCapabilityList),
   });
 }

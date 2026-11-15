@@ -1,6 +1,8 @@
 import { searchProviderConfigured } from "../../../lib/research/provider";
 import { providerSetupStatus } from "../../../lib/integrations/setup-status";
 import { healthConfiguration } from "../../../lib/env";
+import { capabilityStates, fileCapabilities } from "../../../lib/capabilities/file-capabilities";
+import { probeSelfHosted } from "../../../lib/media/selfhost";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,19 @@ export async function GET(request: Request) {
   const deep = new URL(request.url).searchParams.get("deep") === "1";
   const checks: DeepChecks | undefined = deep ? await deepChecks() : undefined;
 
+  // 2026-11-15 (directive: provider-key optimisation, part 4). Reading a PDF, reading a
+  // scan, transcribing a recording and looking closely at a file each report one of seven
+  // honest states. On the cheap path a configured service is "available, unverified"; only
+  // ?deep=1 asks the services themselves, so a green answer here means something answered.
+  const fileCapabilityPayload = deep
+    ? capabilityStates(
+        fileCapabilities(process.env, {
+          ocr: await probeSelfHosted("ocr"),
+          asr: await probeSelfHosted("asr"),
+        })
+      )
+    : capabilityStates(fileCapabilities(process.env));
+
   return Response.json(
     {
       ok: true,
@@ -58,6 +73,8 @@ export async function GET(request: Request) {
         invitation_email: providerSetupStatus().email,
         sms: providerSetupStatus().sms,
       },
+      // Additive: file-processing states only (no URLs, hosts, tokens or vendor names).
+      file_processing: fileCapabilityPayload,
       // Present only when asked for: the cheap path stays cheap.
       ...(checks ? { checks } : {}),
     },

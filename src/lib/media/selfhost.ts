@@ -82,6 +82,12 @@ export interface ProbeResult {
   healthy: boolean;
   /** plain-English status; never contains a URL, token, or file content */
   detail: string;
+  /**
+   * 2026-11-15: what the service said about reading PDF pages.
+   * true = it offers the page route, false = it does not, null = it did not say.
+   * Never assumed: a service that stays silent is "unknown", not "yes".
+   */
+  pdf?: boolean | null;
 }
 
 /**
@@ -117,12 +123,21 @@ export async function probeSelfHosted(
       return {
         configured: true,
         healthy: false,
+        pdf: null,
         detail: `The self-hosted ${kind.toUpperCase()} service answered with status ${res.status}. Check that it is running and reachable from Sophira.`,
       };
+    }
+    let pdf: boolean | null = null;
+    try {
+      const body = (await res.json()) as { pdf?: unknown };
+      if (typeof body?.pdf === "boolean") pdf = body.pdf;
+    } catch {
+      pdf = null; // no JSON body, or none that says: still healthy, PDF support unknown
     }
     return {
       configured: true,
       healthy: true,
+      pdf,
       detail: `The self-hosted ${kind.toUpperCase()} service answered its health check.`,
     };
   } catch {

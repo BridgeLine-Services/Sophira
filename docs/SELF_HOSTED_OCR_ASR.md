@@ -53,10 +53,26 @@ chunk rather than starting over.
 ### OCR service (Tesseract)
 
 ```
-GET  /health               -> 200 {"status":"ok"}
+GET  /health               -> 200 {"status":"ok", "pdf": true}
 POST /ocr                  multipart: file, language=eng
      -> 200 {"text":"...", "confidence": 0.93}      (0..1 or 0..100 both accepted)
+POST /ocr/pdf              multipart: file, pages=1,4,7, language=eng
+     -> 200 {"pages":[{"page":1,"text":"...","mean_confidence":0.91}]}
 ```
+
+`POST /ocr/pdf` is the scanned-PDF route (added 2026-11-15). Sophira sends the
+WHOLE PDF plus the page numbers that have no text layer, and the service renders
+those pages (`pdftoppm`) and reads them with Tesseract. Two rules keep it honest:
+
+- A page the service does not return stays **blank and reported**, never filled
+  from a neighbouring page. A page with no measurable confidence is banded
+  **low**, never high.
+- `/health` may advertise `"pdf": true`. If it says `false`, Sophira reports PDF
+  reading as **needs setup** and keeps pictures-of-text working. If it says
+  nothing, Sophira tries and reports the service's refusal plainly.
+
+Only pages WITHOUT a text layer are ever sent, so an ordinary PDF costs no
+service call at all. Up to 40 scanned pages are read per document.
 
 ### Transcription service (Whisper-compatible)
 
@@ -102,11 +118,37 @@ Both are open source. No account, no key, no invoice.
 
 ## 5. What is built today, and what is not
 
-**Built and tested (32 assertions, real HTTP round-trips against a stub service):**
-`src/lib/media/selfhost.ts` (config + health probe), `src/lib/extract/ocr.ts`
-(Tesseract client), `src/lib/media/transcribe.ts` (Whisper client with segment
-normalisation). OCR is wired into the image path of `/api/extract`, ahead of any
-cloud vision call.
+**Built and tested (real HTTP round-trips against a stub service, plus pure unit
+tests for every honesty rule):**
+`src/lib/media/selfhost.ts` (config + health probe, now reporting `pdf`),
+`src/lib/extract/ocr.ts` (Tesseract client for images),
+`src/lib/extract/pdf-ocr.ts` (2026-11-15: scanned PDF pages, page numbers kept,
+merge never overwrites a text layer), `src/lib/media/transcribe.ts` (Whisper
+client with segment normalisation, engine-reported certainty, and a format gate
+that refuses a container the engine cannot decode before anything is uploaded).
+
+Where they are wired:
+- `src/lib/extract/read.ts` — the ONE file reader used by `/api/extract`; a scan
+  is read after the text layer comes up empty.
+- `src/lib/research/document-intake.ts` — a scan the student adds becomes a
+  quotable research source only when words were really read.
+- `src/lib/extract/analysis.ts` + `POST /api/extract/analyze` — a model pass over
+  the student's own file, using the EXISTING AI provider plan (no second key, no
+  keyless fake), with every returned quotation checked against the extracted text
+  and page numbers attached only from the parser's page map.
+
+### Capability states (one vocabulary, seven states)
+
+`src/lib/capabilities/file-capabilities.ts` reports each file capability as one of:
+
+`local` · `available` · `requires_installation` · `requires_provider_configuration`
+· `requires_api_key` · `temporarily_unavailable` · `unsupported_by_hosting`
+
+`available` is only ever green when a probe answered; a configured service that
+nobody has pinged is `available` with `verified: false`, which never counts as
+usable. `/api/health` publishes the states (no URLs, hosts or tokens) and
+`/api/provider-status` gives the owner the full list with the next step.
+The serverless limit is itself a state (`unsupported_by_hosting`), not a footnote.
 
 **Not built yet (next, in order):**
 

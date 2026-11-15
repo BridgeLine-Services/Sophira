@@ -2,159 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { aiChat, aiConfigured, parseJsonLoose } from "@/lib/ai/client";
-import { docxHtmlToStructuredText, parsePptx, parseSpreadsheet, parseCsv } from "@/lib/extract/documents";
-import { buildPdfProvenance } from "@/lib/extract/provenance";
+import { readUploadedFile, type Extraction } from "@/lib/extract/read";
 
 export const runtime = "nodejs";
 
+/**
+ * POST /api/extract - read an uploaded file into text.
+ *
+ * 2026-11-15 (directive: provider-key optimisation, part 1): the reading itself moved to
+ * `src/lib/extract/read.ts` so the AI-analysis route uses exactly the same extraction
+ * instead of a copy. Response fields are unchanged and `provenance` is now also returned
+ * (additive): it carries page numbers and, for a scanned PDF, which pages were read from
+ * the page images and which still could not be read.
+ *
+ * A scanned PDF is read by the owner's OWN Tesseract service, never a paid vendor, and
+ * only pages with no text layer are sent to it.
+ */
+
 const MAX_BYTES = 10 * 1024 * 1024;
-
-interface Extraction {
-  text: string;
-  confidence: "high" | "medium" | "low" | "failed";
-  /** Phase 3a: optional page-level provenance (PDF today; additive). */
-  provenance?: unknown;
-  notes: string;
-}
-
-async function extractText(bytes: Buffer, mime: string, name: string): Promise<Extraction> {
-  const lower = name.toLowerCase();
-  if (mime.startsWith("text/") || /\.(txt|md|csv|tex|json)$/.test(lower)) {
-    const text = bytes.toString("utf8");
-    return { text, confidence: "high", notes: "Plain text file read directly." };
-  }
-
-  if (mime === "application/pdf" || lower.endsWith(".pdf")) {
-    const { extractPdfText } = await import("@/lib/extract/pdf");
-    const pdf = await extractPdfText(bytes);
-    const { text, via } = pdf;
-    const clean = (text || "").trim();
-    if (via === "none") {
-      return { text: "", confidence: "failed", notes: "This PDF could not be read (it may be corrupted or password-protected). Try a different export or paste the text." };
-    }
-    if (clean.length < 80) {
-      return {
-        text: clean,
-        confidence: "low",
-        notes: "This PDF contained very little readable text. It may be a scanned image (no embedded text). Try exporting it as a text-based PDF, take a clear photo of the page, or paste the text.",
-        provenance: buildPdfProvenance(pdf.pages ?? null),
-      };
-    }
-    return {
-      text: clean,
-      confidence: "high",
-      notes: "Text extracted from PDF. Layout, tables, and math formatting may be imperfect - please review.",
-      // Phase 3a: page-level provenance (page numbers, scanned pages).
-      // Purely additive - existing fields above are unchanged.
-      provenance: buildPdfProvenance(pdf.pages ?? null),
-    };
-  }
-
-  if (mime.startsWith("image/")) {
-    // Phase 3b: try the OWNER'S self-hosted Tesseract first — free, local, and
-    // no vendor. It only runs when SOPHIRA_OCR_URL is configured; otherwise
-    // this block is skipped entirely and behaviour is unchanged.
-    {
-      const { ocrImage } = await import("@/lib/extract/ocr");
-      const ocr = await ocrImage(bytes, mime);
-      if (ocr.ok) {
-        return {
-          text: ocr.text,
-          confidence: ocr.confidence,
-          notes: ocr.notes,
-          provenance: {
-            kind: "image",
-            engine: ocr.engine,
-            meanConfidence: ocr.meanConfidence,
-          },
-        };
-      }
-      // A configured service that returned nothing is a real signal (a scan of
-      // handwriting, a diagram): report it honestly instead of asking a cloud
-      // model to guess. An UNCONFIGURED service falls through to the existing
-      // AI-vision path below, exactly as before.
-      if (ocr.engine === "tesseract-selfhost") {
-        return { text: "", confidence: "failed", notes: ocr.notes };
-      }
-    }
-    if (!aiConfigured()) {
-      throw new Error("AI vision is not configured, so I can't read text from images yet. Please type or paste the question instead.");
-    }
-    const dataUrl = `data:${mime};base64,${bytes.toString("base64")}`;
-    const raw = await aiChat(
-      [
-        { role: "system", content: "You transcribe academic documents and handwritten work from photos. Extract ALL visible text, questions, equations, and instructions EXACTLY as shown, including handwritten mathematics (use plain text math notation: x^2, sqrt(x), a/b, integral notation as INT[f(x)]dx). If the image is handwritten, say so in notes. HONESTY: if any part is blurry, cut off, or unreadable, list it in 'unreadable' — NEVER guess or fabricate missing text, exponents, or digits. Respond only with JSON: {\"text\": \"...\", \"confidence\": \"high|medium|low\", \"notes\": \"...\", \"is_handwriting\": true|false, \"unreadable\": [\"...\"]}" },
-        { role: "user", content: "Extract the text from this image.", },
-      ],
-      { temperature: 0, maxTokens: 3000, jsonMode: true, images: [dataUrl] }
-    );
-    const parsed = parseJsonLoose<{ text?: string; confidence?: string; notes?: string; is_handwriting?: boolean; unreadable?: string[] }>(raw);
-    if (!parsed || typeof parsed.text !== "string" || !parsed.text.trim()) {
-      return { text: "", confidence: "failed", notes: "I could not read this image reliably. Please take a clearer photo (more light, no blur, text filling the frame) or type the question." };
-    }
-    const unread = (parsed.unreadable || []).filter(Boolean);
-    const conf = (["high", "medium", "low"] as const).includes(parsed.confidence as "high") ? (parsed.confidence as "high" | "medium" | "low") : "low";
-    const notes = [
-      parsed.notes,
-      parsed.is_handwriting ? "Handwriting detected — please review the interpretation carefully before solving." : null,
-      unread.length ? `Unreadable parts: ${unread.join("; ")}` : null,
-    ].filter(Boolean).join(" ") || "Transcribed from image.";
-    return { text: parsed.text, confidence: unread.length ? (conf === "high" ? "medium" : conf) : conf, notes };
-  }
-
-  if (mime.includes("wordprocessingml") || lower.endsWith(".docx")) {
-    // DOCX support (spec §11): mammoth converts to HTML, then we preserve
-    // document structure (headings, lists, tables) as lightweight Markdown-ish
-    // text instead of a wall of prose.
-    try {
-      const mammoth = await import("mammoth");
-      const { value: html } = await mammoth.convertToHtml({ buffer: bytes });
-      const text = docxHtmlToStructuredText(html);
-      const clean = text.trim();
-      if (clean.length < 80) {
-        return { text: clean, confidence: "low", notes: "This Word document contained very little text (it may be mostly images). Try a PDF export, a photo of the page, or paste the text." };
-      }
-      return {
-        text: clean,
-        confidence: "high",
-        notes: "Text extracted from the Word document with headings, lists, and tables preserved where possible. Equations embedded as images could not be read — check any math carefully.",
-      };
-    } catch {
-      return { text: "", confidence: "failed", notes: "This Word document could not be read (it may be corrupted, or an older .doc format — only .docx is supported). Export it as PDF or paste the text." };
-    }
-  }
-
-  if (mime.includes("presentationml") || lower.endsWith(".pptx")) {
-    try {
-      const { text, notes } = await parsePptx(bytes);
-      const clean = text.trim();
-      if (clean.length < 40) {
-        return { text: clean, confidence: "low", notes: "This presentation contains almost no readable text (it may be all images). Try exporting as PDF or photograph the important slides." };
-      }
-      return { text: clean, confidence: "high", notes };
-    } catch {
-      return { text: "", confidence: "failed", notes: "This PowerPoint could not be read (only .pptx is supported — not .ppt or .pptm). Export it as PDF or paste the text." };
-    }
-  }
-
-  if (mime.includes("spreadsheetml") || /\.xlsx$/.test(lower)) {
-    try {
-      const { text, notes } = await parseSpreadsheet(bytes);
-      return { text: text.trim(), confidence: "high", notes };
-    } catch {
-      return { text: "", confidence: "failed", notes: "This Excel workbook could not be read (only .xlsx is supported — not legacy .xls). Export it as CSV or paste the data." };
-    }
-  }
-
-  if (mime === "text/csv" || lower.endsWith(".csv")) {
-    const text = bytes.toString("utf8");
-    if (!text.trim()) return { text: "", confidence: "failed", notes: "This CSV file is empty." };
-    return { text: parseCsv(text).text, confidence: "high", notes: parseCsv(text).notes };
-  }
-
-  return { text: "", confidence: "failed", notes: `Unsupported file type${mime ? ` (${mime})` : ""}. I can read PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), CSV, plain text/Markdown, and images. You can always paste the text instead.` };
-}
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -182,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   let extraction: Extraction;
   try {
-    extraction = await extractText(bytes, file.type || "", file.name);
+    extraction = await readUploadedFile(bytes, { mime: file.type || "", name: file.name });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Could not read this file." }, { status: 500 });
   }
@@ -214,6 +79,8 @@ export async function POST(request: NextRequest) {
       extracted_text: extraction.text.slice(0, 60000),
       confidence: extraction.confidence,
       notes: storage_path ? extraction.notes : extraction.notes + " (Note: the original file could not be saved to private storage — extracted text only.)",
+      // Additive: page map plus what the scan reader did. Absent for formats without pages.
+      ...(extraction.provenance ? { provenance: extraction.provenance } : {}),
     },
   });
 }

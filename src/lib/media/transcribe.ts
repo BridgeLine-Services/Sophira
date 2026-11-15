@@ -13,6 +13,18 @@
  *  - An empty transcript is a failure, not a success: Sophira never pretends
  *    audio was understood when nothing was returned.
  *  - The engine name is recorded so provenance is honest.
+ *
+ * 2026-11-15 (directive: provider-key optimisation, part 2). Three additions, all
+ * additive - no existing field or behaviour changed:
+ *  - A format gate. A recording whose container the engine cannot decode (WMA, AMR,
+ *    MIDI) is refused BEFORE anything is uploaded, in one sentence, instead of being
+ *    posted and failing with a vendor error. Unknown extensions are still tried, so a
+ *    readable file is never blocked by an over-eager whitelist.
+ *  - Engine-reported certainty. faster-whisper style servers return `avg_logprob` and
+ *    `no_speech_prob` per segment; when they do, the confidence band uses them. When
+ *    they do not, the band stays exactly what it was (coverage based) and the result
+ *    says the engine reported nothing, rather than inventing a number.
+ *  - The format that was actually read is reported, so provenance says what was heard.
  */
 import { postSelfHosted, readSelfHostedConfig } from "../media/selfhost";
 
@@ -34,10 +46,63 @@ export interface TranscriptionResult {
   speakers: string[];
   confidence: TranscriptConfidence;
   model: string | null;
+  /** Container that was read, e.g. "mp3". Empty when it could not be determined. */
+  format?: string;
+  /** Certainty the ENGINE reported (avg_logprob / no_speech_prob), null when it reported none. */
+  engineConfidence?: TranscriptConfidence | null;
+  /** Segments the engine itself flagged as probably-not-speech or low certainty. */
+  uncertainSegments?: number;
   notes: string;
 }
 
 export const MAX_MEDIA_BYTES = 200 * 1024 * 1024;
+
+/**
+ * Containers a Whisper server decodes without a separate conversion step.
+ * Kept deliberately small and honest: anything else is either refused with a reason or
+ * attempted with a note - never silently relabelled as a format it is not.
+ */
+export const SUPPORTED_AUDIO_EXTENSIONS = [
+  "wav", "mp3", "m4a", "mp4", "webm", "ogg", "oga", "opus", "flac", "aac", "mpga", "mpeg", "weba",
+] as const;
+
+/** Known-unreadable by a Whisper server without conversion. Named so the refusal is specific. */
+export const UNSUPPORTED_AUDIO_EXTENSIONS = ["wma", "amr", "mid", "midi", "aiff", "aif", "caf", "ape"] as const;
+
+export interface AudioFormatCheck {
+  supported: boolean;
+  /** Extension actually used for the decision, lower case, no dot; empty when unknown. */
+  format: string;
+  /** True when the extension is not on either list, so the engine is simply asked. */
+  unknown: boolean;
+  /** Plain sentence when refused; null when it is fine to try. */
+  reason: string | null;
+}
+
+export function audioFormatSupport(filename: string, mime = ""): AudioFormatCheck {
+  const name = (filename || "").toLowerCase();
+  const extFromName = (name.match(/\.([a-z0-9]{1,5})$/) || [])[1] || "";
+  const extFromMime = (mime || "").toLowerCase().startsWith("audio/") || (mime || "").toLowerCase().startsWith("video/")
+    ? ((mime || "").toLowerCase().split("/")[1] || "").split(";")[0].replace("x-", "")
+    : "";
+  const format = extFromName || extFromMime;
+  if (!format) {
+    return { supported: true, format: "", unknown: true, reason: null };
+  }
+  if ((SUPPORTED_AUDIO_EXTENSIONS as readonly string[]).includes(format)) {
+    return { supported: true, format, unknown: false, reason: null };
+  }
+  if ((UNSUPPORTED_AUDIO_EXTENSIONS as readonly string[]).includes(format)) {
+    return {
+      supported: false,
+      format,
+      unknown: false,
+      reason: `This recording is in a format Sophira's transcriber cannot read (${format.toUpperCase()}). Convert it to MP3, M4A or WAV and add it again. Your original file is kept.`,
+    };
+  }
+  // Unknown container: try it. A refusal here would block a file that might work.
+  return { supported: true, format, unknown: true, reason: null };
+}
 
 function num(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -53,10 +118,15 @@ export function normalizeTranscription(json: unknown): {
   durationSec: number | null;
   model: string | null;
   speakers: string[];
+  /** Bands from the engine's own per-segment certainty, null when it reported none. */
+  engineConfidence: TranscriptConfidence | null;
+  uncertainSegments: number;
 } {
   const p = (json ?? {}) as Record<string, unknown>;
   const rawSegments = Array.isArray(p.segments) ? (p.segments as Record<string, unknown>[]) : [];
   const segments: TranscriptSegment[] = [];
+  const engineBands: TranscriptConfidence[] = [];
+  let uncertainSegments = 0;
   for (const s of rawSegments) {
     const text = typeof s.text === "string" ? s.text.trim() : "";
     const start = num(s.start);
@@ -65,6 +135,18 @@ export function normalizeTranscription(json: unknown): {
     if (!text || start === null || end === null) continue;
     const speaker = typeof s.speaker === "string" && s.speaker.trim() ? s.speaker.trim() : null;
     segments.push({ startSec: Math.max(0, start), endSec: Math.max(Math.max(0, start), end), text, speaker });
+
+    // Engine certainty, ONLY when the server actually reported it.
+    const logprob = num(s.avg_logprob);
+    const noSpeech = num(s.no_speech_prob);
+    if (logprob !== null || noSpeech !== null) {
+      const byLogprob: TranscriptConfidence =
+        logprob === null ? "medium" : logprob >= -0.35 ? "high" : logprob >= -0.6 ? "medium" : "low";
+      const probablyNotSpeech = noSpeech !== null && noSpeech >= 0.6;
+      const band: TranscriptConfidence = probablyNotSpeech ? "low" : byLogprob;
+      engineBands.push(band);
+      if (band !== "high") uncertainSegments++;
+    }
   }
   segments.sort((a, b) => a.startSec - b.startSec);
 
@@ -79,12 +161,19 @@ export function normalizeTranscription(json: unknown): {
     new Set(segments.map((s) => s.speaker).filter((s): s is string => Boolean(s)))
   ).sort();
 
+  const RANK: Record<TranscriptConfidence, number> = { failed: 0, low: 1, medium: 2, high: 3 };
+  const engineConfidence: TranscriptConfidence | null = engineBands.length
+    ? engineBands.reduce<TranscriptConfidence>((worst, b) => (RANK[b] < RANK[worst] ? b : worst), "high")
+    : null;
+
   return {
     segments,
     language: typeof p.language === "string" ? p.language : null,
     durationSec: duration,
     model: typeof p.model === "string" ? p.model : null,
     speakers,
+    engineConfidence,
+    uncertainSegments,
   };
 }
 
@@ -111,6 +200,10 @@ export async function transcribeMedia(
     return empty("No self-hosted transcription service is configured, so Sophira does not claim to transcribe audio or video.");
   }
   if (bytes.byteLength === 0) return empty("The file was empty, so there was nothing to transcribe. Your original file was kept.");
+  const formatCheck = audioFormatSupport(filename, mime);
+  if (!formatCheck.supported) {
+    return empty(formatCheck.reason || "This recording is in a format Sophira's transcriber cannot read. Convert it and add it again.");
+  }
   if (bytes.byteLength > MAX_MEDIA_BYTES) {
     return empty("This recording is larger than the 200 MB limit, so it was not processed. Your original file was kept.");
   }
@@ -146,12 +239,30 @@ export async function transcribeMedia(
 
   const speechSeconds = normalized.segments.reduce((sum, s) => sum + Math.max(0, s.endSec - s.startSec), 0);
   const coverage = normalized.durationSec && normalized.durationSec > 0 ? speechSeconds / normalized.durationSec : null;
-  const confidence: TranscriptConfidence =
+  const byCoverage: TranscriptConfidence =
     coverage === null ? "medium" : coverage >= 0.5 ? "high" : coverage >= 0.2 ? "medium" : "low";
 
-  const notes = normalized.speakers.length
-    ? `Transcribed with timestamps. Speakers were identified by the engine (${normalized.speakers.length} found). Check names before relying on them.`
-    : "Transcribed with timestamps. Speaker separation is not available from this engine, so Sophira does not claim to know who spoke when.";
+  // Conservative: the worse of what the audio covered and what the engine was sure of.
+  // A confident engine on a thin transcript is still a thin transcript.
+  const RANK: Record<TranscriptConfidence, number> = { failed: 0, low: 1, medium: 2, high: 3 };
+  const confidence: TranscriptConfidence =
+    normalized.engineConfidence && RANK[normalized.engineConfidence] < RANK[byCoverage]
+      ? normalized.engineConfidence
+      : byCoverage;
+
+  const certaintyNote =
+    normalized.engineConfidence === null
+      ? "The engine did not report how sure it was, so Sophira does not claim more than the amount of speech it found."
+      : normalized.uncertainSegments > 0
+        ? `${normalized.uncertainSegments} part${normalized.uncertainSegments === 1 ? "" : "s"} of the transcript were marked uncertain by the engine - check those passages against the recording before quoting them.`
+        : "The engine reported high certainty for this recording.";
+
+  const notes = [
+    normalized.speakers.length
+      ? `Transcribed with timestamps. Speakers were identified by the engine (${normalized.speakers.length} found). Check names before relying on them.`
+      : "Transcribed with timestamps. Speaker separation is not available from this engine, so Sophira does not claim to know who spoke when.",
+    certaintyNote,
+  ].join(" ");
 
   return {
     ok: true,
@@ -162,6 +273,9 @@ export async function transcribeMedia(
     speakers: normalized.speakers,
     confidence,
     model: normalized.model,
+    format: formatCheck.format,
+    engineConfidence: normalized.engineConfidence,
+    uncertainSegments: normalized.uncertainSegments,
     notes,
   };
 }

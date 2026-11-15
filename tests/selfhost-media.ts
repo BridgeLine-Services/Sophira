@@ -197,9 +197,12 @@ export async function runSelfHostedMediaTests(): Promise<{ passed: number; faile
 
   // ---------- Wiring pins ----------
   const route = readFileSync("src/app/api/extract/route.ts", "utf8");
-  assert(route.includes("ocrImage") && route.indexOf("ocrImage") < route.indexOf("aiConfigured()"),
-    "3b: the extract route tries the free self-hosted OCR BEFORE any cloud vision call");
-  assert(route.includes('engine === "tesseract-selfhost"') && route.includes("confidence: \"failed\""),
+  const reader = readFileSync("src/lib/extract/read.ts", "utf8");
+  assert(route.includes('from "@/lib/extract/read"'),
+    "3b: the extract route delegates to the shared reader that owns the OCR-before-vision order");
+  assert(reader.includes("ocrImage") && reader.indexOf("ocrImage") < reader.indexOf("aiConfigured()"),
+    "3b: the reader tries the free self-hosted OCR BEFORE any cloud vision call");
+  assert(reader.includes('engine === "tesseract-selfhost"') && reader.includes('confidence: "failed"'),
     "3b: a configured-but-unreadable scan is reported honestly instead of escalated to a guess");
   const manifest = readFileSync("src/config/env.manifest.json", "utf8");
   assert(manifest.includes("SOPHIRA_OCR_URL") && manifest.includes("SOPHIRA_ASR_URL"),
