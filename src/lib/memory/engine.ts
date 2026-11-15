@@ -296,6 +296,19 @@ export const SCOPE_BONUS = {
   general: 0.15,
 } as const;
 
+/**
+ * A second, WIDER scope can never outrank a narrower one (2026-11-14).
+ *
+ * A memory may legitimately match several scopes at once ("this teacher, in this
+ * course"). Adding those bonuses together let a teacher+course memory (1.1 + 0.8 =
+ * 1.9) outrank the student's own note for the assignment they are working on right
+ * now (1.4) — the exact precedence inversion the five-scope rule forbids. So the
+ * narrowest match decides the bonus, and every extra wider match adds only this small
+ * tie-breaker. Single-scope memories score exactly as they always did; only stacks of
+ * scopes move, and they move to just above their narrowest scope.
+ */
+export const WIDER_SCOPE_TIEBREAK = 0.05;
+
 export interface MemoryPromptSection {
   /** Compact lines injected into the system prompt. */
   lines: string[];
@@ -321,15 +334,23 @@ export function relevanceScore(m: StudentMemory, ctx: MemoryContext, nowISO?: st
   // COURSE SCOPE (0031): an exact-course match outranks a subject-tag
   // match; a memory scoped to a DIFFERENT course is never selected for
   // this course (see selectRelevantMemories eligible filter).
-  // Narrowest first: assignment, then teacher, then course, then subject.
-  if (ctx.assignmentId && m.assignment_id === ctx.assignmentId) score += SCOPE_BONUS.assignment;
-  if (ctx.teacherId && m.teacher_id === ctx.teacherId) score += SCOPE_BONUS.teacher;
-  if (ctx.courseId && m.course_id === ctx.courseId) score += SCOPE_BONUS.course;
-  if (subject && tags.includes(subject)) score += SCOPE_BONUS.subjectTag;
-  if (subject && (m.subject || "").toLowerCase() === subject) score += SCOPE_BONUS.subjectField;
+  // Narrowest first: assignment, then teacher, then course, then subject. Collect every
+  // scope that matches, then let the NARROWEST one decide the bonus (see
+  // WIDER_SCOPE_TIEBREAK): matching more, wider scopes can only nudge the score, never
+  // leapfrog the assignment the student is working on.
+  const scopeHits: number[] = [];
+  if (ctx.assignmentId && m.assignment_id === ctx.assignmentId) scopeHits.push(SCOPE_BONUS.assignment);
+  if (ctx.teacherId && m.teacher_id === ctx.teacherId) scopeHits.push(SCOPE_BONUS.teacher);
+  if (ctx.courseId && m.course_id === ctx.courseId) scopeHits.push(SCOPE_BONUS.course);
+  if (subject && tags.includes(subject)) scopeHits.push(SCOPE_BONUS.subjectTag);
+  if (subject && (m.subject || "").toLowerCase() === subject) scopeHits.push(SCOPE_BONUS.subjectField);
   if (!subject || tags.includes(subject) || (m.subject || "").toLowerCase() === subject) {
     // cross-subject memories only when they carry no conflicting subject
-    if (!m.subject && !tags.length) score += SCOPE_BONUS.general;
+    if (!m.subject && !tags.length) scopeHits.push(SCOPE_BONUS.general);
+  }
+  if (scopeHits.length) {
+    scopeHits.sort((a, b) => b - a);
+    score += scopeHits[0] + WIDER_SCOPE_TIEBREAK * (scopeHits.length - 1);
   }
   score += 0.3 * clampConfidence(m.confidence);
   const lastSeen = Date.parse(m.last_observed);

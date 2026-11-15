@@ -32,6 +32,10 @@ export async function GET(request: NextRequest) {
     category: params.get("category") || undefined,
     status: params.get("status") || undefined,
     teacher_id: params.get("teacher_id") || undefined,
+    // ASSIGNMENT SCOPE (scope 5, 2026-11-14): the assignment page asks for its own rows
+    // only. Same rule as the teacher filter: it narrows an already user_id-scoped,
+    // RLS-protected list, so it can never widen what the student can see.
+    assignment_id: params.get("assignment_id") || undefined,
   });
 
   // Evidence counts (the inspector loads full rows via /api/memory/[id]).
@@ -61,6 +65,7 @@ export async function POST(request: NextRequest) {
   const subject = body.subject ? String(body.subject).trim() : null;
   const course_id = body.course_id ? String(body.course_id) : null;
   const teacher_id = body.teacher_id ? String(body.teacher_id) : null;
+  const assignment_id = body.assignment_id ? String(body.assignment_id) : null;
   if (!MEMORY_CATEGORIES.includes(category as never)) {
     return NextResponse.json({ error: "Unknown memory category." }, { status: 400 });
   }
@@ -83,6 +88,23 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // ASSIGNMENT SCOPE (scope 5, 2026-11-14). The narrowest scope: a note saved here is
+  // retrieved only while the student is working on THIS assignment (engine.ts excludes
+  // any other assignment's notes), so the id has to be one of the student's own
+  // assignments. The read below runs on the request-scoped client, so assignments_own
+  // RLS (user_id = auth.uid()) decides what counts as "their own": a stranger's id
+  // returns no row and is refused before anything is written.
+  if (assignment_id) {
+    const { data: assignment } = await supabase
+      .from("assignments")
+      .select("id")
+      .eq("id", assignment_id)
+      .maybeSingle();
+    if (!assignment) {
+      return NextResponse.json({ error: "That assignment is not in your list." }, { status: 400 });
+    }
+  }
+
   const { data: memory, error } = await supabase
     .from("student_memories")
     .insert({
@@ -94,6 +116,7 @@ export async function POST(request: NextRequest) {
       subject_tags: subject ? [subject.toLowerCase()] : [],
       course_id,
       teacher_id,
+      assignment_id,
       confidence: 1, // student-stated facts are trusted at creation
       status: "active",
       origin: "student_supplied",

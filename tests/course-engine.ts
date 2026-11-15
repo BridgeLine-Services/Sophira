@@ -8,6 +8,7 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { readNavSurface } from "./helpers/navigation";
 import { join } from "path";
 import { classifyEngine, ENGINES, ENGINE_TOOLS, subjectTools, toolUrl, subjectToolUrl, COURSE_GROUPS } from "../src/lib/courses/engines";
+import { relevanceScore, type StudentMemory } from "../src/lib/memory/engine";
 
 export function runCourseEngineTests(assert: (c: boolean, n: string) => void, section: (t: string) => void): void {
   section("Course engine: subjects, workspaces, relocation, consolidation");
@@ -452,10 +453,27 @@ export function runCourseEngineTests(assert: (c: boolean, n: string) => void, se
   assert(memEngine.includes("course_id?: string | null;") && memEngine.includes("courseId?: string | null;"),
     "memory: engine types carry the course scope end to end");
   // The literal 0.6 moved into the named SCOPE_BONUS table on 2026-11-11, so this
-  // pins the ORDER (which is the claim) instead of a magic number.
-  assert(memEngine.includes("m.course_id === ctx.courseId) score += SCOPE_BONUS.course") &&
+  // pins the ORDER (which is the claim) instead of a magic number. 2026-11-14: scopes
+  // are now collected and the NARROWEST decides the bonus (so stacking wider scopes
+  // can never overtake a narrower one), so the pin follows the new shape AND checks
+  // the claim by scoring two otherwise identical memories.
+  assert(memEngine.includes("m.course_id === ctx.courseId) scopeHits.push(SCOPE_BONUS.course)") &&
     /course: 0\.8/.test(memEngine) && /subjectTag: 0\.5/.test(memEngine),
     "memory: an exact-course match outranks a subject-tag match in relevance");
+  {
+    const base = {
+      user_id: "11111111-1111-4111-8111-111111111111", category: "learning_preference",
+      statement: "Keep answers short", details: "", subject: null, confidence: 1, status: "active",
+      improvement_trend: "", origin: "student_supplied", source: "manual",
+      first_observed: "2026-11-14T00:00:00Z", last_observed: "2026-11-14T00:00:00Z", last_used_at: null,
+      created_at: "2026-11-14T00:00:00Z", updated_at: "2026-11-14T00:00:00Z",
+      course_id: null, teacher_id: null, assignment_id: null, subject_tags: [],
+    } as unknown as StudentMemory;
+    const ctx = { courseId: "99999999-9999-4999-8999-999999999999", subject: "Biology" };
+    const inCourse = relevanceScore({ ...base, id: "c", course_id: ctx.courseId } as StudentMemory, ctx, "2026-11-14T00:00:00Z");
+    const byTag = relevanceScore({ ...base, id: "t", subject_tags: ["biology"] } as StudentMemory, ctx, "2026-11-14T00:00:00Z");
+    assert(inCourse > byTag, "memory: scoring agrees - a course match really does beat a subject-tag match");
+  }
   assert(memEngine.includes("!(m.course_id && m.course_id !== ctx.courseId)"),
     "memory: a memory scoped to a DIFFERENT course never leaks into another course's or a course-less subject prompt");
   const subjectCtx = readFileSync("src/lib/courses/subject-context.ts", "utf8");
