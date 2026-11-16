@@ -26,19 +26,6 @@ node scripts/release-gate.mjs --fast       # skip npm test/build/tsc — use ONL
                                            # the same CI job already ran them
 node scripts/release-gate.mjs --report     # print the report, always exit 0
 
-### What BLOCKED means for the production URL (2026-11-15)
-
-`scripts/verify-deployment.mjs` distinguishes three live outcomes, and the gate now honours the
-distinction instead of flattening it:
-
-| Exit | Meaning | Gate status |
-|---|---|---|
-| 0 | Reachable, serving, fully configured | PASS |
-| 3 | Reachable, serving a real commit, and the only missing piece is something only the Owner can add (an AI provider key) | BLOCKED, with the served commit in the detail |
-| 1 | Unreachable, unhealthy, wrong service name, or a genuine misconfiguration | FAIL |
-
-Before this, a healthy deployment waiting on an owner-supplied key was reported as FAIL, which
-made a working site look broken and hid the real fact: nothing needs fixing, a person is needed.
 node scripts/release-gate.mjs --self-test  # verify the gate's own rules (fast)
 ```
 
@@ -185,3 +172,16 @@ Since 2026-10-11 the gate also runs hands-off (`.github/workflows/health.yml`):
   BLOCKED until the owner connects those credentials, and device and legal items
   always require owner action. The workflow uses read-only code access and can
   only write that one issue; no credential values are ever written to logs.
+
+### What BLOCKED means for the production URL (2026-11-15)
+
+`scripts/verify-deployment.mjs` distinguishes three live outcomes, and the gate now honours the
+distinction instead of flattening it:
+
+- **Exit 0: PASS.** Reachable, serving, fully configured.
+- **Exit 3: BLOCKED.** Reachable, serving a real commit, and the only missing piece is something
+  only the Owner can add (an AI provider key). The served commit is printed in the detail.
+- **Exit 1: FAIL.** Unreachable, unhealthy, wrong service name, or a genuine misconfiguration.
+
+Before this, a healthy deployment waiting on an owner-supplied key was reported as FAIL, which
+made a working site look broken and hid the real fact: nothing needs fixing, a person is needed.
