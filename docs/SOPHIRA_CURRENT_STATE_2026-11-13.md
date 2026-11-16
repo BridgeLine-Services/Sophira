@@ -1531,3 +1531,44 @@ not a new store, is still where a finished run lands.
 3. The scheduled worker has never advanced a run. It needs the same password in Vercel and in the
    repository secrets, plus the two switches set together.
 4. No phone, tablet, iOS or Android verification was performed this round.
+
+## §25. Provenance on the page that matters (2026-11-15, commit after 6db7955)
+
+Baseline: `master` at `6db7955`, tree clean, production serving the same commit, 9416 tests
+passed / 0 failed.
+
+### What was wrong
+
+The directive's Part 7 requires that a student can review how a document was produced. Three
+screens could say it - the runs page, the export file, and the Owner's requirement record - and
+the one screen where a student actually reads and edits the text could not. A student opening
+their finished essay saw an ordinary essay.
+
+### What changed
+
+| Path | Change |
+|---|---|
+| `src/lib/essay/autonomous.ts` | `RunView` gained `finalCheck` (the server's own verdict and note, or null) and `sources` (what the plan used). Additive: no existing field moved or changed meaning. |
+| `src/components/app/AutonomousProvenance.tsx` | New card on the essay workspace: the day the draft was prepared, the final check exactly as recorded, the sources used or a plain "none, this draft makes no cited factual claims", every recorded limitation, and both download formats. |
+| `src/app/essay/page.tsx` | Renders that card for the open essay. Nothing else on the page changed. |
+| `tests/autonomous-assignment.ts` | 20 new assertions: the view's new fields, the silent path for a manually written essay, the matching rule, both formats, the authorship rule, and the quiet failure. |
+
+### Deliberate limits, stated on the screen
+
+- It shows only a run whose `documentSessionId` equals the open essay, so another student's run
+  can never appear; the runs list it reads is already user-scoped by `requireUser`.
+- An unverified run shows "No final check has been recorded", never a hopeful verdict.
+- A failed read renders nothing. Provenance is supplementary; an error banner over somebody's
+  essay would be noise, and its absence implies nothing.
+- It never uses the service-role client and never claims human authorship.
+
+### Verification
+
+9436 tests passed / 0 failed (was 9416 / 0), `tsc --noEmit` clean, lint 0 errors / 33 warnings,
+build OK, jargon 0, a11y PASS, design drift 0, inventory unchanged at 84 pages and 118 API routes
+(the new component is not a route).
+
+### Still unverified
+
+The card has never rendered against a real completed run, because that needs an AI provider key
+so a run can produce text. It is pinned offline only.

@@ -615,4 +615,38 @@ export function runAutonomousAssignmentTests(assert: Check, section: (title: str
   const r16 = PRODUCT_REQUIREMENTS.find((r) => r.id === "R16");
   assert(Boolean(r16) && (r16!.evidence.join(" ").includes("src/app/owner/requirements/page.tsx")), "requirements record: R16 cites the screen");
   assert(existsSync(join(ROOT, "src/app/owner/requirements/page.tsx")), "requirements record: and that screen exists, so the citation is not a promise");
+
+  /* ---------------------------------------------------------------- */
+  section("Provenance where the text is read - the student's own essay screen");
+  /* ---------------------------------------------------------------- */
+
+  const verifiedView = runView({ ...fullyDrafted(), state: "completed" }, NOW, {});
+  assert(verifiedView.finalCheck !== null, "provenance: the view carries what the final check said");
+  assert(verifiedView.finalCheck!.status === "VERIFIED" || verifiedView.finalCheck!.status === "NEEDS REVIEW",
+    "provenance: and the status is one the server records, never a word invented for the screen");
+  const plannedView = runView(plannedRun(), NOW, {});
+  assert(plannedView.finalCheck === null, "provenance: an unverified run reports no verdict at all, rather than a hopeful one");
+  assert(Array.isArray(plannedView.sources), "provenance: the sources the plan used travel with the view");
+
+  const provenancePath = "src/components/app/AutonomousProvenance.tsx";
+  assert(existsSync(join(ROOT, provenancePath)), "provenance: the essay screen has a component that states how the draft was made");
+  const provenance = readFileSync(join(ROOT, provenancePath), "utf8");
+  assert(provenance.includes("/api/essay/autonomous"), "provenance: it reads the student's own runs list");
+  assert(/documentSessionId === sessionId/.test(provenance), "provenance: it shows only the run that delivered THIS essay");
+  assert(/if \(!run\) return null/.test(provenance), "provenance: a manually written essay shows nothing at all, not an empty box");
+  assert(provenance.includes("format=md") && provenance.includes("format=txt"), "provenance: the finished document downloads from the screen it is read on");
+  assert(/draft to\s+read, edit and submit as your own work/.test(provenance), "provenance: it says plainly what the student may do with the text");
+  assert(!/written by hand|no AI|human-authored/i.test(provenance), "provenance: it never claims human authorship");
+  assert(!/createAdminClient/.test(provenance), "provenance: it never uses the service-role client");
+  assert(/run\.finalCheck\b/.test(provenance) && /status === "VERIFIED"/.test(provenance), "provenance: the verdict shown is the server's own");
+  assert(/severity === "limitation"/.test(provenance), "provenance: recorded limitations reach the reader");
+  assert(/catch \{/.test(provenance) && !/setError/.test(provenance), "provenance: a failed read stays quiet instead of covering the essay with an error");
+  assert(/rel="noreferrer noopener"/.test(provenance), "provenance: a source link opens without handing over the page");
+
+  const essayPage = readFileSync(join(ROOT, "src/app/essay/page.tsx"), "utf8");
+  assert(/import AutonomousProvenance from/.test(essayPage), "provenance: the essay workspace imports it");
+  assert(/<AutonomousProvenance sessionId=\{session\.id\} \/>/.test(essayPage), "provenance: and renders it for the open essay");
+
+  const exportRouteAgain = readFileSync(join(ROOT, "src/app/api/essay/autonomous/[id]/export/route.ts"), "utf8");
+  assert(/format=md|isExportFormat/.test(exportRouteAgain), "provenance: the links it offers are the export route, not a second download path");
 }

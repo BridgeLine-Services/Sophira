@@ -14,6 +14,7 @@ import { formatAssignmentPlan, type AssignmentPlan, type OutlineSection } from "
 import { OUTPUT_MODE_LABELS, effectiveRevealWpm, restoreReveal, serializeReveal, revealStorageKey, type CalibratedProfile, type OutputMode, type SectionRevealState } from "@/lib/essay/pacing";
 import { CalendarClock, FileText, Pause, Play, Timer } from "lucide-react";
 import EssaySectionEditor from "@/components/app/EssaySectionEditor";
+import AutonomousProvenance from "@/components/app/AutonomousProvenance";
 
 /**
  * Essay workspace (2026-10-06 hardening): the staged pipeline is VISIBLE —
@@ -223,6 +224,9 @@ function EssayPageInner() {
 
         {session && (
           <>
+            {/* HOW THIS DRAFT WAS PREPARED — shown in the place the text is read (Part 7) */}
+            <AutonomousProvenance sessionId={session.id} />
+
             {session.schedule_verdict && (
               <p className={`rounded-lg p-3 text-sm ${session.schedule_verdict.startsWith("IMPOSSIBLE") ? "bg-danger/10 text-ink" : "bg-ink/[0.05] text-ink/70"}`}>
                 <CalendarClock className="mr-1.5 inline h-4 w-4" /> {session.schedule_verdict}

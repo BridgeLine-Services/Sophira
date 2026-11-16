@@ -78,6 +78,14 @@ export const CHANGE_ENTRIES: readonly ChangeEntry[] = [
   },
   {
     date: "2026-11-15",
+    category: "agent_development",
+    title: "The screen where a student reads the essay now says how it was made",
+    detail: "The runs page and the export file could state a draft's provenance, but the essay itself said nothing. A card on the essay workspace now shows the day it was prepared, what the final check recorded, the sources the plan used, every limitation recorded during the run, and both download formats. It appears only for an essay one of the student's own runs delivered, and stays silent for a manually written one.",
+    evidence: ["src/components/app/AutonomousProvenance.tsx", "src/app/essay/page.tsx", "src/lib/essay/autonomous.ts (RunView.finalCheck, RunView.sources)", "tests/autonomous-assignment.ts"],
+    decidedBy: "Owner directive of 2026-11-15 (Part 7)",
+  },
+  {
+    date: "2026-11-15",
     category: "deployment",
     title: "Production has served every pushed commit, and is checked rather than assumed",
     detail: "The app reports the commit it is running, so a push is never mistaken for a deployment. Production currently serves the same commit as master, and the scheduled sweep now fails its own run when production is unreachable instead of reporting a quiet success.",

@@ -628,6 +628,13 @@ export interface RunView {
   sectionCount: number;
   /** The essay this run delivered, or null before it finished. */
   documentSessionId: string | null;
+  /**
+   * What the final check said, and the sources the plan used. Carried on the view so the
+   * student's own essay screen can state its provenance where the text is read, instead of
+   * leaving that only on the runs page or in the export file.
+   */
+  finalCheck: { status: "VERIFIED" | "NEEDS REVIEW"; note: string } | null;
+  sources: { title: string; url: string | null }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -646,6 +653,10 @@ export function runView(run: RunRecord, nowMs: number, env: EnvLike = process.en
     feasibility: feasibility(run, nowMs),
     sectionCount: run.sections.length,
     documentSessionId: run.essay_session_id,
+    finalCheck: run.final_verification
+      ? { status: run.final_verification.status, note: run.final_verification.note }
+      : null,
+    sources: (run.plan?.sources ?? []).map((src) => ({ title: src.title, url: src.url || null })),
     createdAt: run.created_date,
     updatedAt: run.updated_date,
   };
