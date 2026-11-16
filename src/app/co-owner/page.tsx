@@ -9,6 +9,8 @@ import { readActivityDaily } from "@/lib/dashboard/activity";
 import { Badge, Card, CardContent } from "@/components/ui";
 import { Briefcase, CheckCircle2, ClipboardList, Users } from "lucide-react";
 import { canUseTesterFeatures, canAccessOwnerSecurity } from "@/lib/auth/permissions";
+import { CoOwnerQueue } from "@/components/co-owner/CoOwnerQueue";
+import { buildCoOwnerQueue } from "@/lib/co-owner/queue";
 import { isStaff, normalizeRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +51,50 @@ export default async function CoOwnerPage() {
     // Member Activity: recent registrations, from the directory staff may read.
     supabase.from("profiles").select("id, display_name, role, created_at").order("created_at", { ascending: false }).limit(5),
   ]);
+
+  /*
+   * WORK WAITING FOR YOU (2026-11-15).
+   *
+   * Four reads, all through the user-scoped client so row level security decides what a Co-Owner
+   * may see - nothing here is widened, and no admin client is used. Each read is nullable on
+   * purpose: a source that fails is reported as unreadable by the queue, never as "nothing
+   * waiting". The `status` filter is the point: an item leaves this queue when the record itself
+   * is dealt with on the screen that owns it, so there is no second copy to keep in step.
+   */
+  const [queueRequests, queueInvitations, queueReports, queueMembers] = await Promise.all([
+    supabase
+      .from("invitation_requests")
+      .select("id, email, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(200),
+    supabase
+      .from("invitations")
+      .select("id, email, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(200),
+    supabase
+      .from("qa_reports")
+      .select("id, title, severity, kind, created_at")
+      .eq("status", "open")
+      .order("created_at", { ascending: true })
+      .limit(200),
+    supabase
+      .from("profiles")
+      .select("id, display_name, role, status, created_at, last_active_at")
+      .in("status", ["active", "accepted"])
+      .order("created_at", { ascending: true })
+      .limit(500),
+  ]);
+
+  const queue = buildCoOwnerQueue({
+    now: new Date().toISOString(),
+    accessRequests: queueRequests.error ? null : (queueRequests.data ?? null),
+    invitations: queueInvitations.error ? null : (queueInvitations.data ?? null),
+    testerReports: queueReports.error ? null : (queueReports.data ?? null),
+    members: queueMembers.error ? null : (queueMembers.data ?? null),
+  });
 
   const memberRows = members.data ?? null;
   const activeMembers = memberRows ? memberRows.filter((m) => String(m.status ?? "") === "active").length : null;
@@ -134,6 +180,7 @@ return (
               <h2 className="dash-hero-title mt-1">The network you help run</h2>
               <p className="dash-hero-sub mt-2 max-w-2xl">Your areas, member activity and QA work, read live from the database. Anything unreadable says so.</p>
             </div>
+            <CoOwnerQueue result={queue} />
             <TrendChart
               title="Your team this week"
               subtitle="Membership events in the last seven days, so you can see where the work actually landed."

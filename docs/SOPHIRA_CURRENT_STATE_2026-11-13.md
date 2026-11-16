@@ -1655,3 +1655,59 @@ Baseline: `master` at `21b101d`, tree clean, production serving `21b101d`, 9465 
 
 The AI-dependent paths remain unexercised (no provider key), no signed-in or device pass has been
 done, and the scheduled worker still has not advanced a run. Parts 3, 4 and 18 remain the Owner's.
+
+## 28. Accurate activity, and the Co-Owner's queue (2026-11-15 evening)
+
+Two rounds. The first fixed the reported Last Active fault and proved it on a real database; the
+second built the Co-Owner's operational queue.
+
+### 28.1 Last Active (migration 0060, commit 5aca070)
+
+The heartbeat recorded that somebody was at their screen but never wrote "last meaningful activity",
+so only the student dashboard ever moved `profiles.last_active_at`. That is exactly the reported
+shape: presence Active, heartbeat running, Last Active four days old.
+
+`public.presence_heartbeat()` is replaced (compatible superset of 0050) and now also advances the
+caller's own `profiles.last_active_at` — at most once per minute, only when `p_interacted` is true,
+identity from `auth.uid()` inside the definer function, the throttle expressed as the `WHERE` clause
+so it is atomic across tabs, and a failed update reported as `failed` with a warning instead of a
+fabricated timestamp. Nothing is added to the schema; no policy or grant is widened; 0050 and 0051
+are untouched. `src/lib/presence/activity.ts` holds the same rule as pure code, the presence route
+passes the database's own outcome through, and the student dashboard's fallback write is throttled
+to the same window so the column is not written twice.
+
+Proved, not asserted: `npm run db:verify:local` now runs 18 behaviour checks on real PostgreSQL 15 —
+a real interaction records, a second one inside the minute is throttled, a passive beat writes
+nothing, another member's row is untouched, a revoked account is refused and its session cleared,
+and presence rows still sit beside the account record.
+
+### 28.2 The Co-Owner's operational queue (commit after 308c254)
+
+`src/lib/co-owner/queue.ts` (pure) + `src/components/co-owner/CoOwnerQueue.tsx` + the panel on
+`/co-owner`. Four sources: access requests, unaccepted invitations, unanswered tester reports and
+quiet members (signed up and never used it, or stopped more than a month ago). Each item carries a
+plain-English urgency, how long it has waited in words, why it matters and a link to the screen that
+clears it.
+
+The queue is **derived**: every item is a record whose own `status` decides it, so clearing the work
+removes the item and there is no second list to drift. It keeps **no claim flag** — no table records
+who picked an item up, so the module says so rather than implying otherwise, and R17 records that as
+remaining.
+
+Honesty rules, all tested: a source that could not be read makes every count `null` and puts the
+failure in the headline, never "nothing waiting"; the order is urgency then longest wait, because the
+thing untouched for three weeks is the neglect; no status word, column name or error code reaches a
+Co-Owner.
+
+### Evidence
+
+* `npm test` 9686/9686 (119 new assertions in `tests/co-owner-queue.ts`), `tsc --noEmit` clean, lint
+  0 errors, build OK, jargon 0, a11y PASS 194 files, contrast PASS 32 pairs both themes, design drift
+  0, secret scan CLEAN, conformance 84 routes / 0 without h1 or landmark, inventory 84 pages / 118 API
+  routes, `npm run release:report` 41 checks with 0 FAIL (25 PASS, 15 BLOCKED, 1 NOT RUN).
+* `npm run db:verify:local`: the whole chain applies and 0060 behaves as described.
+
+### Still not verified
+
+No signed-in pass by a Co-Owner, so the panel has never been rendered against real rows. The AI key,
+the scheduler password and a member test account remain the Owner's.

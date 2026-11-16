@@ -151,8 +151,9 @@ and the completed-work library. *Evidence:* `history-labels.ts`, `gradual-insert
 ### R12 — Dashboards expand, permissions do not move
 Owner, Co-Owner, Tester and student dashboards gain the new information; every existing block
 and every role restriction stays. Co-Owners keep no Owner-only power.
-*Status:* `PARTIALLY IMPLEMENTED`. Owner monitoring and the requirement/roadmap view are built;
-Co-Owner task queue, Tester test-case library and the student assignment centre remain to build.
+*Status:* `PARTIALLY IMPLEMENTED`. Owner monitoring, the requirement/roadmap view and the Co-Owner
+operational queue are built; the Tester test-case library and the student assignment centre remain to
+build, and the queue keeps no claim flag because no table records who picked an item up.
 
 ### R13 — Security and privacy are not traded for convenience
 Every member-facing route uses the existing authentication guard and the user-scoped client;
@@ -194,7 +195,11 @@ work with software can follow.
 3. **Expanded Owner operational monitoring.** Real health checks, not a green badge because a page
    rendered.
 4. **Co-Owner operational queue.** The administrative work waiting for a Co-Owner, from one shared
-   source, so two administrators cannot duplicate it.
+   source, so two administrators cannot work from different lists. Built 2026-11-15: access
+   requests, unaccepted invitations, unanswered tester reports and quiet members, ordered by urgency
+   and then by how long they have waited, each linking to the record that clears it. The records
+   themselves remain the single source of truth; there is no claim flag yet, because no table records
+   who picked an item up.
 5. **Tester test-case library.** Structured, numbered tests with recorded outcomes, history and a
    regression summary.
 6. **Student assignment centre.** Every assignment, run and draft in one place, built on stored run
@@ -211,9 +216,9 @@ work with software can follow.
 *Status:* `PARTIALLY IMPLEMENTED`. *Evidence:* `src/lib/presence/activity.ts` and migration `0060`
 (one activity rule for every role), `tests/dashboard-activity.ts`, the 18 live behaviour checks in
 `npm run db:verify:local`, the existing Owner screens left intact, `/owner/requirements`.
-*Remaining:* the Co-Owner queue, the Tester test-case library, the student assignment centre and the
-Owner's consolidated alert area are not built; the shared-definition and plain-language passes are
-partial; no signed-in pass by a real member of each role has happened.
+*Remaining:* the Tester test-case library, the student assignment centre and the Owner's consolidated
+alert area are not built; the Co-Owner queue has no claim flag; the shared-definition and
+plain-language passes are partial; no signed-in pass by a real member of each role has happened.
 
 ## 4. Historical implementation decisions that were not Owner decisions
 

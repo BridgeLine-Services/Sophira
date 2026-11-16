@@ -175,8 +175,13 @@ export const PRODUCT_REQUIREMENTS: readonly ProductRequirement[] = [
     group: "Dashboards",
     statement: "All four dashboards gain the new information while every existing block and role restriction stays. Co-Owners keep no Owner-only power.",
     status: "PARTIALLY IMPLEMENTED",
-    evidence: ["/owner/requirements", "Owner autonomous monitoring (src/lib/owner/autonomous-monitor.ts)", "existing dashboard blocks untouched"],
-    remaining: "Co-Owner operational queue, Tester test-case library and the student assignment centre are not built yet. Accuracy and consistency of the numbers themselves are tracked separately in R17.",
+    evidence: [
+      "/owner/requirements",
+      "Owner autonomous monitoring (src/lib/owner/autonomous-monitor.ts)",
+      "the Co-Owner operational queue (src/lib/co-owner/queue.ts, rendered on /co-owner)",
+      "existing dashboard blocks untouched",
+    ],
+    remaining: "The Tester test-case library and the student assignment centre are not built yet, and the Co-Owner queue has no claim or assignment flag because no table records who picked an item up. Accuracy and consistency of the numbers themselves are tracked separately in R17.",
     ownerAction: null,
   },
   {
@@ -231,10 +236,11 @@ export const PRODUCT_REQUIREMENTS: readonly ProductRequirement[] = [
       "tests/dashboard-activity.ts (79 assertions) and npm run db:verify:local (18 behaviour checks on real PostgreSQL: records, throttles, ignores passive beats, refuses a revoked account, leaves other members untouched)",
       "existing Owner screens preserved and unchanged: members, invitations, requests, presence, AI operations, migrations, backup, release and legal readiness, security, network analytics",
       "/owner/requirements (every requirement with its status, its evidence and what is still missing)",
+      "src/lib/co-owner/queue.ts + src/components/co-owner/CoOwnerQueue.tsx, rendered on /co-owner (area 4: the administrative work waiting, oldest and most urgent first, from the records themselves)",
       "docs/PRODUCT_REQUIREMENTS.md §R17",
     ],
     remaining:
-      "Areas 1, 2, 9, 10 and 12 are in place and, for activity, verified against a real database. Not built yet: the Co-Owner operational queue (4), the Tester test-case library (5), the student assignment centre (6) and the Owner's consolidated alert area (3). Consistency of the remaining shared definitions (7) and the plain-language pass over every error (8) are partial. No dashboard has had a signed-in pass by a real member of each role, which needs working accounts.",
+      "Areas 1, 2, 4, 9, 10 and 12 are in place; activity is verified against a real database and the Co-Owner queue is built and tested offline. Not built yet: the Tester test-case library (5), the student assignment centre (6) and the Owner's consolidated alert area (3). The Co-Owner queue orders and opens the real records but keeps no claim flag, so two Co-Owners cannot see who picked an item up (4, partial). Consistency of the remaining shared definitions (7) and the plain-language pass over every error (8) are partial. No dashboard has had a signed-in pass by a real member of each role, which needs working accounts.",
     ownerAction: null,
   },
 ];
