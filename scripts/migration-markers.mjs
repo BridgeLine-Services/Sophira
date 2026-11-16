@@ -156,4 +156,8 @@ export const MARKERS = {
   // activity word together, so a half-applied replacement cannot pass.
   "0060_member_activity_sync.sql":
     "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'presence_heartbeat' and n.nspname = 'public' and p.prosrc like '%last_active_at%' and p.prosrc like '%v_activity%')",
+  // 0061: the tester's numbered test list and its recorded results. The probe asks for BOTH
+  // tables together, so a half-applied migration (cases created, results missing) cannot pass.
+  "0061_qa_test_library.sql":
+    "to_regclass('public.qa_test_cases') is not null and to_regclass('public.qa_test_results') is not null",
 };

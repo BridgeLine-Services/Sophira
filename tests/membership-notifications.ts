@@ -294,7 +294,7 @@ export function runMembershipNotificationTests(
   // needs no migration of its own - the assertion above proves it.
   // 2026-11-15: 59 -> 60 (0060, the heartbeat also keeps last_active_at in step). The
   // notification work still needs no migration of its own - the assertion above proves it.
-  assert(migrations.length === 60,
+  assert(migrations.length === 61,
     "schema: notification changes ride the 0042 table; 0055 adds announcements");
 
   section("approving a request actually sends the invitation");

@@ -85,6 +85,21 @@ export default async function TesterPage() {
           write it down here. Every report is attached to your account, and you can follow its status.
         </p>
 
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink">The numbered test list</p>
+              <p className="mt-0.5 text-sm text-ink-soft">
+                What to test, what should happen, and what happened last time each test was run. Recording a result keeps
+                the history, so a regression is noticed rather than remembered.
+              </p>
+            </div>
+            <Link href="/tester/tests" className="shrink-0 text-sm font-medium text-accent hover:underline">
+              Open the test list &rarr;
+            </Link>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-3 gap-3">
           {[
             { label: "Outstanding", value: open, note: "open or being reviewed" },

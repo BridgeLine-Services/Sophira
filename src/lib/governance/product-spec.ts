@@ -238,10 +238,11 @@ export const PRODUCT_REQUIREMENTS: readonly ProductRequirement[] = [
       "existing Owner screens preserved and unchanged: members, invitations, requests, presence, AI operations, migrations, backup, release and legal readiness, security, network analytics",
       "/owner/requirements (every requirement with its status, its evidence and what is still missing)",
       "src/lib/co-owner/queue.ts + src/components/co-owner/CoOwnerQueue.tsx, rendered on /co-owner (area 4: the administrative work waiting, oldest and most urgent first, from the records themselves)",
+      "the Tester test-case library (src/lib/tester/test-library.ts, migration 0061, rendered on /tester/tests: numbered tests, recorded outcomes, history and a regression summary)",
       "docs/PRODUCT_REQUIREMENTS.md §R17",
     ],
     remaining:
-      "Areas 1, 2, 3, 4, 9, 10 and 12 are in place; activity is verified against a real database, and the Co-Owner queue and Owner alert area are built and tested offline. Not built yet: the Tester test-case library (5) and the student assignment centre (6). The Co-Owner queue orders and opens the real records but keeps no claim flag, so two Co-Owners cannot see who picked an item up (4, partial). Consistency of the remaining shared definitions (7) and the plain-language pass over every error (8) are partial. No dashboard has had a signed-in pass by a real member of each role, which needs working accounts.",
+      "Areas 1, 2, 3, 4, 5, 9, 10 and 12 are in place; activity is verified against a real database, and the Co-Owner queue, the Owner alert area and the Tester test-case library are built and tested offline. Not built yet: the student assignment centre (6), and no test result has been recorded by a real tester yet. The Co-Owner queue orders and opens the real records but keeps no claim flag, so two Co-Owners cannot see who picked an item up (4, partial). Consistency of the remaining shared definitions (7) and the plain-language pass over every error (8) are partial. No dashboard has had a signed-in pass by a real member of each role, which needs working accounts.",
     ownerAction: null,
   },
 ];

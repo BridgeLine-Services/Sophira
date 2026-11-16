@@ -460,9 +460,9 @@ export function runAutonomousAssignmentTests(assert: Check, section: (title: str
   // still present and still the newest migration that CREATES this feature's table; the pin is
   // split so neither fact can hide behind the other.
   assert(migrationFiles.includes("0059_assignment_runs.sql"), "0059 (the assignment runs table) is in the chain");
-  assert(migrationFiles[migrationFiles.length - 1] === "0060_member_activity_sync.sql",
+  assert(migrationFiles[migrationFiles.length - 1] === "0061_qa_test_library.sql",
     "the newest migration is the latest in the chain, whatever it is");
-  assert(migrationFiles.length === 60, `the chain is 60 migrations (found ${migrationFiles.length})`);
+  assert(migrationFiles.length === 61, `the chain is 61 migrations (found ${migrationFiles.length})`);
   assert(migrationFiles.includes("0058_writing_profile_contexts.sql"), "the previous chain end is untouched");
 
   const markers = readFileSync(join(ROOT, "scripts/migration-markers.mjs"), "utf8");

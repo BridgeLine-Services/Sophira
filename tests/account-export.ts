@@ -47,7 +47,10 @@ export function runAccountExportTests(assert: (c: boolean, n: string) => void, s
       // Operator records, not member data: the role-change audit names the ADMIN who made each
       // change (exporting it to a member would hand them another person's actions), and the
       // presence thresholds are one global owner setting, not a member's own row.
-      "membership_audit", "presence_settings"].includes(t)
+      "membership_audit", "presence_settings",
+      // The test library is a shared staff-authored list of what to test, not a member's own data.
+      // A tester's RESULTS are their own and are exported.
+      "qa_test_cases"].includes(t)
   );
   for (const t of userOwned) {
     assert(route.includes(`"${t}"`),

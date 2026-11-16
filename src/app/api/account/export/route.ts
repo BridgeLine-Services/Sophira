@@ -64,6 +64,10 @@ const USER_TABLES = [
   "notebooks",
   "learning_goals",
   "qa_reports",
+  // 2026-11-16: the results a tester recorded against the numbered test list are their own work.
+  // The list itself (qa_test_cases) is staff-authored reference data, not a member's row, so it is
+  // not exported.
+  "qa_test_results",
   "notebook_notes",
   "notebook_sources",
   "notebook_questions",

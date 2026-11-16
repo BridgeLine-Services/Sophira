@@ -136,6 +136,7 @@ import { runMemberPresenceTests } from "./member-presence";
 import { runDashboardActivityTests } from "./dashboard-activity";
 import { runCoOwnerQueueTests } from "./co-owner-queue";
 import { runOwnerAlertTests } from "./owner-alerts";
+import { runTestLibraryTests } from "./test-library";
 import { runActionItemTests } from "./action-items";
 import { runOwnerReadinessTests } from "./owner-readiness";
 import { runOwnerCommandCenterTests } from "./owner-command-center";
@@ -2755,12 +2756,12 @@ async function runSecurityRegressionTests(): Promise<void> {
     // helpers are themselves auth.uid()-scoped, SECURITY DEFINER, a closed role list, and not
     // executable by anon — all asserted immediately below. A policy scoped by NOTHING is still
     // a failure: the check did not loosen, it learned one new legitimate shape.
-    const roleScoped = (body: string) => /public\.(is_staff|is_owner)\(\)/.test(body);
+    const roleScoped = (body: string) => /public\.(is_staff|is_owner|is_tester_or_staff)\(\)/.test(body);
     const unscoped = policies.filter((p) => !/auth\.uid\(\)/.test(p.body) && !roleScoped(p.body));
     assert(unscoped.length === 0,
       `security: every policy is scoped to auth.uid() or a verified role helper (unscoped: ${unscoped.map((p) => p.table).join(", ") || "none"}) — no permissive policy can slip in`);
-    const helpers = sql.match(/create or replace function public\.(is_staff|is_owner)\(\)[\s\S]*?\$\$;/g) ?? [];
-    assert(helpers.length === 2,
+    const helpers = sql.match(/create or replace function public\.(is_staff|is_owner|is_tester_or_staff)\(\)[\s\S]*?\$\$;/g) ?? [];
+    assert(helpers.length === 3,
       "security: the role helpers used by policies are defined in the migrations");
     for (const helper of helpers) {
       assert(/security definer/.test(helper), "security: each role helper runs as definer so it can read profiles safely");
@@ -5591,5 +5592,6 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     runDashboardActivityTests(assert, section);
     runCoOwnerQueueTests(assert, section);
     runOwnerAlertTests(assert, section);
+    runTestLibraryTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

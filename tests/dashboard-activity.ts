@@ -194,8 +194,8 @@ export function runDashboardActivityTests(assert: (cond: boolean, msg: string) =
   section("11. The change is additive, numbered after the chain, and reversible");
   {
     const files = readdirSync(join(ROOT, "supabase", "migrations")).filter((f) => f.endsWith(".sql")).sort();
-    assert(files[files.length - 1] === "0060_member_activity_sync.sql",
-      "0060 is the newest migration in the chain");
+    assert(files.includes("0060_member_activity_sync.sql"),
+      "0060 is in the chain, and a later migration never removes it");
     assert(files.includes("0050_member_presence.sql") && files.includes("0051_directory_privacy_and_staff_invitations.sql"),
       "the applied migrations it supersedes are still in the chain");
     assert(!/create table/i.test(migration), "it creates no table");

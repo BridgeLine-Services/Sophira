@@ -205,7 +205,12 @@ work with software can follow.
    themselves remain the single source of truth; there is no claim flag yet, because no table records
    who picked an item up.
 5. **Tester test-case library.** Structured, numbered tests with recorded outcomes, history and a
-   regression summary.
+   regression summary. Built 2026-11-16: migration 0061 adds the numbered list (twenty starter tests
+   across access, dashboards, presence, memory, honesty and reliability) and an append-only record of
+   every attempt, so a regression is "failed now, passed before" rather than something remembered.
+   Testers read the list and record only their own results; only staff change it. A test nobody has
+   run is reported as never run and is excluded from the pass rate, and a test that could not be run
+   is counted on its own rather than as a pass or a failure.
 6. **Student assignment centre.** Every assignment, run and draft in one place, built on stored run
    state, never claiming work that was not verified.
 7. **Appropriate role-specific notifications.** Each role hears about what it can act on.
@@ -220,9 +225,9 @@ work with software can follow.
 *Status:* `PARTIALLY IMPLEMENTED`. *Evidence:* `src/lib/presence/activity.ts` and migration `0060`
 (one activity rule for every role), `tests/dashboard-activity.ts`, the 18 live behaviour checks in
 `npm run db:verify:local`, the existing Owner screens left intact, `/owner/requirements`.
-*Remaining:* the Tester test-case library and the student assignment centre are not built; the
-Co-Owner queue has no claim flag; the shared-definition and plain-language passes are partial; no
-signed-in pass by a real member of each role has happened.
+*Remaining:* the student assignment centre is not built; the Co-Owner queue has no claim flag; no
+test result has been recorded by a real tester yet; the shared-definition and plain-language passes
+are partial; no signed-in pass by a real member of each role has happened.
 
 ## 4. Historical implementation decisions that were not Owner decisions
 

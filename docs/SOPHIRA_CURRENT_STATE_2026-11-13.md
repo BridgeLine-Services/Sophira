@@ -1750,3 +1750,56 @@ monitoring, and a test now fails if the spec cites a path that is not there.
 
 No signed-in Owner pass, so the panel has never been rendered against real rows, and the alerts have
 never been seen by the person they are written for.
+
+## 30. The tester's numbered test list (2026-11-16)
+
+Testing had no list. The tester role could file a report (0054), but every round started from
+nothing: the same screens were re-tested, others were never touched, and "does this still work?" had
+no answer beyond somebody's memory. A report is a failure that happened to be noticed. A test library
+is the list that makes noticing systematic.
+
+Migration `0061` adds two tables. `qa_test_cases` holds twenty numbered starter tests (TC-001 to
+TC-020) across ten areas - access, dashboards, presence, owner tools, tester tools, memory, honesty,
+language, consistency, reliability - each with the steps and the expected result, so two testers get
+the same answer. `qa_test_results` records one row per attempt: passed, failed, could not run, or not
+run, with a note, who ran it and when.
+
+`src/lib/tester/test-library.ts` (pure, tested without a browser) decides what the numbers mean, and
+the rules are the whole point:
+
+* A test nobody has run is **never run**, its own count, excluded from the pass rate. The headline
+  says it plainly: "12 passing, and 8 of 20 never run. That is not the same as 20 passes."
+* **Could not run** is a first-class answer, not a pass and not a failure. A tester with no account,
+  no key or no device can say so, and the environment's gap is not charged to Sophira.
+* A **regression** is only claimed when the history says so: failed now, passed the attempt
+  immediately before. A first failure is described as a new failure, because nothing used to pass.
+* An unreadable timestamp sorts last, so a malformed row cannot make old news look like the newest
+  fact. An unreadable table says the list could not be read and claims no counts at all.
+
+`/tester/tests` renders it, and the tester's home links to it.
+
+### What the database actually does
+
+The chain was applied to a throwaway PostgreSQL 15 and inspected, not assumed: 20 cases across 10
+areas, row level security on both tables, three policies on the list (testers and staff read; only
+staff write) and two on the results (a tester reads and writes only their own). The results table
+carries **only INSERT and SELECT for `authenticated`** - `revoke update, delete` is explicit, because
+Supabase grants the authenticated role broad table privileges by default and an attempt that can be
+rewritten makes "it passed before" meaningless. There is no update policy and no delete policy on
+results, so an attempt that was recorded stays recorded.
+
+### Evidence
+
+* `npm test` 9869/9869 (96 new assertions in `tests/test-library.ts`), `tsc --noEmit` clean, lint 0
+  errors / 33 warnings, build OK, jargon 0, a11y PASS, contrast PASS both themes, design drift 0,
+  secret scan CLEAN, conformance 85 routes / 0 without h1 or landmark.
+* `npm run db:verify:local` applied the 61-migration chain on real PostgreSQL 15, including 0061 over
+  existing data, losing no existing text.
+* `docs/PRODUCT_REQUIREMENTS.md` R17 area 5 is recorded as built; only the student assignment centre
+  and a result recorded by a real tester remain.
+
+### Still not verified
+
+No result has been recorded by a signed-in tester, so the screen has never rendered against real
+rows. Staff editing the list is enforced by policy but has no screen yet: the twenty starter tests are
+the list until an editor is built.

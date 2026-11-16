@@ -9,7 +9,7 @@ migrations, the tables they create (minus any dropped later) and the storage buc
 and fails the suite when they disagree. A migration added without updating this line
 is a test failure, not a stale document.
 
-**Scope at time of writing:** 60 migrations, 66 application tables, 1 private storage bucket (`private-docs`).
+**Scope at time of writing:** 61 migrations, 66 application tables, 1 private storage bucket (`private-docs`).
 
 ---
 
@@ -107,6 +107,8 @@ Every table below is owned by exactly one member and must come back to that same
 | `notebooks` | A member's notebooks. | yes | yes |
 | `learning_goals` | The student's own objectives, progress and target dates |
 | `qa_reports` | Tester bug reports and feedback, private to the tester (staff can triage status) |
+| `qa_test_cases` | The numbered list of tests (what to test and what should happen). Staff-authored reference data, readable by testers and staff |
+| `qa_test_results` | One row per test attempt, private to the tester who recorded it (staff can read all). Kept so a regression is a fact, not a memory |
 | `notebook_notes` | Notes inside a notebook. | yes | yes |
 | `notebook_sources` | Sources attached to a notebook. | yes | yes |
 | `notebook_questions` | Questions raised. | yes | yes |
