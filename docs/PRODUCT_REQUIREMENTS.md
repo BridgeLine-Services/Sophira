@@ -184,6 +184,37 @@ changes.
 and needs a signed-in Owner to display). Evidence: `src/lib/governance/product-spec.ts`,
 `/owner/requirements`.
 
+### R17 — Accurate, complete, understandable and role-appropriate dashboards
+All four dashboards must tell the truth about the same facts, in language a person who does not
+work with software can follow.
+
+1. **Accurate activity across all four roles.** One mechanism records "last meaningful activity"
+   for Owner, Co-Owner, Tester and User. A person who is working is not shown as absent for days.
+2. **Consistent live presence.** "Online" means the same thing on every screen that shows it.
+3. **Expanded Owner operational monitoring.** Real health checks, not a green badge because a page
+   rendered.
+4. **Co-Owner operational queue.** The administrative work waiting for a Co-Owner, from one shared
+   source, so two administrators cannot duplicate it.
+5. **Tester test-case library.** Structured, numbered tests with recorded outcomes, history and a
+   regression summary.
+6. **Student assignment centre.** Every assignment, run and draft in one place, built on stored run
+   state, never claiming work that was not verified.
+7. **Appropriate role-specific notifications.** Each role hears about what it can act on.
+8. **Plain-language error handling.** No database error, stack trace or internal term reaches a
+   student.
+9. **Preserved role restrictions.** Enforced server-side; a hidden button is not authorization.
+10. **Preserved academic privacy.** No member sees another student's work.
+11. **Verified functionality.** Offline and live evidence are distinguished, and nothing is called
+    verified because tests passed offline.
+12. **Documented rollback.** Every database change says how to undo it.
+
+*Status:* `PARTIALLY IMPLEMENTED`. *Evidence:* `src/lib/presence/activity.ts` and migration `0060`
+(one activity rule for every role), `tests/dashboard-activity.ts`, the 18 live behaviour checks in
+`npm run db:verify:local`, the existing Owner screens left intact, `/owner/requirements`.
+*Remaining:* the Co-Owner queue, the Tester test-case library, the student assignment centre and the
+Owner's consolidated alert area are not built; the shared-definition and plain-language passes are
+partial; no signed-in pass by a real member of each role has happened.
+
 ## 4. Historical implementation decisions that were not Owner decisions
 
 These were made by an earlier automated development process. They are recorded here **as

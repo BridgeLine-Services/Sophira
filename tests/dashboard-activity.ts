@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { PRODUCT_REQUIREMENTS, REQUIREMENT_STATUSES } from "../src/lib/governance/product-spec";
 import {
   ACTIVITY_THROTTLE_SECONDS, ACTIVITY_THROTTLE_MS, ACTIVITY_OUTCOMES, isActivityOutcome,
   shouldRecordActivity, nextActivityValue, describeActivityOutcome, activitySummaryLines,
@@ -231,7 +232,37 @@ export function runDashboardActivityTests(assert: (cond: boolean, msg: string) =
       "no role condition can leave one of the four roles without activity");
   }
 
-  section("13. The student dashboard's own write is a throttled fallback, not a duplicate");
+  section("13. Requirement R17 exists, and does not claim what is not built");
+  {
+    const r17 = PRODUCT_REQUIREMENTS.find((r) => r.id === "R17");
+    assert(Boolean(r17), "R17 is registered beside the other requirements");
+    const spec = r17!;
+    assert(spec.group === "Dashboards", "R17 sits in the dashboards group, not in a new one");
+    assert((REQUIREMENT_STATUSES as readonly string[]).includes(spec.status),
+      `R17 uses an agreed status word (${spec.status})`);
+    assert(spec.status === "PARTIALLY IMPLEMENTED",
+      "R17 is not marked complete while the Co-Owner queue, Tester library and assignment centre are unbuilt");
+    assert(/plain language/i.test(spec.statement) && /privacy/i.test(spec.statement) && /rollback/i.test(spec.statement),
+      "R17 states the twelve acceptance areas a non-technical reader asked for, in their terms");
+    assert(spec.evidence.some((e) => e.includes("0060")), "R17's evidence names the migration, not just the code");
+    assert(spec.evidence.some((e) => e.includes("db:verify:local")),
+      "R17's evidence distinguishes real-database verification from offline tests");
+    assert(Boolean(spec.remaining) && /not built/i.test(spec.remaining!),
+      "what is not built is named rather than implied");
+    assert(/signed-in pass/i.test(spec.remaining!),
+      "the live gap is stated, so nothing here reads as live-verified");
+
+    const doc = read("docs/PRODUCT_REQUIREMENTS.md");
+    assert(/### R17 — /.test(doc), "the document carries the same requirement, so code and document cannot drift");
+    for (const area of ["Accurate activity across all four roles", "Consistent live presence", "Co-Owner operational queue", "Tester test-case library", "Student assignment centre", "Preserved academic privacy", "Documented rollback"]) {
+      assert(doc.includes(area), `R17's acceptance area "${area}" is written down, not only summarised`);
+    }
+    const r12 = PRODUCT_REQUIREMENTS.find((r) => r.id === "R12");
+    assert(Boolean(r12) && /R17/.test(r12!.remaining ?? ""),
+      "R12 points at R17 for accuracy instead of claiming it");
+  }
+
+  section("14. The student dashboard's own write is a throttled fallback, not a duplicate");
   {
     assert(/ACTIVITY_THROTTLE_MS/.test(dashboard), "the dashboard uses the same window as the heartbeat");
     assert(/\.or\(`last_active_at\.is\.null,last_active_at\.lte\.\$\{activityFloor\}`\)/.test(dashboard),

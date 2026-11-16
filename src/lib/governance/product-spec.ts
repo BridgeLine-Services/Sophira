@@ -176,7 +176,7 @@ export const PRODUCT_REQUIREMENTS: readonly ProductRequirement[] = [
     statement: "All four dashboards gain the new information while every existing block and role restriction stays. Co-Owners keep no Owner-only power.",
     status: "PARTIALLY IMPLEMENTED",
     evidence: ["/owner/requirements", "Owner autonomous monitoring (src/lib/owner/autonomous-monitor.ts)", "existing dashboard blocks untouched"],
-    remaining: "Co-Owner operational queue, Tester test-case library and the student assignment centre are not built yet.",
+    remaining: "Co-Owner operational queue, Tester test-case library and the student assignment centre are not built yet. Accuracy and consistency of the numbers themselves are tracked separately in R17.",
     ownerAction: null,
   },
   {
@@ -217,6 +217,24 @@ export const PRODUCT_REQUIREMENTS: readonly ProductRequirement[] = [
     status: "IMPLEMENTED, LIVE VERIFICATION REQUIRED",
     evidence: ["src/lib/governance/product-spec.ts (16 requirements, statuses, evidence, remaining, owner action)", "src/app/owner/requirements/page.tsx (the screen that renders them)", "src/lib/owner/change-log.ts (six change kinds, each dated with its evidence)", "tests/autonomous-assignment.ts pins document, code and page together"],
     remaining: "The screen and its data are built and pinned offline; nobody has yet opened /owner/requirements with a signed-in Owner account, which needs a working member session.",
+    ownerAction: null,
+  },
+  {
+    id: "R17",
+    title: "Accurate, complete, understandable and role-appropriate dashboards",
+    group: "Dashboards",
+    statement:
+      "All four dashboards tell the truth about the same facts. (1) Account activity is accurate for Owner, Co-Owner, Tester and User alike, through one mechanism, not four. (2) Live presence is consistent across every screen that shows it. (3) The Owner dashboard carries real operational monitoring, not green badges for pages that loaded. (4) The Co-Owner has an operational queue of actual administrative work. (5) The Tester has a structured test-case library with recorded outcomes. (6) The student has an assignment centre built on real run state. (7) Each role gets notifications appropriate to it. (8) Errors are explained in plain language to someone who does not work with software. (9) Existing role restrictions are preserved and enforced server-side, never by hiding a button. (10) Academic privacy is preserved: nobody sees another student's work. (11) Every claim of working behaviour is verified, with offline and live evidence told apart. (12) Every database change carries documented rollback.",
+    status: "PARTIALLY IMPLEMENTED",
+    evidence: [
+      "src/lib/presence/activity.ts + supabase/migrations/0060_member_activity_sync.sql (one activity rule for every role; presence and account activity stay separate answers)",
+      "tests/dashboard-activity.ts (79 assertions) and npm run db:verify:local (18 behaviour checks on real PostgreSQL: records, throttles, ignores passive beats, refuses a revoked account, leaves other members untouched)",
+      "existing Owner screens preserved and unchanged: members, invitations, requests, presence, AI operations, migrations, backup, release and legal readiness, security, network analytics",
+      "/owner/requirements (every requirement with its status, its evidence and what is still missing)",
+      "docs/PRODUCT_REQUIREMENTS.md §R17",
+    ],
+    remaining:
+      "Areas 1, 2, 9, 10 and 12 are in place and, for activity, verified against a real database. Not built yet: the Co-Owner operational queue (4), the Tester test-case library (5), the student assignment centre (6) and the Owner's consolidated alert area (3). Consistency of the remaining shared definitions (7) and the plain-language pass over every error (8) are partial. No dashboard has had a signed-in pass by a real member of each role, which needs working accounts.",
     ownerAction: null,
   },
 ];
