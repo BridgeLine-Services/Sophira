@@ -57,6 +57,7 @@ import {
 import { FLAG_KEYS, FLAGS, flagDisabledMessage, flagEnabled, flagStates } from "../src/lib/features/flags";
 import { EXPORT_FORMATS, exportFilename, isExportFormat, renderExport } from "../src/lib/essay/export";
 import { changeSummary, changesIn, recentChanges, silentCategories } from "../src/lib/owner/change-log";
+import { OWNER_SETUP_STEPS, OWNER_SETUP_SAFETY, ownerHeldParts } from "../src/lib/owner/owner-setup";
 import { CHANGE_CATEGORIES, CHANGE_CATEGORY_LABELS } from "../src/lib/governance/product-spec";
 
 const ROOT = join(__dirname, "..", "..");
@@ -649,4 +650,40 @@ export function runAutonomousAssignmentTests(assert: Check, section: (title: str
 
   const exportRouteAgain = readFileSync(join(ROOT, "src/app/api/essay/autonomous/[id]/export/route.ts"), "utf8");
   assert(/format=md|isExportFormat/.test(exportRouteAgain), "provenance: the links it offers are the export route, not a second download path");
+
+  /* ---------------------------------------------------------------- */
+  section("The Owner's own list - three steps, no secrets, no commands");
+  /* ---------------------------------------------------------------- */
+
+  assert(ownerHeldParts().length === 3, "owner steps: exactly three things the Owner holds, so the list stays readable");
+  assert(ownerHeldParts().join() === "3,4,18", "owner steps: the scheduler, the AI service and the legal details, in that order");
+  for (const step of OWNER_SETUP_STEPS) {
+    assert(step.steps.length >= 5, `owner steps: part ${step.part} is broken into real, countable steps`);
+    assert(step.unlocks.length > 20 && step.ifYouSkipIt.length > 20,
+      `owner steps: part ${step.part} says what it unlocks AND what still works if it is skipped`);
+    assert(step.steps.every((line) => line.trim().length > 15), `owner steps: part ${step.part} has no placeholder line`);
+    const text = step.steps.join(" ");
+    // Nothing here may ask the Owner to do something only a developer can do.
+    assert(!/\bcurl\b|\bnpm\b|\bgit \b|terminal|command line|ssh\b|\.env\b/i.test(text),
+      `owner steps: part ${step.part} never asks for a terminal, a command or a dotfile`);
+    // And nothing here may look like a secret value.
+    assert(!/[A-Za-z0-9_-]{32,}/.test(text), `owner steps: part ${step.part} contains no string that could be mistaken for a key`);
+    assert(!/sk-|Bearer |ghp_|eyJ/.test(text), `owner steps: part ${step.part} contains no key-shaped example`);
+  }
+  const scheduler = OWNER_SETUP_STEPS.find((s) => s.part === 3)!;
+  assert(scheduler.steps.some((l) => l.includes("CRON_SECRET")), "owner steps: the scheduler step names the exact box to fill");
+  assert(scheduler.steps.filter((l) => l.includes("CRON_SECRET")).length === 2,
+    "owner steps: and asks for the same phrase in both places, because one without the other does nothing");
+  assert(scheduler.steps.some((l) => l.includes("SOPHIRA_AUTONOMOUS_SCHEDULE") && l.includes("SOPHIRA_AUTONOMOUS_ESSAY")),
+    "owner steps: the two switches are set together, exactly as the variables guide requires");
+  assert(scheduler.steps.some((l) => /Redeploy/i.test(l)), "owner steps: it says how to make the new setting take effect");
+  assert(OWNER_SETUP_SAFETY.some((l) => /Never send them to me/i.test(l)), "owner steps: the safety note forbids sending a secret, before the Owner is tempted");
+  assert(OWNER_SETUP_SAFETY.some((l) => /one-time code|card number/i.test(l)), "owner steps: and names the other things never to send");
+  assert(OWNER_SETUP_SAFETY.some((l) => /did not come from me/i.test(l)),
+    "owner steps: someone impersonating Sophira cannot talk the Owner into a terminal");
+
+  const setupPage = readFileSync(join(ROOT, "src/app/owner/requirements/page.tsx"), "utf8");
+  assert(/Three things only you can do/.test(setupPage), "owner steps: the page shows them to the Owner in the app");
+  assert(/OWNER_SETUP_STEPS\.map/.test(setupPage) && /OWNER_SETUP_SAFETY\.map/.test(setupPage),
+    "owner steps: rendered from the pinned data, so the page cannot drift from what the tests check");
 }

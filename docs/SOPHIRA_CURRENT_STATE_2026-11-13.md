@@ -1572,3 +1572,46 @@ build OK, jargon 0, a11y PASS, design drift 0, inventory unchanged at 84 pages a
 
 The card has never rendered against a real completed run, because that needs an AI provider key
 so a run can produce text. It is pinned offline only.
+
+## §26. The Owner's own three steps, written to be safe (2026-11-15, commit after e6b5907)
+
+Baseline: `master` at `e6b5907`, tree clean, production serving it, 9436 tests passed / 0 failed.
+
+### What was wrong
+
+The Owner is not technical and had asked what they must do. The answers existed only in my chat
+replies and in `docs/ENVIRONMENT_VARIABLES.md`, which is written for an engineer: it names
+variables but not the order of clicks, and nothing in the app said "these three are yours, here is
+where the box is". A wrong step in a secrets flow is also the one kind of mistake that can leak a
+credential, so the instructions needed a safety floor, not just a list.
+
+### What changed
+
+| Path | Change |
+|---|---|
+| `src/lib/owner/owner-setup.ts` | New: three owner steps (Part 3 scheduler, Part 4 AI service, Part 18 legal details), each with what it unlocks, what still works if skipped, numbered click paths and a safety list. |
+| `src/app/owner/requirements/page.tsx` | Renders them as "Three things only you can do", above the "Waiting on you" list. |
+| `tests/autonomous-assignment.ts` | 29 new assertions, including the ones that make it safe (see below). |
+
+### The safety floor, enforced by tests not by good intentions
+
+- No string in these instructions may be 32+ characters of key-shaped text, and none may match
+  `sk-`, `Bearer `, `ghp_` or `eyJ`. A step can never carry an example that gets mistaken for a key.
+- No step may mention a terminal, a shell command, `npm`, `curl`, `ssh`, `git` or `.env`. If any
+  instruction ever does, it did not come from Sophira, and the page says so in those words.
+- The safety list forbids sending keys or passwords in chat *before* the Owner reaches the step
+  where they would be tempted, forbids one-time codes and card numbers entirely, and says what to
+  do if something leaks.
+- Each step names the exact box (`CRON_SECRET`, `GEMINI_API_KEY` / `OPENAI_API_KEY`,
+  `SOPHIRA_AUTONOMOUS_ESSAY`, `SOPHIRA_AUTONOMOUS_SCHEDULE`) and ends in something observable from
+  outside, so the Owner never has to judge whether it worked.
+
+### Verification
+
+9465 tests passed / 0 failed, `tsc --noEmit` clean, lint 0 errors / 33 warnings, build OK, jargon 0,
+a11y PASS, design drift 0, secret scan CLEAN, inventory unchanged at 84 pages and 118 API routes.
+
+### Still not verified
+
+The Owner has not yet performed these steps, so Parts 3, 4 and 18 remain open. Nothing in this
+round claims otherwise, and every screen still reports the honest current state.

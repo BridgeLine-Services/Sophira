@@ -15,6 +15,7 @@ import {
   type RequirementStatus,
 } from "@/lib/governance/product-spec";
 import { changeSummary, recentChanges, silentCategories } from "@/lib/owner/change-log";
+import { OWNER_SETUP_STEPS, OWNER_SETUP_SAFETY } from "@/lib/owner/owner-setup";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,45 @@ export default async function OwnerRequirementsPage() {
             Back to overview
           </Link>
         </div>
+
+        <section aria-labelledby="req-owner-steps">
+          <h3 id="req-owner-steps" className="mb-2 meta-strong">
+            Three things only you can do
+          </h3>
+          <Card>
+            <CardContent className="space-y-4 p-4">
+              <p className="text-sm text-ink-soft">
+                Everything else is built. These three need an account only you hold. None of them
+                asks you to write code, open a terminal or read a log file, and each one says what
+                still works if you decide to leave it for later.
+              </p>
+              {OWNER_SETUP_STEPS.map((step) => (
+                <div key={step.part} className="border-t border-line pt-3 first:border-0 first:pt-0">
+                  <p className="font-medium text-ink">
+                    Part {step.part}: {step.title}
+                  </p>
+                  <p className="mt-1 text-sm text-ink-soft">{step.unlocks}</p>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-ink-soft">
+                    {step.steps.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ol>
+                  <p className="mt-2 text-xs text-ink-soft">
+                    <span className="font-medium">If you skip it:</span> {step.ifYouSkipIt}
+                  </p>
+                </div>
+              ))}
+              <div className="rounded-lg border border-line bg-ink/[0.03] p-3">
+                <p className="text-sm font-medium text-ink">Keeping you safe while you do this</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-ink-soft">
+                  {OWNER_SETUP_SAFETY.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
 
         {blocked.length > 0 && (
           <Card>
