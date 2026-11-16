@@ -456,8 +456,13 @@ export function runAutonomousAssignmentTests(assert: Check, section: (title: str
   assert(/check \(state in \(/.test(migration), "the state column is constrained to the machine's states");
 
   const migrationFiles = readdirSync(join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-  assert(migrationFiles[migrationFiles.length - 1] === "0059_assignment_runs.sql", "0059 is the newest migration");
-  assert(migrationFiles.length === 59, `the chain is 59 migrations (found ${migrationFiles.length})`);
+  // 2026-11-15: 0059 -> 0060 (the heartbeat also keeps the account record in step). 0059 is
+  // still present and still the newest migration that CREATES this feature's table; the pin is
+  // split so neither fact can hide behind the other.
+  assert(migrationFiles.includes("0059_assignment_runs.sql"), "0059 (the assignment runs table) is in the chain");
+  assert(migrationFiles[migrationFiles.length - 1] === "0060_member_activity_sync.sql",
+    "the newest migration is the latest in the chain, whatever it is");
+  assert(migrationFiles.length === 60, `the chain is 60 migrations (found ${migrationFiles.length})`);
   assert(migrationFiles.includes("0058_writing_profile_contexts.sql"), "the previous chain end is untouched");
 
   const markers = readFileSync(join(ROOT, "scripts/migration-markers.mjs"), "utf8");

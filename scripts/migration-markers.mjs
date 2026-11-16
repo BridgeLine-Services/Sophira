@@ -150,4 +150,10 @@ export const MARKERS = {
   // 0059: the durable record behind an autonomous assignment run. The probe asks for the table
   // itself, which only exists once this migration really ran.
   "0059_assignment_runs.sql": "to_regclass('public.assignment_runs') is not null",
+  // 0060: the heartbeat now also keeps the account record in step. The probe reads the
+  // function's own source, so it is false while 0050's version is installed and true only
+  // once this migration's replacement really ran. It asks about the column AND the returned
+  // activity word together, so a half-applied replacement cannot pass.
+  "0060_member_activity_sync.sql":
+    "exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'presence_heartbeat' and n.nspname = 'public' and p.prosrc like '%last_active_at%' and p.prosrc like '%v_activity%')",
 };

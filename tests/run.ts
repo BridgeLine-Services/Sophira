@@ -133,6 +133,7 @@ import { runMemberIdentityTests } from "./member-identity";
 import { runMembershipRoleTests } from "./membership-roles";
 import { runAdminAuditTests } from "./admin-audit";
 import { runMemberPresenceTests } from "./member-presence";
+import { runDashboardActivityTests } from "./dashboard-activity";
 import { runActionItemTests } from "./action-items";
 import { runOwnerReadinessTests } from "./owner-readiness";
 import { runOwnerCommandCenterTests } from "./owner-command-center";
@@ -5583,5 +5584,8 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     runAutonomousAssignmentTests(assert, section);
     runAutonomousSurfaceTests(assert, section);
     runAutonomousDeliveryTests(assert, section);
+    // 2026-11-15: Last Active and live presence are two answers, and only one of them was
+    // ever being fed. The activity correction and its ten honesty rules.
+    runDashboardActivityTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

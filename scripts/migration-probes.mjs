@@ -254,7 +254,10 @@ async function selfTest() {
   check(current.probes.some((p) => p.file === newest), "the newest migration is always probed");
 
   const allOk = await runMigrationProbes({ baseUrl: "https://x.supabase.co", apiKey: "k", plan: current,
-    fetchImpl: fakeFetch({ rpc: ["record_admin_event", "network_activity_daily", "network_member_phones"] }) });
+    // 2026-11-15: presence_heartbeat belongs in this fixture because 0060's marker reads the
+    // function's own body. A "fully current database" now includes the replaced heartbeat, so
+    // omitting it would make the fixture describe an out-of-date schema, not a defect.
+    fetchImpl: fakeFetch({ rpc: ["record_admin_event", "network_activity_daily", "network_member_phones", "presence_heartbeat"] }) });
   check(allOk.status === "PASS", "a fully current database PASSES");
   check(/window \d{4}-\d{4}/.test(allOk.detail), "the PASS names the verified window instead of claiming the whole chain");
 
@@ -268,7 +271,7 @@ async function selfTest() {
   check(/network_activity_daily|0056/.test(missingNewest.detail), "the failure names the missing newest migration");
 
   const partial = await runMigrationProbes({ baseUrl: "https://x.supabase.co", apiKey: "k", plan: current,
-    fetchImpl: fakeFetch({ missing: ["qa_reports"], rpc: ["record_admin_event", "network_activity_daily", "network_member_phones"] }) });
+    fetchImpl: fakeFetch({ missing: ["qa_reports"], rpc: ["record_admin_event", "network_activity_daily", "network_member_phones", "presence_heartbeat"] }) });
   check(partial.status === "FAIL" && /qa_reports/.test(partial.detail), "a partial state is detected and named");
   check(/\/setup repair/.test(partial.detail), "the diagnostic names the repair action");
   check(partial.verified > 0 && partial.failed.length === 1, "the executor reports how much was verified alongside what failed");

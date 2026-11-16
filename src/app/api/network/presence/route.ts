@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/supabase/guard";
+import { isActivityOutcome } from "@/lib/presence/activity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,11 +37,20 @@ export async function POST(request: NextRequest) {
     // Older database without migration 0050: report honestly, do not fake "connected".
     return NextResponse.json({ ok: false, presence: "unavailable" }, { status: 200 });
   }
-  const result = (data ?? {}) as { ok?: boolean; error?: string; sessions?: number };
+  const result = (data ?? {}) as { ok?: boolean; error?: string; sessions?: number; activity?: string };
   if (result.ok !== true) {
     return NextResponse.json({ ok: false, reason: result.error ?? "not permitted" }, { status: 403 });
   }
-  return NextResponse.json({ ok: true, sessions: result.sessions ?? 1 });
+  /*
+   * 2026-11-15: the beat also advances the member's own account record, at most once a
+   * minute and only for a meaningful interaction (migration 0060). The outcome is passed
+   * on rather than flattened into "ok": a tab whose interaction could not be recorded is
+   * still present, and a screen that said otherwise would be wrong in the other direction.
+   * An older database returns no `activity` at all, which is reported as "idle", never as
+   * a write that did not happen.
+   */
+  const activity = isActivityOutcome(result.activity) ? result.activity : "idle";
+  return NextResponse.json({ ok: true, sessions: result.sessions ?? 1, activity });
 }
 
 export async function DELETE(request: NextRequest) {

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser, readProfileWithRepair } from "@/lib/supabase/require-user";
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { AppShell } from "@/components/app/AppShell";
+import { ACTIVITY_THROTTLE_MS } from "@/lib/presence/activity";
 import { Badge, Button, Card, CardContent, EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { LearningGoals } from "@/components/dashboard/LearningGoals";
@@ -70,8 +71,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   if (profile.role === "owner" && view !== "workspace") redirect("/owner");
   if (!profile.onboarded) redirect("/onboarding");
 
-  // Activity tracking for privacy-safe aggregate owner analytics.
-  await supabase.from("profiles").update({ last_active_at: new Date().toISOString() }).eq("id", user.id).then(() => undefined);
+  /*
+   * Activity tracking for privacy-safe aggregate owner analytics.
+   *
+   * 2026-11-15: this write is kept as the student dashboard's own compatible fallback, but it
+   * is now THROTTLED to the same one-minute window the presence heartbeat uses (migration
+   * 0060). Without that, opening this page beat the heartbeat to the row and the two wrote the
+   * same column twice within a second. A failed write here is still silent and harmless: the
+   * heartbeat records the same thing moments later, and nothing on this page depends on it.
+   */
+  const activityFloor = new Date(Date.now() - ACTIVITY_THROTTLE_MS).toISOString();
+  await supabase
+    .from("profiles")
+    .update({ last_active_at: new Date().toISOString() })
+    .eq("id", user.id)
+    .or(`last_active_at.is.null,last_active_at.lte.${activityFloor}`)
+    .then(() => undefined);
 
   // RECENT ACTIVITY (owner-approved definition): derived from real rows only -
   // no click log, no surveillance - read through the RLS-scoped client.

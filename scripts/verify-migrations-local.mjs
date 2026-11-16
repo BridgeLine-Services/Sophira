@@ -182,6 +182,94 @@ try {
   check((rlsOff.stdout || "").trim() === "", "every public table has row level security on",
     (rlsOff.stdout || "").trim() === "" ? "" : `not on: ${(rlsOff.stdout || "").trim()}`);
 
+  // 1c. THE ACTIVITY CORRECTION, BEHAVING (2026-11-15).
+  //     The suite proves what migration 0060 SAYS. This proves what it DOES on a real
+  //     PostgreSQL: a meaningful interaction moves the caller's own last_active_at, a
+  //     passive beat does not, the one-minute window suppresses the write, another
+  //     member's row is never touched, and a suspended account is refused without a
+  //     timestamp being invented for it.
+  //
+  //     The local stub returns "no user" by design, so for this scenario only auth.uid()
+  //     reads a session claim. That is a throwaway database, and the honest limit is
+  //     unchanged: this proves the schema and the function's behaviour, not production.
+  {
+    const ACTIVE_A = "aaaaaaaa-0000-0000-0000-000000000001";
+    const ACTIVE_B = "aaaaaaaa-0000-0000-0000-000000000002";
+    const SUSPENDED_C = "aaaaaaaa-0000-0000-0000-000000000003";
+    freshDatabase();
+    const applied = psql(DB, ["-f", BOOTSTRAP_SQL]);
+    if (applied.status !== 0) {
+      check(false, "0060 behaviour: the full chain applies", (applied.stderr || "").slice(0, 200));
+    } else {
+      psql(DB, ["-c", `create or replace function auth.uid() returns uuid language sql stable as $$
+        select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$`]);
+      // The real sign-up path is invitation-only (a trigger enforces it), so the three
+      // members are seeded with that trigger suspended, and their profiles written
+      // explicitly - which is also why the fixture cannot drift into "sign-up worked".
+      const seeded = psql(DB, ["-c", `
+        set session_replication_role = replica;
+        insert into auth.users (id, email, email_confirmed_at) values
+          ('${ACTIVE_A}','a@example.test', now()),
+          ('${ACTIVE_B}','b@example.test', now()),
+          ('${SUSPENDED_C}','c@example.test', now()) on conflict do nothing;
+        insert into public.profiles (id, display_name, role, status) values
+          ('${ACTIVE_A}','Member A','user','active'),
+          ('${ACTIVE_B}','Member B','user','active'),
+          ('${SUSPENDED_C}','Member C','user','active')
+          on conflict (id) do update set role = 'user', status = 'active';
+        set session_replication_role = origin;`]);
+      check(seeded.status === 0, "0060 behaviour: three members exist to measure",
+        seeded.status === 0 ? "" : (seeded.stderr || "").slice(0, 200));
+
+      /** Call the heartbeat AS a member and read one field from what it returned. */
+      const beat = (user, session, interacted, key) => {
+        const r = psql(DB, ["-tAc", `select set_config('request.jwt.claim.sub','${user}',false);
+          select coalesce(public.presence_heartbeat('${session}', ${interacted ? "true" : "false"}) ->> '${key}', '');`]);
+        return (r.stdout || "").trim().split("\n").filter((l) => l !== "").pop()?.trim() ?? "";
+      };
+      const lastActive = (user) => (psql(DB, ["-tAc",
+        `select coalesce(last_active_at::text,'') from public.profiles where id = '${user}'`]).stdout || "").trim();
+      const first = beat(ACTIVE_A, "tab-activity-0001", true, "activity");
+      check(first === "recorded", "0060 behaviour: a meaningful interaction records activity", `got ${JSON.stringify(first)}`);
+      const t1 = lastActive(ACTIVE_A);
+      check(t1 !== "", "0060 behaviour: the account record now holds a real timestamp");
+      const second = beat(ACTIVE_A, "tab-activity-0001", true, "activity");
+      check(second === "throttled", "0060 behaviour: a second interaction inside the minute is throttled, not written", `got ${JSON.stringify(second)}`);
+      check(lastActive(ACTIVE_A) === t1, "0060 behaviour: the throttled beat changed nothing");
+      const passive = beat(ACTIVE_A, "tab-activity-0001", false, "activity");
+      check(passive === "idle", "0060 behaviour: a passive heartbeat claims no activity", `got ${JSON.stringify(passive)}`);
+      check(lastActive(ACTIVE_A) === t1, "0060 behaviour: a passive heartbeat wrote nothing");
+      const sessions = beat(ACTIVE_A, "tab-activity-0002", true, "sessions");
+      check(sessions === "2", "0060 behaviour: a second tab is counted as a second session", `got ${JSON.stringify(sessions)}`);
+      check(lastActive(ACTIVE_A) === t1, "0060 behaviour: the second tab's interaction was throttled by the first");
+      check(lastActive(ACTIVE_B) === "", "0060 behaviour: another member's record was never touched");
+      psql(DB, ["-c", `update public.profiles set last_active_at = now() - interval '2 minutes' where id = '${ACTIVE_A}'`]);
+      const afterWindow = beat(ACTIVE_A, "tab-activity-0001", true, "activity");
+      check(afterWindow === "recorded", "0060 behaviour: an interaction after the window records again", `got ${JSON.stringify(afterWindow)}`);
+      check(lastActive(ACTIVE_A) !== t1, "0060 behaviour: the timestamp actually advanced after the window");
+      const separate = psql(DB, ["-tAc", `select count(*) from public.member_presence where user_id = '${ACTIVE_A}'`]);
+      check((separate.stdout || "").trim() === "2", "0060 behaviour: presence rows still exist beside the account record",
+        `got ${JSON.stringify((separate.stdout || "").trim())}`);
+      const before = beat(SUSPENDED_C, "tab-activity-0003", true, "activity");
+      check(before === "recorded", "0060 behaviour: the third member was active before suspension", `got ${JSON.stringify(before)}`);
+      const keptC = lastActive(SUSPENDED_C);
+      // "Suspended" in the Owner's language is status 'revoked' in the schema (0024); the
+      // heartbeat refuses every status outside active/accepted/pending, so this is the real
+      // path a suspended member takes.
+      psql(DB, ["-c", `update public.profiles set status = 'revoked' where id = '${SUSPENDED_C}'`]);
+      const refused = beat(SUSPENDED_C, "tab-activity-0003", true, "ok");
+      check(refused === "false", "0060 behaviour: a suspended (revoked) account is refused", `got ${JSON.stringify(refused)}`);
+      check(lastActive(SUSPENDED_C) === keptC, "0060 behaviour: the refusal invented no timestamp");
+      const clearedC = (psql(DB, ["-tAc",
+        `select count(*) from public.member_presence where user_id = '${SUSPENDED_C}'`]).stdout || "").trim();
+      check(clearedC === "0", "0060 behaviour: the suspended account's session was cleared", `got ${JSON.stringify(clearedC)}`);
+      const anonymous = (psql(DB, ["-tAc", `select set_config('request.jwt.claim.sub','',false);
+        select coalesce(public.presence_heartbeat('tab-activity-0004', true) ->> 'error','');`]).stdout || "").trim()
+        .split("\n").filter((l) => l !== "").pop()?.trim() ?? "";
+      check(anonymous === "not authenticated", "0060 behaviour: a caller with no identity is refused by name", `got ${JSON.stringify(anonymous)}`);
+    }
+  }
+
   // 2. Migrations that must survive EXISTING rows, which is the only way to catch a
   //    NOT NULL column or a backfill that would break a live deployment.
   //

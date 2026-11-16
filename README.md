@@ -56,7 +56,7 @@ authentication entry point is `src/proxy.ts` — Next.js 16 renamed the old
    `SUPABASE_SERVICE_ROLE_KEY`).
 4. **Run it.** `npm run dev` → http://localhost:3000. For a deployed app,
    open `/setup` and click **Set Up Sophira** — the app applies its own
-   migration chain (all 59 migrations, `0001`–`0059`) from inside the app. No SQL editor, ever.
+   migration chain (all 60 migrations, `0001`–`0060`) from inside the app. No SQL editor, ever.
 5. **Create the owner account.** With no owner yet, the sign-in screen shows
    **Create Owner Account** (also at **/create-owner**). Enter your email and
    choose your own password: migration 0025 makes the FIRST completed
