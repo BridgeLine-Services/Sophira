@@ -160,8 +160,10 @@ export function runRoleNavigationTests(
     // a notebook. The existing order is otherwise unchanged; Settings is still last.
     // 2026-11-15: Assignment runs joins directly after Typing Calibration; both are writing tools and
     // the runs screen is reached from the writing workspace. Nothing else moved.
-    assert(sectionOrder.join("|") === ["/dashboard", "/writing/typing", "/writing/autonomous", "/courses", "/notebooks", "/flashcards", "/lectures", "/learning", "/notifications", "/offline", "/settings"].join("|"),
-      "role-nav: the academic order is Home, Typing Calibration, Assignment runs, Courses, Notebooks, Flashcards, Lectures, Learning / Memory, Notifications, Offline, Settings");
+    // 2026-11-16: the Assignment centre joins directly after Home. It is the screen a student opens
+    // to ask "what still needs me?", so it is reached before the tools. Nothing else moved.
+    assert(sectionOrder.join("|") === ["/dashboard", "/assignments", "/writing/typing", "/writing/autonomous", "/courses", "/notebooks", "/flashcards", "/lectures", "/learning", "/notifications", "/offline", "/settings"].join("|"),
+      "role-nav: the academic order is Home, Assignments, Typing Calibration, Assignment runs, Courses, Notebooks, Flashcards, Lectures, Learning / Memory, Notifications, Offline, Settings");
     assert(WORKSPACE_SECTIONS.filter((i) => i.href === "/dashboard").length === 1,
       "role-nav: Home appears exactly once (no duplicated destination)");
   }

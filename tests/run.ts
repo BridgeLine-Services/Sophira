@@ -137,6 +137,7 @@ import { runDashboardActivityTests } from "./dashboard-activity";
 import { runCoOwnerQueueTests } from "./co-owner-queue";
 import { runOwnerAlertTests } from "./owner-alerts";
 import { runTestLibraryTests } from "./test-library";
+import { runAssignmentCentreTests } from "./assignment-centre";
 import { runActionItemTests } from "./action-items";
 import { runOwnerReadinessTests } from "./owner-readiness";
 import { runOwnerCommandCenterTests } from "./owner-command-center";
@@ -5593,5 +5594,6 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     runCoOwnerQueueTests(assert, section);
     runOwnerAlertTests(assert, section);
     runTestLibraryTests(assert, section);
+    runAssignmentCentreTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 

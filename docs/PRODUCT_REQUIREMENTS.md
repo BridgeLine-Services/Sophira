@@ -212,7 +212,13 @@ work with software can follow.
    run is reported as never run and is excluded from the pass rate, and a test that could not be run
    is counted on its own rather than as a pass or a failure.
 6. **Student assignment centre.** Every assignment, run and draft in one place, built on stored run
-   state, never claiming work that was not verified.
+   state, never claiming work that was not verified. Built 2026-11-16 at `/assignments`, with a menu
+   entry directly after Home: one row per assignment giving its run, its draft and what still needs the
+   student. A draft is called **checked** only when the stored run records `final_verification.status`
+   exactly `VERIFIED`; a finished run with no recorded check is "Draft, not checked" and one that needs
+   review says it did not pass. An unfinished run says which step it reached and that nothing is
+   finished. An unreadable table makes the counts "unknown" and the headline says the picture is
+   incomplete, rather than showing a student an empty list.
 7. **Appropriate role-specific notifications.** Each role hears about what it can act on.
 8. **Plain-language error handling.** No database error, stack trace or internal term reaches a
    student.
@@ -225,9 +231,10 @@ work with software can follow.
 *Status:* `PARTIALLY IMPLEMENTED`. *Evidence:* `src/lib/presence/activity.ts` and migration `0060`
 (one activity rule for every role), `tests/dashboard-activity.ts`, the 18 live behaviour checks in
 `npm run db:verify:local`, the existing Owner screens left intact, `/owner/requirements`.
-*Remaining:* the student assignment centre is not built; the Co-Owner queue has no claim flag; no
-test result has been recorded by a real tester yet; the shared-definition and plain-language passes
-are partial; no signed-in pass by a real member of each role has happened.
+*Remaining:* a screen for staff to edit the test list is not built; the Co-Owner queue has no claim
+flag; no test result has been recorded by a real tester yet; no draft run has been watched by a real
+member; the shared-definition and plain-language passes are partial; no signed-in pass by a real
+member of each role has happened.
 
 ## 4. Historical implementation decisions that were not Owner decisions
 

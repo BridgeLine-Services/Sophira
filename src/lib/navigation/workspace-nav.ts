@@ -17,6 +17,7 @@
 import {
   Bell,
   BookOpen,
+  ClipboardList,
   Brain,
   CloudOff,
   Gauge,
@@ -45,6 +46,9 @@ export interface WorkspaceNavItem {
  */
 export const WORKSPACE_SECTIONS: WorkspaceNavItem[] = [
   { href: "/dashboard", label: "Home", icon: Home, kind: "home" },
+  // Assignment centre (2026-11-16, R17 area 6): every assignment, run and draft in one place.
+  // It sits immediately after Home because it answers the question a student opens the app with.
+  { href: "/assignments", label: "Assignments", icon: ClipboardList, kind: "section" },
   { href: "/writing/typing", label: "Typing Calibration", icon: Keyboard, kind: "section" },
   // Assignment runs (2026-11-15, Part 4/7): the screen that drives the autonomous runner.
   { href: "/writing/autonomous", label: "Assignment runs", icon: ListChecks, kind: "section" },

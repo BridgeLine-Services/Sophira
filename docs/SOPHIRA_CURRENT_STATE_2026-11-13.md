@@ -1809,3 +1809,47 @@ chain on a throwaway database; it does not apply anything to Supabase. Probed wi
 2026-11-16, both tables answer 404 (PGRST205, not in the schema cache). The page handles that: it
 shows the "update the database" notice rather than an empty test list, so nothing breaks in the
 meantime. One press of Update database in /setup applies it, and nothing else is outstanding.
+
+## 31. The student assignment centre (2026-11-16)
+
+A student had to remember which assignments Sophira had prepared. The runs screen listed runs, the
+workspace showed one assignment at a time, and nothing answered "what still needs me?". Requirement
+R17 area 6 asked for one place, "built on stored run state, never claiming work that was not
+verified".
+
+`/assignments` is that place, with a menu entry directly after Home. `src/lib/assignments/centre.ts`
+(pure, tested without a browser) decides every word, and three rules are the reason it is a module
+rather than markup:
+
+* **Checked means checked.** A draft is called checked only when the stored run records
+  `final_verification.status` exactly `VERIFIED`. A completed run with no verification is "Draft, not
+  checked"; `NEEDS REVIEW` says it did not pass, and the note explaining why is shown. A legacy
+  `essay_sessions` row whose status column says "verified" is **not** trusted: that column predates the
+  run's final check, so only a recorded verification counts. A malformed row with an unreadable time
+  sorts last, so it cannot become the newest fact and manufacture a pass.
+* **Unfinished is unfinished.** Queued, analysing, planning, researching, drafting, auditing and
+  verifying all read as "Being prepared", with the step reached ("step 4 of 6"), and the sentence ends
+  "Nothing is finished yet." A zero-step run does not print "step 1 of 0".
+* **An unreadable source is not a zero.** If any of the three reads fails, the counts are withheld,
+  "Not started" is not claimed (absence of work is not something the screen can assert with a broken
+  read), and the headline says part of the picture could not be read and nothing has been deleted.
+
+A blocked run is filed under "Needs you now" with the recorded reason verbatim; a failed one says it
+did not finish; an unrecognised state is admitted rather than guessed into a friendlier one. At most
+three recorded limitations are shown per row, so the row stays readable.
+
+All three reads use the student's own client filtered by `user_id`, so row-level security is a second
+lock rather than the only one. No admin client, no new table, no migration, no policy touched.
+
+### Evidence
+
+* `npm test` 9985/9985 (115 new assertions in `tests/assignment-centre.ts`), `tsc --noEmit` clean,
+  lint 0 errors / 33 warnings (ceiling held), build OK, jargon 0, a11y PASS, contrast PASS both
+  themes, design drift 0, secret scan CLEAN, conformance 86 routes / 0 without h1 or landmark.
+* Requirements R17 area 6 recorded as built; the only unbuilt pieces left are a staff screen for
+  editing the test list and the Co-Owner claim flag.
+
+### Still not verified
+
+No signed-in student has opened `/assignments`, and no real run has populated it, so the screen has
+never rendered against real rows. The 0059 runs table is live; the 0061 test tables are not.
