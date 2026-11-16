@@ -1803,3 +1803,9 @@ results, so an attempt that was recorded stays recorded.
 No result has been recorded by a signed-in tester, so the screen has never rendered against real
 rows. Staff editing the list is enforced by policy but has no screen yet: the twenty starter tests are
 the list until an editor is built.
+
+The live database does not have 0061 yet. The GitHub "Migrations" job is green, but it verifies the
+chain on a throwaway database; it does not apply anything to Supabase. Probed with the service key on
+2026-11-16, both tables answer 404 (PGRST205, not in the schema cache). The page handles that: it
+shows the "update the database" notice rather than an empty test list, so nothing breaks in the
+meantime. One press of Update database in /setup applies it, and nothing else is outstanding.
