@@ -1,25 +1,25 @@
 {
-  "generatedAt": "2026-11-15T17:19:23.312Z",
+  "generatedAt": "2026-11-16T01:54:04.298Z",
   "verdict": "BLOCKED",
   "counts": {
     "total": 41,
     "pass": 25,
-    "fail": 1,
-    "blocked": 14,
+    "fail": 0,
+    "blocked": 15,
     "notRun": 1
   },
   "checks": [
     {
       "id": "production-url",
       "name": "Production URL works",
-      "status": "FAIL",
-      "detail": "verify-deployment failed for https://sophira.vercel.app/: Deployment NOT ready: AI provider key.\nOptional: web-search provider (research degrades gracefully — not blocking)\n::error::Release blocked — the target deployment is not configured: AI provider key\n"
+      "status": "BLOCKED",
+      "detail": "deployment answers at https://sophira.vercel.app/ but is waiting on the Owner: Serving commit: 21b101d60b841e11792e5e518880bbbbe4390242 Deployment NOT ready: AI provider key. Optional: web-search provider (research degrades gracefully — not blocking) Deployment answers, but is waiting on the Owner:"
     },
     {
       "id": "db-migrations",
       "name": "Database migrations applied",
       "status": "PASS",
-      "detail": "every sampled migration marker is in the LIVE production schema (window 0047-0058, 10 of 10 probes verified, newest 0058 proven; 2 catalog-only marker(s) not probeable via REST)"
+      "detail": "every sampled migration marker is in the LIVE production schema (window 0048-0059, 10 of 10 probes verified, newest 0059 proven; 2 catalog-only marker(s) not probeable via REST)"
     },
     {
       "id": "ai-provider",
@@ -73,91 +73,91 @@
       "id": "writing-profile",
       "name": "Writing profile tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §3/§5 (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §3/§5 (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "teacher-rules",
       "name": "Teacher-specific rules tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §1/§4 (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §1/§4 (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "teacher-override-habits",
       "name": "Teacher rules override old personal habits",
       "status": "PASS",
-      "detail": "offline suite green — suite §8/§12a + §18 conflict loop (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §8/§12a + §18 conflict loop (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "learning-corrections",
       "name": "Learning corrections tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §9-§12 (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §9-§12 (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "stale-patterns",
       "name": "Learning stale-pattern detection tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §8d + §18 decay (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §8d + §18 decay (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "typing-test",
       "name": "Typing test tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §13/§15d (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §13/§15d (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "typing-paced",
       "name": "Typing-paced output tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §14/§15b (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §14/§15b (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "deadline-scheduler",
       "name": "Deadline scheduler tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §15/§15c (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §15/§15c (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "break-session-state",
       "name": "Persisted break/session state tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §19 execution state machine (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §19 execution state machine (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "rubric-audit",
       "name": "Rubric audit tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §15e (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §15e (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "submission-readiness",
       "name": "Submission readiness gate tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §15j/§15k + §16b-§16d (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §15j/§15k + §16b-§16d (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "research-retrieval",
       "name": "Research retrieval tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §15i (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §15i (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "claim-to-source",
       "name": "Claim-to-source verification tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §16b (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §16b (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "citation-integrity",
       "name": "Citation integrity tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §15h/§16d (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §15h/§16d (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "source-authority",
       "name": "Source authority ranking tested",
       "status": "PASS",
-      "detail": "offline suite green — suite §16c (npm test RESULTS: 8854 passed, 0 failed, 8854 total)"
+      "detail": "offline suite green — suite §16c (npm test RESULTS: 9467 passed, 0 failed, 9467 total)"
     },
     {
       "id": "pwa-android",
@@ -211,13 +211,13 @@
       "id": "no-secrets",
       "name": "No secrets committed",
       "status": "PASS",
-      "detail": "no secret patterns in 997 tracked files (private keys, sk-/rk-, AWS, ghp_, xox)"
+      "detail": "no secret patterns in 1033 tracked files (private keys, sk-/rk-, AWS, ghp_, xox)"
     },
     {
       "id": "npm-test",
       "name": "npm test passes",
       "status": "PASS",
-      "detail": "npm test RESULTS: 8854 passed, 0 failed, 8854 total"
+      "detail": "npm test RESULTS: 9467 passed, 0 failed, 9467 total"
     },
     {
       "id": "npm-build",

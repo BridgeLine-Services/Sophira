@@ -191,9 +191,14 @@ function runGate() {
     const u = env("SOPHIRA_APP_URL");
     if (!u) return { status: "BLOCKED", detail: "SOPHIRA_APP_URL is not configured (owner must set the production deployment URL)" };
     const r = run(["node", "scripts/verify-deployment.mjs", u.value], { timeout: 60000 });
-    return r.code === 0
-      ? { status: "PASS", detail: `deployment readiness verified at ${u.value}` }
-      : { status: "FAIL", detail: `verify-deployment failed for ${u.value}: ${r.out.slice(0, 300)}` };
+    if (r.code === 0) return { status: "PASS", detail: `deployment readiness verified at ${u.value}` };
+    // Exit 3: the deployment answered with a real commit and the app runs; the only missing piece
+    // is something only the Owner can add. Reporting that as FAIL made a healthy site look broken
+    // and buried the real fact, which is that a person is needed, not a fix.
+    if (r.code === 3) {
+      return { status: "BLOCKED", detail: `deployment answers at ${u.value} but is waiting on the Owner: ${r.out.replace(/\s+/g, " ").slice(0, 220)}` };
+    }
+    return { status: "FAIL", detail: `verify-deployment failed for ${u.value}: ${r.out.slice(0, 300)}` };
   });
 
   // 2. Database migrations applied

@@ -25,6 +25,20 @@ node scripts/release-gate.mjs              # full gate (runs npm test, build, ts
 node scripts/release-gate.mjs --fast       # skip npm test/build/tsc — use ONLY when
                                            # the same CI job already ran them
 node scripts/release-gate.mjs --report     # print the report, always exit 0
+
+### What BLOCKED means for the production URL (2026-11-15)
+
+`scripts/verify-deployment.mjs` distinguishes three live outcomes, and the gate now honours the
+distinction instead of flattening it:
+
+| Exit | Meaning | Gate status |
+|---|---|---|
+| 0 | Reachable, serving, fully configured | PASS |
+| 3 | Reachable, serving a real commit, and the only missing piece is something only the Owner can add (an AI provider key) | BLOCKED, with the served commit in the detail |
+| 1 | Unreachable, unhealthy, wrong service name, or a genuine misconfiguration | FAIL |
+
+Before this, a healthy deployment waiting on an owner-supplied key was reported as FAIL, which
+made a working site look broken and hid the real fact: nothing needs fixing, a person is needed.
 node scripts/release-gate.mjs --self-test  # verify the gate's own rules (fast)
 ```
 

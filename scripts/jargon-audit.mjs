@@ -21,7 +21,13 @@
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join, relative } from "path";
 
-const ROOT = "src/app";
+/**
+ * Two roots, because a student's text does not all live in a page: the cards, panels and helpers
+ * under src/components/app render inside student screens and are read by the same person. They
+ * were outside this scanner until 2026-11-15, which meant a whole class of student-facing copy was
+ * unchecked. Staff areas are still skipped, by the same STAFF rule below.
+ */
+const ROOTS = ["src/app", "src/components/app"];
 const STAFF = ["/owner/", "/co-owner/", "/tester/", "/setup", "/admin/", "/api/"];
 
 /** term -> why it is wrong for a student */
@@ -59,6 +65,15 @@ function files(dir) {
 }
 
 /** The text a student can see, per file. */
+/**
+ * True when a candidate is prose a person reads. A code expression is not: `initialRole ===
+ * undefined ? null : ...` reached the report once and had to be explained, which is exactly how a
+ * scanner stops being trusted. Operators never appear in a sentence on a screen.
+ */
+export function isProse(t) {
+  return !/=>|===|!==|&&|\|\||\?\.|\bundefined\b/.test(t);
+}
+
 export function visibleText(src) {
   let s = src
     .replace(/\/\*[\s\S]*?\*\//g, " ")
@@ -68,17 +83,18 @@ export function visibleText(src) {
   // JSX text nodes: >text<  (no braces, no tags)
   for (const m of s.matchAll(/>([^<>{}]+)</g)) {
     const t = m[1].trim();
-    if (t) out.push(t);
+    if (t && isProse(t)) out.push(t);
   }
   // strings passed to props/labels that render
   const VISIBLE_PROP = /\b(title|description|subtitle|label|placeholder|message|heading|note|helper|emptyTitle|emptyDescription|aria-label|alt)\s*=\s*["']([^"']+)["']/g;
-  for (const m of s.matchAll(VISIBLE_PROP)) out.push(m[2]);
+  for (const m of s.matchAll(VISIBLE_PROP)) if (isProse(m[2])) out.push(m[2]);
   // string literals that are plainly sentences shown to a person
   const SENTENCE = /["']([A-Z][^"'\\\n]{18,})["']/g;
   for (const m of s.matchAll(SENTENCE)) {
     const t = m[1];
     if (/^(use |import |use client)/.test(t)) continue;
     if (/^[A-Z_]+$/.test(t)) continue;
+    if (!isProse(t)) continue;
     out.push(t);
   }
   return out;
@@ -86,7 +102,8 @@ export function visibleText(src) {
 
 export function audit() {
   const findings = [];
-  for (const file of files(ROOT)) {
+  const seenFiles = ROOTS.flatMap((root) => files(root));
+  for (const file of seenFiles) {
     const rel = relative(process.cwd(), file).replaceAll("\\", "/");
     if (STAFF.some((p) => `/${rel}`.includes(p))) continue;
     for (const text of visibleText(readFileSync(file, "utf8"))) {
@@ -115,6 +132,10 @@ function selfTest() {
   add("a real leak would be flagged", leaked.some((t) => /Supabase/.test(t)));
   const prop = visibleText(`export const Y = () => <Button label="Download JSON" />;`);
   add("visible prop strings are read", prop.some((t) => /JSON/.test(t)));
+  const code = visibleText(`export const Z = ({ a }: { a?: string }) => <p>{(a === undefined ? "b" : a)}</p>;`);
+  add("a code expression is not mistaken for student text", !code.some((t) => /undefined|===/.test(t)));
+  const prose = visibleText(`export const V = () => <p>Nothing saved yet.</p>;`);
+  add("plain prose beside code is still read", prose.some((t) => t.includes("Nothing saved yet")));
   return checks;
 }
 

@@ -10,7 +10,10 @@
  *                                                       against the manifest
  *   node scripts/verify-deployment.mjs --self-test     — verify THIS script's rules
  *
- * Exit codes: 0 ready, 1 not ready / unreachable, 2 usage error.
+ * Exit codes: 0 ready, 1 not ready / unreachable, 2 usage error,
+ *             3 reachable and serving, but not yet configured for something only the Owner can
+ *               supply (an AI provider key). A release gate must not report that as a hard
+ *               failure: nothing is wrong with the deployment, it is simply waiting on a person.
  *
  * The readiness rules mirror src/lib/deployment.ts (unit-tested in
  * tests/run.ts — keep both in sync). No dependencies: plain Node fetch,
@@ -26,11 +29,17 @@ function evaluateDeploymentReadiness(health) {
   if (cfg.ai !== true) missing.push("AI provider key");
   if (h.ok !== true) missing.push("the /api/health response did not report ok");
   if (h.name && h.name !== "sophira") missing.push(`unexpected service name "${h.name}" — this is not a Sophira deployment`);
+  // Items only a person with the provider account can supply. Everything else is a real fault.
+  const OWNER_GATED = ["AI provider key"];
+  const owner_missing = missing.filter((m) => OWNER_GATED.includes(m));
   const optional_missing = [];
   if (cfg.search !== true) optional_missing.push("web-search provider (research degrades gracefully — not blocking)");
   return {
     ready: missing.length === 0,
     missing,
+    owner_missing,
+    /** Reachable and serving, and the only thing missing is something only the Owner can add. */
+    awaiting_owner: missing.length > 0 && owner_missing.length === missing.length,
     optional_missing,
     detail: missing.length === 0
       ? `Deployment fully configured${optional_missing.length ? ` (optional: ${optional_missing.join("; ")})` : ""}.`
@@ -38,6 +47,16 @@ function evaluateDeploymentReadiness(health) {
   };
 }
 
+
+/**
+ * The exit code for a live verdict, kept as a pure function so the self-test can pin all three
+ * outcomes instead of trusting the prose above them.
+ */
+function liveExitCode(verdict) {
+  if (verdict.ready) return 0;
+  if (verdict.awaiting_owner) return 3;
+  return 1;
+}
 
 // ---- live check ---------------------------------------------------------
 // ---- offline environment validation (--env-only) ----------------------
@@ -124,6 +143,13 @@ if (process.argv.includes("--self-test")) {
   t("live: wrong service name -> not ready", evaluateDeploymentReadiness({ ok: true, name: "something-else", configuration: { supabase: true, supabase_service_role: true, ai: true } }).ready === false);
   t("live: not ok -> not ready", evaluateDeploymentReadiness({ ok: false, name: "sophira", configuration: { supabase: true, supabase_service_role: true, ai: true } }).ready === false);
   t("live: empty payload -> not ready", evaluateDeploymentReadiness(null).ready === false);
+  // The distinction the release gate now relies on: a missing key is not a broken deployment.
+  t("live: missing ai is owner-gated, not a fault", (() => { const v = evaluateDeploymentReadiness({ ok: true, name: "sophira", configuration: { supabase: true, supabase_service_role: true, ai: false } }); return v.awaiting_owner === true && v.owner_missing.join() === "AI provider key"; })());
+  t("live: missing supabase is a fault, never owner-gated", evaluateDeploymentReadiness({ ok: true, name: "sophira", configuration: { ai: true } }).awaiting_owner === false);
+  t("live: ai missing AND supabase missing is a fault", (() => { const v = evaluateDeploymentReadiness({ ok: true, name: "sophira", configuration: { ai: false } }); return v.awaiting_owner === false && liveExitCode(v) === 1; })());
+  t("exit 0 when ready", liveExitCode({ ready: true }) === 0);
+  t("exit 3 when only the Owner is missing", liveExitCode({ ready: false, awaiting_owner: true }) === 3);
+  t("exit 1 when something is actually wrong", liveExitCode({ ready: false, awaiting_owner: false }) === 1);
   t("message never contains values", !evaluateEnv({ NEXT_PUBLIC_SITE_URL: "https://very-secret-host.example" }, { production: true }).errors.some((e) => e.includes("very-secret-host")));
   console.log("verify-deployment.mjs self-test passed (7 live + 10 env rules)");
   process.exit(0);
@@ -161,9 +187,17 @@ try {
     process.exit(1);
   }
   const health = await res.json();
+  if (health && typeof health.commit === "string") console.log(`Serving commit: ${health.commit}`);
   const verdict = evaluateDeploymentReadiness(health);
   console.log(verdict.detail);
   if (verdict.optional_missing.length) console.log(`Optional: ${verdict.optional_missing.join("; ")}`);
+  if (verdict.awaiting_owner) {
+    // Not a fault and not a pass: the deployment answers with a real commit and the app runs, and
+    // the one missing piece is a key only the Owner can add.
+    console.log(`Deployment answers, but is waiting on the Owner: ${verdict.owner_missing.join("; ")}.`);
+    console.log("Deployment readiness: AWAITING OWNER (not a failure, and not ready)");
+    process.exit(3);
+  }
   if (!verdict.ready) {
     console.error(`::error::Release blocked — the target deployment is not configured: ${verdict.missing.join("; ")}`);
     process.exit(1);

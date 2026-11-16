@@ -1615,3 +1615,43 @@ a11y PASS, design drift 0, secret scan CLEAN, inventory unchanged at 84 pages an
 
 The Owner has not yet performed these steps, so Parts 3, 4 and 18 remain open. Nothing in this
 round claims otherwise, and every screen still reports the honest current state.
+
+## §27. The plain-language scanner widened, and a healthy deployment no longer reported as broken (2026-11-15)
+
+Baseline: `master` at `21b101d`, tree clean, production serving `21b101d`, 9465 tests passed.
+
+### Two defects, both of the same kind: a check that measured the wrong thing
+
+1. **The plain-language audit only read `src/app`.** Every card, panel and helper under
+   `src/components/app` renders inside a student screen and is read by the same person, and none of
+   it was ever checked for engineering vocabulary. The provenance card added in the previous round
+   was itself outside the scanner.
+2. **`verify-deployment.mjs` called a missing AI key a deployment failure.** Production is
+   reachable, serving the right commit, and honest about what is not configured; the release gate
+   reported that as FAIL. A gate that cries wolf teaches its reader to ignore it, and it hid the
+   true state: the deployment is fine and is waiting on a person.
+
+### Files changed
+
+| Path | Change |
+|---|---|
+| `scripts/jargon-audit.mjs` | Scans `src/app` **and** `src/components/app` (141 files, was 112); a shared `isProse()` filter so a code expression is never reported as a student-visible word; the self-test gained the case that produced the false positive. |
+| `scripts/verify-deployment.mjs` | `evaluateDeploymentReadiness` now separates `owner_missing` (only a provider key today) from real faults and returns `awaiting_owner`; a pure `liveExitCode()` maps that to exit 3; the live run prints the commit it reached. Exit 0/1/3 self-tested. |
+| `scripts/release-gate.mjs` | Exit 3 becomes BLOCKED with the served commit in the detail; exit 1 stays FAIL. |
+| `docs/RELEASE_GATE.md` | The three live outcomes documented as a table, with why the distinction exists. |
+| `docs/release-gate-report.json` | Regenerated: 41 checks, 25 PASS, 15 BLOCKED, 1 NOT RUN, **0 FAIL**. |
+
+### Evidence
+
+* `npm run release:report`: 0 FAIL (was 1). The one FAIL was the deployment check; it is now
+  BLOCKED with `Serving commit: 21b101d...` in the detail, which is the truth.
+* Live probes against production, unauthenticated: `/api/health` 200, `/api/essay/autonomous` 401,
+  `/`, `/essay`, `/owner/requirements` all 307 to `/login?next=...`. The owner screen exists in the
+  deployed build and its guard runs, and invitation-only access still refuses an anonymous caller.
+* `npm test` 9467/9467, `tsc --noEmit` clean, lint 0 errors, build OK, jargon 0 across 141 files,
+  a11y PASS, design drift 0, secret scan CLEAN, conformance 84 routes.
+
+### Still not verified
+
+The AI-dependent paths remain unexercised (no provider key), no signed-in or device pass has been
+done, and the scheduled worker still has not advanced a run. Parts 3, 4 and 18 remain the Owner's.
