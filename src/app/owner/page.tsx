@@ -26,6 +26,8 @@ import { legalPlaceholdersRemain, loadLegalDoc } from "@/lib/legal";
 import { providerSetupStatus } from "@/lib/integrations/setup-status";
 import { canvasConfigured } from "@/lib/integrations/canvas";
 import { buildActionItems, describeUnreadableMembers } from "@/lib/owner/action-items";
+import { OwnerAlerts } from "@/components/owner/OwnerAlerts";
+import { buildOwnerAlerts } from "@/lib/owner/alerts";
 import { scanMigrations } from "@/lib/db-ddl";
 
 export const dynamic = "force-dynamic";
@@ -195,6 +197,45 @@ export default async function OwnerPage() {
     canvasReady: canvasConfigured(),
   });
 
+  /*
+   * EVERYTHING THAT NEEDS YOU (2026-11-16).
+   *
+   * The "Needs attention" list below already covers the system checks. What it cannot show is age:
+   * a tester report from Tuesday, an access request from last week, an invitation or a member
+   * account untouched for a month. Three reads do that here, all through the user-scoped client, so
+   * row level security still decides - the Owner sees all of it because the Owner is staff, not
+   * because this page reached for an admin key.
+   *
+   * Each read is nullable on purpose: if one fails, the alerts panel says that part of the picture
+   * could not be checked, rather than implying an all-clear.
+   */
+  const [alertReports, alertMembers] = await Promise.all([
+    supabase
+      .from("qa_reports")
+      .select("id, title, severity, created_at")
+      .in("status", ["open", "triaged"])
+      .order("created_at", { ascending: true })
+      .limit(50),
+    supabase
+      .from("profiles")
+      .select("id, display_name, status, created_at, last_active_at")
+      .order("created_at", { ascending: true })
+      .limit(500),
+  ]);
+
+  const ownerAlerts = buildOwnerAlerts({
+    now: new Date().toISOString(),
+    actionItems,
+    testerReports: alertReports.error ? null : (alertReports.data ?? null),
+    accessRequests: roster.requestsAvailable
+      ? requests.filter((r) => String(r.status ?? "") === "pending")
+      : null,
+    invitations: roster.invitationsAvailable
+      ? invitations.filter((i) => String(i.status ?? "") === "pending")
+      : null,
+    members: alertMembers.error ? null : (alertMembers.data ?? null),
+  });
+
     /*
    * NETWORK ACTIVITY (2026-11-12). The reference's analytics panel, drawn only from rows that
    * exist: membership_audit records every membership event this network has actually seen, so a
@@ -310,6 +351,9 @@ return (
           </CardContent></Card>
         </div>
       )}
+      <div id="alerts" className="scroll-mt-4">
+        <OwnerAlerts result={ownerAlerts} />
+      </div>
       <section id="needs-attention" className="panel scroll-mt-4">
         <div className="panel-head">
           <h2 className="panel-title">

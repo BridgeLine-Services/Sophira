@@ -193,7 +193,11 @@ work with software can follow.
    for Owner, Co-Owner, Tester and User. A person who is working is not shown as absent for days.
 2. **Consistent live presence.** "Online" means the same thing on every screen that shows it.
 3. **Expanded Owner operational monitoring.** Real health checks, not a green badge because a page
-   rendered.
+   rendered. Built 2026-11-16 as "Everything that needs you": the existing system checks keep their
+   own wording and links and are joined by what a count can never show - the age of an unanswered
+   tester report, an undecided access request, an unused invitation and a member account nobody has
+   touched. One list, one sentence per problem, and an alert about a member never contains anything a
+   student wrote.
 4. **Co-Owner operational queue.** The administrative work waiting for a Co-Owner, from one shared
    source, so two administrators cannot work from different lists. Built 2026-11-15: access
    requests, unaccepted invitations, unanswered tester reports and quiet members, ordered by urgency
@@ -216,9 +220,9 @@ work with software can follow.
 *Status:* `PARTIALLY IMPLEMENTED`. *Evidence:* `src/lib/presence/activity.ts` and migration `0060`
 (one activity rule for every role), `tests/dashboard-activity.ts`, the 18 live behaviour checks in
 `npm run db:verify:local`, the existing Owner screens left intact, `/owner/requirements`.
-*Remaining:* the Tester test-case library, the student assignment centre and the Owner's consolidated
-alert area are not built; the Co-Owner queue has no claim flag; the shared-definition and
-plain-language passes are partial; no signed-in pass by a real member of each role has happened.
+*Remaining:* the Tester test-case library and the student assignment centre are not built; the
+Co-Owner queue has no claim flag; the shared-definition and plain-language passes are partial; no
+signed-in pass by a real member of each role has happened.
 
 ## 4. Historical implementation decisions that were not Owner decisions
 

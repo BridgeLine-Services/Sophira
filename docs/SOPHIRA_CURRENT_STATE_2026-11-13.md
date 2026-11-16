@@ -1711,3 +1711,42 @@ Co-Owner.
 
 No signed-in pass by a Co-Owner, so the panel has never been rendered against real rows. The AI key,
 the scheduler password and a member test account remain the Owner's.
+
+## 29. Everything that needs you (2026-11-16)
+
+The Owner dashboard had a good "Needs attention" list, but it could only speak about the inputs
+handed to it: providers, the database, backups, legal pages. Three things that genuinely need the
+Owner were invisible there and findable only by opening the right page and noticing an age: a tester
+report from Tuesday, an access request from last week, an invitation or a member account untouched
+for a month. A count cannot say "this has been ignored for 22 days"; age is usually what makes
+something the Owner's problem rather than an administrator's.
+
+`src/lib/owner/alerts.ts` (pure) joins the existing action items - unchanged wording, unchanged links
+- with four derived sources: unanswered tester reports, undecided access requests, unused invitations
+and member accounts never used or long quiet. `src/components/owner/OwnerAlerts.tsx` renders it on
+`/owner` as "Everything that needs you", above the panel it extends. Two extra user-scoped reads feed
+it (`qa_reports` open or triaged, `profiles` with `last_active_at`); RLS still decides, and no admin
+client is used.
+
+Rules, all tested: an urgent action item is "Today", an informational one is "Worth knowing" and
+there is no third invented level; a topic already covered by an action item is not repeated as a
+derived alert, so the Owner reads one sentence per problem; a failed read makes every count unknown
+and the headline says the picture is incomplete; an alert about a member contains a name and a fact
+about access, never anything a student wrote.
+
+One correction in the same round: the product spec cited `src/lib/owner/autonomous-monitor.ts` as
+evidence for R12. No such file has ever existed. It is replaced by the files that do implement the
+monitoring, and a test now fails if the spec cites a path that is not there.
+
+### Evidence
+
+* `npm test` 9773/9773 (87 new assertions in `tests/owner-alerts.ts`), `tsc --noEmit` clean, lint 0
+  errors / 33 warnings, build OK, jargon 0, a11y PASS, contrast PASS both themes, design drift 0,
+  secret scan CLEAN, conformance 84 routes / 0 without h1 or landmark, `npm run release:report` 41
+  checks with 0 FAIL (25 PASS, 15 BLOCKED, 1 NOT RUN).
+* R17 area 3 and area 4 are now recorded as built in `docs/PRODUCT_REQUIREMENTS.md`.
+
+### Still not verified
+
+No signed-in Owner pass, so the panel has never been rendered against real rows, and the alerts have
+never been seen by the person they are written for.

@@ -177,7 +177,8 @@ export const PRODUCT_REQUIREMENTS: readonly ProductRequirement[] = [
     status: "PARTIALLY IMPLEMENTED",
     evidence: [
       "/owner/requirements",
-      "Owner autonomous monitoring (src/lib/owner/autonomous-monitor.ts)",
+      "the Owner alert area (src/lib/owner/alerts.ts, rendered on /owner as Everything that needs you)",
+      "the existing system-check list (src/lib/owner/action-items.ts), re-ranked rather than duplicated",
       "the Co-Owner operational queue (src/lib/co-owner/queue.ts, rendered on /co-owner)",
       "existing dashboard blocks untouched",
     ],
@@ -240,7 +241,7 @@ export const PRODUCT_REQUIREMENTS: readonly ProductRequirement[] = [
       "docs/PRODUCT_REQUIREMENTS.md §R17",
     ],
     remaining:
-      "Areas 1, 2, 4, 9, 10 and 12 are in place; activity is verified against a real database and the Co-Owner queue is built and tested offline. Not built yet: the Tester test-case library (5), the student assignment centre (6) and the Owner's consolidated alert area (3). The Co-Owner queue orders and opens the real records but keeps no claim flag, so two Co-Owners cannot see who picked an item up (4, partial). Consistency of the remaining shared definitions (7) and the plain-language pass over every error (8) are partial. No dashboard has had a signed-in pass by a real member of each role, which needs working accounts.",
+      "Areas 1, 2, 3, 4, 9, 10 and 12 are in place; activity is verified against a real database, and the Co-Owner queue and Owner alert area are built and tested offline. Not built yet: the Tester test-case library (5) and the student assignment centre (6). The Co-Owner queue orders and opens the real records but keeps no claim flag, so two Co-Owners cannot see who picked an item up (4, partial). Consistency of the remaining shared definitions (7) and the plain-language pass over every error (8) are partial. No dashboard has had a signed-in pass by a real member of each role, which needs working accounts.",
     ownerAction: null,
   },
 ];

@@ -135,6 +135,7 @@ import { runAdminAuditTests } from "./admin-audit";
 import { runMemberPresenceTests } from "./member-presence";
 import { runDashboardActivityTests } from "./dashboard-activity";
 import { runCoOwnerQueueTests } from "./co-owner-queue";
+import { runOwnerAlertTests } from "./owner-alerts";
 import { runActionItemTests } from "./action-items";
 import { runOwnerReadinessTests } from "./owner-readiness";
 import { runOwnerCommandCenterTests } from "./owner-command-center";
@@ -5589,5 +5590,6 @@ __fileTests.then(() => __researchTests).then(() => run()).then(() => runHealthTe
     // ever being fed. The activity correction and its ten honesty rules.
     runDashboardActivityTests(assert, section);
     runCoOwnerQueueTests(assert, section);
+    runOwnerAlertTests(assert, section);
   }).then(finish).catch((e) => { console.error(e); process.exit(1); });
 
